@@ -1,0 +1,3 @@
+[workspace]
+members = ["apps/desktop/aegis-desktop/src-tauri", "apps/server/aegis-server"]
+resolver = "3"
