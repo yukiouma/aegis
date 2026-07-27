@@ -1,4 +1,5 @@
 **/node_modules
 **/target
 .claude
+.vscode
 CLAUDE.md
