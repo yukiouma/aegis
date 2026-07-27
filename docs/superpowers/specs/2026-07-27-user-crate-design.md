@@ -9,7 +9,7 @@ Add `lib/crates/user` as a reusable Rust library that provides domain-driven use
 Use a ports-and-adapters DDD structure:
 
 - `domain`: `User`, `Role`, validation, domain errors, and the repository port.
-- `application`: `UserUsecase`, command/query DTOs, password hashing orchestration, and application errors.
+- `usecase`: `UserUsecase`, command/query DTOs, password hashing orchestration, and application errors.
 - `infrastructure`: SQLx `UserRepo`, database row conversion, and migrations.
 
 The domain layer must not depend on SQLx. The infrastructure repository implements the domain repository port. The crate root re-exports the public model, usecase, repository, and relevant DTO/error types.
@@ -46,7 +46,7 @@ The repository uses `sqlx::PgPool` and parameterized queries. Row mapping conver
 
 ## Password security
 
-The usecase hashes passwords with Argon2 and a cryptographically random salt during create and password-changing updates. Plaintext passwords are never written to PostgreSQL or returned from query results. Hashing failures are represented in the crate's error type.
+The usecase layer hashes passwords with Argon2 and a cryptographically random salt during create and password-changing updates. Plaintext passwords are never written to PostgreSQL or returned from query results. Hashing failures are represented in the crate's error type.
 
 ## Testing
 
