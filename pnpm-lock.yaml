@@ -10,6 +10,9 @@ importers:
 
   apps/desktop/aegis-desktop:
     dependencies:
+      '@aegis/ui':
+        specifier: workspace:*
+        version: link:../../../lib/packages/ui
       '@tauri-apps/api':
         specifier: ^2
         version: 2.11.1
