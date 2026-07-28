@@ -105,7 +105,7 @@ import type { ComponentType } from 'react';
 export interface SubMenuItem {
   link: string;
   title: string;
-  icon: ComponentType;
+  icon: ComponentType; // MUI icons satisfy ComponentType; if extra props (e.g. SvgIconProps) are needed, widen at the consumer side
 }
 
 export interface MenuItem extends SubMenuItem {
@@ -159,7 +159,7 @@ export interface SidebarProps {
 4. Menu item without `subMenu`: clicking calls `onNavigate(item.link)`.
 5. Menu item with `subMenu`: clicking toggles submenu open/closed.
 6. `onNavigate` is not called when expanding a submenu.
-7. Custom `width` and `collapsedWidth` props are applied to the drawer.
+7. Custom `width` and `collapsedWidth` props are applied to the drawer — implementation applies these via `Drawer`'s `sx` prop (`width: open ? width : collapsedWidth`) and `variant="permanent"`.
 
 Test setup uses `jsdom` + `@testing-library/jest-dom`. A small `test-utils.tsx` wraps renders in MUI's `<ThemeProvider>` so components have access to a theme.
 
