@@ -11,6 +11,8 @@
 // verification of the SQL itself. The migration test in
 // `infrastructure::tests` covers the schema content directly.
 
+use std::convert::TryFrom;
+
 use async_trait::async_trait;
 use sqlx::PgPool;
 
@@ -47,7 +49,7 @@ impl UserRepository for UserRepo {
             .await
             .map_err(map_create_error)?;
 
-        Ok(row.into())
+        row.try_into()
     }
 
     async fn find_by_id(&self, id: i32) -> Result<User, DomainError> {
@@ -59,7 +61,7 @@ impl UserRepository for UserRepo {
             .await
             .map_err(map_query_error)?
             .ok_or(DomainError::NotFound)?;
-        Ok(row.into())
+        row.try_into()
     }
 
     async fn find_by_code(&self, code: &str) -> Result<User, DomainError> {
@@ -71,7 +73,7 @@ impl UserRepository for UserRepo {
             .await
             .map_err(map_query_error)?
             .ok_or(DomainError::NotFound)?;
-        Ok(row.into())
+        row.try_into()
     }
 
     async fn list(&self) -> Result<Vec<User>, DomainError> {
@@ -81,7 +83,7 @@ impl UserRepository for UserRepo {
             .fetch_all(&self.pool)
             .await
             .map_err(map_query_error)?;
-        Ok(rows.into_iter().map(User::from).collect())
+        rows.into_iter().map(User::try_from).collect()
     }
 
     async fn update(&self, input: UserUpdate) -> Result<User, DomainError> {
@@ -135,7 +137,7 @@ impl UserRepository for UserRepo {
             .await
             .map_err(map_query_error)?
             .ok_or(DomainError::NotFound)?;
-        Ok(row.into())
+        row.try_into()
     }
 
     async fn deactivate(&self, id: i32) -> Result<User, DomainError> {
@@ -147,7 +149,7 @@ impl UserRepository for UserRepo {
             .await
             .map_err(map_query_error)?
             .ok_or(DomainError::NotFound)?;
-        Ok(row.into())
+        row.try_into()
     }
 }
 

@@ -1,4 +1,4 @@
-mod row;
+pub mod row;
 #[cfg(test)]
 mod tests;
-mod user_repo;
+pub mod user_repo;
