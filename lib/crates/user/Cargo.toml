@@ -9,4 +9,4 @@ tokio = { workspace = true }
 argon2 = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
-rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
+rand_core = { workspace = true }

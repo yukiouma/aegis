@@ -38,16 +38,20 @@ struct MockState {
     next_id: i32,
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct MockUserRepository {
     state: Arc<Mutex<MockState>>,
 }
 
 impl MockUserRepository {
     fn new() -> Self {
-        let mock = Self::default();
-        mock.state.lock().unwrap().next_id = 1;
-        mock
+        let state = MockState {
+            next_id: 1,
+            ..Default::default()
+        };
+        Self {
+            state: Arc::new(Mutex::new(state)),
+        }
     }
 
     /// Seed the mock with a single pre-existing user.
@@ -228,7 +232,7 @@ async fn update_with_password_re_hashes_it() {
     let cmd = UpdateUser {
         id: 7,
         password: Some("new-pass".into()),
-        ..blank_update()
+        ..Default::default()
     };
 
     let view = usecase.update(cmd).await.expect("update succeeds");
@@ -254,7 +258,7 @@ async fn update_without_password_leaves_hash_unchanged() {
     let cmd = UpdateUser {
         id: 9,
         name: Some("Carol Updated".into()),
-        ..blank_update()
+        ..Default::default()
     };
 
     usecase.update(cmd).await.expect("update succeeds");
@@ -398,7 +402,7 @@ async fn empty_update_inputs_are_rejected_before_hitting_repo() {
     let cmd = UpdateUser {
         id: 30,
         code: Some("".into()),
-        ..blank_update()
+        ..Default::default()
     };
     let err = usecase.update(cmd).await.expect_err("blank code rejected");
     assert!(matches!(err, UsecaseError::Validation(DomainError::EmptyCode)));
@@ -406,7 +410,7 @@ async fn empty_update_inputs_are_rejected_before_hitting_repo() {
     let cmd = UpdateUser {
         id: 30,
         password: Some("".into()),
-        ..blank_update()
+        ..Default::default()
     };
     let err = usecase.update(cmd).await.expect_err("blank password rejected");
     assert!(matches!(
@@ -457,15 +461,4 @@ fn make_usecase_with_users(users: Vec<User>) -> (MockUserRepository, UserUsecase
     let mock = MockUserRepository::with_users(users);
     let usecase = UserUsecase::new(mock.clone());
     (mock, usecase)
-}
-
-const fn blank_update() -> UpdateUser {
-    UpdateUser {
-        id: 0,
-        code: None,
-        name: None,
-        role: None,
-        active: None,
-        password: None,
-    }
 }

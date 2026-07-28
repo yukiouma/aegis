@@ -7,6 +7,7 @@ pub struct CreateUser {
     pub password: String,
 }
 
+#[derive(Default)]
 pub struct UpdateUser {
     pub id: i32,
     pub code: Option<String>,

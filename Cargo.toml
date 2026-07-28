@@ -16,3 +16,4 @@ tokio = { version = "1.53", features = ["macros", "rt-multi-thread"] }
 argon2 = "0.5.3"
 async-trait = "0.1.91"
 thiserror = "2"
+rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
