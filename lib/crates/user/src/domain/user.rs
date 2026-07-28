@@ -17,7 +17,15 @@ impl User {
     /// Strict constructor used by the domain layer.
     ///
     /// Validates that `code`, `name`, and `password` are non-empty.
-    pub fn new(
+    /// Kept `pub(crate)` because the production paths construct
+    /// `User` from inbound SQLx rows (`for_repository`) or from
+    /// `UserView` (`From`); the validating constructor is only useful
+    /// for in-crate tests and the future password-verification path.
+    /// The `allow(dead_code)` silences the lib build (which does not
+    /// see the test call sites); the test build sees the calls and
+    /// would not warn even without the allow.
+    #[allow(dead_code)]
+    pub(crate) fn new(
         id: i32,
         code: String,
         name: String,

@@ -8,7 +8,7 @@ fn role_as_str_maps_to_lowercase() {
 }
 
 #[test]
-fn try_from_str_parses_known_values_case_insensitive() {
+fn try_from_str_parses_known_values_lowercase() {
     assert_eq!(Role::try_from("root").unwrap(), Role::Root);
     assert_eq!(Role::try_from("admin").unwrap(), Role::Admin);
     assert_eq!(Role::try_from("general").unwrap(), Role::General);

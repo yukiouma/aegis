@@ -5,10 +5,10 @@ use crate::domain::DomainError;
 #[derive(Debug, Error)]
 pub enum UsecaseError {
     #[error("validation failed: {0}")]
-    Validation(DomainError),
+    Validation(#[source] DomainError),
 
     #[error("repository error: {0}")]
-    Repository(DomainError),
+    Repository(#[source] DomainError),
 
     #[error("password hashing failed: {0}")]
     Hashing(String),

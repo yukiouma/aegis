@@ -9,4 +9,8 @@ tokio = { workspace = true }
 argon2 = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
+# `rand_core` is pulled in for `argon2::password_hash::rand_core::OsRng`,
+# which is the random source used to generate argon2id salts in the
+# usecase layer (`hash_password`). The `getrandom` feature on the
+# workspace dependency must remain enabled so that `OsRng` is reachable.
 rand_core = { workspace = true }

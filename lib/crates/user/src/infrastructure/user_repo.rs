@@ -51,7 +51,7 @@ impl UserRepository for UserRepo {
             .bind(&input.password_hash)
             .fetch_one(&self.pool)
             .await
-            .map_err(map_create_error)?;
+            .map_err(map_db_error)?;
 
         row.try_into()
     }
@@ -62,7 +62,7 @@ impl UserRepository for UserRepo {
             .bind(id)
             .fetch_optional(&self.pool)
             .await
-            .map_err(map_query_error)?
+            .map_err(map_db_error)?
             .ok_or(DomainError::NotFound)?;
         row.try_into()
     }
@@ -74,7 +74,7 @@ impl UserRepository for UserRepo {
             .bind(code)
             .fetch_optional(&self.pool)
             .await
-            .map_err(map_query_error)?
+            .map_err(map_db_error)?
             .ok_or(DomainError::NotFound)?;
         row.try_into()
     }
@@ -84,7 +84,7 @@ impl UserRepository for UserRepo {
         let rows: Vec<UserRow> = sqlx::query_as(SQL)
             .fetch_all(&self.pool)
             .await
-            .map_err(map_query_error)?;
+            .map_err(map_db_error)?;
         rows.into_iter().map(User::try_from).collect()
     }
 
@@ -137,7 +137,7 @@ impl UserRepository for UserRepo {
             .build_query_as::<UserRow>()
             .fetch_optional(&self.pool)
             .await
-            .map_err(map_query_error)?
+            .map_err(map_db_error)?
             .ok_or(DomainError::NotFound)?;
         row.try_into()
     }
@@ -149,35 +149,28 @@ impl UserRepository for UserRepo {
             .bind(id)
             .fetch_optional(&self.pool)
             .await
-            .map_err(map_query_error)?
+            .map_err(map_db_error)?
             .ok_or(DomainError::NotFound)?;
         row.try_into()
     }
 }
 
-/// Map a `sqlx::Error` from a non-`create` query into a
-/// `DomainError`. `RowNotFound` becomes `NotFound`; any other
-/// database error is wrapped in `Repository`.
-fn map_query_error(err: sqlx::Error) -> DomainError {
-    match err {
-        sqlx::Error::RowNotFound => DomainError::NotFound,
-        other => DomainError::Repository(other.to_string()),
-    }
-}
-
-/// Map a `sqlx::Error` from the `create` query into a `DomainError`.
-/// Unique-violation errors that target the `code` constraint become
-/// `DuplicateCode(code)`. We do not have the offending code value in
-/// hand here (sqlx does not surface the bound value), so the
-/// `DuplicateCode` carries the constraint name as a debugging hint;
-/// the caller can match on it. In practice the usecase layer is the
-/// only caller and it surfaces the original `code` alongside the
-/// error, so the placeholder string is informational only.
+/// Map any `sqlx::Error` from a repository query into a `DomainError`.
 ///
-/// `RowNotFound` from a `RETURNING` clause means the row was deleted
-/// between the INSERT plan-check and the actual write; surface it as
-/// `NotFound` for symmetry with the rest of the repository.
-fn map_create_error(err: sqlx::Error) -> DomainError {
+/// * `RowNotFound` becomes `NotFound` (used for `fetch_optional` /
+///   `RETURNING` paths that miss the row).
+/// * PostgreSQL SQLSTATE `23505` (unique-violation) becomes
+///   `DuplicateCode(constraint_name)`. The payload is the constraint
+///   name (e.g. `users_code_unique`) rather than the offending code
+///   value, because `sqlx` does not surface the bound value here. The
+///   usecase layer is the only caller and it surfaces the original
+///   `code` alongside the error, so the placeolder string is
+///   informational only. The unique-violation branch is a no-op for
+///   `SELECT`/`LIST` queries because those operations never produce
+///   SQLSTATE `23505`.
+/// * Any other database error is wrapped in `Repository` with the
+///   driver's message so the rest of the stack can surface it.
+fn map_db_error(err: sqlx::Error) -> DomainError {
     match err {
         sqlx::Error::RowNotFound => DomainError::NotFound,
         sqlx::Error::Database(db_err) => {

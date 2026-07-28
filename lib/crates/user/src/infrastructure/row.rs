@@ -8,13 +8,15 @@
 // and surface the `InvalidRole` error path as defensive belt-and-braces
 // even though the conversion cannot fail in practice.
 //
-// The module is `pub(crate)` (see `infrastructure.rs`) so external
-// consumers can name `UserRow` only via the crate-root re-export.
-// The `password` field is `pub(crate)` for the same reason: it must
-// stay accessible to the repository and the in-crate test suite, but
-// not to anyone reaching for `UserRow` from outside the crate. The
-// manual `Debug` impl below ensures the hash never leaks through
-// `Debug` formatting even inside the crate.
+// The module is `pub(crate)` (see `infrastructure.rs`) and `UserRow`
+// is NOT re-exported at the crate root: it is an internal bridge
+// between SQLx's `FromRow` derive and the domain `User` type, and the
+// only callers are the repository itself and the in-crate test
+// suite. The `password` field is `pub(crate)` for the same reason:
+// it must stay accessible to the repository and the in-crate test
+// suite, but not to anyone reaching for `UserRow` from outside the
+// crate. The manual `Debug` impl below ensures the hash never leaks
+// through `Debug` formatting even inside the crate.
 
 use std::convert::TryFrom;
 use std::fmt;

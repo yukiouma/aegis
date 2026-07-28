@@ -90,7 +90,13 @@ impl UserRepository for MockUserRepository {
             .values()
             .any(|existing| existing.code == input.code)
         {
-            return Err(DomainError::DuplicateCode(input.code.clone()));
+            // Mirror the real repository's payload: the constraint
+            // name rather than the offending code value (sqlx does
+            // not surface the bound value, so the repository cannot
+            // either; the mock follows the same convention).
+            return Err(DomainError::DuplicateCode(
+                "(constraint users_code_unique)".to_string(),
+            ));
         }
         let id = state.next_id;
         state.next_id += 1;
@@ -445,8 +451,8 @@ async fn repository_errors_propagate_as_usecase_repository_error() {
     };
     let err = usecase.create(cmd).await.expect_err("duplicate rejected");
     assert!(
-        matches!(err, UsecaseError::Repository(DomainError::DuplicateCode(ref c)) if c == "u1"),
-        "expected Repository(DuplicateCode(\"u1\")), got {err:?}"
+        matches!(err, UsecaseError::Repository(DomainError::DuplicateCode(ref c)) if c == "(constraint users_code_unique)"),
+        "expected Repository(DuplicateCode(\"(constraint users_code_unique)\")), got {err:?}"
     );
 
     // The mock only records successful creates; the duplicate was rejected
