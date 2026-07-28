@@ -8,7 +8,7 @@
 // and surface the `InvalidRole` error path as defensive belt-and-braces
 // even though the conversion cannot fail in practice.
 //
-// The module is `pub(crate)` (see `infrastructure.rs`) and `UserRow`
+// The module is `pub(crate)` (see `persistence/postgres/mod.rs`) and `UserRow`
 // is NOT re-exported at the crate root: it is an internal bridge
 // between SQLx's `FromRow` derive and the domain `User` type, and the
 // only callers are the repository itself and the in-crate test

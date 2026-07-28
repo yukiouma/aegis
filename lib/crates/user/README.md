@@ -7,10 +7,12 @@ repository and an async `UserUsecase`.
 
 ```text
 src/
-  domain/        # User, Role, validation, errors, repository port
-  usecase/       # UserUsecase, command DTOs, password hashing, errors
-  infrastructure/# SQLx-backed UserRepo, UserRow, migrations
-migrations/      # SQLx migrations applied to the database
+  domain/                       # User, Role, validation, errors, repository port
+  usecase/                      # UserUsecase, command DTOs, password hashing, errors
+  infrastructure/               # persistence adapters
+    persistence/
+      postgres/                 # SQLx-backed UserRepo, UserRow
+migrations/                     # SQLx migrations applied to the database
 ```
 
 The crate root re-exports the public surface (`User`, `Role`,
