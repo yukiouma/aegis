@@ -4,7 +4,7 @@
 
 **Goal:** Create the `@aegis/ui` pnpm workspace package with MUI re-exports and a collapsible Sidebar component, integrated with the existing Tauri desktop app.
 
-**Architecture:** Single workspace package `lib/packages/ui` consumes its own TypeScript source directly (no build step). Desktop app's existing Vite + React plugin transpiles on import. Sidebar built on MUI `Drawer` variant="permanent" + `List`/`ListItemButton`. State is controlled (parent owns `open`/`onClose`); submenu expansion is local state.
+**Architecture:** Single workspace package `lib/packages/ui` consumes its own TypeScript source directly (no build step). Desktop app's existing Vite + React plugin transpiles on import. Sidebar built on MUI `Drawer` variant="permanent" + `List`/`ListItemButton`. State is controlled (parent owns `open`/`onToggle`); submenu expansion is local state.
 
 **Tech Stack:** React 19, TypeScript 5.8, MUI 9.2, Emotion 11, Vitest, @testing-library/react, pnpm 10.33 workspaces.
 
@@ -299,7 +299,7 @@ export interface SidebarProps {
   title: string;
   menu: MenuItem[];
   open: boolean;
-  onClose: () => void;
+  onToggle: () => void;
   onNavigate?: (link: string) => void;
   width?: number;
   collapsedWidth?: number;
@@ -379,10 +379,10 @@ git commit -m "feat(ui): add Sidebar types, test utilities, and barrel"
 - Modify: `lib/packages/ui/components/Sidebar/Sidebar.tsx`
 
 **Interfaces:**
-- Consumes: `SidebarProps.title`, `SidebarProps.open`, `SidebarProps.onClose`, `SidebarProps.width`, `SidebarProps.collapsedWidth`.
-- Produces: a `<Sidebar>` that renders a `Drawer` with a title bar (close button left of title) when `open=true`; both hidden when `open=false`. Drawer width follows `open ? width : collapsedWidth`.
+- Consumes: `SidebarProps.title`, `SidebarProps.open`, `SidebarProps.onToggle`, `SidebarProps.width`, `SidebarProps.collapsedWidth`.
+- Produces: a `<Sidebar>` that renders a `Drawer` with a toggle `IconButton` always visible (icon is `FormatIndentDecrease` when `open=true`, `FormatIndentIncrease` when `open=false`) on the **left**, and a `Typography` of `title` on the **right** (only when `open=true`). Clicking the icon button calls `onToggle`. Drawer width follows `open ? width : collapsedWidth`.
 
-**Tests covered in this task:** (1) renders title when open=true, (2) hides title when open=false, (3) close button calls onClose.
+**Tests covered in this task:** (1) renders title when open=true, (2) hides title when open=false, (3) toggle button calls onToggle, (4) toggle icon is FormatIndentDecrease when open=true, (5) toggle icon is FormatIndentIncrease when open=false.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -412,7 +412,7 @@ const defaultProps = {
   title: 'My App',
   menu: baseMenu,
   open: true,
-  onClose: () => {},
+  onToggle: () => {},
 };
 
 describe('Sidebar', () => {
@@ -426,11 +426,21 @@ describe('Sidebar', () => {
     expect(screen.queryByText('My App')).not.toBeInTheDocument();
   });
 
-  it('close button calls onClose when clicked', async () => {
-    const onClose = vi.fn();
-    renderWithTheme(<Sidebar {...defaultProps} onClose={onClose} />);
-    await userEvent.click(screen.getByLabelText('close sidebar'));
-    expect(onClose).toHaveBeenCalledTimes(1);
+  it('toggle button calls onToggle when clicked', async () => {
+    const onToggle = vi.fn();
+    renderWithTheme(<Sidebar {...defaultProps} onToggle={onToggle} />);
+    await userEvent.click(screen.getByLabelText('toggle sidebar'));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('toggle icon is FormatIndentDecrease when open=true', () => {
+    renderWithTheme(<Sidebar {...defaultProps} />);
+    expect(screen.getByTestId('FormatIndentDecreaseIcon')).toBeInTheDocument();
+  });
+
+  it('toggle icon is FormatIndentIncrease when open=false', () => {
+    renderWithTheme(<Sidebar {...defaultProps} open={false} />);
+    expect(screen.getByTestId('FormatIndentIncreaseIcon')).toBeInTheDocument();
   });
 });
 ```
@@ -449,13 +459,13 @@ Replace `components/Sidebar/Sidebar.tsx`:
 
 ```tsx
 import { Drawer, Box, Typography, IconButton, Divider } from '@mui/material';
-import { ChevronLeft } from '@mui/icons-material';
+import { FormatIndentDecrease, FormatIndentIncrease } from '@mui/icons-material';
 import type { SidebarProps } from './types';
 
 export function Sidebar({
   title,
   open,
-  onClose,
+  onToggle,
   width = 240,
   collapsedWidth = 56,
 }: SidebarProps) {
@@ -476,29 +486,29 @@ export function Sidebar({
         },
       }}
     >
-      {open && (
-        <Box sx={{ display: 'flex', alignItems: 'center', p: 1, minHeight: 56 }}>
-          <IconButton onClick={onClose} aria-label="close sidebar" edge="start">
-            <ChevronLeft />
-          </IconButton>
+      <Box sx={{ display: 'flex', alignItems: 'center', p: 1, minHeight: 56 }}>
+        <IconButton onClick={onToggle} aria-label="toggle sidebar" edge="start">
+          {open ? <FormatIndentDecrease /> : <FormatIndentIncrease />}
+        </IconButton>
+        {open && (
           <Typography variant="h6" sx={{ ml: 1 }} noWrap>
             {title}
           </Typography>
-        </Box>
-      )}
+        )}
+      </Box>
       <Divider />
     </Drawer>
   );
 }
 ```
 
-- [ ] **Step 4: Run the three tests to verify they pass**
+- [ ] **Step 4: Run the five tests to verify they pass**
 
 ```bash
 pnpm -F @aegis/ui test -t "Sidebar"
 ```
 
-Expected: 3 tests PASS.
+Expected: 5 tests PASS.
 
 - [ ] **Step 5: Run typecheck**
 
@@ -513,7 +523,7 @@ Expected: PASS.
 ```bash
 cd d:/projects/rusty/aegis
 git add lib/packages/ui/components/Sidebar/Sidebar.tsx lib/packages/ui/components/Sidebar/Sidebar.test.tsx
-git commit -m "feat(ui): render Sidebar title bar and close button"
+git commit -m "feat(ui): render Sidebar toggle button with conditional icon"
 ```
 
 ---
@@ -603,14 +613,14 @@ import {
   Collapse,
   Tooltip,
 } from '@mui/material';
-import { ChevronLeft } from '@mui/icons-material';
+import { FormatIndentDecrease, FormatIndentIncrease } from '@mui/icons-material';
 import type { SidebarProps, MenuItem } from './types';
 
 export function Sidebar({
   title,
   menu,
   open,
-  onClose,
+  onToggle,
   onNavigate,
   width = 240,
   collapsedWidth = 56,
@@ -642,16 +652,16 @@ export function Sidebar({
         },
       }}
     >
-      {open && (
-        <Box sx={{ display: 'flex', alignItems: 'center', p: 1, minHeight: 56 }}>
-          <IconButton onClick={onClose} aria-label="close sidebar" edge="start">
-            <ChevronLeft />
-          </IconButton>
+      <Box sx={{ display: 'flex', alignItems: 'center', p: 1, minHeight: 56 }}>
+        <IconButton onClick={onToggle} aria-label="toggle sidebar" edge="start">
+          {open ? <FormatIndentDecrease /> : <FormatIndentIncrease />}
+        </IconButton>
+        {open && (
           <Typography variant="h6" sx={{ ml: 1 }} noWrap>
             {title}
           </Typography>
-        </Box>
-      )}
+        )}
+      </Box>
       <Divider />
       <List>
         {menu.map((item) => (
@@ -798,7 +808,7 @@ function App() {
         title="Aegis"
         menu={[{ link: "/", title: "Home", icon: () => <span>🏠</span> }]}
         open={open}
-        onClose={() => setOpen(false)}
+        onToggle={() => setOpen((o) => !o)}
       />
       <main style={{ flex: 1, padding: 16 }}>
         <h1>Aegis</h1>
