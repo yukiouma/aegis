@@ -1,0 +1,41 @@
+{
+  "name": "@aegis/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./Sidebar": "./components/Sidebar/index.ts",
+    "./mui": "./src/mui/index.ts",
+    "./icons": "./src/icons/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "peerDependencies": {
+    "react": "^19",
+    "react-dom": "^19",
+    "@emotion/react": "^11",
+    "@emotion/styled": "^11",
+    "@mui/material": "^9",
+    "@mui/icons-material": "^9"
+  },
+  "devDependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "@emotion/react": "^11",
+    "@emotion/styled": "^11",
+    "@mui/material": "9.2.0",
+    "@mui/icons-material": "9.2.0",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "typescript": "~5.8.3",
+    "vitest": "^2.1.0",
+    "@testing-library/react": "^16.0.0",
+    "@testing-library/jest-dom": "^6.5.0",
+    "@testing-library/user-event": "^14.5.0",
+    "jsdom": "^25.0.0"
+  }
+}
