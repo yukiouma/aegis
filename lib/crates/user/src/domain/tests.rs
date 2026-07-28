@@ -28,22 +28,27 @@ fn try_from_str_rejects_empty_string() {
 
 #[test]
 fn new_user_rejects_empty_code() {
-    let err = User::new(1, "".into(), "Alice".into(), Role::Admin, true, "hash".into())
-        .unwrap_err();
+    let err = User::new(
+        1,
+        "".into(),
+        "Alice".into(),
+        Role::Admin,
+        true,
+        "hash".into(),
+    )
+    .unwrap_err();
     assert!(matches!(err, DomainError::EmptyCode));
 }
 
 #[test]
 fn new_user_rejects_empty_name() {
-    let err = User::new(1, "u1".into(), "".into(), Role::Admin, true, "hash".into())
-        .unwrap_err();
+    let err = User::new(1, "u1".into(), "".into(), Role::Admin, true, "hash".into()).unwrap_err();
     assert!(matches!(err, DomainError::EmptyName));
 }
 
 #[test]
 fn new_user_rejects_empty_password() {
-    let err = User::new(1, "u1".into(), "Alice".into(), Role::Admin, true, "".into())
-        .unwrap_err();
+    let err = User::new(1, "u1".into(), "Alice".into(), Role::Admin, true, "".into()).unwrap_err();
     assert!(matches!(err, DomainError::EmptyPassword));
 }
 

@@ -1,4 +1,4 @@
-use argon2::password_hash::{rand_core::OsRng, SaltString};
+use argon2::password_hash::{SaltString, rand_core::OsRng};
 use argon2::{Argon2, PasswordHasher};
 
 use crate::domain::{DomainError, Role, User, UserNew, UserRepository, UserUpdate};
@@ -41,10 +41,19 @@ pub struct UserUsecase<R: UserRepository> {
 }
 
 impl<R: UserRepository> UserUsecase<R> {
+    /// Build a new `UserUsecase` wrapping the supplied `repository`.
+    ///
+    /// The usecase owns the password hashing policy and the
+    /// `User` -> `UserView` projection. `repository` is the
+    /// persistence port; pass [`UserRepo`](crate::UserRepo) for the
+    /// PostgreSQL-backed implementation.
     pub fn new(repository: R) -> Self {
         Self { repository }
     }
 
+    /// Validate the inputs, hash the plaintext password with argon2id,
+    /// and persist a new user. Returns the resulting user as a
+    /// [`UserView`] (the password hash is not exposed).
     pub async fn create(&self, cmd: CreateUser) -> Result<UserView, UsecaseError> {
         validate_create(&cmd)?;
 
@@ -62,11 +71,16 @@ impl<R: UserRepository> UserUsecase<R> {
         Ok(user.into())
     }
 
+    /// Look up a user by numeric id and project the result into a
+    /// [`UserView`]. Returns [`UsecaseError::Repository`] wrapping
+    /// [`DomainError::NotFound`] if the id is unknown.
     pub async fn get_by_id(&self, id: i32) -> Result<UserView, UsecaseError> {
         let user = self.repository.find_by_id(id).await?;
         Ok(user.into())
     }
 
+    /// Look up a user by their unique `code`. The code is validated
+    /// for non-emptiness before the repository is touched.
     pub async fn get_by_code(&self, code: &str) -> Result<UserView, UsecaseError> {
         if code.trim().is_empty() {
             return Err(UsecaseError::Validation(DomainError::EmptyCode));
@@ -75,11 +89,16 @@ impl<R: UserRepository> UserUsecase<R> {
         Ok(user.into())
     }
 
+    /// List every user as a `Vec<UserView>`. There is no pagination
+    /// yet; the full collection is returned.
     pub async fn list(&self) -> Result<Vec<UserView>, UsecaseError> {
         let users = self.repository.list().await?;
         Ok(users.into_iter().map(UserView::from).collect())
     }
 
+    /// Apply the optional fields on `cmd` to the user identified by
+    /// `cmd.id`. A supplied `password` is re-hashed before it reaches
+    /// the repository.
     pub async fn update(&self, cmd: UpdateUser) -> Result<UserView, UsecaseError> {
         validate_update(&cmd)?;
 
@@ -101,6 +120,8 @@ impl<R: UserRepository> UserUsecase<R> {
         Ok(user.into())
     }
 
+    /// Soft-remove the user by id (sets `active = false`). There is
+    /// no hard `delete` operation by design.
     pub async fn deactivate(&self, id: i32) -> Result<UserView, UsecaseError> {
         let user = self.repository.deactivate(id).await?;
         Ok(user.into())
@@ -123,20 +144,20 @@ fn validate_create(cmd: &CreateUser) -> Result<(), UsecaseError> {
 }
 
 fn validate_update(cmd: &UpdateUser) -> Result<(), UsecaseError> {
-    if let Some(ref code) = cmd.code {
-        if code.trim().is_empty() {
-            return Err(UsecaseError::Validation(DomainError::EmptyCode));
-        }
+    if let Some(ref code) = cmd.code
+        && code.trim().is_empty()
+    {
+        return Err(UsecaseError::Validation(DomainError::EmptyCode));
     }
-    if let Some(ref name) = cmd.name {
-        if name.trim().is_empty() {
-            return Err(UsecaseError::Validation(DomainError::EmptyName));
-        }
+    if let Some(ref name) = cmd.name
+        && name.trim().is_empty()
+    {
+        return Err(UsecaseError::Validation(DomainError::EmptyName));
     }
-    if let Some(ref password) = cmd.password {
-        if password.is_empty() {
-            return Err(UsecaseError::Validation(DomainError::EmptyPassword));
-        }
+    if let Some(ref password) = cmd.password
+        && password.is_empty()
+    {
+        return Err(UsecaseError::Validation(DomainError::EmptyPassword));
     }
     Ok(())
 }

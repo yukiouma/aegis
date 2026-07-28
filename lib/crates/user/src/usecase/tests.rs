@@ -110,11 +110,7 @@ impl UserRepository for MockUserRepository {
     async fn find_by_id(&self, id: i32) -> Result<User, DomainError> {
         let mut state = self.state.lock().unwrap();
         state.find_by_id_calls.push(id);
-        state
-            .users
-            .get(&id)
-            .cloned()
-            .ok_or(DomainError::NotFound)
+        state.users.get(&id).cloned().ok_or(DomainError::NotFound)
     }
 
     async fn find_by_code(&self, code: &str) -> Result<User, DomainError> {
@@ -277,10 +273,7 @@ async fn get_by_id_returns_view_without_password() {
     let stored = seed_user(11, "u11", "Dana", Role::Admin, true, "secret-hash");
     let (mock, usecase) = make_usecase_with_user(stored);
 
-    let view = usecase
-        .get_by_id(11)
-        .await
-        .expect("get_by_id succeeds");
+    let view = usecase.get_by_id(11).await.expect("get_by_id succeeds");
 
     assert_eq!(view.id, 11);
     assert_eq!(view.code, "u11");
@@ -335,10 +328,7 @@ async fn deactivate_forwards_id_and_returns_inactive_view() {
     let stored = seed_user(20, "u20", "Frank", Role::Admin, true, "h");
     let (mock, usecase) = make_usecase_with_user(stored);
 
-    let view = usecase
-        .deactivate(20)
-        .await
-        .expect("deactivate succeeds");
+    let view = usecase.deactivate(20).await.expect("deactivate succeeds");
 
     assert_eq!(view.id, 20);
     assert!(!view.active, "usecase returns the inactive user");
@@ -381,7 +371,10 @@ async fn empty_create_inputs_are_rejected_before_hitting_repo() {
         role: Role::Admin,
         password: "".into(),
     };
-    let err = usecase.create(cmd).await.expect_err("blank password rejected");
+    let err = usecase
+        .create(cmd)
+        .await
+        .expect_err("blank password rejected");
     assert!(matches!(
         err,
         UsecaseError::Validation(DomainError::EmptyPassword)
@@ -405,14 +398,20 @@ async fn empty_update_inputs_are_rejected_before_hitting_repo() {
         ..Default::default()
     };
     let err = usecase.update(cmd).await.expect_err("blank code rejected");
-    assert!(matches!(err, UsecaseError::Validation(DomainError::EmptyCode)));
+    assert!(matches!(
+        err,
+        UsecaseError::Validation(DomainError::EmptyCode)
+    ));
 
     let cmd = UpdateUser {
         id: 30,
         password: Some("".into()),
         ..Default::default()
     };
-    let err = usecase.update(cmd).await.expect_err("blank password rejected");
+    let err = usecase
+        .update(cmd)
+        .await
+        .expect_err("blank password rejected");
     assert!(matches!(
         err,
         UsecaseError::Validation(DomainError::EmptyPassword)
@@ -457,7 +456,9 @@ async fn repository_errors_propagate_as_usecase_repository_error() {
     assert_eq!(state.created.len(), 1);
 }
 
-fn make_usecase_with_users(users: Vec<User>) -> (MockUserRepository, UserUsecase<MockUserRepository>) {
+fn make_usecase_with_users(
+    users: Vec<User>,
+) -> (MockUserRepository, UserUsecase<MockUserRepository>) {
     let mock = MockUserRepository::with_users(users);
     let usecase = UserUsecase::new(mock.clone());
     (mock, usecase)

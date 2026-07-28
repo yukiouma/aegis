@@ -7,21 +7,47 @@
 // reach us from the database, so the repository can call `try_into()`
 // and surface the `InvalidRole` error path as defensive belt-and-braces
 // even though the conversion cannot fail in practice.
+//
+// The module is `pub(crate)` (see `infrastructure.rs`) so external
+// consumers can name `UserRow` only via the crate-root re-export.
+// The `password` field is `pub(crate)` for the same reason: it must
+// stay accessible to the repository and the in-crate test suite, but
+// not to anyone reaching for `UserRow` from outside the crate. The
+// manual `Debug` impl below ensures the hash never leaks through
+// `Debug` formatting even inside the crate.
 
 use std::convert::TryFrom;
+use std::fmt;
 
 use sqlx::FromRow;
 
 use crate::domain::{DomainError, Role, User};
 
-#[derive(Debug, Clone, FromRow)]
+#[derive(Clone, FromRow)]
 pub struct UserRow {
     pub id: i32,
     pub code: String,
     pub name: String,
     pub role: String,
     pub active: bool,
-    pub password: String,
+    pub(crate) password: String,
+}
+
+/// Hand-rolled `Debug` impl that intentionally redacts the `password`
+/// column. Matches the redaction policy applied to `User` so neither
+/// the domain aggregate nor its SQLx row shape leaks the hash through
+/// `Debug` output (e.g. logs, panics, error chains).
+impl fmt::Debug for UserRow {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("UserRow")
+            .field("id", &self.id)
+            .field("code", &self.code)
+            .field("name", &self.name)
+            .field("role", &self.role)
+            .field("active", &self.active)
+            .field("password", &"<redacted>")
+            .finish()
+    }
 }
 
 impl TryFrom<UserRow> for User {

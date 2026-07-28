@@ -28,6 +28,10 @@ pub struct UserRepo {
 }
 
 impl UserRepo {
+    /// Build a new `UserRepo` backed by the supplied `sqlx::PgPool`.
+    ///
+    /// The repository does not open any connections itself; it stores
+    /// the pool and acquires connections lazily on each operation.
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -53,8 +57,7 @@ impl UserRepository for UserRepo {
     }
 
     async fn find_by_id(&self, id: i32) -> Result<User, DomainError> {
-        const SQL: &str =
-            "SELECT id, code, name, role, active, password FROM users WHERE id = $1";
+        const SQL: &str = "SELECT id, code, name, role, active, password FROM users WHERE id = $1";
         let row: UserRow = sqlx::query_as(SQL)
             .bind(id)
             .fetch_optional(&self.pool)
@@ -77,8 +80,7 @@ impl UserRepository for UserRepo {
     }
 
     async fn list(&self) -> Result<Vec<User>, DomainError> {
-        const SQL: &str =
-            "SELECT id, code, name, role, active, password FROM users ORDER BY id";
+        const SQL: &str = "SELECT id, code, name, role, active, password FROM users ORDER BY id";
         let rows: Vec<UserRow> = sqlx::query_as(SQL)
             .fetch_all(&self.pool)
             .await

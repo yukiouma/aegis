@@ -1,0 +1,71 @@
+//! Public-API compile test for the `user` crate.
+//!
+//! This test does NOT connect to PostgreSQL. Its only job is to
+//! type-check the documented public surface and the constructor
+//! dependency chain `UserRepo::new(pool) -> UserUsecase::new(repo)`.
+//!
+//! We avoid constructing a real `sqlx::PgPool` because that would
+//! require either a live database or a checked-in offline metadata
+//! cache (neither of which this workspace build provides). Instead
+//! we use the `fn(PgPool) -> _` shape so the `UserRepo::new`
+//! signature is referenced but never invoked against a real
+//! connection.
+
+use user::{CreateUser, Role, UpdateUser, UserRepo, UserUsecase, UserView};
+
+/// The crate-root imports compile. Touching the type tokens below is
+/// enough to force a resolution error if any of the re-exports
+/// regress.
+#[test]
+fn public_types_are_nameable_from_crate_root() {
+    fn assert_role(_: Role) {}
+    fn assert_view(_: UserView) {}
+    fn assert_create(_: CreateUser) {}
+    fn assert_update(_: UpdateUser) {}
+
+    // Inline `Role` ctor so we can build a value without importing
+    // anything from `user::domain` directly.
+    assert_role(Role::General);
+    assert_view(UserView {
+        id: 1,
+        code: "u1".into(),
+        name: "Alice".into(),
+        role: Role::General,
+        active: true,
+    });
+    assert_create(CreateUser {
+        code: "u1".into(),
+        name: "Alice".into(),
+        role: Role::General,
+        password: "hunter2".into(),
+    });
+    assert_update(UpdateUser {
+        id: 1,
+        ..Default::default()
+    });
+}
+
+/// `UserRepo::new` accepts a `sqlx::PgPool` and returns a
+/// `UserRepo`. We hold the constructor as a function pointer so the
+/// test never actually opens a connection.
+#[test]
+fn user_repo_new_accepts_a_pg_pool() {
+    let ctor: fn(sqlx::PgPool) -> UserRepo = UserRepo::new;
+    // Materialise the function pointer in a no-op `let` binding so
+    // `clippy::let_underscore_must_use` cannot complain about
+    // dropping a `MustUse` value.
+    let _ = ctor;
+}
+
+/// The dependency chain `UserRepo::new(pool) -> UserUsecase::new(repo)`
+/// type-checks. `UserRepo` is `Send + Sync` (it carries only a
+/// `PgPool`), so it satisfies the `UserRepository` port the usecase
+/// is generic over.
+#[test]
+fn usecase_can_be_constructed_from_user_repo() {
+    fn assert_repo_is_repository<R: user::UserRepository>() {}
+    assert_repo_is_repository::<UserRepo>();
+
+    fn assert_new_constructor<R: user::UserRepository>(_: fn(R) -> UserUsecase<R>) {}
+    assert_new_constructor::<UserRepo>(UserUsecase::new);
+}

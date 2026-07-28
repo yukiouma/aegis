@@ -239,16 +239,10 @@ fn live_database_create_then_find_then_deactivate() {
         assert_eq!(created.code, unique);
         assert!(created.active);
 
-        let fetched_by_id = repo
-            .find_by_id(created.id)
-            .await
-            .expect("find_by_id");
+        let fetched_by_id = repo.find_by_id(created.id).await.expect("find_by_id");
         assert_eq!(fetched_by_id.id, created.id);
 
-        let fetched_by_code = repo
-            .find_by_code(&unique)
-            .await
-            .expect("find_by_code");
+        let fetched_by_code = repo.find_by_code(&unique).await.expect("find_by_code");
         assert_eq!(fetched_by_code.id, created.id);
 
         let list = repo.list().await.expect("list");
@@ -262,10 +256,7 @@ fn live_database_create_then_find_then_deactivate() {
         let updated = repo.update(update).await.expect("update");
         assert_eq!(updated.name, "Task Four Renamed");
 
-        let deactivated = repo
-            .deactivate(created.id)
-            .await
-            .expect("deactivate");
+        let deactivated = repo.deactivate(created.id).await.expect("deactivate");
         assert!(!deactivated.active);
     });
 }

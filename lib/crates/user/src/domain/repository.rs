@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
+use super::DomainError;
 use super::role::Role;
 use super::user::User;
-use super::DomainError;
 
 /// Input DTO for `UserRepository::create`.
 #[derive(Debug, Clone)]
