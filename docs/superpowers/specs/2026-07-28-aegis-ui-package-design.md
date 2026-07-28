@@ -118,7 +118,7 @@ export interface SidebarProps {
   title: string;
   menu: MenuItem[];
   open: boolean;
-  onClose: () => void;
+  onToggle: () => void;
   onNavigate?: (link: string) => void;
   width?: number;          // expanded width, default 240
   collapsedWidth?: number; // default 56
@@ -132,8 +132,10 @@ export interface SidebarProps {
 
 ### 4.3 Behavior
 
-- **Controlled state:** parent owns `open`. The close button calls `onClose`.
-- **Title bar:** title text on the right, `IconButton` (default icon `ChevronLeft` from `@mui/icons-material`) on the **left**. Hidden entirely when collapsed.
+- **Controlled state:** parent owns `open`. The icon button calls `onToggle`.
+- **Title bar:**
+  - `IconButton` is always rendered (in both states). Icon is `FormatIndentDecrease` when `open=true`, `FormatIndentIncrease` when `open=false` (both from `@mui/icons-material`).
+  - Title text (`Typography`) is rendered only when `open=true`. Positioned to the **right** of the icon button.
 - **Menu list:** `List`/`ListItem`/`ListItemButton` from MUI.
   - **Collapsed (`open=false`):** only icons render. Titles appear in `Tooltip` on hover. Submenu items do not render (per spec).
   - **Expanded (`open=true`):** full text + icons.
