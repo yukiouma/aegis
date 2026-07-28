@@ -52,7 +52,7 @@ export function Sidebar({
         },
       }}
     >
-      <Box sx={{ display: 'flex', alignItems: 'center', p: 1, minHeight: 56 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', px: 2.5, py: 1, minHeight: 56 }}>
         <IconButton onClick={onToggle} aria-label="toggle sidebar" edge="start">
           {open ? <FormatIndentDecrease /> : <FormatIndentIncrease />}
         </IconButton>
