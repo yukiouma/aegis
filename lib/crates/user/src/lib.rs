@@ -7,7 +7,7 @@
 //! users (`domain`, `usecase`, `infrastructure`) and re-exports the
 //! public surface at the crate root so consumers can simply write
 //!
-//! ```ignore
+//! ```no_run
 //! use user::{UserRepo, UserUsecase, CreateUser, UpdateUser, Role, UserView};
 //! ```
 
@@ -24,9 +24,3 @@ pub mod usecase;
 pub use domain::{Role, User, UserRepository};
 pub use infrastructure::user_repo::UserRepo;
 pub use usecase::{CreateUser, UpdateUser, UserUsecase, UserView};
-
-// `UserRow` is re-exported for tests / advanced consumers, but the
-// `infrastructure::row` module is `pub(crate)` so the password column
-// is not casually observable through field access. The redaction is
-// enforced by `UserRow`'s hand-rolled `Debug` impl in that module.
-pub use infrastructure::row::UserRow;

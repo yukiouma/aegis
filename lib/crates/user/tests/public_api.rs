@@ -4,12 +4,11 @@
 //! type-check the documented public surface and the constructor
 //! dependency chain `UserRepo::new(pool) -> UserUsecase::new(repo)`.
 //!
-//! We avoid constructing a real `sqlx::PgPool` because that would
-//! require either a live database or a checked-in offline metadata
-//! cache (neither of which this workspace build provides). Instead
-//! we use the `fn(PgPool) -> _` shape so the `UserRepo::new`
-//! signature is referenced but never invoked against a real
-//! connection.
+//! We want the test to type-check the dependency chain without
+//! performing I/O, so we hold `UserRepo::new` and `UserUsecase::new`
+//! as function pointers. The `fn(PgPool) -> _` / `fn(R) -> _` shape
+//! is the most explicit way to assert that the documented constructor
+//! signatures are stable, and avoids ever opening a real connection.
 
 use user::{CreateUser, Role, UpdateUser, UserRepo, UserUsecase, UserView};
 
@@ -52,8 +51,9 @@ fn public_types_are_nameable_from_crate_root() {
 fn user_repo_new_accepts_a_pg_pool() {
     let ctor: fn(sqlx::PgPool) -> UserRepo = UserRepo::new;
     // Materialise the function pointer in a no-op `let` binding so
-    // `clippy::let_underscore_must_use` cannot complain about
-    // dropping a `MustUse` value.
+    // it is not flagged as an unused-variable assignment. The
+    // function pointer itself is not `#[must_use]`; the binding is
+    // here purely to silence the unused-variable warning.
     let _ = ctor;
 }
 
