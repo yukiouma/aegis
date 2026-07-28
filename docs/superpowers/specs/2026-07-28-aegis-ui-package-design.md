@@ -23,16 +23,18 @@ lib/packages/ui/
   vitest.config.ts
   vitest.setup.ts
   src/
-    index.ts              # main barrel — exports Sidebar, types, and the mui/icons sub-barrels
+    index.ts              # main barrel — re-exports Sidebar + types from ../components/Sidebar
+    mui/
+      index.ts            # re-exports @mui/material
+    icons/
+      index.ts            # re-exports @mui/icons-material
+  components/
     Sidebar/
       index.ts            # public exports
       Sidebar.tsx         # implementation
       types.ts            # MenuItem, SubMenuItem, SidebarProps
       Sidebar.test.tsx    # vitest + RTL tests
-    mui/
-      index.ts            # re-exports @mui/material
-    icons/
-      index.ts            # re-exports @mui/icons-material
+      test-utils.tsx      # render helpers (theme wrapper)
 ```
 
 ### 2.1 Build & consumption
@@ -44,7 +46,7 @@ The package exports `.tsx`/`.ts` source files directly (no build step). The desk
 ```json
 {
   ".":             "./src/index.ts",
-  "./Sidebar":     "./src/Sidebar/index.ts",
+  "./Sidebar":     "./components/Sidebar/index.ts",
   "./mui":         "./src/mui/index.ts",
   "./icons":       "./src/icons/index.ts"
 }
@@ -97,7 +99,7 @@ Naming collisions between re-exports and direct MUI imports are the consumer's r
 
 ## 4. Sidebar API
 
-### 4.1 Types (`src/Sidebar/types.ts`)
+### 4.1 Types (`components/Sidebar/types.ts`)
 
 ```ts
 import type { ComponentType } from 'react';
@@ -123,7 +125,7 @@ export interface SidebarProps {
 }
 ```
 
-### 4.2 Public exports (`src/Sidebar/index.ts`)
+### 4.2 Public exports (`components/Sidebar/index.ts`)
 
 - `Sidebar` (named + default)
 - Type re-exports: `MenuItem`, `SubMenuItem`, `SidebarProps`
