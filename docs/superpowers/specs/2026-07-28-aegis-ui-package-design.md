@@ -59,8 +59,8 @@ The package exports `.tsx`/`.ts` source files directly (no build step). The desk
 - `react-dom` ^19
 - `@emotion/react` ^11
 - `@emotion/styled` ^11
-- `@mui/material` ^6
-- `@mui/icons-material` ^6
+- `@mui/material` ^9
+- `@mui/icons-material` ^9
 
 **devDependencies:** the same MUI/emotion packages (so the package builds and tests in isolation), `@types/react`, `@types/react-dom`, `typescript`, `vitest`, `@testing-library/react`, `@testing-library/jest-dom`, `jsdom`.
 
