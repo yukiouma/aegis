@@ -67,6 +67,15 @@ impl User {
 
     /// Returns the argon2 password hash. Only available inside the crate
     /// so the hash never leaves the `user` crate's boundary.
+    ///
+    /// The accessor is reserved for the future password-verification
+    /// entry point in the infrastructure layer. Until that lands, the
+    /// only consumer is the infrastructure test suite (which calls
+    /// `password_hash()` to assert that `for_repository` round-trips
+    /// the `password` field). The `#[allow(dead_code)]` silences the
+    /// lib build, which does not see test usage; the test build sees
+    /// the call site and would not warn even without the allow.
+    #[allow(dead_code)]
     pub(crate) fn password_hash(&self) -> &str {
         &self.password
     }

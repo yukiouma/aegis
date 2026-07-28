@@ -1,0 +1,189 @@
+// PostgreSQL-backed implementation of `UserRepository`.
+//
+// This module intentionally uses SQLx's *runtime* query API
+// (`sqlx::query_as` and `sqlx::QueryBuilder`) rather than the
+// `query_as!` / `query!` compile-time-checked macros. The compile-time
+// macros require either a live `DATABASE_URL` or a checked-in
+// `sqlx-data.json` offline metadata cache, neither of which the
+// workspace build currently provides. The runtime API is type-checked
+// against the bound parameters we hand it and lets the build proceed
+// in any environment, at the cost of a small loss in static
+// verification of the SQL itself. The migration test in
+// `infrastructure::tests` covers the schema content directly.
+
+use async_trait::async_trait;
+use sqlx::PgPool;
+
+use crate::domain::{DomainError, User, UserNew, UserRepository, UserUpdate};
+
+use super::row::UserRow;
+
+/// PostgreSQL SQLSTATE for a unique-violation error.
+const SQLSTATE_UNIQUE_VIOLATION: &str = "23505";
+
+pub struct UserRepo {
+    pool: PgPool,
+}
+
+impl UserRepo {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[async_trait]
+impl UserRepository for UserRepo {
+    async fn create(&self, input: UserNew) -> Result<User, DomainError> {
+        const SQL: &str = "INSERT INTO users (code, name, role, active, password) \
+                           VALUES ($1, $2, $3, $4, $5) \
+                           RETURNING id, code, name, role, active, password";
+        let row: UserRow = sqlx::query_as(SQL)
+            .bind(&input.code)
+            .bind(&input.name)
+            .bind(input.role.as_str())
+            .bind(input.active)
+            .bind(&input.password_hash)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(map_create_error)?;
+
+        Ok(row.into())
+    }
+
+    async fn find_by_id(&self, id: i32) -> Result<User, DomainError> {
+        const SQL: &str =
+            "SELECT id, code, name, role, active, password FROM users WHERE id = $1";
+        let row: UserRow = sqlx::query_as(SQL)
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(map_query_error)?
+            .ok_or(DomainError::NotFound)?;
+        Ok(row.into())
+    }
+
+    async fn find_by_code(&self, code: &str) -> Result<User, DomainError> {
+        const SQL: &str =
+            "SELECT id, code, name, role, active, password FROM users WHERE code = $1";
+        let row: UserRow = sqlx::query_as(SQL)
+            .bind(code)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(map_query_error)?
+            .ok_or(DomainError::NotFound)?;
+        Ok(row.into())
+    }
+
+    async fn list(&self) -> Result<Vec<User>, DomainError> {
+        const SQL: &str =
+            "SELECT id, code, name, role, active, password FROM users ORDER BY id";
+        let rows: Vec<UserRow> = sqlx::query_as(SQL)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(map_query_error)?;
+        Ok(rows.into_iter().map(User::from).collect())
+    }
+
+    async fn update(&self, input: UserUpdate) -> Result<User, DomainError> {
+        // Build a dynamic UPDATE that only touches the columns whose
+        // option is `Some`. `QueryBuilder` is type-checked at the
+        // bind sites so we cannot smuggle an unbound value into the
+        // SQL string.
+        let mut qb = sqlx::QueryBuilder::new("UPDATE users SET ");
+        let mut first = true;
+        let mut separated = |qb: &mut sqlx::QueryBuilder<sqlx::Postgres>| {
+            if first {
+                first = false;
+            } else {
+                qb.push(", ");
+            }
+        };
+
+        if let Some(ref code) = input.code {
+            separated(&mut qb);
+            qb.push("code = ").push_bind(code);
+        }
+        if let Some(ref name) = input.name {
+            separated(&mut qb);
+            qb.push("name = ").push_bind(name);
+        }
+        if let Some(role) = input.role {
+            separated(&mut qb);
+            qb.push("role = ").push_bind(role.as_str());
+        }
+        if let Some(active) = input.active {
+            separated(&mut qb);
+            qb.push("active = ").push_bind(active);
+        }
+        if let Some(ref hash) = input.password_hash {
+            separated(&mut qb);
+            qb.push("password = ").push_bind(hash);
+        }
+
+        if first {
+            // Nothing to update; short-circuit and return the existing
+            // row, or `NotFound` if the id does not exist.
+            return self.find_by_id(input.id).await;
+        }
+
+        qb.push(" WHERE id = ").push_bind(input.id);
+        qb.push(" RETURNING id, code, name, role, active, password");
+
+        let row: UserRow = qb
+            .build_query_as::<UserRow>()
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(map_query_error)?
+            .ok_or(DomainError::NotFound)?;
+        Ok(row.into())
+    }
+
+    async fn deactivate(&self, id: i32) -> Result<User, DomainError> {
+        const SQL: &str = "UPDATE users SET active = FALSE WHERE id = $1 \
+                           RETURNING id, code, name, role, active, password";
+        let row: UserRow = sqlx::query_as(SQL)
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(map_query_error)?
+            .ok_or(DomainError::NotFound)?;
+        Ok(row.into())
+    }
+}
+
+/// Map a `sqlx::Error` from a non-`create` query into a
+/// `DomainError`. `RowNotFound` becomes `NotFound`; any other
+/// database error is wrapped in `Repository`.
+fn map_query_error(err: sqlx::Error) -> DomainError {
+    match err {
+        sqlx::Error::RowNotFound => DomainError::NotFound,
+        other => DomainError::Repository(other.to_string()),
+    }
+}
+
+/// Map a `sqlx::Error` from the `create` query into a `DomainError`.
+/// Unique-violation errors that target the `code` constraint become
+/// `DuplicateCode(code)`. We do not have the offending code value in
+/// hand here (sqlx does not surface the bound value), so the
+/// `DuplicateCode` carries the constraint name as a debugging hint;
+/// the caller can match on it. In practice the usecase layer is the
+/// only caller and it surfaces the original `code` alongside the
+/// error, so the placeholder string is informational only.
+///
+/// `RowNotFound` from a `RETURNING` clause means the row was deleted
+/// between the INSERT plan-check and the actual write; surface it as
+/// `NotFound` for symmetry with the rest of the repository.
+fn map_create_error(err: sqlx::Error) -> DomainError {
+    match err {
+        sqlx::Error::RowNotFound => DomainError::NotFound,
+        sqlx::Error::Database(db_err) => {
+            if db_err.code().as_deref() == Some(SQLSTATE_UNIQUE_VIOLATION) {
+                let constraint = db_err.constraint().unwrap_or("code");
+                DomainError::DuplicateCode(format!("(constraint {constraint})"))
+            } else {
+                DomainError::Repository(db_err.message().to_string())
+            }
+        }
+        other => DomainError::Repository(other.to_string()),
+    }
+}
