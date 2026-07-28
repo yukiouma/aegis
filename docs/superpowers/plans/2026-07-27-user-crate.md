@@ -4,13 +4,15 @@
 
 **Goal:** Build a workspace library crate at `lib/crates/user` that exposes a SQLx/PostgreSQL-backed DDD user repository and asynchronous `UserUsecase` with password hashing and non-destructive deactivation.
 
-**Architecture:** Use ports-and-adapters DDD. `domain` owns `User`, `Role`, validation, errors, and an async repository port; `usecase` owns commands, password hashing, and orchestration; `infrastructure` implements the port with SQLx and owns migrations. The crate root re-exports the consumer-facing API.
+**Architecture:** Use ports-and-adapters DDD. `domain` owns `User`, `Role`, validation, errors, and an async repository port; `usecase` owns commands, password hashing, and orchestration; `infrastructure` implements the port with SQLx and owns migrations. The crate root re-exports the consumer-facing API. Modules use modern Rust 2024 style: child files are declared alongside their parent `mod.rs`-free files.
 
-**Tech Stack:** Rust 2024, Cargo workspace, SQLx PostgreSQL runtime/Tokio, Tokio, Argon2, async-trait, thiserror, UUID/random salt support via Argon2 dependencies.
+**Tech Stack:** Rust 2024 edition, Cargo workspace, SQLx PostgreSQL runtime/Tokio, Tokio, Argon2, async-trait, thiserror, random salts from Argon2.
 
 ## Global Constraints
 
 - Add `lib/crates/user` to the root Cargo workspace.
+- Use the `2024` Rust edition for all newly added crates.
+- Avoid `mod.rs`; use `src/<module>.rs` plus a `src/<module>/` directory of child files.
 - Use asynchronous APIs returning typed `Result` values.
 - Store roles as `root`, `admin`, and `general`.
 - `code` is unique and required.
@@ -27,9 +29,9 @@
 - Modify: `Cargo.toml`
 - Create: `lib/crates/user/Cargo.toml`
 - Create: `lib/crates/user/src/lib.rs`
-- Create: `lib/crates/user/src/domain/mod.rs`
-- Create: `lib/crates/user/src/usecase/mod.rs`
-- Create: `lib/crates/user/src/infrastructure/mod.rs`
+- Create: `lib/crates/user/src/domain.rs`
+- Create: `lib/crates/user/src/usecase.rs`
+- Create: `lib/crates/user/src/infrastructure.rs`
 
 **Interfaces:**
 - Produces a compiling `user` crate and module boundaries for later tasks.
@@ -37,11 +39,11 @@
 
 - [ ] **Step 1: Add the member and dependency declarations**
 
-Add `"lib/crates/user"` to the workspace members and declare package metadata. Use SQLx with `postgres`, `runtime-tokio`, and `macros`; Tokio with `macros` and `rt-multi-thread`; Argon2; `async-trait`; and `thiserror`.
+Add `"lib/crates/user"` to the workspace members and declare package metadata with `edition = "2024"`. Use SQLx with `postgres`, `runtime-tokio`, and `macros`; Tokio with `macros` and `rt-multi-thread`; Argon2; `async-trait`; and `thiserror`.
 
-- [ ] **Step 2: Add module stubs and public re-exports**
+- [ ] **Step 2: Add module declarations and re-exports**
 
-Create the three module files with declarations, then make `lib.rs` declare the modules and re-export their eventual public types. Keep stubs minimal so the crate compiles before domain implementation.
+Create `lib/crates/user/src/{domain,usecase,infrastructure}.rs` with empty module bodies. Declare them in `lib.rs` and re-export their eventual public types. Keep stubs minimal so the crate compiles before domain implementation.
 
 - [ ] **Step 3: Verify scaffolding**
 
@@ -61,8 +63,8 @@ git commit -m "feat: scaffold user library crate"
 - Create: `lib/crates/user/src/domain/role.rs`
 - Create: `lib/crates/user/src/domain/error.rs`
 - Create: `lib/crates/user/src/domain/repository.rs`
-- Modify: `lib/crates/user/src/domain/mod.rs`
 - Create: `lib/crates/user/src/domain/tests.rs`
+- Modify: `lib/crates/user/src/domain.rs`
 
 **Interfaces:**
 - `pub struct User { pub id: i32, pub code: String, pub name: String, pub role: Role, pub active: bool, pub(crate) password: String }`.
@@ -80,7 +82,7 @@ Run `cargo test -p user domain`. Expected: FAIL because domain types and validat
 
 - [ ] **Step 3: Implement the domain types and port**
 
-Implement role conversion, user construction/validation, typed domain errors, and the async repository trait using `async-trait`. Use owned `User` values for repository results and an explicit update input that permits code/name/role/active/password changes while keeping plaintext password handling in the usecase.
+Replace the empty `domain.rs` with `mod user; mod role; mod error; mod repository;` and `#[cfg(test)] mod tests;`. Implement role conversion, user construction/validation, typed domain errors, and the async repository trait using `async-trait`. Use owned `User` values for repository results and an explicit update input that permits code/name/role/active/password changes while keeping plaintext password handling in the usecase.
 
 - [ ] **Step 4: Run focused tests**
 
@@ -89,7 +91,7 @@ Run `cargo test -p user domain`. Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/crates/user/src/domain
+git add lib/crates/user/src/domain.rs lib/crates/user/src/domain
 git commit -m "feat: add user domain model and repository port"
 ```
 
@@ -99,8 +101,8 @@ git commit -m "feat: add user domain model and repository port"
 - Create: `lib/crates/user/src/usecase/error.rs`
 - Create: `lib/crates/user/src/usecase/commands.rs`
 - Create: `lib/crates/user/src/usecase/user_usecase.rs`
-- Modify: `lib/crates/user/src/usecase/mod.rs`
 - Create: `lib/crates/user/src/usecase/tests.rs`
+- Modify: `lib/crates/user/src/usecase.rs`
 
 **Interfaces:**
 - `pub struct CreateUser { pub code: String, pub name: String, pub role: Role, pub password: String }`.
@@ -118,7 +120,7 @@ Run `cargo test -p user usecase`. Expected: FAIL because the usecase and command
 
 - [ ] **Step 3: Implement usecase orchestration**
 
-Use Argon2’s random salt generation and password hashing. Validate create/update inputs before repository calls. Convert the hashed password into the domain persistence input, map repository errors into usecase errors, and return a safe `UserView`/projection that omits `password`.
+Replace the empty `usecase.rs` with `mod commands; mod error; mod user_usecase;` and `#[cfg(test)] mod tests;`. Use Argon2’s random salt generation and password hashing. Validate create/update inputs before repository calls. Convert the hashed password into the domain persistence input, map repository errors into usecase errors, and return a safe `UserView`/projection that omits `password`.
 
 - [ ] **Step 4: Run focused tests**
 
@@ -127,7 +129,7 @@ Run `cargo test -p user usecase`. Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add lib/crates/user/src/usecase
+git add lib/crates/user/src/usecase.rs lib/crates/user/src/usecase
 git commit -m "feat: add user usecase and password hashing"
 ```
 
@@ -136,9 +138,9 @@ git commit -m "feat: add user usecase and password hashing"
 **Files:**
 - Create: `lib/crates/user/src/infrastructure/user_repo.rs`
 - Create: `lib/crates/user/src/infrastructure/row.rs`
-- Modify: `lib/crates/user/src/infrastructure/mod.rs`
-- Create: `lib/crates/user/migrations/0001_create_users.sql`
 - Create: `lib/crates/user/src/infrastructure/tests.rs`
+- Modify: `lib/crates/user/src/infrastructure.rs`
+- Create: `lib/crates/user/migrations/0001_create_users.sql`
 
 **Interfaces:**
 - `pub struct UserRepo { pool: sqlx::PgPool }`.
@@ -159,7 +161,7 @@ Create `users` with `id INTEGER GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY`, u
 
 - [ ] **Step 4: Implement SQLx repository**
 
-Use `sqlx::query_as!` or runtime `query_as` consistently with workspace build constraints. Map rows into `User`, convert role strings through `Role::try_from`, translate unique violations/not-found/database errors, and implement deactivation as an `UPDATE`, never `DELETE`.
+Replace the empty `infrastructure.rs` with `mod user_repo; mod row;` and `#[cfg(test)] mod tests;`. Use `sqlx::query_as!` or runtime `query_as` consistently with workspace build constraints. Map rows into `User`, convert role strings through `Role::try_from`, translate unique violations/not-found/database errors, and implement deactivation as an `UPDATE`, never `DELETE`.
 
 - [ ] **Step 5: Run tests and check compilation**
 
@@ -169,7 +171,7 @@ Run `cargo test -p user` and `cargo check --workspace`. Expected: PASS. If offli
 
 ```bash
 git add lib/crates/user
- git commit -m "feat: add postgres user repository and migration"
+git commit -m "feat: add postgres user repository and migration"
 ```
 
 ### Task 5: Public API integration and verification
@@ -198,11 +200,12 @@ Run `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-
 
 ```bash
 git add lib/crates/user README.md
- git commit -m "feat: expose user crate public API"
+git commit -m "feat: expose user crate public API"
 ```
 
 ## Self-review
 
 - Spec coverage: workspace registration (Task 1), DDD layers (Tasks 2–4), public constructors/API (Task 5), role persistence (Tasks 2 and 4), password hashing (Task 3), no hard delete/deactivation (Tasks 3 and 4), migration (Task 4), and unit/integration verification (Tasks 2–5) are all covered.
+- Edition/modernization: every newly added crate uses `edition = "2024"`, and module structure avoids `mod.rs`.
 - Placeholder scan: no TBD/TODO or unspecified implementation steps are present.
 - Type consistency: `UserRepository`, `UserRepo`, `UserUsecase<R>`, `CreateUser`, `UpdateUser`, and `UserView` are defined before their use by later tasks.
