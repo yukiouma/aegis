@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Sidebar } from './Sidebar';
 import type { MenuItem } from './types';
@@ -50,5 +50,46 @@ describe('Sidebar', () => {
   it('toggle icon is FormatIndentIncrease when open=false', () => {
     renderWithTheme(<Sidebar {...defaultProps} open={false} />);
     expect(screen.getByTestId('FormatIndentIncreaseIcon')).toBeInTheDocument();
+  });
+
+  it('clicking a leaf menu item calls onNavigate with its link', async () => {
+    const onNavigate = vi.fn();
+    renderWithTheme(<Sidebar {...defaultProps} onNavigate={onNavigate} />);
+    await userEvent.click(screen.getByText('Home'));
+    expect(onNavigate).toHaveBeenCalledWith('/home');
+  });
+
+  it('clicking a parent menu toggles its submenu open', async () => {
+    renderWithTheme(<Sidebar {...defaultProps} />);
+    expect(screen.queryByText('Profile')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText('Settings'));
+    expect(screen.getByText('Profile')).toBeInTheDocument();
+    await userEvent.click(screen.getByText('Settings'));
+    await waitFor(() =>
+      expect(screen.queryByText('Profile')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('clicking a parent menu does NOT call onNavigate', async () => {
+    const onNavigate = vi.fn();
+    renderWithTheme(<Sidebar {...defaultProps} onNavigate={onNavigate} />);
+    await userEvent.click(screen.getByText('Settings'));
+    expect(onNavigate).not.toHaveBeenCalled();
+  });
+
+  it('collapsed mode renders only icons, hides menu text', () => {
+    renderWithTheme(<Sidebar {...defaultProps} open={false} />);
+    expect(screen.queryByText('Home')).not.toBeInTheDocument();
+    expect(screen.queryByText('Settings')).not.toBeInTheDocument();
+    expect(screen.queryByText('Profile')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('mock-icon').length).toBeGreaterThan(0);
+  });
+
+  it('applies custom width and collapsedWidth without crashing', () => {
+    expect(() =>
+      renderWithTheme(
+        <Sidebar {...defaultProps} width={300} collapsedWidth={64} />,
+      ),
+    ).not.toThrow();
   });
 });
