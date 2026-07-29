@@ -49,6 +49,11 @@ function ReadAndSetMode() {
   );
 }
 
+function ReadHookMode() {
+  const { mode } = useThemeMode();
+  return <span data-testid="hook-mode">{mode}</span>;
+}
+
 beforeEach(() => {
   // jsdom 25 leaves `localStorage` as an empty `{}` by default; install a
   // fresh in-memory shim so provider tests can read/write to it.
@@ -146,5 +151,46 @@ describe('AegisThemeProvider', () => {
       /useThemeMode must be used inside <AegisThemeProvider>/,
     );
     errSpy.mockRestore();
+  });
+
+  it('useThemeMode returns the current mode', () => {
+    render(
+      <AegisThemeProvider>
+        <ReadHookMode />
+      </AegisThemeProvider>,
+    );
+    expect(screen.getByTestId('hook-mode')).toHaveTextContent('light');
+  });
+
+  it('useThemeMode.setMode is stable across renders', () => {
+    const seen: Set<unknown> = new Set();
+    function Capture() {
+      const { setMode } = useThemeMode();
+      seen.add(setMode);
+      return null;
+    }
+    const { rerender } = render(
+      <AegisThemeProvider>
+        <Capture />
+      </AegisThemeProvider>,
+    );
+    rerender(
+      <AegisThemeProvider>
+        <Capture />
+      </AegisThemeProvider>,
+    );
+    expect(seen.size).toBe(1);
+  });
+
+  it('useThemeMode.setMode("dark") updates mode and writes to localStorage', async () => {
+    render(
+      <AegisThemeProvider>
+        <ReadAndSetMode />
+      </AegisThemeProvider>,
+    );
+    expect(screen.getByTestId('hook-mode')).toHaveTextContent('light');
+    await userEvent.click(screen.getByText('set-dark'));
+    expect(screen.getByTestId('hook-mode')).toHaveTextContent('dark');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
   });
 });

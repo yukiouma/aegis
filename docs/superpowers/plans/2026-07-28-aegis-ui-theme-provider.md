@@ -209,6 +209,33 @@ import { useThemeMode } from './useThemeMode';
 
 const STORAGE_KEY = 'aegis:theme:mode';
 
+function createMemoryStorage(): Storage {
+  // jsdom 25 does not expose a usable `localStorage` global and throws on
+  // `new Storage()`. Provide a minimal Storage-shaped shim so provider tests
+  // can read/write to it.
+  const data = new Map<string, string>();
+  return {
+    get length() {
+      return data.size;
+    },
+    clear() {
+      data.clear();
+    },
+    getItem(key: string) {
+      return data.has(key) ? data.get(key)! : null;
+    },
+    key(index: number) {
+      return Array.from(data.keys())[index] ?? null;
+    },
+    removeItem(key: string) {
+      data.delete(key);
+    },
+    setItem(key: string, value: string) {
+      data.set(key, value);
+    },
+  } as unknown as Storage;
+}
+
 function ReadThemeMode() {
   const theme = useTheme();
   return <span data-testid="theme-mode">{theme.palette.mode}</span>;
@@ -224,8 +251,15 @@ function ReadAndSetMode() {
   );
 }
 
+function ReadHookMode() {
+  const { mode } = useThemeMode();
+  return <span data-testid="hook-mode">{mode}</span>;
+}
+
 beforeEach(() => {
-  localStorage.clear();
+  // jsdom 25 leaves `localStorage` as an empty `{}` by default; install a
+  // fresh in-memory shim so provider tests can read/write to it.
+  vi.stubGlobal('localStorage', createMemoryStorage());
   vi.restoreAllMocks();
 });
 
@@ -319,6 +353,47 @@ describe('AegisThemeProvider', () => {
       /useThemeMode must be used inside <AegisThemeProvider>/,
     );
     errSpy.mockRestore();
+  });
+
+  it('useThemeMode returns the current mode', () => {
+    render(
+      <AegisThemeProvider>
+        <ReadHookMode />
+      </AegisThemeProvider>,
+    );
+    expect(screen.getByTestId('hook-mode')).toHaveTextContent('light');
+  });
+
+  it('useThemeMode.setMode is stable across renders', () => {
+    const seen: Set<unknown> = new Set();
+    function Capture() {
+      const { setMode } = useThemeMode();
+      seen.add(setMode);
+      return null;
+    }
+    const { rerender } = render(
+      <AegisThemeProvider>
+        <Capture />
+      </AegisThemeProvider>,
+    );
+    rerender(
+      <AegisThemeProvider>
+        <Capture />
+      </AegisThemeProvider>,
+    );
+    expect(seen.size).toBe(1);
+  });
+
+  it('useThemeMode.setMode("dark") updates mode and writes to localStorage', async () => {
+    render(
+      <AegisThemeProvider>
+        <ReadAndSetMode />
+      </AegisThemeProvider>,
+    );
+    expect(screen.getByTestId('hook-mode')).toHaveTextContent('light');
+    await userEvent.click(screen.getByText('set-dark'));
+    expect(screen.getByTestId('hook-mode')).toHaveTextContent('dark');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
   });
 });
 ```
