@@ -67,7 +67,7 @@ export function HomePage() {
       <Typography variant="body1" sx={{ mb: 3 }}>
         Welcome to Aegis.
       </Typography>
-      <Stack direction="row" spacing={2} alignItems="center">
+      <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
         <Button variant="contained" onClick={testGreet}>
           Test greet
         </Button>
