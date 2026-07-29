@@ -53,6 +53,23 @@ where
         .await
         .expect("connect to PostgreSQL via AEGIS_DATABASE_URL");
 
+    // Drop the live `users` table (if a previous test run left one)
+    // and the `sqlx_migrations` bookkeeping so the migration below
+    // starts from scratch. This is destructive but safe because the
+    // integration tests own the schema — the live DB is the test
+    // database, not a shared staging environment. If you point the
+    // tests at a real production database by mistake you will lose
+    // data; this is intentional so the failure is loud rather than
+    // silently corrupting state.
+    sqlx::query("DROP TABLE IF EXISTS users CASCADE")
+        .execute(&pool)
+        .await
+        .expect("drop users table");
+    sqlx::query("DROP TABLE IF EXISTS _sqlx_migrations CASCADE")
+        .execute(&pool)
+        .await
+        .expect("drop sqlx_migrations bookkeeping");
+
     // Apply the migration. `sqlx::migrate!` discovers and applies any
     // unapplied migration files at the given path; on a fresh database
     // it creates the `users` table.
@@ -134,6 +151,12 @@ async fn update_replaces_name_and_role() {
             .await
             .expect("create");
 
+        // The trigger sets `updated_at` on every row change, so the
+        // pre-update value must be strictly less than the post-update
+        // value. We sleep briefly between operations so the database
+        // clock has a chance to advance between `create` and `update`.
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
         let updated = repo
             .update(user::domain::UserUpdate {
                 id: created.id,
@@ -146,6 +169,16 @@ async fn update_replaces_name_and_role() {
 
         assert_eq!(updated.name, "After");
         assert_eq!(updated.role, Role::Root);
+        assert!(
+            updated.updated_at > created.updated_at,
+            "users_set_updated_at trigger must bump updated_at on UPDATE (created={}, updated={})",
+            created.updated_at,
+            updated.updated_at
+        );
+        assert_eq!(
+            updated.created_at, created.created_at,
+            "created_at must not change on UPDATE"
+        );
 
         let reread = repo.find_by_id(created.id).await.expect("reread");
         assert_eq!(reread.name, "After");

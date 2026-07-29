@@ -1,5 +1,11 @@
 use super::*;
 
+use chrono::{TimeZone, Utc};
+
+fn test_now() -> chrono::DateTime<Utc> {
+    Utc.with_ymd_and_hms(2026, 7, 29, 0, 0, 0).unwrap()
+}
+
 #[test]
 fn role_as_str_maps_to_lowercase() {
     assert_eq!(Role::Root.as_str(), "root");
@@ -34,6 +40,8 @@ fn new_user_rejects_empty_code() {
         "Alice".into(),
         Role::Admin,
         true,
+        test_now(),
+        test_now(),
         "hash".into(),
     )
     .unwrap_err();
@@ -42,13 +50,33 @@ fn new_user_rejects_empty_code() {
 
 #[test]
 fn new_user_rejects_empty_name() {
-    let err = User::new(1, "u1".into(), "".into(), Role::Admin, true, "hash".into()).unwrap_err();
+    let err = User::new(
+        1,
+        "u1".into(),
+        "".into(),
+        Role::Admin,
+        true,
+        test_now(),
+        test_now(),
+        "hash".into(),
+    )
+    .unwrap_err();
     assert!(matches!(err, DomainError::EmptyName));
 }
 
 #[test]
 fn new_user_rejects_empty_password() {
-    let err = User::new(1, "u1".into(), "Alice".into(), Role::Admin, true, "".into()).unwrap_err();
+    let err = User::new(
+        1,
+        "u1".into(),
+        "Alice".into(),
+        Role::Admin,
+        true,
+        test_now(),
+        test_now(),
+        "".into(),
+    )
+    .unwrap_err();
     assert!(matches!(err, DomainError::EmptyPassword));
 }
 
@@ -60,6 +88,8 @@ fn new_user_accepts_valid_input() {
         "Alice".into(),
         Role::Admin,
         true,
+        test_now(),
+        test_now(),
         "argon-hash".into(),
     )
     .expect("valid user should construct");
@@ -79,6 +109,8 @@ fn password_is_not_exposed_via_public_projection() {
         "Bob".into(),
         Role::General,
         true,
+        test_now(),
+        test_now(),
         "secret-hash".into(),
     )
     .unwrap();

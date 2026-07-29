@@ -23,9 +23,18 @@ use std::convert::TryFrom;
 use std::fs;
 use std::path::PathBuf;
 
+use chrono::{TimeZone, Utc};
+
 use crate::domain::{DomainError, Role, User};
 
 use super::row::UserRow;
+
+/// Fixed timestamp used by the in-crate row tests. Production code
+/// reads the timestamp from the database; the row tests only need
+/// consistent values to feed back through `User::for_repository`.
+fn row_test_timestamp() -> chrono::DateTime<Utc> {
+    Utc.with_ymd_and_hms(2026, 7, 29, 0, 0, 0).unwrap()
+}
 
 fn migration_path() -> PathBuf {
     // CARGO_MANIFEST_DIR is the directory of `Cargo.toml` for the
@@ -149,6 +158,42 @@ fn migration_has_role_check_constraint() {
 }
 
 #[test]
+fn migration_has_created_at_and_updated_at_columns() {
+    let block = create_table_block();
+    let upper = block.to_uppercase();
+    // Both columns must be TIMESTAMPTZ NOT NULL DEFAULT NOW() so the
+    // database fills them in on insert.
+    assert!(
+        upper.contains("CREATED_AT TIMESTAMPTZ NOT NULL DEFAULT NOW()"),
+        "users table must declare created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(); got:\n{block}"
+    );
+    assert!(
+        upper.contains("UPDATED_AT TIMESTAMPTZ NOT NULL DEFAULT NOW()"),
+        "users table must declare updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(); got:\n{block}"
+    );
+}
+
+#[test]
+fn migration_has_users_set_updated_at_trigger() {
+    // The trigger and its function live outside the CREATE TABLE
+    // body, so read the whole migration file rather than only the
+    // CREATE TABLE block.
+    let sql = load_migration();
+    assert!(
+        sql.contains("CREATE TRIGGER users_set_updated_at"),
+        "migration must declare the users_set_updated_at trigger; got:\n{sql}"
+    );
+    assert!(
+        sql.contains("BEFORE UPDATE ON users"),
+        "trigger must fire on BEFORE UPDATE; got:\n{sql}"
+    );
+    assert!(
+        sql.contains("CREATE OR REPLACE FUNCTION users_set_updated_at"),
+        "migration must declare the users_set_updated_at function; got:\n{sql}"
+    );
+}
+
+#[test]
 fn row_converts_to_user_for_each_known_role() {
     for (role, as_str) in [
         (Role::Root, "root"),
@@ -161,6 +206,8 @@ fn row_converts_to_user_for_each_known_role() {
             name: "Alice".to_string(),
             role: as_str.to_string(),
             active: true,
+            created_at: row_test_timestamp(),
+            updated_at: row_test_timestamp(),
             password: "argon-phc".to_string(),
         };
         let user: User = row.try_into().expect("known role must convert");
@@ -181,6 +228,8 @@ fn row_with_unknown_role_fails_to_convert() {
         name: "Bob".to_string(),
         role: "superuser".to_string(),
         active: true,
+        created_at: row_test_timestamp(),
+        updated_at: row_test_timestamp(),
         password: "argon-phc".to_string(),
     };
     let err = User::try_from(row).expect_err("unknown role must be rejected");
@@ -198,6 +247,8 @@ fn user_password_hash_accessor_returns_the_hash() {
         name: "Carol".to_string(),
         role: "root".to_string(),
         active: true,
+        created_at: row_test_timestamp(),
+        updated_at: row_test_timestamp(),
         password: "$argon2id$v=19$secret".to_string(),
     };
     let user: User = row.try_into().expect("known role must convert");

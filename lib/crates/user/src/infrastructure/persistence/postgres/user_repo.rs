@@ -42,7 +42,7 @@ impl UserRepository for UserRepo {
     async fn create(&self, input: UserNew) -> Result<User, DomainError> {
         const SQL: &str = "INSERT INTO users (code, name, role, active, password) \
                            VALUES ($1, $2, $3, $4, $5) \
-                           RETURNING id, code, name, role, active, password";
+                           RETURNING id, code, name, role, active, created_at, updated_at, password";
         let row: UserRow = sqlx::query_as(SQL)
             .bind(&input.code)
             .bind(&input.name)
@@ -57,42 +57,56 @@ impl UserRepository for UserRepo {
     }
 
     async fn find_by_id(&self, id: i32) -> Result<User, DomainError> {
-        const SQL: &str = "SELECT id, code, name, role, active, password FROM users WHERE id = $1";
-        let row: UserRow = sqlx::query_as(SQL)
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(map_db_error)?
-            .ok_or(DomainError::NotFound)?;
+        // Use `QueryBuilder` so we can construct the SELECT at
+        // runtime without violating sqlx's `SqlSafeStr` bound
+        // (which only permits `&'static str` to flow into
+        // `query_as`). The column list is a compile-time constant
+        // here; nothing user-supplied touches the SQL string.
+        let row: UserRow = sqlx::QueryBuilder::new(
+            "SELECT id, code, name, role, active, created_at, updated_at, password \
+             FROM users WHERE id = ",
+        )
+        .push_bind(id)
+        .build_query_as::<UserRow>()
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(DomainError::NotFound)?;
         row.try_into()
     }
 
     async fn find_by_code(&self, code: &str) -> Result<User, DomainError> {
-        const SQL: &str =
-            "SELECT id, code, name, role, active, password FROM users WHERE code = $1";
-        let row: UserRow = sqlx::query_as(SQL)
-            .bind(code)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(map_db_error)?
-            .ok_or(DomainError::NotFound)?;
+        let row: UserRow = sqlx::QueryBuilder::new(
+            "SELECT id, code, name, role, active, created_at, updated_at, password \
+             FROM users WHERE code = ",
+        )
+        .push_bind(code)
+        .build_query_as::<UserRow>()
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_db_error)?
+        .ok_or(DomainError::NotFound)?;
         row.try_into()
     }
 
     async fn list(&self) -> Result<Vec<User>, DomainError> {
-        const SQL: &str = "SELECT id, code, name, role, active, password FROM users ORDER BY id";
-        let rows: Vec<UserRow> = sqlx::query_as(SQL)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(map_db_error)?;
+        let rows: Vec<UserRow> = sqlx::QueryBuilder::new(
+            "SELECT id, code, name, role, active, created_at, updated_at, password \
+             FROM users ORDER BY id",
+        )
+        .build_query_as::<UserRow>()
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_error)?;
         rows.into_iter().map(User::try_from).collect()
     }
 
     async fn update(&self, input: UserUpdate) -> Result<User, DomainError> {
         // Build a dynamic UPDATE that only touches the columns whose
-        // option is `Some`. `QueryBuilder` is type-checked at the
-        // bind sites so we cannot smuggle an unbound value into the
-        // SQL string.
+        // option is `Some`. `QueryBuilder` is type-checked at the bind
+        // sites so we cannot smuggle an unbound value into the SQL
+        // string. `updated_at` is set automatically by the
+        // `users_set_updated_at` trigger; we do not bind it here.
         let mut qb = sqlx::QueryBuilder::new("UPDATE users SET ");
         let mut first = true;
         let mut separated = |qb: &mut sqlx::QueryBuilder<sqlx::Postgres>| {
@@ -131,7 +145,7 @@ impl UserRepository for UserRepo {
         }
 
         qb.push(" WHERE id = ").push_bind(input.id);
-        qb.push(" RETURNING id, code, name, role, active, password");
+        qb.push(" RETURNING id, code, name, role, active, created_at, updated_at, password");
 
         let row: UserRow = qb
             .build_query_as::<UserRow>()
@@ -143,10 +157,10 @@ impl UserRepository for UserRepo {
     }
 
     async fn deactivate(&self, id: i32) -> Result<User, DomainError> {
-        const SQL: &str = "UPDATE users SET active = FALSE WHERE id = $1 \
-                           RETURNING id, code, name, role, active, password";
-        let row: UserRow = sqlx::query_as(SQL)
-            .bind(id)
+        let row: UserRow = sqlx::QueryBuilder::new("UPDATE users SET active = FALSE WHERE id = ")
+            .push_bind(id)
+            .push(" RETURNING id, code, name, role, active, created_at, updated_at, password")
+            .build_query_as::<UserRow>()
             .fetch_optional(&self.pool)
             .await
             .map_err(map_db_error)?

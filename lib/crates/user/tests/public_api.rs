@@ -10,6 +10,7 @@
 //! is the most explicit way to assert that the documented constructor
 //! signatures are stable, and avoids ever opening a real connection.
 
+use chrono::{TimeZone, Utc};
 use user::{CreateUser, Role, UpdateUser, UserRepo, UserUsecase, UserView};
 
 /// The crate-root imports compile. Touching the type tokens below is
@@ -31,6 +32,8 @@ fn public_types_are_nameable_from_crate_root() {
         name: "Alice".into(),
         role: Role::General,
         active: true,
+        created_at: Utc.with_ymd_and_hms(2026, 7, 29, 0, 0, 0).unwrap(),
+        updated_at: Utc.with_ymd_and_hms(2026, 7, 29, 0, 0, 0).unwrap(),
     });
     assert_create(CreateUser {
         code: "u1".into(),

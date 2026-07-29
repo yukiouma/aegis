@@ -8,11 +8,19 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
+use chrono::{DateTime, TimeZone, Utc};
 
 use crate::domain::{DomainError, Role, User, UserNew, UserRepository, UserUpdate};
 use crate::usecase::commands::{CreateUser, UpdateUser};
 use crate::usecase::error::UsecaseError;
 use crate::usecase::user_usecase::{UserUsecase, UserView};
+
+/// Fixed epoch timestamp used by the mock repository. Production
+/// users get `created_at` / `updated_at` from the database; the mock
+/// only needs consistent values to feed back through `UserView`.
+fn mock_now() -> DateTime<Utc> {
+    Utc.with_ymd_and_hms(2026, 7, 29, 0, 0, 0).unwrap()
+}
 
 /// Captured state for the mock repository. Held behind a `Mutex` so the
 /// usecase (async) and the test (sync) can both observe it.
@@ -106,6 +114,8 @@ impl UserRepository for MockUserRepository {
             input.name.clone(),
             input.role,
             true,
+            mock_now(),
+            mock_now(),
             input.password_hash.clone(),
         );
         state.users.insert(id, stored.clone());
@@ -184,7 +194,17 @@ fn make_usecase_with_user(user: User) -> (MockUserRepository, UserUsecase<MockUs
 }
 
 fn seed_user(id: i32, code: &str, name: &str, role: Role, active: bool, hash: &str) -> User {
-    User::for_repository(id, code.into(), name.into(), role, active, hash.into())
+    let now = mock_now();
+    User::for_repository(
+        id,
+        code.into(),
+        name.into(),
+        role,
+        active,
+        now,
+        now,
+        hash.into(),
+    )
 }
 
 #[tokio::test]
@@ -206,6 +226,8 @@ async fn create_hashes_password_before_repository() {
         name: "Alice".into(),
         role: Role::Admin,
         active: true,
+        created_at: mock_now(),
+        updated_at: mock_now(),
     };
     assert_eq!(view, expected);
 

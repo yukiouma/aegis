@@ -1,5 +1,7 @@
 use std::fmt;
 
+use chrono::{DateTime, Utc};
+
 use super::DomainError;
 use super::role::Role;
 
@@ -10,6 +12,8 @@ pub struct User {
     pub name: String,
     pub role: Role,
     pub active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub(crate) password: String,
 }
 
@@ -25,12 +29,15 @@ impl User {
     /// see the test call sites); the test build sees the calls and
     /// would not warn even without the allow.
     #[allow(dead_code)]
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         id: i32,
         code: String,
         name: String,
         role: Role,
         active: bool,
+        created_at: DateTime<Utc>,
+        updated_at: DateTime<Utc>,
         password: String,
     ) -> Result<Self, DomainError> {
         if code.trim().is_empty() {
@@ -48,6 +55,8 @@ impl User {
             name,
             role,
             active,
+            created_at,
+            updated_at,
             password,
         })
     }
@@ -55,12 +64,15 @@ impl User {
     /// Constructor reserved for the infrastructure layer when materialising
     /// rows from persistence. Skips domain validation because the data is
     /// assumed to have been validated on the way in.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn for_repository(
         id: i32,
         code: String,
         name: String,
         role: Role,
         active: bool,
+        created_at: DateTime<Utc>,
+        updated_at: DateTime<Utc>,
         password: String,
     ) -> Self {
         Self {
@@ -69,6 +81,8 @@ impl User {
             name,
             role,
             active,
+            created_at,
+            updated_at,
             password,
         }
     }
@@ -99,6 +113,8 @@ impl fmt::Debug for User {
             .field("name", &self.name)
             .field("role", &self.role)
             .field("active", &self.active)
+            .field("created_at", &self.created_at)
+            .field("updated_at", &self.updated_at)
             .field("password", &"<redacted>")
             .finish()
     }

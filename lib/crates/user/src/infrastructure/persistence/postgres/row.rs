@@ -8,6 +8,10 @@
 // and surface the `InvalidRole` error path as defensive belt-and-braces
 // even though the conversion cannot fail in practice.
 //
+// `created_at` and `updated_at` are populated by the database
+// (DEFAULT NOW() on insert, a BEFORE UPDATE trigger on update) so the
+// row never carries stale timestamps.
+//
 // The module is `pub(crate)` (see `persistence/postgres/mod.rs`) and `UserRow`
 // is NOT re-exported at the crate root: it is an internal bridge
 // between SQLx's `FromRow` derive and the domain `User` type, and the
@@ -21,6 +25,7 @@
 use std::convert::TryFrom;
 use std::fmt;
 
+use chrono::{DateTime, Utc};
 use sqlx::FromRow;
 
 use crate::domain::{DomainError, Role, User};
@@ -32,6 +37,8 @@ pub struct UserRow {
     pub name: String,
     pub role: String,
     pub active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub(crate) password: String,
 }
 
@@ -47,6 +54,8 @@ impl fmt::Debug for UserRow {
             .field("name", &self.name)
             .field("role", &self.role)
             .field("active", &self.active)
+            .field("created_at", &self.created_at)
+            .field("updated_at", &self.updated_at)
             .field("password", &"<redacted>")
             .finish()
     }
@@ -67,6 +76,8 @@ impl TryFrom<UserRow> for User {
             row.name,
             role,
             row.active,
+            row.created_at,
+            row.updated_at,
             row.password,
         ))
     }

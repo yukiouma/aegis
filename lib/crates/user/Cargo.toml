@@ -14,6 +14,12 @@ thiserror = { workspace = true }
 # usecase layer (`hash_password`). The `getrandom` feature on the
 # workspace dependency must remain enabled so that `OsRng` is reachable.
 rand_core = { workspace = true }
+# `chrono` provides the `DateTime<Utc>` type used by the domain
+# `User` and the usecase `UserView` to carry the `created_at` /
+# `updated_at` columns surfaced by the repository. The `clock` feature
+# keeps the binary small (no local time zones) while still enabling
+# `NOW()`-style integration through `chrono::Utc`.
+chrono = { workspace = true }
 
 [dev-dependencies]
 # Loads `.env` at test startup so live-DB integration tests can find

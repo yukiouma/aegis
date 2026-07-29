@@ -1,5 +1,6 @@
 use argon2::password_hash::{SaltString, rand_core::OsRng};
 use argon2::{Argon2, PasswordHasher};
+use chrono::{DateTime, Utc};
 
 use crate::domain::{DomainError, Role, User, UserNew, UserRepository, UserUpdate};
 
@@ -15,6 +16,8 @@ pub struct UserView {
     pub name: String,
     pub role: Role,
     pub active: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 impl From<User> for UserView {
@@ -25,6 +28,8 @@ impl From<User> for UserView {
             name: user.name,
             role: user.role,
             active: user.active,
+            created_at: user.created_at,
+            updated_at: user.updated_at,
         }
     }
 }
