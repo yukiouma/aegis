@@ -3,6 +3,11 @@
 Workspace library providing a SQLx/PostgreSQL-backed DDD user
 repository and an async `UserUsecase`.
 
+> See [docs/guidelines/lib-crate-development.md](../../docs/guidelines/lib-crate-development.md)
+> for the cross-cutting conventions this crate follows (workspace
+> deps, no `mod.rs`, ports-and-adapters layering, ignored live-DB
+> tests, etc.).
+
 ## Layout
 
 ```text
