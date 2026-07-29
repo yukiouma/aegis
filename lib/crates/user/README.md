@@ -42,3 +42,21 @@ let user_usecase = UserUsecase::new(user_repo);
 
 The `user` crate does not run migrations at runtime; a deployment
 step is required.
+
+## Integration tests
+
+The crate ships live-database integration tests at
+[`tests/integration_persistence.rs`](tests/integration_persistence.rs).
+They connect to PostgreSQL, apply the migration, and exercise the
+full CRUD surface (including unique-violation and `NotFound`
+round-trips) plus a smoke test of the usecase layer. They are
+`#[ignore]`-gated so the default `cargo test -p user` run stays green
+without a database.
+
+Run them against a local PostgreSQL with:
+
+```bash
+# .env at the workspace root is sourced automatically by the tests
+# via dotenvy; AEGIS_DATABASE_URL must point at a reachable server.
+cargo test -p user -- --ignored
+```

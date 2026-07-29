@@ -1,28 +1,29 @@
-//! Tests for the infrastructure layer.
-//!
-//! These tests exercise the two pieces that do not require a live
-//! PostgreSQL connection:
+//! Tests for the PostgreSQL infrastructure adapter that do NOT
+//! require a live database connection.
 //!
 //! 1. The `0001_create_users.sql` migration file content (the schema
-//!    that downstream tasks will apply). The leading doc comment is
-//!    stripped before assertion so the tests anchor on the `CREATE
+//!    that downstream consumers will apply). The leading doc comment
+//!    is stripped before assertion so the tests anchor on the `CREATE
 //!    TABLE` block, not on keywords in the header.
 //! 2. The `UserRow` -> `User` conversion, including the role parsing
 //!    path.
 //!
-//! A live-database round-trip test is included below as `#[ignore]` so
-//! that `cargo test -p user` stays green without a connection. Run it
-//! with:
+//! Live-database round-trip tests live in `tests/integration_persistence.rs`
+//! at the crate root and are `#[ignore]`-gated. Run them with:
 //!
 //! ```text
 //! cargo test -p user -- --ignored
 //! ```
+//!
+//! They require the `AEGIS_DATABASE_URL` environment variable (or a
+//! `.env` file containing it at the workspace root) and apply the
+//! migration against the database before each test run.
 
 use std::convert::TryFrom;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::domain::{DomainError, Role, User, UserRepository};
+use crate::domain::{DomainError, Role, User};
 
 use super::row::UserRow;
 
@@ -201,76 +202,4 @@ fn user_password_hash_accessor_returns_the_hash() {
     };
     let user: User = row.try_into().expect("known role must convert");
     assert_eq!(user.password_hash(), "$argon2id$v=19$secret");
-}
-
-#[test]
-#[ignore = "requires a live PostgreSQL configured via DATABASE_URL"]
-fn live_database_create_then_find_then_deactivate() {
-    // The actual round-trip test is wired up here so that downstream
-    // tasks / reviewers can opt in with `cargo test -p user -- --ignored`.
-    // It is gated because the CI environment for this task has no
-    // PostgreSQL.
-    let url = match std::env::var("DATABASE_URL") {
-        Ok(v) if !v.is_empty() => v,
-        _ => panic!("DATABASE_URL must be set to run ignored tests"),
-    };
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .expect("runtime");
-    runtime.block_on(async move {
-        let pool = sqlx::PgPool::connect(&url)
-            .await
-            .expect("connect to PostgreSQL");
-
-        let repo = super::user_repo::UserRepo::new(pool);
-
-        // Use a code unique to this run to avoid clashing with other
-        // state in the database.
-        let unique = format!("task4-{}", nanosecond_suffix());
-        let new = crate::domain::UserNew {
-            code: unique.clone(),
-            name: "Task Four".to_string(),
-            role: Role::Admin,
-            password_hash: "$argon2id$v=19$placeholder".to_string(),
-            active: true,
-        };
-        let created = repo.create(new).await.expect("create");
-        assert_eq!(created.code, unique);
-        assert!(created.active);
-
-        let fetched_by_id = repo.find_by_id(created.id).await.expect("find_by_id");
-        assert_eq!(fetched_by_id.id, created.id);
-
-        let fetched_by_code = repo.find_by_code(&unique).await.expect("find_by_code");
-        assert_eq!(fetched_by_code.id, created.id);
-
-        let list = repo.list().await.expect("list");
-        assert!(list.iter().any(|u| u.id == created.id));
-
-        let update = crate::domain::UserUpdate {
-            id: created.id,
-            name: Some("Task Four Renamed".to_string()),
-            ..Default::default()
-        };
-        let updated = repo.update(update).await.expect("update");
-        assert_eq!(updated.name, "Task Four Renamed");
-
-        let deactivated = repo.deactivate(created.id).await.expect("deactivate");
-        assert!(!deactivated.active);
-    });
-}
-
-/// Small helper that does not require pulling the `uuid` crate into
-/// the workspace just for the ignored test. Formats the current
-/// `SystemTime` nanosecond counter as a lowercase hex string, which
-/// is unique enough to avoid clashing with other rows in the same
-/// database across runs of the ignored test.
-fn nanosecond_suffix() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos())
-        .unwrap_or(0);
-    format!("{nanos:x}")
 }
