@@ -5,7 +5,6 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./Sidebar": "./components/Sidebar/index.ts",
     "./mui": "./src/mui/index.ts",
     "./icons": "./src/icons/index.ts",
     "./theme": "./src/theme/index.ts"
