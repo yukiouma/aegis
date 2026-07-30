@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AegisI18nProvider, useI18n } from '@aegis/ui/i18n';
 import { DocumentLangSync } from './DocumentLangSync';
@@ -34,6 +34,10 @@ beforeEach(() => {
   vi.unstubAllGlobals();
   vi.stubGlobal('localStorage', createMemoryStorage());
   document.documentElement.lang = 'en';
+});
+
+afterEach(() => {
+  cleanup();
 });
 
 function Switcher() {
