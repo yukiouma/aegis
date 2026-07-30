@@ -426,7 +426,7 @@ describe('DocumentLangSync', () => {
 Run:
 
 ```bash
-pnpm --filter aegis-desktop test src/DocumentLangSync.test.tsx 2>&1 | tail -10
+pnpm --filter aegis-desktop exec vitest run src/DocumentLangSync.test.tsx 2>&1 | tail -10
 ```
 
 Expected: FAIL because `./DocumentLangSync` does not exist.
@@ -453,7 +453,7 @@ export function DocumentLangSync(): null {
 Run:
 
 ```bash
-pnpm --filter aegis-desktop test src/DocumentLangSync.test.tsx 2>&1 | tail -10
+pnpm --filter aegis-desktop exec vitest run src/DocumentLangSync.test.tsx 2>&1 | tail -10
 ```
 
 Expected: PASS, 2 tests.
@@ -580,7 +580,7 @@ describe('SettingsPage', () => {
 Run:
 
 ```bash
-pnpm --filter aegis-desktop test src/SettingsPage.test.tsx 2>&1 | tail -10
+pnpm --filter aegis-desktop exec vitest run src/SettingsPage.test.tsx 2>&1 | tail -10
 ```
 
 Expected: FAIL because `./SettingsPage` still renders the old English copy with no switcher.
@@ -654,7 +654,7 @@ export function SettingsPage() {
 Run:
 
 ```bash
-pnpm --filter aegis-desktop test src/SettingsPage.test.tsx 2>&1 | tail -10
+pnpm --filter aegis-desktop exec vitest run src/SettingsPage.test.tsx 2>&1 | tail -10
 ```
 
 Expected: PASS, 3 tests.
