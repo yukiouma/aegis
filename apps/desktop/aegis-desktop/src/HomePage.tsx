@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { Box, Button, Stack, Typography } from "@aegis/ui/mui";
+import { useI18n } from "@aegis/ui/i18n";
 import { invoke } from "@tauri-apps/api/core";
 
 export function HomePage() {
+  const { t } = useI18n();
   const [greetMsg, setGreetMsg] = useState("");
 
   async function testGreet() {
@@ -11,13 +13,15 @@ export function HomePage() {
 
   return (
     <Box sx={{ p: 4 }}>
-      <Typography variant="h4" gutterBottom>Home</Typography>
+      <Typography variant="h4" gutterBottom>
+        {t("home.heading")}
+      </Typography>
       <Typography variant="body1" sx={{ mb: 3 }}>
-        Welcome to Aegis.
+        {t("home.welcome")}
       </Typography>
       <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
         <Button variant="contained" onClick={testGreet}>
-          Test greet
+          {t("home.testGreet")}
         </Button>
         {greetMsg && <Typography variant="body2">{greetMsg}</Typography>}
       </Stack>
