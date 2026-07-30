@@ -7,7 +7,8 @@
     ".": "./src/index.ts",
     "./mui": "./src/mui/index.ts",
     "./icons": "./src/icons/index.ts",
-    "./theme": "./src/theme/index.ts"
+    "./theme": "./src/theme/index.ts",
+    "./i18n": "./src/i18n/index.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
