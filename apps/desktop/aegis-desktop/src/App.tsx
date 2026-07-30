@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Box } from "@aegis/ui/mui";
 import { Sidebar, type MenuItem, type SidebarProps } from "@aegis/ui";
 import { Home as HomeIcon, Settings as SettingsIcon } from "@aegis/ui/icons";
+import { useI18n } from "@aegis/ui/i18n";
 import { HomePage } from "./HomePage";
 import { SettingsPage } from "./SettingsPage";
 
@@ -11,11 +12,6 @@ import { SettingsPage } from "./SettingsPage";
 const HomeMenuIcon = () => <HomeIcon />;
 const SettingsMenuIcon = () => <SettingsIcon />;
 
-const menu: MenuItem[] = [
-  { link: "/home", title: "Home", icon: HomeMenuIcon },
-  { link: "/settings", title: "Settings", icon: SettingsMenuIcon },
-];
-
 type Page = "home" | "settings";
 
 function pageFromLink(link: string): Page {
@@ -23,11 +19,17 @@ function pageFromLink(link: string): Page {
 }
 
 export default function App() {
+  const { t } = useI18n();
   const [page, setPage] = useState<Page>("home");
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  const menu: MenuItem[] = [
+    { link: "/home", title: t("nav.home"), icon: HomeMenuIcon },
+    { link: "/settings", title: t("nav.settings"), icon: SettingsMenuIcon },
+  ];
+
   const sidebarProps: SidebarProps = {
-    title: "Aegis",
+    title: t("app.title"),
     menu,
     open: sidebarOpen,
     onToggle: () => setSidebarOpen((o) => !o),
