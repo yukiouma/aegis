@@ -184,8 +184,6 @@ pnpm --filter aegis-desktop build
 - `apps/desktop/aegis-desktop/src/HomePage.tsx` — translate heading, welcome text, and button label via `useI18n`.
 - `apps/desktop/aegis-desktop/src/SettingsPage.tsx` — translate heading, theme label, and add the language switcher.
 - `apps/desktop/aegis-desktop/package.json` — add Vitest + testing-library devDependencies, a `test` script, and a `typecheck` script.
-- `apps/desktop/aegis-desktop/vite.config.ts` — leave unchanged (existing test runner is independent of Vite's build).
-- `apps/desktop/aegis-desktop/tsconfig.json` — leave unchanged.
 
 ### Files to create
 
@@ -199,6 +197,14 @@ pnpm --filter aegis-desktop build
 
 - `lib/packages/ui/src/i18n/registry.ts`
 - `lib/packages/ui/src/i18n/AegisI18nProvider.tsx`
+- `lib/packages/ui/src/i18n/useI18n.ts`
+- `lib/packages/ui/src/i18n/index.ts`
+- `lib/packages/ui/src/i18n/types.ts`
+- `apps/desktop/aegis-desktop/vite.config.ts`
+- `apps/desktop/aegis-desktop/tsconfig.json`
+- `apps/desktop/aegis-desktop/index.html`
+- `apps/desktop/aegis-desktop/src-tauri/**`
+- Any Rust files.
 - `lib/packages/ui/src/i18n/useI18n.ts`
 - `lib/packages/ui/src/i18n/index.ts`
 - `apps/desktop/aegis-desktop/index.html`
