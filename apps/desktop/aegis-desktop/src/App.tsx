@@ -1,51 +1,54 @@
 import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
-import "./App.css";
+import { Box } from "@aegis/ui/mui";
+import { Sidebar, type MenuItem, type SidebarProps } from "@aegis/ui";
+import { Home as HomeIcon, Settings as SettingsIcon } from "@aegis/ui/icons";
+import { useI18n } from "@aegis/ui/i18n";
+import { HomePage } from "./HomePage";
+import { SettingsPage } from "./SettingsPage";
 
-function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+// MUI icon components require SvgIconProps; the Sidebar's `icon` slot is
+// typed as the no-required-props `ComponentType`. Wrap each icon in a
+// no-arg function so the assignment type-checks.
+const HomeMenuIcon = () => <HomeIcon />;
+const SettingsMenuIcon = () => <SettingsIcon />;
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+type Page = "home" | "settings";
 
-  return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
-    </main>
-  );
+function pageFromLink(link: string): Page {
+  return link === "/settings" ? "settings" : "home";
 }
 
-export default App;
+export default function App() {
+  const { t } = useI18n();
+  const [page, setPage] = useState<Page>("home");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const menu: MenuItem[] = [
+    { link: "/home", title: t("nav.home"), icon: HomeMenuIcon },
+    { link: "/settings", title: t("nav.settings"), icon: SettingsMenuIcon },
+  ];
+
+  const sidebarProps: SidebarProps = {
+    title: t("app.title"),
+    menu,
+    open: sidebarOpen,
+    onToggle: () => setSidebarOpen((o) => !o),
+    onNavigate: (link) => setPage(pageFromLink(link)),
+  };
+
+  return (
+    <Box sx={{ display: "flex", minHeight: "100vh" }}>
+      <Sidebar {...sidebarProps} />
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          ml: `${sidebarOpen ? 240 : 56}px`,
+          transition: "margin 0.3s",
+        }}
+      >
+        {page === "settings" ? <SettingsPage /> : <HomePage />}
+      </Box>
+    </Box>
+  );
+}
