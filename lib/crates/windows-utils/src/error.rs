@@ -1,6 +1,5 @@
 use thiserror::Error;
 
-#[cfg(target_os = "windows")]
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum WindowsUtilsError {

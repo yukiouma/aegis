@@ -18,7 +18,6 @@ pub struct DomainUserInfo {
     pub host_machine: String,
 }
 
-#[cfg(target_os = "windows")]
 pub fn get_user_info() -> Result<DomainUserInfo, WindowsUtilsError> {
     let domain = get_domain_info()?;
     let userid_domain = get_user_id_info()?;
