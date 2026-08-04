@@ -12,6 +12,21 @@ pub enum WindowsUtilsError {
         #[source]
         source: windows::core::Error,
     },
+
+    #[error("failed to open the LSA policy handle")]
+    LsaOpenPolicy(#[source] windows::core::Error),
+
+    #[error("failed to query the LSA account domain information")]
+    LsaQueryPolicy(#[source] windows::core::Error),
+
+    #[error("LSA returned no account domain SID")]
+    MissingDomainSid,
+
+    #[error("failed to convert the account domain SID to a string")]
+    ConvertSid(#[source] windows::core::Error),
+
+    #[error("the account domain SID string is not valid UTF-8")]
+    SidNotUtf8(#[source] std::string::FromUtf8Error),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
