@@ -1,13 +1,10 @@
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use std::time::Duration;
 
 use apis::user::{UserApiError, UserService};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{
-    DomainError, DomainIdentityRepository, UserCredentials, UserCredentialsRepository,
-};
+use crate::domain::{DomainError, DomainIdentityRepository, UserCredentialsRepository};
 
 use super::commands::{
     AccessTokenView, AuthClaimsView, LoginWithDomainUserInfo, LoginWithPassword, Logout, LogoutAck,
@@ -57,10 +54,10 @@ struct RefreshClaims {
 
 /// Async orchestration for the auth flow.
 ///
-/// Holds an `Arc<RwLock<HashMap<String, u32>>>` cache of token versions
-/// keyed by user code. `verify` and `refresh` consult the cache; on miss
-/// they fall back to `credentials.find_by_code` and populate the cache.
-/// `login_with_*` and `logout` write to the cache directly.
+/// The token-version cache lives inside the
+/// [`UserCredentialsRepository`](crate::domain::UserCredentialsRepository)
+/// implementation — see the `current_token_version` port method. The
+/// usecase calls it directly; no cache state of its own.
 pub struct AuthUsecase<R: UserCredentialsRepository, D: DomainIdentityRepository> {
     credentials: R,
     identities: D,
@@ -68,7 +65,6 @@ pub struct AuthUsecase<R: UserCredentialsRepository, D: DomainIdentityRepository
     signing_key: Vec<u8>,
     access_ttl: Duration,
     refresh_ttl: Duration,
-    token_versions: Arc<RwLock<HashMap<String, u32>>>,
 }
 
 impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D> {
@@ -80,26 +76,9 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             signing_key: config.signing_key,
             access_ttl: config.access_ttl,
             refresh_ttl: config.refresh_ttl,
-            token_versions: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    /// Internal helper: read the cached `token_version` for `code`,
-    /// falling back to the repo on miss.
-    async fn current_token_version(&self, code: &str) -> Result<u32, UsecaseError> {
-        if let Some(v) = self.token_versions.read().unwrap().get(code).copied() {
-            return Ok(v);
-        }
-        let creds = self.credentials.find_by_code(code).await?;
-        let v = creds.token_version;
-        self.token_versions
-            .write()
-            .unwrap()
-            .insert(code.to_string(), v);
-        Ok(v)
-    }
-
-    /// Placeholder method bodies; full implementations land in Tasks 4 and 5.
     pub async fn login_with_password(
         &self,
         cmd: LoginWithPassword,
@@ -129,12 +108,6 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         {
             return Err(UsecaseError::Repository(DomainError::InvalidCredentials));
         }
-
-        // Populate the cache so the freshly-minted tokens verify without a miss.
-        self.token_versions
-            .write()
-            .unwrap()
-            .insert(cmd.code.clone(), creds.token_version);
 
         let role = role_from_api(user.role);
         let access = self.mint_access_token(&cmd.code, role, creds.token_version)?;
@@ -171,10 +144,6 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             return Err(UsecaseError::Repository(DomainError::Inactive));
         }
         let creds = self.credentials.find_by_code(&cmd.code).await?;
-        self.token_versions
-            .write()
-            .unwrap()
-            .insert(cmd.code.clone(), creds.token_version);
         let role = role_from_api(user.role);
         let access = self.mint_access_token(&cmd.code, role, creds.token_version)?;
         let refresh = self.mint_refresh_token(&cmd.code, creds.token_version)?;
@@ -194,10 +163,10 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             .map_err(|e| UsecaseError::Verification(format!("decode access: {e}")))?;
         let claims = data.claims;
 
-        let current = self.current_token_version(&claims.sub).await?;
+        let current = self.credentials.current_token_version(&claims.sub).await?;
         if current != claims.ver {
             return Err(UsecaseError::Verification(format!(
-                "token_version mismatch (cached = {current}, jwt.ver = {})",
+                "token_version mismatch (current = {current}, jwt.ver = {})",
                 claims.ver
             )));
         }
@@ -229,10 +198,10 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             .map_err(|e| UsecaseError::Verification(format!("decode refresh: {e}")))?;
         let claims = data.claims;
 
-        let current = self.current_token_version(&claims.sub).await?;
+        let current = self.credentials.current_token_version(&claims.sub).await?;
         if current != claims.ver {
             return Err(UsecaseError::Verification(format!(
-                "token_version mismatch (cached = {current}, jwt.ver = {})",
+                "token_version mismatch (current = {current}, jwt.ver = {})",
                 claims.ver
             )));
         }
@@ -257,18 +226,12 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         if cmd.code.trim().is_empty() {
             return Err(UsecaseError::Repository(DomainError::EmptyCode));
         }
-        let new_version = self.credentials.bump_token_version(&cmd.code).await?;
-        self.token_versions
-            .write()
-            .unwrap()
-            .insert(cmd.code.clone(), new_version);
+        // The repository atomically bumps the database and writes the new
+        // version into its in-memory cache, so subsequent verify / refresh
+        // calls in this process reject tokens minted before the bump.
+        self.credentials.bump_token_version(&cmd.code).await?;
         Ok(LogoutAck { code: cmd.code })
     }
-
-    // `UserCredentials` is referenced in tests later; keep the import
-    // so the compiler warns if a later task accidentally removes it.
-    #[allow(dead_code)]
-    fn _phantom(&self, _: UserCredentials) {}
 
     fn mint_access_token(
         &self,

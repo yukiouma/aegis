@@ -13,8 +13,16 @@ pub trait UserCredentialsRepository: Send + Sync {
 
     /// Atomically increments `token_version` for the user identified
     /// by `code` and returns the new value. Returns `DomainError::NotFound`
-    /// if no row exists.
+    /// if no row exists. Implementations also refresh their internal
+    /// in-memory token-version cache with the returned value so the
+    /// next `current_token_version` call sees the bump.
     async fn bump_token_version(&self, code: &str) -> Result<u32, DomainError>;
+
+    /// Returns the user's current `token_version`. Implementations may
+    /// cache the result to avoid repeated database reads on the
+    /// `verify` / `refresh` hot path. `bump_token_version` updates the
+    /// cache atomically with the database write.
+    async fn current_token_version(&self, code: &str) -> Result<u32, DomainError>;
 }
 
 /// Outbound port for persistence of `DomainIdentity`.

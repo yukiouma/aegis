@@ -33,6 +33,7 @@ struct MockCredState {
     by_code: HashMap<String, UserCredentials>,
     find_calls: usize,
     bump_calls: usize,
+    current_version_calls: usize,
 }
 
 #[derive(Clone, Default)]
@@ -80,6 +81,15 @@ impl UserCredentialsRepository for MockUserCredentialsRepo {
         let entry = s.by_code.get_mut(code).ok_or(DomainError::NotFound)?;
         entry.token_version += 1;
         Ok(entry.token_version)
+    }
+
+    async fn current_token_version(&self, code: &str) -> Result<u32, DomainError> {
+        let mut s = self.state.lock().unwrap();
+        s.current_version_calls += 1;
+        s.by_code
+            .get(code)
+            .map(|c| c.token_version)
+            .ok_or(DomainError::NotFound)
     }
 }
 
@@ -412,7 +422,7 @@ async fn verify_returns_claims_for_freshly_minted_access_token() {
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
     users.seed("u1", ApiRole::Admin, true);
-    let usecase = make_usecase(creds.clone(), ids, users);
+    let usecase = make_usecase(creds, ids, users);
 
     let pair = usecase
         .login_with_password(LoginWithPassword {
@@ -423,37 +433,25 @@ async fn verify_returns_claims_for_freshly_minted_access_token() {
         .expect("login succeeds");
     let claims = usecase
         .verify(VerifyAccessToken {
-            access_token: pair.access_token.clone(),
+            access_token: pair.access_token,
         })
         .await
         .expect("verify succeeds");
     assert_eq!(claims.code, "u1");
     assert_eq!(claims.role, Role::Admin);
     assert_eq!(claims.token_version, 7);
-
-    // Login populated the cache; verify must not touch the repo.
-    let find_calls_before = creds.state.lock().unwrap().find_calls;
-    let _ = usecase
-        .verify(VerifyAccessToken {
-            access_token: pair.access_token,
-        })
-        .await
-        .expect("verify succeeds again");
-    assert_eq!(
-        creds.state.lock().unwrap().find_calls,
-        find_calls_before,
-        "verify must hit the cache, not the repo"
-    );
 }
 
 #[tokio::test]
-async fn verify_falls_back_to_repo_on_cache_miss_and_populates_cache() {
+async fn verify_uses_current_token_version_port_not_find_by_code() {
+    // The token-version cache lives inside the repository; verify
+    // goes through `current_token_version`, not `find_by_code`.
     let creds = MockUserCredentialsRepo::default();
     creds.seed_hash("u1", &hash_password("hunter2"), 3);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
     users.seed("u1", ApiRole::Admin, true);
-    let usecase = make_usecase(creds.clone(), ids.clone(), users.clone());
+    let usecase = make_usecase(creds.clone(), ids, users);
 
     let pair = usecase
         .login_with_password(LoginWithPassword {
@@ -463,39 +461,52 @@ async fn verify_falls_back_to_repo_on_cache_miss_and_populates_cache() {
         .await
         .expect("login succeeds");
 
-    // Build a fresh usecase that shares the same repo but starts with
-    // an empty cache (simulating a cold restart within the same process).
-    let cold_users = FakeUserService::default();
-    cold_users.seed("u1", ApiRole::Admin, true);
-    let cold_usecase = make_usecase(creds.clone(), ids, cold_users);
+    let find_calls_before = {
+        let s = creds.state.lock().unwrap();
+        s.find_calls
+    };
+    let current_version_before = {
+        let s = creds.state.lock().unwrap();
+        s.current_version_calls
+    };
 
-    let find_calls_before = creds.state.lock().unwrap().find_calls;
-    let claims = cold_usecase
+    usecase
         .verify(VerifyAccessToken {
             access_token: pair.access_token.clone(),
         })
         .await
-        .expect("verify succeeds after cold restart");
-    assert_eq!(claims.token_version, 3);
+        .expect("verify succeeds");
 
-    let find_calls_after_first = creds.state.lock().unwrap().find_calls;
-    assert!(
-        find_calls_after_first > find_calls_before,
-        "first verify after cold restart must hit the repo"
-    );
+    {
+        let s = creds.state.lock().unwrap();
+        assert_eq!(
+            s.find_calls, find_calls_before,
+            "verify must not call find_by_code"
+        );
+        assert!(
+            s.current_version_calls > current_version_before,
+            "verify must call current_token_version"
+        );
+    }
 
-    // Second verify must hit the cache.
-    let _ = cold_usecase
-        .verify(VerifyAccessToken {
-            access_token: pair.access_token,
+    // Same for refresh.
+    let current_version_before = {
+        let s = creds.state.lock().unwrap();
+        s.current_version_calls
+    };
+    usecase
+        .refresh(RefreshAccessToken {
+            refresh_token: pair.refresh_token,
         })
         .await
-        .expect("verify succeeds again");
-    assert_eq!(
-        creds.state.lock().unwrap().find_calls,
-        find_calls_after_first,
-        "second verify must hit the cache"
-    );
+        .expect("refresh succeeds");
+    {
+        let s = creds.state.lock().unwrap();
+        assert!(
+            s.current_version_calls > current_version_before,
+            "refresh must call current_token_version"
+        );
+    }
 }
 
 #[tokio::test]

@@ -51,16 +51,15 @@ fn auth_usecase_config_has_expected_field_shape() {
     // Locks the public surface of `AuthUsecaseConfig` without running it.
     // The closure body never runs — its only job is to type-check every
     // field name against the actual struct definition.
-    let _assert_config_shape: fn(
-        cfg: AuthUsecaseConfig<UserCredentialsRepo, DomainIdentityRepo>,
-    ) = |cfg| {
-        let _: &UserCredentialsRepo = &cfg.credentials;
-        let _: &DomainIdentityRepo = &cfg.identities;
-        let _: &Arc<dyn UserService> = &cfg.user_service;
-        let _: &[u8] = &cfg.signing_key;
-        let _: Duration = cfg.access_ttl;
-        let _: Duration = cfg.refresh_ttl;
-    };
+    let _assert_config_shape: fn(cfg: AuthUsecaseConfig<UserCredentialsRepo, DomainIdentityRepo>) =
+        |cfg| {
+            let _: &UserCredentialsRepo = &cfg.credentials;
+            let _: &DomainIdentityRepo = &cfg.identities;
+            let _: &Arc<dyn UserService> = &cfg.user_service;
+            let _: &[u8] = &cfg.signing_key;
+            let _: Duration = cfg.access_ttl;
+            let _: Duration = cfg.refresh_ttl;
+        };
 }
 
 #[test]
@@ -77,7 +76,6 @@ fn auth_usecase_new_accepts_an_auth_usecase_config() {
 fn auth_service_impl_is_object_safe() {
     // Pin the trait surface through a function pointer so object-safety
     // is checked at compile time without ever constructing an instance.
-    let _: fn(
-        AuthServiceImpl<UserCredentialsRepo, DomainIdentityRepo>,
-    ) -> Box<dyn AuthService> = |s| Box::new(s);
+    let _: fn(AuthServiceImpl<UserCredentialsRepo, DomainIdentityRepo>) -> Box<dyn AuthService> =
+        |s| Box::new(s);
 }
