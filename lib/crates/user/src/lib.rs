@@ -25,5 +25,5 @@ pub mod usecase;
 // re-exported so consumers can `match` on them and construct
 // repository inputs without reaching into the internal modules.
 pub use domain::{DomainError, Role, User, UserNew, UserRepository, UserUpdate};
-pub use adapter::UserRepo;
+pub use adapter::{UserRepo, UserServiceImpl};
 pub use usecase::{CreateUser, UpdateUser, UsecaseError, UserUsecase, UserView};

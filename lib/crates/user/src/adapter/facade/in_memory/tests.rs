@@ -346,3 +346,16 @@ async fn update_rejects_duplicate_code() {
         apis::user::UserApiError::DuplicateCode(ref c) if c == "u1"
     ));
 }
+
+#[tokio::test]
+async fn user_service_impl_is_object_safe() {
+    let svc = service();
+    let _boxed: Box<dyn UserService> = Box::new(svc);
+}
+
+#[tokio::test]
+async fn user_service_impl_is_send_sync() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<UserServiceImpl<InMemoryRepo>>();
+    assert_send_sync::<Box<dyn UserService>>();
+}
