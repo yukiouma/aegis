@@ -114,8 +114,9 @@ impl<R: UserRepository> UserService for UserServiceImpl<R> {
         Ok(user_view_from_internal(view))
     }
 
-    async fn get_by_code(&self, _code: &str) -> Result<UserView, UserApiError> {
-        todo!("implemented in task 6")
+    async fn get_by_code(&self, code: &str) -> Result<UserView, UserApiError> {
+        let view = self.usecase.get_by_code(code).await?;
+        Ok(user_view_from_internal(view))
     }
 
     async fn list(&self) -> Result<Vec<UserView>, UserApiError> {
