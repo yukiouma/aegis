@@ -51,20 +51,52 @@ let credentials_repo = UserCredentialsRepo::new(pool.clone());
 let identities_repo = DomainIdentityRepo::new(pool.clone());
 let user_service: Arc<dyn UserService> = Arc::new(/* … wired UserServiceImpl or fake … */);
 let signing_key = SigningKey::from_bytes(&hmac_secret_bytes);
-let usecase = AuthUsecase::new(
-    credentials_repo,
-    identities_repo,
+
+let usecase = AuthUsecase::new(AuthUsecaseConfig {
+    credentials: credentials_repo,
+    identities: identities_repo,
     user_service,
     signing_key,
-    Duration::from_secs(15 * 60),     // access TTL
-    Duration::from_secs(7 * 24 * 60 * 60), // refresh TTL
-);
+    access_ttl: Duration::from_secs(15 * 60),
+    refresh_ttl: Duration::from_secs(7 * 24 * 60 * 60),
+});
+
 let auth_service: Arc<dyn AuthService> = Arc::new(AuthServiceImpl::new(usecase));
 ```
 
+`AuthUsecaseConfig<R, D>` is a plain struct with `pub` fields — no builder
+ceremony. Generic over the same two repository types as `AuthUsecase` so the
+field types stay concrete:
+
+```rust
+pub struct AuthUsecaseConfig<R: UserCredentialsRepository, D: DomainIdentityRepository> {
+    pub credentials: R,
+    pub identities: D,
+    pub user_service: Arc<dyn UserService>,
+    pub signing_key: SigningKey,
+    pub access_ttl: Duration,
+    pub refresh_ttl: Duration,
+}
+```
+
 The crate root re-exports the domain types, the two Postgres repos, the
-in-memory facade, the usecase, and the command / view DTOs so consumers can
-`use auth::*;` without reaching into sub-modules.
+in-memory facade, the usecase, the config struct, and the command / view DTOs
+so consumers can `use auth::*;` without reaching into sub-modules. Specifically:
+
+```rust
+pub use domain::{
+    DomainError, DomainIdentity, Role, UserCredentials,
+    UserCredentialsRepository, DomainIdentityRepository,
+};
+pub use adapter::persistence::postgres::{UserCredentialsRepo, DomainIdentityRepo};
+pub use adapter::facade::in_memory::AuthServiceImpl;
+pub use usecase::{
+    AuthUsecase, AuthUsecaseConfig, UsecaseError,
+    LoginWithPassword, LoginWithDomainUserInfo, VerifyAccessToken,
+    RefreshAccessToken, Logout, AuthClaimsView, TokenPairView,
+    AccessTokenView, LogoutAck,
+};
+```
 
 ## Domain rules
 
@@ -160,6 +192,38 @@ struct Claims {
   (exposed by `bump_token_version`) invalidates every outstanding token for
   that user.
 
+## Usecase
+
+```rust
+pub struct AuthUsecase<R: UserCredentialsRepository, D: DomainIdentityRepository> {
+    credentials: R,
+    identities: D,
+    user_service: Arc<dyn UserService>,
+    signing_key: SigningKey,
+    access_ttl: Duration,
+    refresh_ttl: Duration,
+}
+
+impl<R, D> AuthUsecase<R, D> {
+    pub fn new(config: AuthUsecaseConfig<R, D>) -> Self {
+        Self {
+            credentials: config.credentials,
+            identities: config.identities,
+            user_service: config.user_service,
+            signing_key: config.signing_key,
+            access_ttl: config.access_ttl,
+            refresh_ttl: config.refresh_ttl,
+        }
+    }
+}
+```
+
+Why `Arc<dyn UserService>` (not generic): the apis `UserService` is an
+object-safe trait; the auth facade already boxes `AuthService` the same way
+(`Arc<dyn AuthService>`). This avoids threading a generic through the auth
+facade's public surface and keeps `AuthServiceImpl` non-generic over the user
+service.
+
 ## Usecase flow
 
 | Command | Steps | Returns |
@@ -237,8 +301,10 @@ Four kinds of tests, in the order listed in the lib-crate guideline:
    - Object safety: `Box<dyn AuthService>` and `Send + Sync`.
 5. **`tests/` directory tests**:
    - `tests/public_api.rs` — compile-only type-naming test. Lock the
-     `UserCredentialsRepo::new(pool)` / `DomainIdentityRepo::new(pool)` /
-     `AuthUsecase::new(...)` constructor chain as function pointers.
+     `UserCredentialsRepo::new(pool)` / `DomainIdentityRepo::new(pool)`
+     constructors as function pointers, and `AuthUsecase::new(cfg)` against
+     a concrete `AuthUsecaseConfig` so the constructor chain is
+     type-checked end-to-end without running anything.
    - `tests/integration_persistence.rs` — `#[ignore]`-gated; reads
      `AEGIS_AUTH_DATABASE_URL`; drops live tables before applying migrations.
 
