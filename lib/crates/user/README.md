@@ -13,7 +13,7 @@ repository and an async `UserUsecase`.
 ```text
 src/
   domain/                       # User, Role, validation, errors, repository port
-  usecase/                      # UserUsecase, command DTOs, password hashing, errors
+  usecase/                      # UserUsecase, command DTOs, errors
   infrastructure/               # persistence adapters
     persistence/
       postgres/                 # SQLx-backed UserRepo, UserRow

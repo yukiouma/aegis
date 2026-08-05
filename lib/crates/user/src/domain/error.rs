@@ -8,9 +8,6 @@ pub enum DomainError {
     #[error("user name must not be empty")]
     EmptyName,
 
-    #[error("password must not be empty")]
-    EmptyPassword,
-
     #[error("invalid role: {0}")]
     InvalidRole(String),
 

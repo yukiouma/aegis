@@ -6,14 +6,8 @@ edition = "2024"
 [dependencies]
 sqlx = { workspace = true }
 tokio = { workspace = true }
-argon2 = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
-# `rand_core` is pulled in for `argon2::password_hash::rand_core::OsRng`,
-# which is the random source used to generate argon2id salts in the
-# usecase layer (`hash_password`). The `getrandom` feature on the
-# workspace dependency must remain enabled so that `OsRng` is reachable.
-rand_core = { workspace = true }
 # `chrono` provides the `DateTime<Utc>` type used by the domain
 # `User` and the usecase `UserView` to carry the `created_at` /
 # `updated_at` columns surfaced by the repository. The `clock` feature

@@ -4,7 +4,6 @@ pub struct CreateUser {
     pub code: String,
     pub name: String,
     pub role: Role,
-    pub password: String,
 }
 
 #[derive(Default)]
@@ -14,5 +13,4 @@ pub struct UpdateUser {
     pub name: Option<String>,
     pub role: Option<Role>,
     pub active: Option<bool>,
-    pub password: Option<String>,
 }

@@ -1,8 +1,9 @@
 //! Tests for the usecase layer.
 //!
 //! A `MockUserRepository` stands in for the real SQLx-backed repository so
-//! we can assert that the usecase hashes passwords, validates inputs, and
-//! never leaks the password hash out of the persistence boundary.
+//! we can assert that the usecase validates inputs and never projects the
+//! `User` aggregate past the persistence boundary except through the
+//! `UserView` DTO.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -32,8 +33,6 @@ struct MockState {
     created: Vec<UserNew>,
     /// Every `update` input the usecase handed to the repo.
     updated: Vec<UserUpdate>,
-    /// Every id the usecase passed to `deactivate`.
-    deactivated: Vec<i32>,
     /// Ids passed to `find_by_id`.
     find_by_id_calls: Vec<i32>,
     /// Codes passed to `find_by_code`.
@@ -116,7 +115,6 @@ impl UserRepository for MockUserRepository {
             true,
             mock_now(),
             mock_now(),
-            input.password_hash.clone(),
         );
         state.users.insert(id, stored.clone());
         state.created.push(input);
@@ -164,20 +162,9 @@ impl UserRepository for MockUserRepository {
         if let Some(active) = input.active {
             stored.active = active;
         }
-        if let Some(hash) = input.password_hash.clone() {
-            stored.password = hash;
-        }
         let updated = stored.clone();
         state.updated.push(input);
         Ok(updated)
-    }
-
-    async fn deactivate(&self, id: i32) -> Result<User, DomainError> {
-        let mut state = self.state.lock().unwrap();
-        state.deactivated.push(id);
-        let stored = state.users.get_mut(&id).ok_or(DomainError::NotFound)?;
-        stored.active = false;
-        Ok(stored.clone())
     }
 }
 
@@ -193,29 +180,27 @@ fn make_usecase_with_user(user: User) -> (MockUserRepository, UserUsecase<MockUs
     (mock, usecase)
 }
 
-fn seed_user(id: i32, code: &str, name: &str, role: Role, active: bool, hash: &str) -> User {
+fn make_usecase_with_users(
+    users: Vec<User>,
+) -> (MockUserRepository, UserUsecase<MockUserRepository>) {
+    let mock = MockUserRepository::with_users(users);
+    let usecase = UserUsecase::new(mock.clone());
+    (mock, usecase)
+}
+
+fn seed_user(id: i32, code: &str, name: &str, role: Role, active: bool) -> User {
     let now = mock_now();
-    User::for_repository(
-        id,
-        code.into(),
-        name.into(),
-        role,
-        active,
-        now,
-        now,
-        hash.into(),
-    )
+    User::for_repository(id, code.into(), name.into(), role, active, now, now)
 }
 
 #[tokio::test]
-async fn create_hashes_password_before_repository() {
+async fn create_returns_view() {
     let (mock, usecase) = make_usecase();
 
     let cmd = CreateUser {
         code: "u1".into(),
         name: "Alice".into(),
         role: Role::Admin,
-        password: "hunter42".into(),
     };
 
     let view = usecase.create(cmd).await.expect("create succeeds");
@@ -237,68 +222,33 @@ async fn create_hashes_password_before_repository() {
     assert_eq!(captured.code, "u1");
     assert_eq!(captured.name, "Alice");
     assert_eq!(captured.role, Role::Admin);
-    assert!(
-        captured.password_hash.starts_with("$argon2"),
-        "expected argon2 PHC string, got {:?}",
-        captured.password_hash
-    );
-    assert!(
-        !captured.password_hash.contains("hunter42"),
-        "plaintext password leaked to repository"
-    );
+    assert!(captured.active);
 }
 
 #[tokio::test]
-async fn update_with_password_re_hashes_it() {
-    let stored = seed_user(7, "u7", "Bob", Role::General, true, "old-hash");
+async fn update_applies_supplied_fields() {
+    let stored = seed_user(7, "u7", "Bob", Role::General, true);
     let (mock, usecase) = make_usecase_with_user(stored);
 
     let cmd = UpdateUser {
         id: 7,
-        password: Some("new-pass".into()),
+        name: Some("Bob Updated".into()),
+        role: Some(Role::Admin),
         ..Default::default()
     };
 
     let view = usecase.update(cmd).await.expect("update succeeds");
     assert_eq!(view.id, 7);
+    assert_eq!(view.name, "Bob Updated");
+    assert_eq!(view.role, Role::Admin);
 
     let state = mock.state.lock().unwrap();
     assert_eq!(state.updated.len(), 1);
-    let captured = &state.updated[0];
-    let new_hash = captured
-        .password_hash
-        .as_ref()
-        .expect("repo receives a hash when password is updated");
-    assert!(new_hash.starts_with("$argon2"));
-    assert!(!new_hash.contains("new-pass"));
-    assert_ne!(new_hash, "old-hash");
 }
 
 #[tokio::test]
-async fn update_without_password_leaves_hash_unchanged() {
-    let stored = seed_user(9, "u9", "Carol", Role::Root, true, "existing-hash");
-    let (mock, usecase) = make_usecase_with_user(stored);
-
-    let cmd = UpdateUser {
-        id: 9,
-        name: Some("Carol Updated".into()),
-        ..Default::default()
-    };
-
-    usecase.update(cmd).await.expect("update succeeds");
-
-    let state = mock.state.lock().unwrap();
-    assert_eq!(state.updated.len(), 1);
-    let captured = &state.updated[0];
-    assert!(
-        captured.password_hash.is_none(),
-        "repo should not see a password hash when caller did not supply one"
-    );
-}
-
-#[tokio::test]
-async fn get_by_id_returns_view_without_password() {
-    let stored = seed_user(11, "u11", "Dana", Role::Admin, true, "secret-hash");
+async fn get_by_id_returns_view() {
+    let stored = seed_user(11, "u11", "Dana", Role::Admin, true);
     let (mock, usecase) = make_usecase_with_user(stored);
 
     let view = usecase.get_by_id(11).await.expect("get_by_id succeeds");
@@ -314,8 +264,8 @@ async fn get_by_id_returns_view_without_password() {
 }
 
 #[tokio::test]
-async fn get_by_code_returns_view_without_password() {
-    let stored = seed_user(12, "u12", "Eve", Role::General, false, "another-hash");
+async fn get_by_code_returns_view() {
+    let stored = seed_user(12, "u12", "Eve", Role::General, false);
     let (mock, usecase) = make_usecase_with_user(stored);
 
     let view = usecase
@@ -331,11 +281,11 @@ async fn get_by_code_returns_view_without_password() {
 }
 
 #[tokio::test]
-async fn list_returns_views_without_passwords() {
+async fn list_returns_views() {
     let users = vec![
-        seed_user(1, "u1", "Alice", Role::Admin, true, "hash-1"),
-        seed_user(2, "u2", "Bob", Role::General, true, "hash-2"),
-        seed_user(3, "u3", "Carol", Role::Root, false, "hash-3"),
+        seed_user(1, "u1", "Alice", Role::Admin, true),
+        seed_user(2, "u2", "Bob", Role::General, true),
+        seed_user(3, "u3", "Carol", Role::Root, false),
     ];
     let (mock, usecase) = make_usecase_with_users(users);
 
@@ -352,20 +302,6 @@ async fn list_returns_views_without_passwords() {
 }
 
 #[tokio::test]
-async fn deactivate_forwards_id_and_returns_inactive_view() {
-    let stored = seed_user(20, "u20", "Frank", Role::Admin, true, "h");
-    let (mock, usecase) = make_usecase_with_user(stored);
-
-    let view = usecase.deactivate(20).await.expect("deactivate succeeds");
-
-    assert_eq!(view.id, 20);
-    assert!(!view.active, "usecase returns the inactive user");
-
-    let state = mock.state.lock().unwrap();
-    assert_eq!(state.deactivated, vec![20], "usecase must forward the id");
-}
-
-#[tokio::test]
 async fn empty_create_inputs_are_rejected_before_hitting_repo() {
     let (mock, usecase) = make_usecase();
 
@@ -373,7 +309,6 @@ async fn empty_create_inputs_are_rejected_before_hitting_repo() {
         code: "   ".into(),
         name: "Alice".into(),
         role: Role::Admin,
-        password: "hunter42".into(),
     };
     let err = usecase.create(cmd).await.expect_err("blank code rejected");
     assert!(
@@ -385,27 +320,11 @@ async fn empty_create_inputs_are_rejected_before_hitting_repo() {
         code: "u1".into(),
         name: "".into(),
         role: Role::Admin,
-        password: "hunter42".into(),
     };
     let err = usecase.create(cmd).await.expect_err("blank name rejected");
     assert!(matches!(
         err,
         UsecaseError::Validation(DomainError::EmptyName)
-    ));
-
-    let cmd = CreateUser {
-        code: "u1".into(),
-        name: "Alice".into(),
-        role: Role::Admin,
-        password: "".into(),
-    };
-    let err = usecase
-        .create(cmd)
-        .await
-        .expect_err("blank password rejected");
-    assert!(matches!(
-        err,
-        UsecaseError::Validation(DomainError::EmptyPassword)
     ));
 
     let state = mock.state.lock().unwrap();
@@ -417,7 +336,7 @@ async fn empty_create_inputs_are_rejected_before_hitting_repo() {
 
 #[tokio::test]
 async fn empty_update_inputs_are_rejected_before_hitting_repo() {
-    let stored = seed_user(30, "u30", "Greta", Role::Admin, true, "h");
+    let stored = seed_user(30, "u30", "Greta", Role::Admin, true);
     let (mock, usecase) = make_usecase_with_user(stored);
 
     let cmd = UpdateUser {
@@ -429,20 +348,6 @@ async fn empty_update_inputs_are_rejected_before_hitting_repo() {
     assert!(matches!(
         err,
         UsecaseError::Validation(DomainError::EmptyCode)
-    ));
-
-    let cmd = UpdateUser {
-        id: 30,
-        password: Some("".into()),
-        ..Default::default()
-    };
-    let err = usecase
-        .update(cmd)
-        .await
-        .expect_err("blank password rejected");
-    assert!(matches!(
-        err,
-        UsecaseError::Validation(DomainError::EmptyPassword)
     ));
 
     let state = mock.state.lock().unwrap();
@@ -459,7 +364,6 @@ async fn repository_errors_propagate_as_usecase_repository_error() {
         code: "u1".into(),
         name: "Alice".into(),
         role: Role::Admin,
-        password: "hunter42".into(),
     };
     // Drive the usecase to create the first user.
     usecase.create(cmd).await.expect("first create works");
@@ -469,7 +373,6 @@ async fn repository_errors_propagate_as_usecase_repository_error() {
         code: "u1".into(),
         name: "Alice".into(),
         role: Role::Admin,
-        password: "hunter42".into(),
     };
     let err = usecase.create(cmd).await.expect_err("duplicate rejected");
     assert!(
@@ -482,12 +385,4 @@ async fn repository_errors_propagate_as_usecase_repository_error() {
     // the captured log.
     let state = mock.state.lock().unwrap();
     assert_eq!(state.created.len(), 1);
-}
-
-fn make_usecase_with_users(
-    users: Vec<User>,
-) -> (MockUserRepository, UserUsecase<MockUserRepository>) {
-    let mock = MockUserRepository::with_users(users);
-    let usecase = UserUsecase::new(mock.clone());
-    (mock, usecase)
 }

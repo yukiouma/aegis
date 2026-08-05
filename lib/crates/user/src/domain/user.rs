@@ -1,5 +1,3 @@
-use std::fmt;
-
 use chrono::{DateTime, Utc};
 
 use super::DomainError;
@@ -14,17 +12,15 @@ pub struct User {
     pub active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    pub(crate) password: String,
 }
 
 impl User {
-    /// Strict constructor used by the domain layer.
+    /// Constructor used by the domain layer.
     ///
-    /// Validates that `code`, `name`, and `password` are non-empty.
-    /// Kept `pub(crate)` because the production paths construct
-    /// `User` from inbound SQLx rows (`for_repository`) or from
-    /// `UserView` (`From`); the validating constructor is only useful
-    /// for in-crate tests and the future password-verification path.
+    /// Validates that `code` and `name` are non-empty. Kept
+    /// `pub(crate)` because the production paths construct
+    /// `User` from inbound SQLx rows (`for_repository`); the
+    /// validating constructor is useful for in-crate tests.
     /// The `allow(dead_code)` silences the lib build (which does not
     /// see the test call sites); the test build sees the calls and
     /// would not warn even without the allow.
@@ -38,16 +34,12 @@ impl User {
         active: bool,
         created_at: DateTime<Utc>,
         updated_at: DateTime<Utc>,
-        password: String,
     ) -> Result<Self, DomainError> {
         if code.trim().is_empty() {
             return Err(DomainError::EmptyCode);
         }
         if name.trim().is_empty() {
             return Err(DomainError::EmptyName);
-        }
-        if password.is_empty() {
-            return Err(DomainError::EmptyPassword);
         }
         Ok(Self {
             id,
@@ -57,7 +49,6 @@ impl User {
             active,
             created_at,
             updated_at,
-            password,
         })
     }
 
@@ -73,7 +64,6 @@ impl User {
         active: bool,
         created_at: DateTime<Utc>,
         updated_at: DateTime<Utc>,
-        password: String,
     ) -> Self {
         Self {
             id,
@@ -83,30 +73,14 @@ impl User {
             active,
             created_at,
             updated_at,
-            password,
         }
-    }
-
-    /// Returns the argon2 password hash. Only available inside the crate
-    /// so the hash never leaves the `user` crate's boundary.
-    ///
-    /// The accessor is reserved for the future password-verification
-    /// entry point in the infrastructure layer. Until that lands, the
-    /// only consumer is the infrastructure test suite (which calls
-    /// `password_hash()` to assert that `for_repository` round-trips
-    /// the `password` field). The `#[allow(dead_code)]` silences the
-    /// lib build, which does not see test usage; the test build sees
-    /// the call site and would not warn even without the allow.
-    #[allow(dead_code)]
-    pub(crate) fn password_hash(&self) -> &str {
-        &self.password
     }
 }
 
-/// Hand-rolled `Debug` impl that intentionally redacts the `password`
-/// field. The hash must never appear in logs or error messages.
-impl fmt::Debug for User {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+/// Hand-rolled `Debug` impl that omits sensitive fields. Currently
+/// every field on `User` is safe to log.
+impl std::fmt::Debug for User {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("User")
             .field("id", &self.id)
             .field("code", &self.code)
@@ -115,7 +89,6 @@ impl fmt::Debug for User {
             .field("active", &self.active)
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
-            .field("password", &"<redacted>")
             .finish()
     }
 }
