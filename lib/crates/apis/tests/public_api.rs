@@ -91,7 +91,8 @@ fn user_service_is_send_sync() {
 
 use apis::auth::{
     AuthApiError, AuthClaims, AuthService, LoginWithDomainUserInfoRequest,
-    LoginWithPasswordRequest, LogoutRequest, RefreshRequest, TokenPair, VerifyRequest,
+    LoginWithPasswordRequest, LogoutRequest, LogoutResponse, RefreshRequest, RefreshResponse,
+    TokenPair, VerifyRequest,
 };
 
 /// Every public type in `apis::auth` is nameable from the test.
@@ -101,9 +102,11 @@ fn auth_public_types_are_nameable() {
     fn assert_claims(_: AuthClaims) {}
     fn assert_login_pw(_: LoginWithPasswordRequest) {}
     fn assert_login_domain(_: LoginWithDomainUserInfoRequest) {}
-    fn assert_logout(_: LogoutRequest) {}
-    fn assert_verify(_: VerifyRequest) {}
-    fn assert_refresh(_: RefreshRequest) {}
+    fn assert_logout_req(_: LogoutRequest) {}
+    fn assert_logout_res(_: LogoutResponse) {}
+    fn assert_verify_req(_: VerifyRequest) {}
+    fn assert_refresh_req(_: RefreshRequest) {}
+    fn assert_refresh_res(_: RefreshResponse) {}
     fn assert_err(_: AuthApiError) {}
 
     // `TokenPair` is constructible field-by-field.
@@ -130,12 +133,17 @@ fn auth_public_types_are_nameable() {
         hostname: "h".into(),
         sid: "s".into(),
     });
-    assert_logout(LogoutRequest { code: "u1".into() });
-    assert_verify(VerifyRequest {
+    assert_logout_req(LogoutRequest { code: "u1".into() });
+    assert_verify_req(VerifyRequest {
         access_token: "a".into(),
     });
-    assert_refresh(RefreshRequest {
+    assert_refresh_req(RefreshRequest {
         refresh_token: "r".into(),
+    });
+    // Every response DTO is constructible field-by-field.
+    assert_logout_res(LogoutResponse { code: "u1".into() });
+    assert_refresh_res(RefreshResponse {
+        access_token: "a".into(),
     });
 
     // Touch every variant of the error type to keep it from being
@@ -170,13 +178,22 @@ impl AuthService for FakeAuthService {
     ) -> Result<TokenPair, AuthApiError> {
         todo!()
     }
-    async fn logout(&self, _req: LogoutRequest) -> Result<(), AuthApiError> {
+    async fn logout(
+        &self,
+        _req: LogoutRequest,
+    ) -> Result<LogoutResponse, AuthApiError> {
         todo!()
     }
-    async fn verify(&self, _req: VerifyRequest) -> Result<AuthClaims, AuthApiError> {
+    async fn verify(
+        &self,
+        _req: VerifyRequest,
+    ) -> Result<AuthClaims, AuthApiError> {
         todo!()
     }
-    async fn refresh(&self, _req: RefreshRequest) -> Result<String, AuthApiError> {
+    async fn refresh(
+        &self,
+        _req: RefreshRequest,
+    ) -> Result<RefreshResponse, AuthApiError> {
         todo!()
     }
 }

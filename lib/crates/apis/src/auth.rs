@@ -10,10 +10,6 @@ use thiserror::Error;
 use crate::user::Role;
 
 /// Access + refresh token pair returned by the login methods.
-///
-/// `refresh` does not use `TokenPair` — it mints a new access token
-/// only, returning the bare `String`. The login methods return both
-/// freshly minted tokens so callers can hand them out together.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TokenPair {
     pub access_token: String,
@@ -26,6 +22,18 @@ pub struct AuthClaims {
     pub code: String,
     pub role: Role,
     pub token_version: u32,
+}
+
+/// Response DTO for [`AuthService::logout`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogoutResponse {
+    pub code: String,
+}
+
+/// Response DTO for [`AuthService::refresh`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefreshResponse {
+    pub access_token: String,
 }
 
 /// Input DTO for [`AuthService::login_with_password`].
@@ -127,9 +135,10 @@ pub trait AuthService: Send + Sync {
 
     /// Invalidate any server-side session state for `code`.
     ///
-    /// Returns `Ok(())` even if the user had no active session.
-    /// Storage failures surface as `AuthApiError::Repository`.
-    async fn logout(&self, req: LogoutRequest) -> Result<(), AuthApiError>;
+    /// Returns `LogoutResponse` echoing the user code on success,
+    /// even if the user had no active session. Storage failures
+    /// surface as `AuthApiError::Repository`.
+    async fn logout(&self, req: LogoutRequest) -> Result<LogoutResponse, AuthApiError>;
 
     /// Verify an access token and recover the identity it was minted for.
     ///
@@ -140,10 +149,10 @@ pub trait AuthService: Send + Sync {
 
     /// Exchange a still-valid refresh token for a brand-new access token.
     ///
-    /// Returns the freshly minted access token as a `String`.
+    /// Returns `RefreshResponse { access_token }` on success.
     /// Expired or tampered-with refresh tokens surface as
     /// `AuthApiError::Verification`. The refresh token itself is
     /// not rotated — callers keep using the same refresh token
     /// until it expires.
-    async fn refresh(&self, req: RefreshRequest) -> Result<String, AuthApiError>;
+    async fn refresh(&self, req: RefreshRequest) -> Result<RefreshResponse, AuthApiError>;
 }
