@@ -27,10 +27,11 @@ use thiserror::Error;
 
 use crate::user::Role;
 
-/// Access + refresh token pair returned by every method that mints tokens.
+/// Access + refresh token pair returned by the login methods.
 ///
-/// Grouped so login / refresh signatures don't pass two `String`s back
-/// and forth, and so call sites are uniform.
+/// `refresh` does not use `TokenPair` — it mints a new access token
+/// only, returning the bare `String`. The login methods return both
+/// freshly minted tokens so callers can hand them out together.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TokenPair {
     pub access_token: String,
