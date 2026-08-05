@@ -138,19 +138,19 @@ pub trait AuthService: Send + Sync {
 
     /// Exchange a still-valid refresh token for a brand-new access token.
     ///
-    /// The returned `TokenPair` always contains a freshly minted
-    /// access token. Whether the `refresh_token` field is rotated
-    /// or reused is an implementation choice — the trait does not
-    /// pin it, only the requirement that the returned pair be
-    /// well-formed. Expired or tampered-with refresh tokens
-    /// surface as `AuthApiError::Verification`.
-    async fn refresh(&self, refresh_token: &str) -> Result<TokenPair, AuthApiError>;
+    /// Returns the freshly minted access token as a `String`.
+    /// Expired or tampered-with refresh tokens surface as
+    /// `AuthApiError::Verification`. The refresh token itself is not
+    /// rotated — callers keep using the same refresh token until it
+    /// expires.
+    async fn refresh(&self, refresh_token: &str) -> Result<String, AuthApiError>;
 }
 ```
 
 Notes:
 
 - Tokens are plain `String`s. The trait does not commit to JWT, PASETO, or any other wire format — signing is an implementation concern.
+- `refresh` returns just the new access token; the refresh token itself is not rotated. Login methods still return `TokenPair` (both tokens fresh).
 - Method parameters are `&str`; DTO struct fields are `String`. The DTOs are the owned-form for cross-boundary transport (HTTP / gRPC adapters), and the trait itself borrows because callers frequently already own an allocation they can lend.
 - `AuthApiError` variants cover every failure mode the methods can produce. No `From<DomainError>` blanket conversion — adapters map backend errors explicitly, matching the convention used by `apis::user::UserApiError`.
 - `AuthClaims::role` reuses `apis::user::Role`. No second `Role` enum is introduced; the conversion story is the same one already documented for `apis::user`.
@@ -197,8 +197,8 @@ No live I/O, no `#[ignore]`-gated integration tests in this task — adapter-sid
 - A concrete `AuthService` implementation that adapts a backend usecase layer (auth or user) to this trait.
 - HTTP / gRPC handler code that calls into `AuthService`.
 - Token-storage strategy (in-memory revocation list, Redis, DB).
-- Password-hashing policy / refresh-token rotation policy. The trait does not constrain either.
-- Encoding `AuthClaims` back into a token on `refresh` — that is the implementation's job; this spec only fixes the method signature.
+- Password-hashing policy. The trait does not constrain it.
+- Refreshing the refresh token. The trait only mints a new access token on `refresh`; callers continue to use the same refresh token until it expires.
 
 ## Workspace integration
 
