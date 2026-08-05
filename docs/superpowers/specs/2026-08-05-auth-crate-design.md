@@ -24,16 +24,21 @@ Ports-and-adapters DDD structure, exactly mirroring
 [`lib/crates/user/`](../../lib/crates/user/):
 
 - `domain` — `UserCredentials`, `DomainIdentity`, `Role`, validating
-  constructors, ports (`UserCredentialsRepository`, `DomainIdentityRepository`),
-  and `DomainError`. No I/O, no `sqlx`, no `tokio`, no `argon2`.
+  constructors, ports (`UserCredentialsRepository`,
+  `DomainIdentityRepository`, `TokenVersionCache`), and `DomainError`.
+  No I/O, no `sqlx`, no `tokio`, no `argon2`.
 - `usecase` — `AuthUsecase<R, D>`, command DTOs (`LoginWithPassword`,
   `LoginWithDomainUserInfo`, `VerifyAccessToken`, `RefreshAccessToken`,
   `Logout`), view DTOs (`TokenPairView`, `AuthClaimsView`, `AccessTokenView`,
-  `LogoutAck`), and `UsecaseError`. Holds `Arc<dyn UserService>` as a private
-  field. Generic over two repository ports so tests inject in-memory fakes.
+  `LogoutAck`), and `UsecaseError`. Holds `Arc<dyn UserService>` and
+  `Arc<dyn TokenVersionCache>` as private fields. Generic over two
+  repository ports so tests inject in-memory fakes.
 - `adapter` — concrete implementations of the domain ports.
   - `adapter/persistence/postgres/` — `UserCredentialsRepo` and
     `DomainIdentityRepo` backed by `sqlx::PgPool`.
+  - `adapter/cache/in_memory/` — `InMemoryTokenVersionCache` backed by
+    `Arc<RwLock<HashMap>>`. A future Redis backend can be added as a
+    sibling file under `adapter/cache/redis.rs` additively.
   - `adapter/facade/in_memory/` — `AuthServiceImpl<R, D>` adapting
     `AuthUsecase<R, D>` to `apis::auth::AuthService`.
 
@@ -50,7 +55,7 @@ Constructors match:
 let credentials_repo = UserCredentialsRepo::new(pool.clone());
 let identities_repo = DomainIdentityRepo::new(pool.clone());
 let user_service: Arc<dyn UserService> = Arc::new(/* … wired UserServiceImpl or fake … */);
-let signing_key = SigningKey::from_bytes(&hmac_secret_bytes);
+let signing_key = hmac_secret_bytes;
 
 let usecase = AuthUsecase::new(AuthUsecaseConfig {
     credentials: credentials_repo,
@@ -73,7 +78,8 @@ pub struct AuthUsecaseConfig<R: UserCredentialsRepository, D: DomainIdentityRepo
     pub credentials: R,
     pub identities: D,
     pub user_service: Arc<dyn UserService>,
-    pub signing_key: SigningKey,
+    pub cache: Arc<dyn TokenVersionCache>,
+    pub signing_key: Vec<u8>,
     pub access_ttl: Duration,
     pub refresh_ttl: Duration,
 }
@@ -85,11 +91,12 @@ so consumers can `use auth::*;` without reaching into sub-modules. Specifically:
 
 ```rust
 pub use domain::{
-    DomainError, DomainIdentity, Role, UserCredentials,
+    DomainError, DomainIdentity, Role, TokenVersionCache, UserCredentials,
     UserCredentialsRepository, DomainIdentityRepository,
 };
-pub use adapter::persistence::postgres::{UserCredentialsRepo, DomainIdentityRepo};
+pub use adapter::cache::in_memory::InMemoryTokenVersionCache;
 pub use adapter::facade::in_memory::AuthServiceImpl;
+pub use adapter::persistence::postgres::{UserCredentialsRepo, DomainIdentityRepo};
 pub use usecase::{
     AuthUsecase, AuthUsecaseConfig, UsecaseError,
     LoginWithPassword, LoginWithDomainUserInfo, VerifyAccessToken,
@@ -211,55 +218,82 @@ struct RefreshClaims {
 
 ## In-memory token-version cache
 
-The cache lives inside the `UserCredentialsRepository` implementation
-(`adapter/persistence/postgres::UserCredentialsRepo`), not in the
-usecase. `AuthUsecase` reaches it through a new port method:
+The cache is its own port + adapter pair, independent of
+`UserCredentialsRepository`. This keeps the repository focused on the
+source of truth (Postgres) and lets the cache backend be swapped without
+touching the repository or the usecase.
+
+### Port
 
 ```rust
+// src/domain/token_version_cache.rs
 #[async_trait]
-pub trait UserCredentialsRepository: Send + Sync {
-    async fn find_by_code(&self, code: &str) -> Result<UserCredentials, DomainError>;
-    async fn create(&self, credentials: UserCredentials) -> Result<UserCredentials, DomainError>;
-    async fn bump_token_version(&self, code: &str) -> Result<u32, DomainError>;
+pub trait TokenVersionCache: Send + Sync {
+    /// Look up the cached version for `code`. Returns `None` on miss
+    /// or transient failure. The caller always falls back to the
+    /// source of truth on `None`.
+    async fn get(&self, code: &str) -> Option<u32>;
 
-    /// Returns the user's current `token_version`. Implementations
-    /// may cache the result to avoid repeated database reads on the
-    /// `verify` / `refresh` hot path. `bump_token_version` updates
-    /// the cache atomically with the database write.
-    async fn current_token_version(&self, code: &str) -> Result<u32, DomainError>;
+    /// Store `version` for `code`. Best-effort: failures (e.g. a
+    /// Redis timeout) should be swallowed by the implementation
+    /// because the cache is an optimization, not the source of
+    /// truth.
+    async fn put(&self, code: &str, version: u32);
 }
 ```
 
-The Postgres impl owns a private `Arc<std::sync::RwLock<HashMap<String,
-u32>>>` keyed by user code. `current_token_version` reads cache → on
-miss, runs a `SELECT token_version FROM auth_user_credentials WHERE code
-= $1` and writes the result into the cache. `bump_token_version` runs
-the existing `UPDATE ... RETURNING` and writes the returned new version
-into the cache. `find_by_code` does NOT touch the cache — it returns
-the full row for callers that need the password hash. Login reads
-`row.token_version` from `find_by_code` directly; the cache populates
-lazily on the first `verify` / `refresh` after login.
+The trait is `async` so future Redis / Memcached / DynamoDB backends
+can use native async clients. The in-memory impl is the default today.
 
-Concurrency:
+### In-memory backend
 
-- `std::sync::RwLock` (not `tokio::sync::RwLock`): the lock is held only
-  during the in-memory map read / write, never across an `.await`.
-  Multiple concurrent `current_token_version` calls share a read lock;
-  `bump_token_version` takes a write lock for the brief duration of the
-  single map entry update.
-- `Arc` is required because `UserCredentialsRepo` is shared state and
-  the cache must live alongside the pool.
+```rust
+// src/adapter/cache/in_memory.rs
+pub struct InMemoryTokenVersionCache {
+    inner: Arc<std::sync::RwLock<HashMap<String, u32>>>,
+}
+```
+
+A `std::sync::RwLock` (not `tokio::sync::RwLock`) because the lock is
+held only during the in-memory map read / write, never across an
+`.await`. `get` takes a read lock; `put` takes a write lock for the
+brief duration of a single map insertion. `Arc` allows the cache to be
+shared across multiple `AuthUsecase` instances if needed.
+
+### Future Redis backend (out of scope)
+
+A `RedisTokenVersionCache` will live at `src/adapter/cache/redis.rs`
+when implemented. It will hold a `redis::aio::ConnectionManager` and
+implement `get` as `GET code` (returns `None` on miss or connection
+error) and `put` as `SET code version` (swallow errors). No changes
+to the usecase, the repository, or any other layer are needed when
+this lands — it is purely additive.
+
+### Wiring
+
+`AuthUsecase<R, D>` stores the cache as `cache: Arc<dyn TokenVersionCache>`.
+The cache is constructed once at process startup and shared via `Arc`:
+
+```rust
+let cache: Arc<dyn TokenVersionCache> =
+    Arc::new(InMemoryTokenVersionCache::new());
+let usecase = AuthUsecase::new(AuthUsecaseConfig {
+    credentials: credentials_repo,
+    identities: identities_repo,
+    user_service,
+    cache,
+    signing_key,
+    access_ttl,
+    refresh_ttl,
+});
+```
 
 Multi-process limitation (documented, not solved here):
 
-- In a multi-process deployment, each process owns its own cache inside
-  its own `UserCredentialsRepo`. If process A processes a `logout`,
-  process B's cache for that code still holds the pre-bump version
-  until B's next cold-miss DB read picks up the new value. This is
-  acceptable for a single-process service. If cross-process revocation
-  is needed later, the cache invalidation hook can be wired to a
-  `LISTEN/NOTIFY` channel or a pub-sub backend; that is out of scope
-  for this spec.
+- In a multi-process deployment the cache is per-process unless a
+  shared backend (Redis) is wired in. Cross-process revocation then
+  requires every verifier's cache to be invalidated, which is
+  exactly the Redis migration path this design prepares for.
 
 ## Usecase
 
@@ -268,7 +302,8 @@ pub struct AuthUsecase<R: UserCredentialsRepository, D: DomainIdentityRepository
     credentials: R,
     identities: D,
     user_service: Arc<dyn UserService>,
-    signing_key: SigningKey,
+    cache: Arc<dyn TokenVersionCache>,
+    signing_key: Vec<u8>,
     access_ttl: Duration,
     refresh_ttl: Duration,
 }
@@ -279,6 +314,7 @@ impl<R, D> AuthUsecase<R, D> {
             credentials: config.credentials,
             identities: config.identities,
             user_service: config.user_service,
+            cache: config.cache,
             signing_key: config.signing_key,
             access_ttl: config.access_ttl,
             refresh_ttl: config.refresh_ttl,
@@ -287,14 +323,16 @@ impl<R, D> AuthUsecase<R, D> {
 }
 ```
 
-Why `Arc<dyn UserService>` (not generic): the apis `UserService` is an
-object-safe trait; the auth facade already boxes `AuthService` the same way
-(`Arc<dyn AuthService>`). This avoids threading a generic through the auth
-facade's public surface and keeps `AuthServiceImpl` non-generic over the user
-service.
+Why `Arc<dyn UserService>` and `Arc<dyn TokenVersionCache>` (not generic):
+both are object-safe traits and follow the same pattern. The auth facade
+already boxes `AuthService` the same way (`Arc<dyn AuthService>`). This
+avoids threading generics through the auth facade's public surface and
+keeps `AuthServiceImpl` non-generic over the user service and cache.
 
-The `token_versions` cache lives in the repository implementation (see
-"In-memory token-version cache" above), not in the usecase.
+The token-version cache is a separate port + adapter pair (see
+"In-memory token-version cache" above). `verify` and `refresh` go
+through `cache.get` with `credentials.find_by_code` as the fall back;
+`logout` updates the cache after `credentials.bump_token_version`.
 
 ## Usecase flow
 
@@ -302,9 +340,9 @@ The `token_versions` cache lives in the repository implementation (see
 | --- | --- | --- |
 | `LoginWithPassword { code, password }` | validate → `credentials.find_by_code` → `user_service.get_by_code` → check `active` → `argon2::verify_password` → mint access + refresh JWTs (uses `row.token_version` directly; the repo's cache populates lazily on the first verify/refresh) | `TokenPairView` |
 | `LoginWithDomainUserInfo { code, domain_name, hostname, sid }` | validate → `identities.find` → `user_service.get_by_code` → check `active` → `credentials.find_by_code` → mint tokens (uses `row.token_version` directly) | `TokenPairView` |
-| `VerifyAccessToken { access_token }` | decode JWT as `AccessClaims` → check signature + expiry → `credentials.current_token_version(sub)` (cache hit, or DB read + cache write on miss) → `user_service.get_by_code` → check `active` → compare `jwt.ver == current_version` → project to `AuthClaimsView` | `AuthClaimsView` |
-| `RefreshAccessToken { refresh_token }` | decode JWT as `RefreshClaims` → check signature + expiry → `credentials.current_token_version(sub)` (cache hit, or DB read + cache write on miss) → `user_service.get_by_code` → check `active` → compare versions → mint new access token (fresh `AccessClaims`) | `AccessTokenView` |
-| `Logout { code }` | validate → `credentials.bump_token_version(code)` (the repo atomically updates the DB and writes the new version into its cache) | `LogoutAck { code }` |
+| `VerifyAccessToken { access_token }` | decode JWT as `AccessClaims` → check signature + expiry → resolve current `token_version` (cache hit via `cache.get(sub)`, or `credentials.find_by_code(sub)` + `cache.put(sub, version)` on miss) → `user_service.get_by_code` → check `active` → compare `jwt.ver == current_version` → project to `AuthClaimsView` | `AuthClaimsView` |
+| `RefreshAccessToken { refresh_token }` | decode JWT as `RefreshClaims` → check signature + expiry → resolve current `token_version` (cache hit via `cache.get(sub)`, or `credentials.find_by_code(sub)` + `cache.put(sub, version)` on miss) → `user_service.get_by_code` → check `active` → compare versions → mint new access token (fresh `AccessClaims`) | `AccessTokenView` |
+| `Logout { code }` | validate → `credentials.bump_token_version(code)` (DB) → `cache.put(code, new_version)` (cache) | `LogoutAck { code }` |
 
 `logout` does not consult `user_service`; bumping `token_version` invalidates
 every outstanding JWT regardless of current active state, and `Inactive` only
@@ -357,31 +395,35 @@ Four kinds of tests, in the order listed in the lib-crate guideline:
    - Row → domain `TryFrom` conversions for both `CredentialRow` and
      `DomainIdentityRow`.
 3. **Usecase unit tests** (`src/usecase/tests.rs`): `MockUserCredentialsRepo`
-   + `MockDomainIdentityRepo` + `FakeUserService`. Exercise every command,
-   assert:
+   + `MockDomainIdentityRepo` + `FakeUserService` + `InMemoryTokenVersionCache`.
+   Exercise every command, assert:
    - Empty input → `Validation`.
    - Inactive user → `Repository(Inactive)`.
    - Wrong password → `Repository(InvalidCredentials)`.
    - JWT round-trips through `verify` and `refresh`.
    - `token_version` mismatch → `Verification`.
-   - `logout` bumps `token_version`; subsequent `verify` of the old access
-     token fails.
-   - `verify` and `refresh` call `MockUserCredentialsRepo::current_token_version`
-     for the version check (assert the mock's `current_token_version_calls`
-     counter increments).
-4. **Persistence adapter cache tests** (`src/adapter/persistence/postgres/tests.rs`,
-   beside the row conversion tests): a separate test module that wraps the
-   Postgres impl behind a stub of the inner DB calls and asserts the
-   cache-population + cache-invalidation behaviour directly. The current
-   in-memory mock exposes `current_token_version` as a direct lookup, so
-   the mock-level tests verify the contract; the live-DB `#[ignore]` tests
-   cover the cache under real Postgres traffic.
-4. **Facade unit tests** (`src/adapter/facade/in_memory/tests.rs`): wire
+   - `logout` bumps `token_version` and writes the new value into the
+     cache; subsequent `verify` of the old access token fails.
+   - Cache hit path: a `verify` call after `login_with_password` does NOT
+     touch `MockUserCredentialsRepo::find_by_code` for the version
+     check (the cache supplies the version).
+   - Cache miss path: a `verify` call against a fresh `AuthUsecase`
+     constructed with an empty cache falls back to
+     `MockUserCredentialsRepo::find_by_code` once and populates the
+     cache.
+4. **In-memory cache tests** (`src/adapter/cache/in_memory/tests.rs`):
+   cover the `TokenVersionCache` contract end-to-end — `get` returns
+   `None` for an unknown code, `put` then `get` returns the stored
+   value, `put` overwrites, and the cache is `Send + Sync`.
+5. **Persistence adapter tests** (`src/adapter/persistence/postgres/tests.rs`):
+   migration content tests (read SQL files as text) plus row → domain
+   `TryFrom` conversions.
+6. **Facade unit tests** (`src/adapter/facade/in_memory/tests.rs`): wire
    `AuthServiceImpl` on top of the mocks + `FakeUserService`. Exercise every
    `AuthService` method; assert:
    - `AuthApiError` mapping for every `UsecaseError` branch.
    - Object safety: `Box<dyn AuthService>` and `Send + Sync`.
-5. **`tests/` directory tests**:
+7. **`tests/` directory tests**:
    - `tests/public_api.rs` — compile-only type-naming test. Lock the
      `UserCredentialsRepo::new(pool)` / `DomainIdentityRepo::new(pool)`
      constructors as function pointers, and `AuthUsecase::new(cfg)` against
