@@ -14,6 +14,9 @@ thiserror = { workspace = true }
 # keeps the binary small (no local time zones) while still enabling
 # `NOW()`-style integration through `chrono::Utc`.
 chrono = { workspace = true }
+# `apis` provides the outbound `UserService` port the facade
+# implements. Path-dep because both crates share the workspace.
+apis = { path = "../apis" }
 
 [dev-dependencies]
 # Loads `.env` at test startup so live-DB integration tests can find
