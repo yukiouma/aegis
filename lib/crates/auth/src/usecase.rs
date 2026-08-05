@@ -7,7 +7,7 @@ pub(crate) mod tests;
 
 pub use auth_usecase::{AuthUsecase, AuthUsecaseConfig};
 pub use commands::{
-    AccessTokenView, AuthClaimsView, Logout, LogoutAck, LoginWithDomainUserInfo,
-    LoginWithPassword, RefreshAccessToken, Role, TokenPairView, VerifyAccessToken,
+    AccessTokenView, AuthClaimsView, LoginWithDomainUserInfo, LoginWithPassword, Logout, LogoutAck,
+    RefreshAccessToken, Role, TokenPairView, VerifyAccessToken,
 };
 pub use error::UsecaseError;

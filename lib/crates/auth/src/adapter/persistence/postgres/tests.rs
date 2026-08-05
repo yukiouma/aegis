@@ -55,11 +55,7 @@ fn migration_0001_creates_auth_user_credentials_table() {
 fn migration_0001_has_required_columns() {
     let block = create_table_block(&load_migration("0001_create_auth_user_credentials.sql"));
     let upper = block.to_uppercase();
-    for required in [
-        "CODE TEXT",
-        "PASSWORD_HASH TEXT",
-        "TOKEN_VERSION INTEGER",
-    ] {
+    for required in ["CODE TEXT", "PASSWORD_HASH TEXT", "TOKEN_VERSION INTEGER"] {
         assert!(
             upper.contains(required),
             "auth_user_credentials must include `{required}`; got:\n{block}"
@@ -106,7 +102,9 @@ fn migration_0002_creates_auth_user_domain_identities_table() {
 
 #[test]
 fn migration_0002_has_required_columns() {
-    let block = create_table_block(&load_migration("0002_create_auth_user_domain_identities.sql"));
+    let block = create_table_block(&load_migration(
+        "0002_create_auth_user_domain_identities.sql",
+    ));
     let upper = block.to_uppercase();
     for required in [
         "USER_CODE TEXT",
@@ -123,7 +121,9 @@ fn migration_0002_has_required_columns() {
 
 #[test]
 fn migration_0002_unique_constraint_covers_all_four_columns() {
-    let block = create_table_block(&load_migration("0002_create_auth_user_domain_identities.sql"));
+    let block = create_table_block(&load_migration(
+        "0002_create_auth_user_domain_identities.sql",
+    ));
     assert!(
         block.contains("UNIQUE (user_code, domain_name, hostname, sid)"),
         "unique constraint must cover all four columns; got:\n{block}"

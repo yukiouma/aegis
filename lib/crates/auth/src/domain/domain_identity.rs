@@ -9,6 +9,8 @@ pub struct DomainIdentity {
 }
 
 impl DomainIdentity {
+    /// Validating constructor used by the domain / usecase layers.
+    #[allow(dead_code)]
     pub(crate) fn new(
         user_code: String,
         domain_name: String,
@@ -18,10 +20,7 @@ impl DomainIdentity {
         if user_code.trim().is_empty() {
             return Err(DomainError::EmptyCode);
         }
-        if domain_name.trim().is_empty()
-            || hostname.trim().is_empty()
-            || sid.trim().is_empty()
-        {
+        if domain_name.trim().is_empty() || hostname.trim().is_empty() || sid.trim().is_empty() {
             return Err(DomainError::EmptyPasswordHash);
         }
         Ok(Self {

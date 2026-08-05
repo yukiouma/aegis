@@ -11,8 +11,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 
 use apis::user::{
-    CreateUserRequest, Role as ApiRole, UpdateUserRequest, UserApiError, UserService,
-    UserView,
+    CreateUserRequest, Role as ApiRole, UpdateUserRequest, UserApiError, UserService, UserView,
 };
 
 use crate::domain::{
@@ -20,7 +19,7 @@ use crate::domain::{
     UserCredentialsRepository,
 };
 use crate::usecase::commands::{
-    AuthClaimsView, Logout, LoginWithDomainUserInfo, LoginWithPassword, RefreshAccessToken,
+    AuthClaimsView, LoginWithDomainUserInfo, LoginWithPassword, Logout, RefreshAccessToken,
     TokenPairView, VerifyAccessToken,
 };
 use crate::usecase::{AuthUsecase, AuthUsecaseConfig, UsecaseError};
@@ -65,15 +64,13 @@ impl UserCredentialsRepository for MockUserCredentialsRepo {
         s.by_code.get(code).cloned().ok_or(DomainError::NotFound)
     }
 
-    async fn create(
-        &self,
-        credentials: UserCredentials,
-    ) -> Result<UserCredentials, DomainError> {
+    async fn create(&self, credentials: UserCredentials) -> Result<UserCredentials, DomainError> {
         let mut s = self.state.lock().unwrap();
         if s.by_code.contains_key(&credentials.code) {
             return Err(DomainError::DuplicateCode(credentials.code));
         }
-        s.by_code.insert(credentials.code.clone(), credentials.clone());
+        s.by_code
+            .insert(credentials.code.clone(), credentials.clone());
         Ok(credentials)
     }
 
@@ -191,7 +188,7 @@ pub fn make_usecase(
 
 /// Hash a password the same way the usecase does (argon2 default).
 pub fn hash_password(plain: &str) -> String {
-    use argon2::password_hash::{rand_core::OsRng, PasswordHasher, SaltString};
+    use argon2::password_hash::{PasswordHasher, SaltString, rand_core::OsRng};
     let salt = SaltString::generate(&mut OsRng);
     argon2::Argon2::default()
         .hash_password(plain.as_bytes(), &salt)
@@ -224,8 +221,7 @@ fn make_seeded_usecase_for_password_login(
 
 #[tokio::test]
 async fn login_with_password_mints_token_pair_for_valid_credentials() {
-    let (_creds, _ids, _users, usecase) =
-        make_seeded_usecase_for_password_login("hunter2", 1);
+    let (_creds, _ids, _users, usecase) = make_seeded_usecase_for_password_login("hunter2", 1);
     let pair = usecase
         .login_with_password(LoginWithPassword {
             code: "u1".into(),
@@ -239,8 +235,7 @@ async fn login_with_password_mints_token_pair_for_valid_credentials() {
 
 #[tokio::test]
 async fn login_with_password_rejects_empty_code_with_validation() {
-    let (_creds, _ids, _users, usecase) =
-        make_seeded_usecase_for_password_login("hunter2", 1);
+    let (_creds, _ids, _users, usecase) = make_seeded_usecase_for_password_login("hunter2", 1);
     let err = usecase
         .login_with_password(LoginWithPassword {
             code: "  ".into(),
@@ -256,8 +251,7 @@ async fn login_with_password_rejects_empty_code_with_validation() {
 
 #[tokio::test]
 async fn login_with_password_rejects_empty_password() {
-    let (_creds, _ids, _users, usecase) =
-        make_seeded_usecase_for_password_login("hunter2", 1);
+    let (_creds, _ids, _users, usecase) = make_seeded_usecase_for_password_login("hunter2", 1);
     let err = usecase
         .login_with_password(LoginWithPassword {
             code: "u1".into(),
@@ -295,8 +289,7 @@ async fn login_with_password_rejects_inactive_user() {
 
 #[tokio::test]
 async fn login_with_password_rejects_wrong_password() {
-    let (_creds, _ids, _users, usecase) =
-        make_seeded_usecase_for_password_login("hunter2", 1);
+    let (_creds, _ids, _users, usecase) = make_seeded_usecase_for_password_login("hunter2", 1);
     let err = usecase
         .login_with_password(LoginWithPassword {
             code: "u1".into(),
@@ -324,7 +317,10 @@ async fn login_with_password_rejects_unknown_user() {
         })
         .await
         .unwrap_err();
-    assert!(matches!(err, UsecaseError::Repository(DomainError::NotFound)));
+    assert!(matches!(
+        err,
+        UsecaseError::Repository(DomainError::NotFound)
+    ));
 }
 
 #[tokio::test]
@@ -373,7 +369,10 @@ async fn login_with_domain_user_info_returns_not_found_for_unmatched_triple() {
         })
         .await
         .unwrap_err();
-    assert!(matches!(err, UsecaseError::Repository(DomainError::NotFound)));
+    assert!(matches!(
+        err,
+        UsecaseError::Repository(DomainError::NotFound)
+    ));
 }
 
 #[tokio::test]

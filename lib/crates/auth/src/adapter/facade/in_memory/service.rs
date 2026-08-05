@@ -2,16 +2,15 @@ use async_trait::async_trait;
 
 use apis::auth::{
     AuthApiError, AuthClaims, AuthService, LoginWithDomainUserInfoRequest,
-    LoginWithPasswordRequest, LogoutRequest, LogoutResponse, RefreshRequest,
-    RefreshResponse, TokenPair, VerifyRequest,
+    LoginWithPasswordRequest, LogoutRequest, LogoutResponse, RefreshRequest, RefreshResponse,
+    TokenPair, VerifyRequest,
 };
 use apis::user::Role as ApiRole;
 
 use crate::domain::{DomainError, DomainIdentityRepository, UserCredentialsRepository};
 use crate::usecase::{
-    AccessTokenView, AuthClaimsView, AuthUsecase, Logout as LogoutCmd,
-    LoginWithDomainUserInfo, LoginWithPassword, RefreshAccessToken, TokenPairView,
-    UsecaseError, VerifyAccessToken,
+    AccessTokenView, AuthClaimsView, AuthUsecase, LoginWithDomainUserInfo, LoginWithPassword,
+    Logout as LogoutCmd, RefreshAccessToken, TokenPairView, UsecaseError, VerifyAccessToken,
 };
 
 pub struct AuthServiceImpl<R: UserCredentialsRepository, D: DomainIdentityRepository> {

@@ -1,4 +1,3 @@
-mod fake_user_service;
 mod service;
 
 #[cfg(test)]

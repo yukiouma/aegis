@@ -34,67 +34,40 @@ fn try_from_str_rejects_empty_string() {
 
 #[test]
 fn new_user_credentials_rejects_empty_code() {
-    let err = UserCredentials::new(
-        "".into(),
-        "hash".into(),
-        1,
-        test_now(),
-        test_now(),
-    )
-    .unwrap_err();
+    let err =
+        UserCredentials::new("".into(), "hash".into(), 1, test_now(), test_now()).unwrap_err();
     assert!(matches!(err, DomainError::EmptyCode));
 }
 
 #[test]
 fn new_user_credentials_rejects_empty_password_hash() {
-    let err = UserCredentials::new(
-        "u1".into(),
-        "".into(),
-        1,
-        test_now(),
-        test_now(),
-    )
-    .unwrap_err();
+    let err = UserCredentials::new("u1".into(), "".into(), 1, test_now(), test_now()).unwrap_err();
     assert!(matches!(err, DomainError::EmptyPasswordHash));
 }
 
 #[test]
 fn new_user_credentials_accepts_valid_input() {
-    let c = UserCredentials::new(
-        "u1".into(),
-        "hash".into(),
-        1,
-        test_now(),
-        test_now(),
-    )
-    .expect("valid credentials should construct");
+    let c = UserCredentials::new("u1".into(), "hash".into(), 1, test_now(), test_now())
+        .expect("valid credentials should construct");
     assert_eq!(c.code, "u1");
     assert_eq!(c.token_version, 1);
 }
 
 #[test]
 fn user_credentials_debug_omits_password_hash() {
-    let c = UserCredentials::for_repository(
-        "u1".into(),
-        "hash".into(),
-        1,
-        test_now(),
-        test_now(),
-    );
+    let c = UserCredentials::for_repository("u1".into(), "hash".into(), 1, test_now(), test_now());
     let dbg = format!("{c:?}");
-    assert!(!dbg.contains("hash"), "Debug must not leak password hash, got: {dbg}");
+    assert!(
+        !dbg.contains("hash"),
+        "Debug must not leak password hash, got: {dbg}"
+    );
     assert!(dbg.contains("u1"));
 }
 
 #[test]
 fn new_domain_identity_rejects_empty_user_code() {
-    let err = DomainIdentity::new(
-        "".into(),
-        "DOM".into(),
-        "host".into(),
-        "S-1-5".into(),
-    )
-    .unwrap_err();
+    let err =
+        DomainIdentity::new("".into(), "DOM".into(), "host".into(), "S-1-5".into()).unwrap_err();
     assert!(matches!(err, DomainError::EmptyCode));
 }
 
@@ -105,26 +78,16 @@ fn new_domain_identity_rejects_empty_triple_components() {
         ("DOM", "", "S-1-5"),
         ("DOM", "host", ""),
     ] {
-        let err = DomainIdentity::new(
-            "u1".into(),
-            domain_name.into(),
-            hostname.into(),
-            sid.into(),
-        )
-        .unwrap_err();
+        let err = DomainIdentity::new("u1".into(), domain_name.into(), hostname.into(), sid.into())
+            .unwrap_err();
         assert!(matches!(err, DomainError::EmptyPasswordHash));
     }
 }
 
 #[test]
 fn new_domain_identity_accepts_valid_input() {
-    let id = DomainIdentity::new(
-        "u1".into(),
-        "DOM".into(),
-        "host".into(),
-        "S-1-5".into(),
-    )
-    .expect("valid identity should construct");
+    let id = DomainIdentity::new("u1".into(), "DOM".into(), "host".into(), "S-1-5".into())
+        .expect("valid identity should construct");
     assert_eq!(id.user_code, "u1");
     assert_eq!(id.domain_name, "DOM");
 }

@@ -37,10 +37,7 @@ impl UserCredentialsRepository for UserCredentialsRepo {
         row.try_into()
     }
 
-    async fn create(
-        &self,
-        credentials: UserCredentials,
-    ) -> Result<UserCredentials, DomainError> {
+    async fn create(&self, credentials: UserCredentials) -> Result<UserCredentials, DomainError> {
         let row: CredentialRow = sqlx::QueryBuilder::new(
             "INSERT INTO auth_user_credentials (code, password_hash, token_version) VALUES (",
         )

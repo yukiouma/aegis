@@ -10,18 +10,15 @@ use crate::domain::{
 };
 
 use super::commands::{
-    AccessTokenView, AuthClaimsView, Logout, LogoutAck, LoginWithDomainUserInfo,
-    LoginWithPassword, RefreshAccessToken, Role, TokenPairView, VerifyAccessToken,
+    AccessTokenView, AuthClaimsView, LoginWithDomainUserInfo, LoginWithPassword, Logout, LogoutAck,
+    RefreshAccessToken, Role, TokenPairView, VerifyAccessToken,
 };
 use super::error::UsecaseError;
 
 /// Configuration passed to [`AuthUsecase::new`]. Plain pub-field struct;
 /// no builder ceremony. Generic over the same two repository types so
 /// field types stay concrete.
-pub struct AuthUsecaseConfig<
-    R: UserCredentialsRepository,
-    D: DomainIdentityRepository,
-> {
+pub struct AuthUsecaseConfig<R: UserCredentialsRepository, D: DomainIdentityRepository> {
     pub credentials: R,
     pub identities: D,
     pub user_service: Arc<dyn UserService>,
@@ -123,9 +120,7 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             return Err(UsecaseError::Repository(DomainError::Inactive));
         }
         let parsed_hash = argon2::PasswordHash::new(&creds.password_hash).map_err(|e| {
-            UsecaseError::Repository(DomainError::Repository(format!(
-                "argon2 parse: {e}"
-            )))
+            UsecaseError::Repository(DomainError::Repository(format!("argon2 parse: {e}")))
         })?;
         use argon2::PasswordVerifier;
         if argon2::Argon2::default()
@@ -189,11 +184,8 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         })
     }
 
-    pub async fn verify(
-        &self,
-        cmd: VerifyAccessToken,
-    ) -> Result<AuthClaimsView, UsecaseError> {
-        use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+    pub async fn verify(&self, cmd: VerifyAccessToken) -> Result<AuthClaimsView, UsecaseError> {
+        use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
         let mut validation = Validation::new(Algorithm::HS256);
         validation.leeway = 5;
         validation.required_spec_claims = std::collections::HashSet::new();
@@ -227,11 +219,8 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         })
     }
 
-    pub async fn refresh(
-        &self,
-        cmd: RefreshAccessToken,
-    ) -> Result<AccessTokenView, UsecaseError> {
-        use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+    pub async fn refresh(&self, cmd: RefreshAccessToken) -> Result<AccessTokenView, UsecaseError> {
+        use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
         let mut validation = Validation::new(Algorithm::HS256);
         validation.leeway = 5;
         validation.required_spec_claims = std::collections::HashSet::new();
@@ -287,7 +276,7 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         role: Role,
         version: u32,
     ) -> Result<String, UsecaseError> {
-        use jsonwebtoken::{encode, EncodingKey, Header};
+        use jsonwebtoken::{EncodingKey, Header, encode};
         let now = chrono::Utc::now().timestamp();
         let claims = AccessClaims {
             sub: code.to_string(),
@@ -302,7 +291,7 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
     }
 
     fn mint_refresh_token(&self, code: &str, version: u32) -> Result<String, UsecaseError> {
-        use jsonwebtoken::{encode, EncodingKey, Header};
+        use jsonwebtoken::{EncodingKey, Header, encode};
         let now = chrono::Utc::now().timestamp();
         let claims = RefreshClaims {
             sub: code.to_string(),
@@ -332,5 +321,5 @@ fn role_from_api(r: apis::user::Role) -> Role {
 }
 
 fn role_from_str(s: &str) -> Result<Role, UsecaseError> {
-    Role::try_from(s).map_err(|e| UsecaseError::Repository(e))
+    Role::try_from(s).map_err(UsecaseError::Repository)
 }

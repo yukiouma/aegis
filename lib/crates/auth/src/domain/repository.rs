@@ -9,10 +9,7 @@ use super::domain_identity::DomainIdentity;
 pub trait UserCredentialsRepository: Send + Sync {
     async fn find_by_code(&self, code: &str) -> Result<UserCredentials, DomainError>;
 
-    async fn create(
-        &self,
-        credentials: UserCredentials,
-    ) -> Result<UserCredentials, DomainError>;
+    async fn create(&self, credentials: UserCredentials) -> Result<UserCredentials, DomainError>;
 
     /// Atomically increments `token_version` for the user identified
     /// by `code` and returns the new value. Returns `DomainError::NotFound`

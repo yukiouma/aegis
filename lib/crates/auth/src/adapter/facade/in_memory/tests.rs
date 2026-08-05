@@ -13,7 +13,7 @@ use apis::auth::{
 use apis::user::Role as ApiRole;
 
 use crate::usecase::tests::{
-    hash_password, FakeUserService, MockDomainIdentityRepo, MockUserCredentialsRepo,
+    FakeUserService, MockDomainIdentityRepo, MockUserCredentialsRepo, hash_password,
 };
 
 use super::service::AuthServiceImpl;
