@@ -1,4 +1,4 @@
-//! Tests for the PostgreSQL infrastructure adapter that do NOT
+//! Tests for the PostgreSQL adapter that do NOT
 //! require a live database connection.
 //!
 //! 1. The `0001_create_users.sql` migration file content (the schema

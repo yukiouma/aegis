@@ -14,7 +14,7 @@ repository and an async `UserUsecase`.
 src/
   domain/                       # User, Role, validation, errors, repository port
   usecase/                      # UserUsecase, command DTOs, errors
-  infrastructure/               # persistence adapters
+  adapter/                      # persistence adapters
     persistence/
       postgres/                 # SQLx-backed UserRepo, UserRow
 migrations/                     # SQLx migrations applied to the database

@@ -1,4 +1,4 @@
-//! Infrastructure layer.
+//! Adapter layer.
 //!
 //! Houses the persistence adapters that implement the
 //! `UserRepository` port defined in the domain layer. Storage-specific

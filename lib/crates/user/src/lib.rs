@@ -4,15 +4,15 @@
 //! repository and an async `UserUsecase`.
 //!
 //! The crate exposes the three DDD layers as sub-modules for power
-//! users (`domain`, `usecase`, `infrastructure`) and re-exports the
+//! users (`domain`, `usecase`, `adapter`) and re-exports the
 //! public surface at the crate root so consumers can simply write
 //!
 //! ```no_run
 //! use user::{UserRepo, UserUsecase, CreateUser, UpdateUser, Role, UserView};
 //! ```
 
+pub mod adapter;
 pub mod domain;
-pub mod infrastructure;
 pub mod usecase;
 
 // Re-exports for the documented public surface.
@@ -25,5 +25,5 @@ pub mod usecase;
 // re-exported so consumers can `match` on them and construct
 // repository inputs without reaching into the internal modules.
 pub use domain::{DomainError, Role, User, UserNew, UserRepository, UserUpdate};
-pub use infrastructure::UserRepo;
+pub use adapter::UserRepo;
 pub use usecase::{CreateUser, UpdateUser, UsecaseError, UserUsecase, UserView};

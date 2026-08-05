@@ -9,7 +9,7 @@
 // against the bound parameters we hand it and lets the build proceed
 // in any environment, at the cost of a small loss in static
 // verification of the SQL itself. The migration test in
-// `infrastructure::tests` covers the schema content directly.
+// `adapter::tests` covers the schema content directly.
 
 use std::convert::TryFrom;
 

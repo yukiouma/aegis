@@ -26,7 +26,7 @@ pub struct UserUpdate {
 
 /// Outbound port for persistence of `User` aggregates.
 ///
-/// Implementations live in the infrastructure layer (e.g. PostgreSQL via
+/// Implementations live in the adapter layer (e.g. PostgreSQL via
 /// `sqlx`). Domain code depends on this trait only; never on concrete
 /// repositories.
 #[async_trait]

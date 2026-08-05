@@ -52,7 +52,7 @@ impl User {
         })
     }
 
-    /// Constructor reserved for the infrastructure layer when materialising
+    /// Constructor reserved for the adapter layer when materialising
     /// rows from persistence. Skips domain validation because the data is
     /// assumed to have been validated on the way in.
     #[allow(clippy::too_many_arguments)]
