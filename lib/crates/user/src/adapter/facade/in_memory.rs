@@ -124,7 +124,15 @@ impl<R: UserRepository> UserService for UserServiceImpl<R> {
         Ok(views.into_iter().map(user_view_from_internal).collect())
     }
 
-    async fn update(&self, _req: UpdateUserRequest) -> Result<UserView, UserApiError> {
-        todo!("implemented in task 8")
+    async fn update(&self, req: UpdateUserRequest) -> Result<UserView, UserApiError> {
+        let cmd = UpdateUser {
+            id: req.id,
+            code: req.code,
+            name: req.name,
+            role: req.role.map(to_internal_role),
+            active: req.active,
+        };
+        let view = self.usecase.update(cmd).await?;
+        Ok(user_view_from_internal(view))
     }
 }

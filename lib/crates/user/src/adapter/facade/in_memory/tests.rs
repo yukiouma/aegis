@@ -273,3 +273,76 @@ async fn list_returns_empty_vec_when_no_users_exist() {
     let list = svc.list().await.unwrap();
     assert!(list.is_empty());
 }
+
+#[tokio::test]
+async fn update_applies_supplied_fields_and_returns_view() {
+    let svc = service();
+    let created = svc
+        .create(apis::user::CreateUserRequest {
+            code: "u1".into(),
+            name: "Alice".into(),
+            role: ApiRole::General,
+        })
+        .await
+        .unwrap();
+    let updated = svc
+        .update(apis::user::UpdateUserRequest {
+            id: created.id,
+            name: Some("Alicia".into()),
+            role: Some(ApiRole::Admin),
+            active: Some(false),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+    assert_eq!(updated.id, created.id);
+    assert_eq!(updated.code, "u1");
+    assert_eq!(updated.name, "Alicia");
+    assert_eq!(updated.role, ApiRole::Admin);
+    assert!(!updated.active);
+}
+
+#[tokio::test]
+async fn update_returns_not_found_for_unknown_id() {
+    let svc = service();
+    let err = svc
+        .update(apis::user::UpdateUserRequest {
+            id: 999,
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(err, apis::user::UserApiError::NotFound));
+}
+
+#[tokio::test]
+async fn update_rejects_duplicate_code() {
+    let svc = service();
+    svc.create(apis::user::CreateUserRequest {
+        code: "u1".into(),
+        name: "Alice".into(),
+        role: ApiRole::General,
+    })
+    .await
+    .unwrap();
+    let second = svc
+        .create(apis::user::CreateUserRequest {
+            code: "u2".into(),
+            name: "Bob".into(),
+            role: ApiRole::General,
+        })
+        .await
+        .unwrap();
+    let err = svc
+        .update(apis::user::UpdateUserRequest {
+            id: second.id,
+            code: Some("u1".into()),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        apis::user::UserApiError::DuplicateCode(ref c) if c == "u1"
+    ));
+}
