@@ -170,24 +170,40 @@ independently. The application layer is responsible for keeping
 
 Use `jsonwebtoken = "11"` from `[workspace.dependencies]`. HS256 only.
 
-Claims payload:
+Two distinct claim structs, defined privately in the usecase module (no
+re-export at the crate root — they are an internal mint/verify detail):
 
 ```rust
-struct Claims {
+#[derive(Serialize, Deserialize)]
+struct AccessClaims {
     sub: String,           // user code
     role: String,          // auth::Role::as_str()
     ver: u32,              // token_version at mint time
-    typ: &'static str,     // "access" or "refresh"
+    exp: i64,              // unix timestamp
+    iat: i64,
+}
+
+#[derive(Serialize, Deserialize)]
+struct RefreshClaims {
+    sub: String,           // user code
+    ver: u32,              // token_version at mint time
     exp: i64,              // unix timestamp
     iat: i64,
 }
 ```
 
-- `typ` distinguishes access vs refresh — `verify` accepts only `"access"`,
-  `refresh` accepts only `"refresh"`. A refresh token cannot be presented as
-  an access token and vice versa.
-- `ver` is the `token_version` baked in at mint time. `verify` reads the
-  user's current `token_version` from the DB and rejects if mismatched. One
+- Refresh tokens carry only `sub`, `ver`, `exp`, `iat` — no role. The
+  refresh path re-fetches the user from `user_service.get_by_code` so it
+  always reads the current `Role` rather than trusting a stale value baked
+  in at refresh-mint time.
+- Token-type rejection is structural: `verify` calls
+  `jsonwebtoken::decode::<AccessClaims>(token, …)`. If a refresh token is
+  presented, serde deserialization fails because `role` is required on
+  `AccessClaims` but absent from the token. The same logic works in reverse
+  for `refresh`. No `typ` discriminator field needed.
+- `ver` is the `token_version` baked in at mint time. `verify` and
+  `refresh` both read the user's current `token_version` from the DB and
+  reject if mismatched. One
   `UPDATE auth_user_credentials SET token_version = token_version + 1`
   (exposed by `bump_token_version`) invalidates every outstanding token for
   that user.
@@ -230,8 +246,8 @@ service.
 | --- | --- | --- |
 | `LoginWithPassword { code, password }` | validate → `credentials.find_by_code` → `user_service.get_by_code` → check `active` → `argon2::verify_password` → mint access + refresh JWTs | `TokenPairView` |
 | `LoginWithDomainUserInfo { code, domain_name, hostname, sid }` | validate → `identities.find` → `user_service.get_by_code` → check `active` → `credentials.find_by_code` → mint tokens | `TokenPairView` |
-| `VerifyAccessToken { access_token }` | decode JWT → check signature, expiry, `typ = "access"` → `credentials.find_by_code` → `user_service.get_by_code` → check `active` → compare `jwt.ver == credentials.token_version` → mint `AuthClaimsView` | `AuthClaimsView` |
-| `RefreshAccessToken { refresh_token }` | decode JWT → check signature, expiry, `typ = "refresh"` → `credentials.find_by_code` → `user_service.get_by_code` → check `active` → compare versions → mint new access token | `AccessTokenView` |
+| `VerifyAccessToken { access_token }` | decode JWT as `AccessClaims` → check signature + expiry → `credentials.find_by_code` → `user_service.get_by_code` → check `active` → compare `jwt.ver == credentials.token_version` → project to `AuthClaimsView` | `AuthClaimsView` |
+| `RefreshAccessToken { refresh_token }` | decode JWT as `RefreshClaims` → check signature + expiry → `credentials.find_by_code` → `user_service.get_by_code` → check `active` → compare versions → mint new access token (fresh `AccessClaims`) | `AccessTokenView` |
 | `Logout { code }` | validate → `credentials.bump_token_version(code)` | `LogoutAck { code }` |
 
 `logout` does not consult `user_service`; bumping `token_version` invalidates
