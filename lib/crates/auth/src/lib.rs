@@ -10,8 +10,12 @@ pub mod adapter;
 pub mod domain;
 pub mod usecase;
 
-// Re-exports for the documented public surface.
 pub use domain::{
     DomainError, DomainIdentity, DomainIdentityRepository, Role, UserCredentials,
     UserCredentialsRepository,
+};
+pub use usecase::{
+    AccessTokenView, AuthClaimsView, AuthUsecase, AuthUsecaseConfig, Logout, LogoutAck,
+    LoginWithDomainUserInfo, LoginWithPassword, RefreshAccessToken, TokenPairView,
+    UsecaseError, VerifyAccessToken,
 };

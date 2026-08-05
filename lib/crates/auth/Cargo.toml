@@ -22,6 +22,8 @@ rand_core = { workspace = true }
 # `jsonwebtoken` provides the HS256 sign / verify primitives used by the
 # usecase layer to mint access + refresh tokens.
 jsonwebtoken = { workspace = true }
+# `serde` provides `Serialize` / `Deserialize` for the JWT claim structs.
+serde = { version = "1", features = ["derive"] }
 # `apis` provides the outbound `AuthService` port the facade implements
 # and the `UserService` port the usecase consults for active state.
 # Path-dep because both crates share the workspace.
