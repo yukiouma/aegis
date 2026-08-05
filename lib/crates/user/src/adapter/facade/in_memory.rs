@@ -11,3 +11,6 @@
 mod service;
 
 pub use service::UserServiceImpl;
+
+#[cfg(test)]
+mod tests;

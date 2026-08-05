@@ -133,6 +133,3 @@ impl<R: UserRepository> UserService for UserServiceImpl<R> {
         Ok(user_view_from_internal(view))
     }
 }
-
-#[cfg(test)]
-mod tests;
