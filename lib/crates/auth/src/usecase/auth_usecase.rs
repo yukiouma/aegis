@@ -32,7 +32,13 @@ pub struct AuthUsecaseConfig<
 }
 
 /// Internal JWT claim payload for access tokens.
+///
+/// `deny_unknown_fields` makes the decode reject refresh tokens (which
+/// lack `role`) and any future field additions explicit. The check is
+/// what gives `verify` and `refresh` their structural type-rejection
+/// without needing a `typ` discriminator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct AccessClaims {
     sub: String,
     role: String,
@@ -41,8 +47,10 @@ struct AccessClaims {
     iat: i64,
 }
 
-/// Internal JWT claim payload for refresh tokens.
+/// Internal JWT claim payload for refresh tokens. See [`AccessClaims`]
+/// for why `deny_unknown_fields` matters.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 struct RefreshClaims {
     sub: String,
     ver: u32,
@@ -183,16 +191,77 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
 
     pub async fn verify(
         &self,
-        _cmd: VerifyAccessToken,
+        cmd: VerifyAccessToken,
     ) -> Result<AuthClaimsView, UsecaseError> {
-        unimplemented!("filled in by Task 5")
+        use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.leeway = 5;
+        validation.required_spec_claims = std::collections::HashSet::new();
+        let key = DecodingKey::from_secret(&self.signing_key);
+        let data = decode::<AccessClaims>(&cmd.access_token, &key, &validation)
+            .map_err(|e| UsecaseError::Verification(format!("decode access: {e}")))?;
+        let claims = data.claims;
+
+        let current = self.current_token_version(&claims.sub).await?;
+        if current != claims.ver {
+            return Err(UsecaseError::Verification(format!(
+                "token_version mismatch (cached = {current}, jwt.ver = {})",
+                claims.ver
+            )));
+        }
+
+        let user = self
+            .user_service
+            .get_by_code(&claims.sub)
+            .await
+            .map_err(map_user_service_error)?;
+        if !user.active {
+            return Err(UsecaseError::Repository(DomainError::Inactive));
+        }
+
+        let role = role_from_str(&claims.role)?;
+        Ok(AuthClaimsView {
+            code: claims.sub,
+            role,
+            token_version: claims.ver,
+        })
     }
 
     pub async fn refresh(
         &self,
-        _cmd: RefreshAccessToken,
+        cmd: RefreshAccessToken,
     ) -> Result<AccessTokenView, UsecaseError> {
-        unimplemented!("filled in by Task 5")
+        use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.leeway = 5;
+        validation.required_spec_claims = std::collections::HashSet::new();
+        let key = DecodingKey::from_secret(&self.signing_key);
+        let data = decode::<RefreshClaims>(&cmd.refresh_token, &key, &validation)
+            .map_err(|e| UsecaseError::Verification(format!("decode refresh: {e}")))?;
+        let claims = data.claims;
+
+        let current = self.current_token_version(&claims.sub).await?;
+        if current != claims.ver {
+            return Err(UsecaseError::Verification(format!(
+                "token_version mismatch (cached = {current}, jwt.ver = {})",
+                claims.ver
+            )));
+        }
+
+        let user = self
+            .user_service
+            .get_by_code(&claims.sub)
+            .await
+            .map_err(map_user_service_error)?;
+        if !user.active {
+            return Err(UsecaseError::Repository(DomainError::Inactive));
+        }
+
+        let role = role_from_api(user.role);
+        let access = self.mint_access_token(&claims.sub, role, current)?;
+        Ok(AccessTokenView {
+            access_token: access,
+        })
     }
 
     pub async fn logout(&self, cmd: Logout) -> Result<LogoutAck, UsecaseError> {
@@ -260,4 +329,8 @@ fn role_from_api(r: apis::user::Role) -> Role {
         apis::user::Role::Admin => Role::Admin,
         apis::user::Role::General => Role::General,
     }
+}
+
+fn role_from_str(s: &str) -> Result<Role, UsecaseError> {
+    Role::try_from(s).map_err(|e| UsecaseError::Repository(e))
 }

@@ -405,3 +405,272 @@ async fn login_with_domain_user_info_rejects_inactive_user() {
         UsecaseError::Repository(DomainError::Inactive)
     ));
 }
+
+#[tokio::test]
+async fn verify_returns_claims_for_freshly_minted_access_token() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", &hash_password("hunter2"), 7);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    users.seed("u1", ApiRole::Admin, true);
+    let usecase = make_usecase(creds.clone(), ids, users);
+
+    let pair = usecase
+        .login_with_password(LoginWithPassword {
+            code: "u1".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect("login succeeds");
+    let claims = usecase
+        .verify(VerifyAccessToken {
+            access_token: pair.access_token.clone(),
+        })
+        .await
+        .expect("verify succeeds");
+    assert_eq!(claims.code, "u1");
+    assert_eq!(claims.role, Role::Admin);
+    assert_eq!(claims.token_version, 7);
+
+    // Login populated the cache; verify must not touch the repo.
+    let find_calls_before = creds.state.lock().unwrap().find_calls;
+    let _ = usecase
+        .verify(VerifyAccessToken {
+            access_token: pair.access_token,
+        })
+        .await
+        .expect("verify succeeds again");
+    assert_eq!(
+        creds.state.lock().unwrap().find_calls,
+        find_calls_before,
+        "verify must hit the cache, not the repo"
+    );
+}
+
+#[tokio::test]
+async fn verify_falls_back_to_repo_on_cache_miss_and_populates_cache() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", &hash_password("hunter2"), 3);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    users.seed("u1", ApiRole::Admin, true);
+    let usecase = make_usecase(creds.clone(), ids.clone(), users.clone());
+
+    let pair = usecase
+        .login_with_password(LoginWithPassword {
+            code: "u1".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect("login succeeds");
+
+    // Build a fresh usecase that shares the same repo but starts with
+    // an empty cache (simulating a cold restart within the same process).
+    let cold_users = FakeUserService::default();
+    cold_users.seed("u1", ApiRole::Admin, true);
+    let cold_usecase = make_usecase(creds.clone(), ids, cold_users);
+
+    let find_calls_before = creds.state.lock().unwrap().find_calls;
+    let claims = cold_usecase
+        .verify(VerifyAccessToken {
+            access_token: pair.access_token.clone(),
+        })
+        .await
+        .expect("verify succeeds after cold restart");
+    assert_eq!(claims.token_version, 3);
+
+    let find_calls_after_first = creds.state.lock().unwrap().find_calls;
+    assert!(
+        find_calls_after_first > find_calls_before,
+        "first verify after cold restart must hit the repo"
+    );
+
+    // Second verify must hit the cache.
+    let _ = cold_usecase
+        .verify(VerifyAccessToken {
+            access_token: pair.access_token,
+        })
+        .await
+        .expect("verify succeeds again");
+    assert_eq!(
+        creds.state.lock().unwrap().find_calls,
+        find_calls_after_first,
+        "second verify must hit the cache"
+    );
+}
+
+#[tokio::test]
+async fn verify_rejects_refresh_token_presented_as_access_token() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", &hash_password("hunter2"), 1);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    users.seed("u1", ApiRole::Admin, true);
+    let usecase = make_usecase(creds, ids, users);
+
+    let pair = usecase
+        .login_with_password(LoginWithPassword {
+            code: "u1".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect("login succeeds");
+    let err = usecase
+        .verify(VerifyAccessToken {
+            access_token: pair.refresh_token,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(err, UsecaseError::Verification(_)));
+}
+
+#[tokio::test]
+async fn verify_rejects_inactive_user() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", &hash_password("hunter2"), 1);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    users.seed("u1", ApiRole::Admin, true);
+    let usecase = make_usecase(creds, ids, users.clone());
+
+    let pair = usecase
+        .login_with_password(LoginWithPassword {
+            code: "u1".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect("login succeeds");
+
+    // Flip the user to inactive and verify fails.
+    users.seed("u1", ApiRole::Admin, false);
+    let err = usecase
+        .verify(VerifyAccessToken {
+            access_token: pair.access_token,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        UsecaseError::Repository(DomainError::Inactive)
+    ));
+}
+
+#[tokio::test]
+async fn refresh_mints_new_access_token_with_current_version() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", &hash_password("hunter2"), 4);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    users.seed("u1", ApiRole::Admin, true);
+    let usecase = make_usecase(creds, ids, users);
+
+    let pair = usecase
+        .login_with_password(LoginWithPassword {
+            code: "u1".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect("login succeeds");
+    let new = usecase
+        .refresh(RefreshAccessToken {
+            refresh_token: pair.refresh_token,
+        })
+        .await
+        .expect("refresh succeeds");
+    assert!(!new.access_token.is_empty());
+
+    // The new access token must verify.
+    let claims = usecase
+        .verify(VerifyAccessToken {
+            access_token: new.access_token,
+        })
+        .await
+        .expect("new access token verifies");
+    assert_eq!(claims.code, "u1");
+    assert_eq!(claims.token_version, 4);
+}
+
+#[tokio::test]
+async fn refresh_rejects_access_token_presented_as_refresh_token() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", &hash_password("hunter2"), 1);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    users.seed("u1", ApiRole::Admin, true);
+    let usecase = make_usecase(creds, ids, users);
+
+    let pair = usecase
+        .login_with_password(LoginWithPassword {
+            code: "u1".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect("login succeeds");
+    let err = usecase
+        .refresh(RefreshAccessToken {
+            refresh_token: pair.access_token,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(err, UsecaseError::Verification(_)));
+}
+
+#[tokio::test]
+async fn logout_bumps_token_version_and_invalidates_outstanding_tokens() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", &hash_password("hunter2"), 1);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    users.seed("u1", ApiRole::Admin, true);
+    let usecase = make_usecase(creds, ids, users);
+
+    let pair = usecase
+        .login_with_password(LoginWithPassword {
+            code: "u1".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect("login succeeds");
+
+    // Pre-logout verify passes.
+    usecase
+        .verify(VerifyAccessToken {
+            access_token: pair.access_token.clone(),
+        })
+        .await
+        .expect("pre-logout verify passes");
+
+    let ack = usecase
+        .logout(Logout { code: "u1".into() })
+        .await
+        .expect("logout succeeds");
+    assert_eq!(ack.code, "u1");
+
+    // Post-logout verify rejects.
+    let err = usecase
+        .verify(VerifyAccessToken {
+            access_token: pair.access_token,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(err, UsecaseError::Verification(_)));
+}
+
+#[tokio::test]
+async fn logout_with_empty_code_is_validation_error() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", &hash_password("hunter2"), 1);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    users.seed("u1", ApiRole::Admin, true);
+    let usecase = make_usecase(creds, ids, users);
+
+    let err = usecase
+        .logout(Logout { code: "  ".into() })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        UsecaseError::Repository(DomainError::EmptyCode)
+    ));
+}
