@@ -82,6 +82,21 @@ impl From<UsecaseError> for UserApiError {
 #[cfg(test)]
 mod tests;
 
+/// Project the usecase-layer `UserView` into the API-layer
+/// `UserView`. Field-for-field because the two structs are kept
+/// identical by design.
+fn user_view_from_internal(view: crate::usecase::UserView) -> UserView {
+    UserView {
+        id: view.id,
+        code: view.code,
+        name: view.name,
+        role: from_internal_role(view.role),
+        active: view.active,
+        created_at: view.created_at,
+        updated_at: view.updated_at,
+    }
+}
+
 #[async_trait]
 impl<R: UserRepository> UserService for UserServiceImpl<R> {
     async fn create(&self, req: CreateUserRequest) -> Result<UserView, UserApiError> {
@@ -91,19 +106,12 @@ impl<R: UserRepository> UserService for UserServiceImpl<R> {
             role: to_internal_role(req.role),
         };
         let view = self.usecase.create(cmd).await?;
-        Ok(UserView {
-            id: view.id,
-            code: view.code,
-            name: view.name,
-            role: from_internal_role(view.role),
-            active: view.active,
-            created_at: view.created_at,
-            updated_at: view.updated_at,
-        })
+        Ok(user_view_from_internal(view))
     }
 
-    async fn get_by_id(&self, _id: i32) -> Result<UserView, UserApiError> {
-        todo!("implemented in task 5")
+    async fn get_by_id(&self, id: i32) -> Result<UserView, UserApiError> {
+        let view = self.usecase.get_by_id(id).await?;
+        Ok(user_view_from_internal(view))
     }
 
     async fn get_by_code(&self, _code: &str) -> Result<UserView, UserApiError> {

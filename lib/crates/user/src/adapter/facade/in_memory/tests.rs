@@ -196,3 +196,25 @@ async fn create_rejects_duplicate_code() {
         apis::user::UserApiError::DuplicateCode(ref c) if c == "u1"
     ));
 }
+
+#[tokio::test]
+async fn get_by_id_returns_seeded_user() {
+    let svc = service();
+    let created = svc
+        .create(apis::user::CreateUserRequest {
+            code: "u1".into(),
+            name: "Alice".into(),
+            role: ApiRole::Admin,
+        })
+        .await
+        .unwrap();
+    let fetched = svc.get_by_id(created.id).await.unwrap();
+    assert_eq!(fetched, created);
+}
+
+#[tokio::test]
+async fn get_by_id_returns_not_found_for_unknown_id() {
+    let svc = service();
+    let err = svc.get_by_id(999).await.unwrap_err();
+    assert!(matches!(err, apis::user::UserApiError::NotFound));
+}
