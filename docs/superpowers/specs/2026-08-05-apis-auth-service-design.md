@@ -136,15 +136,14 @@ pub trait AuthService: Send + Sync {
     /// expiry failures all surface as `AuthApiError::Verification`.
     async fn verify(&self, access_token: &str) -> Result<AuthClaims, AuthApiError>;
 
-    /// Exchange a still-valid refresh token for a brand-new token pair.
+    /// Exchange a still-valid refresh token for a brand-new access token.
     ///
-    /// "Brand new" means: the access token is freshly minted (and a
-    /// new refresh token is issued alongside it by convention; the
-    /// trait does not pin whether implementations choose to rotate
-    /// the refresh token — it only requires the returned
-    /// `TokenPair` to be syntactically valid). Expired or
-    /// tampered-with refresh tokens surface as
-    /// `AuthApiError::Verification`.
+    /// The returned `TokenPair` always contains a freshly minted
+    /// access token. Whether the `refresh_token` field is rotated
+    /// or reused is an implementation choice — the trait does not
+    /// pin it, only the requirement that the returned pair be
+    /// well-formed. Expired or tampered-with refresh tokens
+    /// surface as `AuthApiError::Verification`.
     async fn refresh(&self, refresh_token: &str) -> Result<TokenPair, AuthApiError>;
 }
 ```
