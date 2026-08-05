@@ -4,3 +4,37 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+sqlx = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+# `argon2` provides the password hasher / verifier used by the usecase
+# layer. The repos never see a plaintext password.
+argon2 = { workspace = true }
+# `chrono` provides `DateTime<Utc>` for the `created_at` / `updated_at`
+# columns surfaced by `UserCredentials`.
+chrono = { workspace = true }
+# `rand_core` provides the cryptographic RNG used to derive the HS256
+# signing key from caller-supplied entropy (no direct call today, but
+# pinned here so a future key-rotation helper does not silently pick a
+# weaker default).
+rand_core = { workspace = true }
+# `jsonwebtoken` provides the HS256 sign / verify primitives used by the
+# usecase layer to mint access + refresh tokens.
+jsonwebtoken = { workspace = true }
+# `apis` provides the outbound `AuthService` port the facade implements
+# and the `UserService` port the usecase consults for active state.
+# Path-dep because both crates share the workspace.
+apis = { path = "../apis" }
+
+[dev-dependencies]
+# Loads `.env` at test startup so live-DB integration tests can find
+# `AEGIS_AUTH_DATABASE_URL` without the user having to `source` it manually.
+dotenvy = { workspace = true }
+# Re-export the SQLx driver in `[dev-dependencies]` so the integration
+# tests can build their own `PgPool` without going through the public
+# API for connection setup.
+sqlx = { workspace = true }
+# `tokio` macros + multi-thread runtime are needed for `#[tokio::test]`
+# in unit + integration tests.
+tokio = { workspace = true }

@@ -1,14 +1,11 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! # auth crate
+//!
+//! Workspace library that implements the `apis::auth::AuthService` port.
+//! Three DDD layers (`domain`, `usecase`, `adapter`) plus an
+//! `Arc<RwLock<HashMap<String, u32>>>` token-version cache live inside the
+//! usecase. Public consumers should `use auth::*;` (see the re-exports
+//! below) rather than reach into the sub-modules.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub mod adapter;
+pub mod domain;
+pub mod usecase;

@@ -21,3 +21,4 @@ thiserror = "2"
 rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
 dotenvy = "0.15"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+jsonwebtoken = "11"
