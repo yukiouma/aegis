@@ -20,8 +20,11 @@ chrono = { workspace = true }
 # weaker default).
 rand_core = { workspace = true }
 # `jsonwebtoken` provides the HS256 sign / verify primitives used by the
-# usecase layer to mint access + refresh tokens.
-jsonwebtoken = { workspace = true }
+# usecase layer to mint access + refresh tokens. The `rust_crypto`
+# feature is required on jsonwebtoken 11 because the crate no longer
+# enables a crypto provider by default; `rust_crypto` is pure Rust and
+# avoids pulling in `aws-lc-rs`.
+jsonwebtoken = { workspace = true, features = ["rust_crypto"] }
 # `serde` provides `Serialize` / `Deserialize` for the JWT claim structs.
 serde = { version = "1", features = ["derive"] }
 # `apis` provides the outbound `AuthService` port the facade implements

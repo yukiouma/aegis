@@ -97,16 +97,88 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
     /// Placeholder method bodies; full implementations land in Tasks 4 and 5.
     pub async fn login_with_password(
         &self,
-        _cmd: LoginWithPassword,
+        cmd: LoginWithPassword,
     ) -> Result<TokenPairView, UsecaseError> {
-        unimplemented!("filled in by Task 4")
+        if cmd.code.trim().is_empty() {
+            return Err(UsecaseError::Repository(DomainError::EmptyCode));
+        }
+        if cmd.password.is_empty() {
+            return Err(UsecaseError::Repository(DomainError::EmptyPasswordHash));
+        }
+        let creds = self.credentials.find_by_code(&cmd.code).await?;
+        let user = self
+            .user_service
+            .get_by_code(&cmd.code)
+            .await
+            .map_err(map_user_service_error)?;
+        if !user.active {
+            return Err(UsecaseError::Repository(DomainError::Inactive));
+        }
+        let parsed_hash = argon2::PasswordHash::new(&creds.password_hash).map_err(|e| {
+            UsecaseError::Repository(DomainError::Repository(format!(
+                "argon2 parse: {e}"
+            )))
+        })?;
+        use argon2::PasswordVerifier;
+        if argon2::Argon2::default()
+            .verify_password(cmd.password.as_bytes(), &parsed_hash)
+            .is_err()
+        {
+            return Err(UsecaseError::Repository(DomainError::InvalidCredentials));
+        }
+
+        // Populate the cache so the freshly-minted tokens verify without a miss.
+        self.token_versions
+            .write()
+            .unwrap()
+            .insert(cmd.code.clone(), creds.token_version);
+
+        let role = role_from_api(user.role);
+        let access = self.mint_access_token(&cmd.code, role, creds.token_version)?;
+        let refresh = self.mint_refresh_token(&cmd.code, creds.token_version)?;
+
+        Ok(TokenPairView {
+            access_token: access,
+            refresh_token: refresh,
+        })
     }
 
     pub async fn login_with_domain_user_info(
         &self,
-        _cmd: LoginWithDomainUserInfo,
+        cmd: LoginWithDomainUserInfo,
     ) -> Result<TokenPairView, UsecaseError> {
-        unimplemented!("filled in by Task 4")
+        if cmd.code.trim().is_empty() {
+            return Err(UsecaseError::Repository(DomainError::EmptyCode));
+        }
+        if cmd.domain_name.trim().is_empty()
+            || cmd.hostname.trim().is_empty()
+            || cmd.sid.trim().is_empty()
+        {
+            return Err(UsecaseError::Repository(DomainError::EmptyPasswordHash));
+        }
+        self.identities
+            .find(&cmd.code, &cmd.domain_name, &cmd.hostname, &cmd.sid)
+            .await?;
+        let user = self
+            .user_service
+            .get_by_code(&cmd.code)
+            .await
+            .map_err(map_user_service_error)?;
+        if !user.active {
+            return Err(UsecaseError::Repository(DomainError::Inactive));
+        }
+        let creds = self.credentials.find_by_code(&cmd.code).await?;
+        self.token_versions
+            .write()
+            .unwrap()
+            .insert(cmd.code.clone(), creds.token_version);
+        let role = role_from_api(user.role);
+        let access = self.mint_access_token(&cmd.code, role, creds.token_version)?;
+        let refresh = self.mint_refresh_token(&cmd.code, creds.token_version)?;
+        Ok(TokenPairView {
+            access_token: access,
+            refresh_token: refresh,
+        })
     }
 
     pub async fn verify(
@@ -139,4 +211,53 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
     // so the compiler warns if a later task accidentally removes it.
     #[allow(dead_code)]
     fn _phantom(&self, _: UserCredentials) {}
+
+    fn mint_access_token(
+        &self,
+        code: &str,
+        role: Role,
+        version: u32,
+    ) -> Result<String, UsecaseError> {
+        use jsonwebtoken::{encode, EncodingKey, Header};
+        let now = chrono::Utc::now().timestamp();
+        let claims = AccessClaims {
+            sub: code.to_string(),
+            role: role.as_str().to_string(),
+            ver: version,
+            iat: now,
+            exp: now + self.access_ttl.as_secs() as i64,
+        };
+        let enc = EncodingKey::from_secret(&self.signing_key);
+        encode(&Header::new(jsonwebtoken::Algorithm::HS256), &claims, &enc)
+            .map_err(|e| UsecaseError::Verification(format!("encode access: {e}")))
+    }
+
+    fn mint_refresh_token(&self, code: &str, version: u32) -> Result<String, UsecaseError> {
+        use jsonwebtoken::{encode, EncodingKey, Header};
+        let now = chrono::Utc::now().timestamp();
+        let claims = RefreshClaims {
+            sub: code.to_string(),
+            ver: version,
+            iat: now,
+            exp: now + self.refresh_ttl.as_secs() as i64,
+        };
+        let enc = EncodingKey::from_secret(&self.signing_key);
+        encode(&Header::new(jsonwebtoken::Algorithm::HS256), &claims, &enc)
+            .map_err(|e| UsecaseError::Verification(format!("encode refresh: {e}")))
+    }
+}
+
+fn map_user_service_error(err: UserApiError) -> UsecaseError {
+    match err {
+        UserApiError::NotFound => UsecaseError::Repository(DomainError::NotFound),
+        other => UsecaseError::Repository(DomainError::Repository(other.to_string())),
+    }
+}
+
+fn role_from_api(r: apis::user::Role) -> Role {
+    match r {
+        apis::user::Role::Root => Role::Root,
+        apis::user::Role::Admin => Role::Admin,
+        apis::user::Role::General => Role::General,
+    }
 }
