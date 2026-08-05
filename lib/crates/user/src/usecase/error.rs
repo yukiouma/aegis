@@ -9,9 +9,6 @@ pub enum UsecaseError {
 
     #[error("repository error: {0}")]
     Repository(#[source] DomainError),
-
-    #[error("password hashing failed: {0}")]
-    Hashing(String),
 }
 
 impl From<DomainError> for UsecaseError {

@@ -14,15 +14,13 @@
 //! `row` is kept `pub(crate)` and is NOT re-exported at the crate
 //! root. `UserRow` is an internal row shape that exists only to bridge
 //! SQLx's `FromRow` derive into the domain `User` type; exposing it
-//! outside the crate would leak the password column onto a public
-//! field-access surface. The manual `Debug` impl on `UserRow` enforces
-//! the same hash redaction as the domain `User`.
-//!
-//! `user_repo` is kept private inside the crate for the same reason:
-//! the public surface at the crate root re-exports `UserRepo`
-//! directly (see `lib.rs`), so external callers never need to name the
-//! `user_repo` module. This matches the other two layers (`domain`,
-//! `usecase`), which also keep their child modules private.
+//! outside the crate would leak SQLx types onto a public field-access
+//! surface. The `user_repo` module is kept private inside the crate
+//! for the same reason: the public surface at the crate root
+//! re-exports `UserRepo` directly (see `lib.rs`), so external callers
+//! never need to name the `user_repo` module. This matches the other
+//! two layers (`domain`, `usecase`), which also keep their child
+//! modules private.
 
 pub(crate) mod row;
 #[cfg(test)]

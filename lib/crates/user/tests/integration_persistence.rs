@@ -27,7 +27,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use sqlx::PgPool;
 use user::domain::DomainError;
-use user::{CreateUser, Role, UpdateUser, UserRepo, UserRepository, UserUsecase, UserView};
+use user::{CreateUser, Role, UserRepo, UserRepository, UserUsecase, UserView};
 
 /// Run `f` against a freshly-migrated `PgPool`. Each invocation applies
 /// the migration before the test body runs, so the tests do not
@@ -108,7 +108,6 @@ async fn create_then_find_then_list_round_trip() {
                 code: code.clone(),
                 name: "Integration Alice".to_string(),
                 role: Role::Admin,
-                password_hash: "$argon2id$v=19$placeholder".to_string(),
                 active: true,
             })
             .await
@@ -145,7 +144,6 @@ async fn update_replaces_name_and_role() {
                 code: code.clone(),
                 name: "Before".to_string(),
                 role: Role::General,
-                password_hash: "$argon2id$v=19$placeholder".to_string(),
                 active: true,
             })
             .await
@@ -200,7 +198,6 @@ async fn update_with_duplicate_code_returns_duplicate_code_error() {
                 code: first_code.clone(),
                 name: "First".to_string(),
                 role: Role::General,
-                password_hash: "$argon2id$v=19$placeholder".to_string(),
                 active: true,
             })
             .await
@@ -211,7 +208,6 @@ async fn update_with_duplicate_code_returns_duplicate_code_error() {
                 code: second_code.clone(),
                 name: "Second".to_string(),
                 role: Role::General,
-                password_hash: "$argon2id$v=19$placeholder".to_string(),
                 active: true,
             })
             .await
@@ -233,6 +229,42 @@ async fn update_with_duplicate_code_returns_duplicate_code_error() {
             matches!(err, DomainError::DuplicateCode(_)),
             "expected DuplicateCode, got {err:?}"
         );
+    })
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires AEGIS_DATABASE_URL pointing at a live PostgreSQL"]
+async fn update_can_flip_active_flag() {
+    with_pool(|pool| async move {
+        let repo = UserRepo::new(pool);
+        let code = unique_code("update-active");
+
+        let created = repo
+            .create(user::domain::UserNew {
+                code: code.clone(),
+                name: "Soft-Removed".to_string(),
+                role: Role::General,
+                active: true,
+            })
+            .await
+            .expect("create");
+
+        let updated = repo
+            .update(user::domain::UserUpdate {
+                id: created.id,
+                active: Some(false),
+                ..Default::default()
+            })
+            .await
+            .expect("update flips active");
+
+        assert!(!updated.active, "active flag must be flipped via update");
+
+        // Row is still present (no hard delete).
+        let reread = repo.find_by_id(created.id).await.expect("reread");
+        assert_eq!(reread.code, code);
+        assert!(!reread.active);
     })
     .await;
 }
@@ -277,35 +309,6 @@ async fn find_unknown_code_returns_not_found() {
 
 #[tokio::test]
 #[ignore = "requires AEGIS_DATABASE_URL pointing at a live PostgreSQL"]
-async fn deactivate_flips_active_and_retains_row() {
-    with_pool(|pool| async move {
-        let repo = UserRepo::new(pool);
-        let code = unique_code("deactivate");
-
-        let created = repo
-            .create(user::domain::UserNew {
-                code: code.clone(),
-                name: "To Deactivate".to_string(),
-                role: Role::General,
-                password_hash: "$argon2id$v=19$placeholder".to_string(),
-                active: true,
-            })
-            .await
-            .expect("create");
-
-        let deactivated = repo.deactivate(created.id).await.expect("deactivate");
-        assert!(!deactivated.active);
-
-        // Row is still present (no hard delete).
-        let reread = repo.find_by_id(created.id).await.expect("reread");
-        assert_eq!(reread.code, code);
-        assert!(!reread.active);
-    })
-    .await;
-}
-
-#[tokio::test]
-#[ignore = "requires AEGIS_DATABASE_URL pointing at a live PostgreSQL"]
 async fn usecase_create_and_get_by_code_returns_user_view() {
     with_pool(|pool| async move {
         let repo = UserRepo::new(pool);
@@ -317,7 +320,6 @@ async fn usecase_create_and_get_by_code_returns_user_view() {
                 code: code.clone(),
                 name: "Usecase User".to_string(),
                 role: Role::Admin,
-                password: "correct-horse-battery-staple".to_string(),
             })
             .await
             .expect("usecase create");
@@ -332,47 +334,6 @@ async fn usecase_create_and_get_by_code_returns_user_view() {
             .expect("usecase get_by_code");
         assert_eq!(fetched.id, created_view.id);
         assert_eq!(fetched.code, code);
-    })
-    .await;
-}
-
-#[tokio::test]
-#[ignore = "requires AEGIS_DATABASE_URL pointing at a live PostgreSQL"]
-async fn usecase_update_password_replaces_hash() {
-    with_pool(|pool| async move {
-        let repo = UserRepo::new(pool);
-        let usecase = UserUsecase::new(repo);
-        let code = unique_code("usecase-pw");
-
-        let created_view = usecase
-            .create(CreateUser {
-                code: code.clone(),
-                name: "Password Changer".to_string(),
-                role: Role::General,
-                password: "initial-password".to_string(),
-            })
-            .await
-            .expect("usecase create");
-
-        let updated_view = usecase
-            .update(UpdateUser {
-                id: created_view.id,
-                password: Some("rotated-password".to_string()),
-                ..Default::default()
-            })
-            .await
-            .expect("usecase update");
-
-        assert_eq!(updated_view.id, created_view.id);
-
-        // The repository stored the new password as an Argon2 hash,
-        // not the plaintext. Re-read the row directly to confirm the
-        // hash differs from the plaintext inputs.
-        let reread = usecase
-            .get_by_id(updated_view.id)
-            .await
-            .expect("usecase get_by_id");
-        assert_eq!(reread.code, code);
     })
     .await;
 }

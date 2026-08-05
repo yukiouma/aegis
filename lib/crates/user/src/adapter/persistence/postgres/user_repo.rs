@@ -9,7 +9,7 @@
 // against the bound parameters we hand it and lets the build proceed
 // in any environment, at the cost of a small loss in static
 // verification of the SQL itself. The migration test in
-// `infrastructure::tests` covers the schema content directly.
+// `adapter::tests` covers the schema content directly.
 
 use std::convert::TryFrom;
 
@@ -40,15 +40,14 @@ impl UserRepo {
 #[async_trait]
 impl UserRepository for UserRepo {
     async fn create(&self, input: UserNew) -> Result<User, DomainError> {
-        const SQL: &str = "INSERT INTO users (code, name, role, active, password) \
-                           VALUES ($1, $2, $3, $4, $5) \
-                           RETURNING id, code, name, role, active, created_at, updated_at, password";
+        const SQL: &str = "INSERT INTO users (code, name, role, active) \
+                           VALUES ($1, $2, $3, $4) \
+                           RETURNING id, code, name, role, active, created_at, updated_at";
         let row: UserRow = sqlx::query_as(SQL)
             .bind(&input.code)
             .bind(&input.name)
             .bind(input.role.as_str())
             .bind(input.active)
-            .bind(&input.password_hash)
             .fetch_one(&self.pool)
             .await
             .map_err(map_db_error)?;
@@ -63,7 +62,7 @@ impl UserRepository for UserRepo {
         // `query_as`). The column list is a compile-time constant
         // here; nothing user-supplied touches the SQL string.
         let row: UserRow = sqlx::QueryBuilder::new(
-            "SELECT id, code, name, role, active, created_at, updated_at, password \
+            "SELECT id, code, name, role, active, created_at, updated_at \
              FROM users WHERE id = ",
         )
         .push_bind(id)
@@ -77,7 +76,7 @@ impl UserRepository for UserRepo {
 
     async fn find_by_code(&self, code: &str) -> Result<User, DomainError> {
         let row: UserRow = sqlx::QueryBuilder::new(
-            "SELECT id, code, name, role, active, created_at, updated_at, password \
+            "SELECT id, code, name, role, active, created_at, updated_at \
              FROM users WHERE code = ",
         )
         .push_bind(code)
@@ -91,7 +90,7 @@ impl UserRepository for UserRepo {
 
     async fn list(&self) -> Result<Vec<User>, DomainError> {
         let rows: Vec<UserRow> = sqlx::QueryBuilder::new(
-            "SELECT id, code, name, role, active, created_at, updated_at, password \
+            "SELECT id, code, name, role, active, created_at, updated_at \
              FROM users ORDER BY id",
         )
         .build_query_as::<UserRow>()
@@ -133,10 +132,6 @@ impl UserRepository for UserRepo {
             separated(&mut qb);
             qb.push("active = ").push_bind(active);
         }
-        if let Some(ref hash) = input.password_hash {
-            separated(&mut qb);
-            qb.push("password = ").push_bind(hash);
-        }
 
         if first {
             // Nothing to update; short-circuit and return the existing
@@ -145,21 +140,9 @@ impl UserRepository for UserRepo {
         }
 
         qb.push(" WHERE id = ").push_bind(input.id);
-        qb.push(" RETURNING id, code, name, role, active, created_at, updated_at, password");
+        qb.push(" RETURNING id, code, name, role, active, created_at, updated_at");
 
         let row: UserRow = qb
-            .build_query_as::<UserRow>()
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(map_db_error)?
-            .ok_or(DomainError::NotFound)?;
-        row.try_into()
-    }
-
-    async fn deactivate(&self, id: i32) -> Result<User, DomainError> {
-        let row: UserRow = sqlx::QueryBuilder::new("UPDATE users SET active = FALSE WHERE id = ")
-            .push_bind(id)
-            .push(" RETURNING id, code, name, role, active, created_at, updated_at, password")
             .build_query_as::<UserRow>()
             .fetch_optional(&self.pool)
             .await

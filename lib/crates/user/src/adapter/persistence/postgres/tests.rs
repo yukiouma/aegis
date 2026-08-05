@@ -1,4 +1,4 @@
-//! Tests for the PostgreSQL infrastructure adapter that do NOT
+//! Tests for the PostgreSQL adapter that do NOT
 //! require a live database connection.
 //!
 //! 1. The `0001_create_users.sql` migration file content (the schema
@@ -94,7 +94,7 @@ fn migration_has_required_columns() {
     let block = create_table_block();
     let upper = block.to_uppercase();
 
-    // The brief requires these six columns. We assert the column name
+    // The brief requires these five columns. We assert the column name
     // appears inside the users table definition, in any case the file
     // may use.
     for required in [
@@ -103,13 +103,21 @@ fn migration_has_required_columns() {
         "name TEXT",
         "role TEXT",
         "active BOOLEAN",
-        "password TEXT",
     ] {
         assert!(
             upper.contains(&required.to_uppercase()),
             "users table must include `{required}`; got:\n{block}"
         );
     }
+}
+
+#[test]
+fn migration_has_no_password_column() {
+    let block = create_table_block();
+    assert!(
+        !block.contains("password"),
+        "users table must not declare a password column; got:\n{block}"
+    );
 }
 
 #[test]
@@ -208,7 +216,6 @@ fn row_converts_to_user_for_each_known_role() {
             active: true,
             created_at: row_test_timestamp(),
             updated_at: row_test_timestamp(),
-            password: "argon-phc".to_string(),
         };
         let user: User = row.try_into().expect("known role must convert");
         assert_eq!(user.id, 1);
@@ -216,7 +223,6 @@ fn row_converts_to_user_for_each_known_role() {
         assert_eq!(user.name, "Alice");
         assert_eq!(user.role, role);
         assert!(user.active);
-        assert_eq!(user.password_hash(), "argon-phc");
     }
 }
 
@@ -230,27 +236,10 @@ fn row_with_unknown_role_fails_to_convert() {
         active: true,
         created_at: row_test_timestamp(),
         updated_at: row_test_timestamp(),
-        password: "argon-phc".to_string(),
     };
     let err = User::try_from(row).expect_err("unknown role must be rejected");
     assert!(
         matches!(err, DomainError::InvalidRole(ref s) if s == "superuser"),
         "expected InvalidRole(\"superuser\"), got {err:?}"
     );
-}
-
-#[test]
-fn user_password_hash_accessor_returns_the_hash() {
-    let row = UserRow {
-        id: 3,
-        code: "u3".to_string(),
-        name: "Carol".to_string(),
-        role: "root".to_string(),
-        active: true,
-        created_at: row_test_timestamp(),
-        updated_at: row_test_timestamp(),
-        password: "$argon2id$v=19$secret".to_string(),
-    };
-    let user: User = row.try_into().expect("known role must convert");
-    assert_eq!(user.password_hash(), "$argon2id$v=19$secret");
 }

@@ -10,7 +10,6 @@ pub struct UserNew {
     pub code: String,
     pub name: String,
     pub role: Role,
-    pub password_hash: String,
     pub active: bool,
 }
 
@@ -23,12 +22,11 @@ pub struct UserUpdate {
     pub name: Option<String>,
     pub role: Option<Role>,
     pub active: Option<bool>,
-    pub password_hash: Option<String>,
 }
 
 /// Outbound port for persistence of `User` aggregates.
 ///
-/// Implementations live in the infrastructure layer (e.g. PostgreSQL via
+/// Implementations live in the adapter layer (e.g. PostgreSQL via
 /// `sqlx`). Domain code depends on this trait only; never on concrete
 /// repositories.
 #[async_trait]
@@ -48,8 +46,4 @@ pub trait UserRepository: Send + Sync {
     /// Applies the fields set on `input` to the user identified by `input.id`.
     /// Returns `DomainError::NotFound` if no such user exists.
     async fn update(&self, input: UserUpdate) -> Result<User, DomainError>;
-
-    /// Marks the user as inactive (soft-removes them). There is no hard
-    /// `delete` operation by design.
-    async fn deactivate(&self, id: i32) -> Result<User, DomainError>;
 }

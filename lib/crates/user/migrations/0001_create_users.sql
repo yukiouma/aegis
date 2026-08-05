@@ -16,12 +16,10 @@
 --                    `Role::try_from`) and at the database by a
 --                    CHECK so an out-of-band insert cannot smuggle
 --                    an unknown value past the type system.
---   * `active`     - soft-delete flag. The `UserRepository` exposes
---                    a `deactivate` operation but never a hard
---                    `DELETE` statement.
---   * `password`   - argon2id PHC string (e.g. `$argon2id$v=19$...`).
---                    Hashing is performed by the usecase layer; this
---                    column stores the result.
+--   * `active`     - soft-delete flag. There is no `deactivate`
+--                    operation in the `user` crate; callers can flip
+--                    `active` via the generic `update` entry point.
+--                    The crate never issues a hard `DELETE`.
 --   * `created_at` - timestamp at which the row was inserted. Set once
 --                    by `DEFAULT NOW()` and never modified afterwards.
 --   * `updated_at` - timestamp of the most recent row modification.
@@ -36,7 +34,6 @@ CREATE TABLE users (
     name TEXT NOT NULL,
     role TEXT NOT NULL,
     active BOOLEAN NOT NULL,
-    password TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT users_code_unique UNIQUE (code),
@@ -44,11 +41,10 @@ CREATE TABLE users (
 );
 
 -- Auto-update `updated_at` on every row modification. The trigger
--- fires for every UPDATE (including `deactivate` and password
--- rotation); it does NOT fire on plain INSERTs (the column's DEFAULT
--- handles that) and it does NOT block the calling UPDATE because the
--- `updated_at = NEW.updated_at` assignment is the trigger's only side
--- effect before the row is written.
+-- fires for every UPDATE; it does NOT fire on plain INSERTs (the
+-- column's DEFAULT handles that) and it does NOT block the calling
+-- UPDATE because the `updated_at = NEW.updated_at` assignment is
+-- the trigger's only side effect before the row is written.
 CREATE OR REPLACE FUNCTION users_set_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN

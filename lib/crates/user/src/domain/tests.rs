@@ -42,7 +42,6 @@ fn new_user_rejects_empty_code() {
         true,
         test_now(),
         test_now(),
-        "hash".into(),
     )
     .unwrap_err();
     assert!(matches!(err, DomainError::EmptyCode));
@@ -58,26 +57,9 @@ fn new_user_rejects_empty_name() {
         true,
         test_now(),
         test_now(),
-        "hash".into(),
     )
     .unwrap_err();
     assert!(matches!(err, DomainError::EmptyName));
-}
-
-#[test]
-fn new_user_rejects_empty_password() {
-    let err = User::new(
-        1,
-        "u1".into(),
-        "Alice".into(),
-        Role::Admin,
-        true,
-        test_now(),
-        test_now(),
-        "".into(),
-    )
-    .unwrap_err();
-    assert!(matches!(err, DomainError::EmptyPassword));
 }
 
 #[test]
@@ -90,7 +72,6 @@ fn new_user_accepts_valid_input() {
         true,
         test_now(),
         test_now(),
-        "argon-hash".into(),
     )
     .expect("valid user should construct");
     assert_eq!(user.id, 42);
@@ -98,33 +79,4 @@ fn new_user_accepts_valid_input() {
     assert_eq!(user.name, "Alice");
     assert_eq!(user.role, Role::Admin);
     assert!(user.active);
-    assert_eq!(user.password, "argon-hash");
-}
-
-#[test]
-fn password_is_not_exposed_via_public_projection() {
-    let user = User::new(
-        7,
-        "u7".into(),
-        "Bob".into(),
-        Role::General,
-        true,
-        test_now(),
-        test_now(),
-        "secret-hash".into(),
-    )
-    .unwrap();
-
-    // The Debug output must never include the password hash.
-    let debug = format!("{user:?}");
-    assert!(
-        !debug.contains("secret-hash"),
-        "password leaked via Debug: {debug}"
-    );
-
-    // There is no public accessor for the password field.
-    // We assert this structurally: `password` is not part of the
-    // pub-projection via the fact that the field is `pub(crate)`.
-    // A compile-time check is exercised by the fact that no method
-    // exists on `User` to fetch it from outside the crate.
 }
