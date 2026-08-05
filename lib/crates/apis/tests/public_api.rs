@@ -91,7 +91,7 @@ fn user_service_is_send_sync() {
 
 use apis::auth::{
     AuthApiError, AuthClaims, AuthService, LoginWithDomainUserInfoRequest,
-    LoginWithPasswordRequest, TokenPair,
+    LoginWithPasswordRequest, LogoutRequest, RefreshRequest, TokenPair, VerifyRequest,
 };
 
 /// Every public type in `apis::auth` is nameable from the test.
@@ -101,6 +101,9 @@ fn auth_public_types_are_nameable() {
     fn assert_claims(_: AuthClaims) {}
     fn assert_login_pw(_: LoginWithPasswordRequest) {}
     fn assert_login_domain(_: LoginWithDomainUserInfoRequest) {}
+    fn assert_logout(_: LogoutRequest) {}
+    fn assert_verify(_: VerifyRequest) {}
+    fn assert_refresh(_: RefreshRequest) {}
     fn assert_err(_: AuthApiError) {}
 
     // `TokenPair` is constructible field-by-field.
@@ -115,7 +118,7 @@ fn auth_public_types_are_nameable() {
         role: apis::user::Role::General,
         token_version: 0,
     });
-    // Login request DTOs own their strings — that is the shape
+    // Every request DTO owns its string field — that is the shape
     // adapters receive from outside the backend.
     assert_login_pw(LoginWithPasswordRequest {
         code: "u1".into(),
@@ -126,6 +129,13 @@ fn auth_public_types_are_nameable() {
         domain_name: "d".into(),
         hostname: "h".into(),
         sid: "s".into(),
+    });
+    assert_logout(LogoutRequest { code: "u1".into() });
+    assert_verify(VerifyRequest {
+        access_token: "a".into(),
+    });
+    assert_refresh(RefreshRequest {
+        refresh_token: "r".into(),
     });
 
     // Touch every variant of the error type to keep it from being
@@ -150,27 +160,23 @@ struct FakeAuthService;
 impl AuthService for FakeAuthService {
     async fn login_with_password(
         &self,
-        _code: &str,
-        _password: &str,
+        _req: LoginWithPasswordRequest,
     ) -> Result<TokenPair, AuthApiError> {
         todo!()
     }
     async fn login_with_domain_user_info(
         &self,
-        _code: &str,
-        _domain_name: &str,
-        _hostname: &str,
-        _sid: &str,
+        _req: LoginWithDomainUserInfoRequest,
     ) -> Result<TokenPair, AuthApiError> {
         todo!()
     }
-    async fn logout(&self, _code: &str) -> Result<(), AuthApiError> {
+    async fn logout(&self, _req: LogoutRequest) -> Result<(), AuthApiError> {
         todo!()
     }
-    async fn verify(&self, _access_token: &str) -> Result<AuthClaims, AuthApiError> {
+    async fn verify(&self, _req: VerifyRequest) -> Result<AuthClaims, AuthApiError> {
         todo!()
     }
-    async fn refresh(&self, _refresh_token: &str) -> Result<String, AuthApiError> {
+    async fn refresh(&self, _req: RefreshRequest) -> Result<String, AuthApiError> {
         todo!()
     }
 }

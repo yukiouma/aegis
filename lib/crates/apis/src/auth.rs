@@ -44,6 +44,24 @@ pub struct LoginWithDomainUserInfoRequest {
     pub sid: String,
 }
 
+/// Input DTO for [`AuthService::logout`].
+#[derive(Debug, Clone)]
+pub struct LogoutRequest {
+    pub code: String,
+}
+
+/// Input DTO for [`AuthService::verify`].
+#[derive(Debug, Clone)]
+pub struct VerifyRequest {
+    pub access_token: String,
+}
+
+/// Input DTO for [`AuthService::refresh`].
+#[derive(Debug, Clone)]
+pub struct RefreshRequest {
+    pub refresh_token: String,
+}
+
 /// Error surface returned by every [`AuthService`] method.
 ///
 /// Adapters map backend-specific errors into this type at the
@@ -93,8 +111,7 @@ pub trait AuthService: Send + Sync {
     /// `NotFound`) for a code that exists with the wrong password.
     async fn login_with_password(
         &self,
-        code: &str,
-        password: &str,
+        req: LoginWithPasswordRequest,
     ) -> Result<TokenPair, AuthApiError>;
 
     /// Authenticate with Windows-domain user info (AD / NTLM style).
@@ -105,24 +122,21 @@ pub trait AuthService: Send + Sync {
     /// when no user maps to the supplied domain-identity triple.
     async fn login_with_domain_user_info(
         &self,
-        code: &str,
-        domain_name: &str,
-        hostname: &str,
-        sid: &str,
+        req: LoginWithDomainUserInfoRequest,
     ) -> Result<TokenPair, AuthApiError>;
 
     /// Invalidate any server-side session state for `code`.
     ///
     /// Returns `Ok(())` even if the user had no active session.
     /// Storage failures surface as `AuthApiError::Repository`.
-    async fn logout(&self, code: &str) -> Result<(), AuthApiError>;
+    async fn logout(&self, req: LogoutRequest) -> Result<(), AuthApiError>;
 
     /// Verify an access token and recover the identity it was minted for.
     ///
     /// Returns `AuthClaims` on success. Token-format, signature,
     /// and expiry failures all surface as
     /// `AuthApiError::Verification`.
-    async fn verify(&self, access_token: &str) -> Result<AuthClaims, AuthApiError>;
+    async fn verify(&self, req: VerifyRequest) -> Result<AuthClaims, AuthApiError>;
 
     /// Exchange a still-valid refresh token for a brand-new access token.
     ///
@@ -131,5 +145,5 @@ pub trait AuthService: Send + Sync {
     /// `AuthApiError::Verification`. The refresh token itself is
     /// not rotated — callers keep using the same refresh token
     /// until it expires.
-    async fn refresh(&self, refresh_token: &str) -> Result<String, AuthApiError>;
+    async fn refresh(&self, req: RefreshRequest) -> Result<String, AuthApiError>;
 }
