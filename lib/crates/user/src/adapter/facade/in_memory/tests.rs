@@ -138,3 +138,61 @@ fn service() -> UserServiceImpl<InMemoryRepo> {
 async fn user_service_impl_can_be_constructed() {
     let _service = service();
 }
+
+#[tokio::test]
+async fn create_returns_view_with_assigned_id_and_active_true() {
+    let svc = service();
+    let view = svc
+        .create(apis::user::CreateUserRequest {
+            code: "u1".into(),
+            name: "Alice".into(),
+            role: ApiRole::Admin,
+        })
+        .await
+        .unwrap();
+    assert_eq!(view.id, 1);
+    assert_eq!(view.code, "u1");
+    assert_eq!(view.name, "Alice");
+    assert_eq!(view.role, ApiRole::Admin);
+    assert!(view.active);
+    assert_eq!(view.created_at, epoch());
+    assert_eq!(view.updated_at, epoch());
+}
+
+#[tokio::test]
+async fn create_rejects_empty_code_with_validation() {
+    let svc = service();
+    let err = svc
+        .create(apis::user::CreateUserRequest {
+            code: "  ".into(),
+            name: "Alice".into(),
+            role: ApiRole::General,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(err, apis::user::UserApiError::Validation(_)));
+}
+
+#[tokio::test]
+async fn create_rejects_duplicate_code() {
+    let svc = service();
+    svc.create(apis::user::CreateUserRequest {
+        code: "u1".into(),
+        name: "Alice".into(),
+        role: ApiRole::General,
+    })
+    .await
+    .unwrap();
+    let err = svc
+        .create(apis::user::CreateUserRequest {
+            code: "u1".into(),
+            name: "Bob".into(),
+            role: ApiRole::General,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        apis::user::UserApiError::DuplicateCode(ref c) if c == "u1"
+    ));
+}

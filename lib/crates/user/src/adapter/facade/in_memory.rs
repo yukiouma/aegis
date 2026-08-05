@@ -81,3 +81,40 @@ impl From<UsecaseError> for UserApiError {
 
 #[cfg(test)]
 mod tests;
+
+#[async_trait]
+impl<R: UserRepository> UserService for UserServiceImpl<R> {
+    async fn create(&self, req: CreateUserRequest) -> Result<UserView, UserApiError> {
+        let cmd = CreateUser {
+            code: req.code,
+            name: req.name,
+            role: to_internal_role(req.role),
+        };
+        let view = self.usecase.create(cmd).await?;
+        Ok(UserView {
+            id: view.id,
+            code: view.code,
+            name: view.name,
+            role: from_internal_role(view.role),
+            active: view.active,
+            created_at: view.created_at,
+            updated_at: view.updated_at,
+        })
+    }
+
+    async fn get_by_id(&self, _id: i32) -> Result<UserView, UserApiError> {
+        todo!("implemented in task 5")
+    }
+
+    async fn get_by_code(&self, _code: &str) -> Result<UserView, UserApiError> {
+        todo!("implemented in task 6")
+    }
+
+    async fn list(&self) -> Result<Vec<UserView>, UserApiError> {
+        todo!("implemented in task 7")
+    }
+
+    async fn update(&self, _req: UpdateUserRequest) -> Result<UserView, UserApiError> {
+        todo!("implemented in task 8")
+    }
+}
