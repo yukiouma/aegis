@@ -120,7 +120,8 @@ impl<R: UserRepository> UserService for UserServiceImpl<R> {
     }
 
     async fn list(&self) -> Result<Vec<UserView>, UserApiError> {
-        todo!("implemented in task 7")
+        let views = self.usecase.list().await?;
+        Ok(views.into_iter().map(user_view_from_internal).collect())
     }
 
     async fn update(&self, _req: UpdateUserRequest) -> Result<UserView, UserApiError> {

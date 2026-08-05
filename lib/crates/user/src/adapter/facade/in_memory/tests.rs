@@ -247,3 +247,29 @@ async fn get_by_code_rejects_empty_code_with_validation() {
     let err = svc.get_by_code("   ").await.unwrap_err();
     assert!(matches!(err, apis::user::UserApiError::Validation(_)));
 }
+
+#[tokio::test]
+async fn list_returns_all_seeded_users_in_insertion_order() {
+    let svc = service();
+    for (code, name) in [("u1", "Alice"), ("u2", "Bob"), ("u3", "Carol")] {
+        svc.create(apis::user::CreateUserRequest {
+            code: code.into(),
+            name: name.into(),
+            role: ApiRole::General,
+        })
+        .await
+        .unwrap();
+    }
+    let list = svc.list().await.unwrap();
+    assert_eq!(list.len(), 3);
+    assert_eq!(list[0].code, "u1");
+    assert_eq!(list[1].code, "u2");
+    assert_eq!(list[2].code, "u3");
+}
+
+#[tokio::test]
+async fn list_returns_empty_vec_when_no_users_exist() {
+    let svc = service();
+    let list = svc.list().await.unwrap();
+    assert!(list.is_empty());
+}
