@@ -15,4 +15,5 @@
 mod facade;
 mod persistence;
 
+pub use facade::UserServiceImpl;
 pub use persistence::postgres::UserRepo;

@@ -6,3 +6,5 @@
 //! (e.g. a future gRPC facade) is purely additive.
 
 mod in_memory;
+
+pub use in_memory::UserServiceImpl;
