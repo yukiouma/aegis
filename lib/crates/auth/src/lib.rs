@@ -10,6 +10,8 @@ pub mod adapter;
 pub mod domain;
 pub mod usecase;
 
+pub use adapter::facade::in_memory::AuthServiceImpl;
+pub use adapter::persistence::postgres::{DomainIdentityRepo, UserCredentialsRepo};
 pub use domain::{
     DomainError, DomainIdentity, DomainIdentityRepository, Role, UserCredentials,
     UserCredentialsRepository,

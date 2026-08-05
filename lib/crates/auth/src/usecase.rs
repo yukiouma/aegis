@@ -3,7 +3,7 @@ mod commands;
 mod error;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 pub use auth_usecase::{AuthUsecase, AuthUsecaseConfig};
 pub use commands::{

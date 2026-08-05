@@ -1,1 +1,7 @@
-// Placeholder. The full facade implementation lands in Task 9.
+mod fake_user_service;
+mod service;
+
+#[cfg(test)]
+mod tests;
+
+pub use service::AuthServiceImpl;

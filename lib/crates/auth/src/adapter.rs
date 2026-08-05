@@ -4,9 +4,8 @@
 //! plus outbound-port adapters that adapt the usecase layer to
 //! API-facing traits defined in other workspace crates.
 
-mod facade;
-mod persistence;
+pub(crate) mod facade;
+pub(crate) mod persistence;
 
-// AuthServiceImpl lands in Task 9; uncomment when it does.
-// pub use facade::in_memory::AuthServiceImpl;
+pub use facade::in_memory::AuthServiceImpl;
 pub use persistence::postgres::{DomainIdentityRepo, UserCredentialsRepo};
