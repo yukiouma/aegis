@@ -6,4 +6,5 @@
 //! crate, so any backend can implement the traits by adapting its
 //! own types to the ones defined here.
 
+pub mod auth;
 pub mod user;
