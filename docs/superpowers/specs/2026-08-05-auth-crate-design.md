@@ -202,11 +202,53 @@ struct RefreshClaims {
   `AccessClaims` but absent from the token. The same logic works in reverse
   for `refresh`. No `typ` discriminator field needed.
 - `ver` is the `token_version` baked in at mint time. `verify` and
-  `refresh` both read the user's current `token_version` from the DB and
-  reject if mismatched. One
+  `refresh` both consult the in-memory cache described below; on cache miss
+  they fall back to the DB and populate the cache. One
   `UPDATE auth_user_credentials SET token_version = token_version + 1`
   (exposed by `bump_token_version`) invalidates every outstanding token for
-  that user.
+  that user, and the same call updates the cache so subsequent
+  `verify`/`refresh` calls in this process reject the old `ver`.
+
+## In-memory token-version cache
+
+`AuthUsecase` holds a `token_versions: Arc<std::sync::RwLock<HashMap<String,
+u32>>>` keyed by user code. The cache is an internal implementation detail;
+no constructor parameter, no crate-root re-export.
+
+Lifecycle:
+
+- **Population (lazy).** First `verify` or `refresh` for a given code reads
+  from the cache. On miss, the usecase calls
+  `credentials.find_by_code(code)`, writes the returned `token_version` into
+  the cache, and proceeds. Subsequent `verify`/`refresh` calls for the same
+  code hit the cache.
+- **Invalidation.** `logout` calls `credentials.bump_token_version(code)`,
+  receives the new version, and writes it into the cache under the same
+  key. The next `verify`/`refresh` compares the JWT's `ver` against the
+  freshly-bumped cached value and rejects.
+- **Login.** `login_with_password` and `login_with_domain_user_info` write
+  the freshly-fetched `token_version` into the cache on every successful
+  login so the token they just minted verifies without a cache miss.
+
+Concurrency:
+
+- `std::sync::RwLock` (not `tokio::sync::RwLock`): the lock is held only
+  during the in-memory map read / write, never across an `.await`. Multiple
+  concurrent `verify` calls share a read lock; `logout` and login take a
+  write lock for the brief duration of the single map entry update.
+- `Arc` is required because `AuthServiceImpl` is shared as
+  `Arc<dyn AuthService>` across handlers and the cache must live alongside
+  the usecase.
+
+Multi-process limitation (documented, not solved here):
+
+- In a multi-process deployment, each process owns its own cache. If process
+  A processes a `logout`, process B's cache for that code still holds the
+  pre-bump version until B's next cold-miss DB read picks up the new value.
+  This is acceptable for a single-process service. If cross-process
+  revocation is needed later, the cache invalidation hook can be wired to
+  a `LISTEN/NOTIFY` channel or a pub-sub backend; that is out of scope for
+  this spec.
 
 ## Usecase
 
@@ -218,6 +260,7 @@ pub struct AuthUsecase<R: UserCredentialsRepository, D: DomainIdentityRepository
     signing_key: SigningKey,
     access_ttl: Duration,
     refresh_ttl: Duration,
+    token_versions: Arc<std::sync::RwLock<HashMap<String, u32>>>,
 }
 
 impl<R, D> AuthUsecase<R, D> {
@@ -229,6 +272,7 @@ impl<R, D> AuthUsecase<R, D> {
             signing_key: config.signing_key,
             access_ttl: config.access_ttl,
             refresh_ttl: config.refresh_ttl,
+            token_versions: Arc::new(std::sync::RwLock::new(HashMap::new())),
         }
     }
 }
@@ -244,11 +288,11 @@ service.
 
 | Command | Steps | Returns |
 | --- | --- | --- |
-| `LoginWithPassword { code, password }` | validate → `credentials.find_by_code` → `user_service.get_by_code` → check `active` → `argon2::verify_password` → mint access + refresh JWTs | `TokenPairView` |
-| `LoginWithDomainUserInfo { code, domain_name, hostname, sid }` | validate → `identities.find` → `user_service.get_by_code` → check `active` → `credentials.find_by_code` → mint tokens | `TokenPairView` |
-| `VerifyAccessToken { access_token }` | decode JWT as `AccessClaims` → check signature + expiry → `credentials.find_by_code` → `user_service.get_by_code` → check `active` → compare `jwt.ver == credentials.token_version` → project to `AuthClaimsView` | `AuthClaimsView` |
-| `RefreshAccessToken { refresh_token }` | decode JWT as `RefreshClaims` → check signature + expiry → `credentials.find_by_code` → `user_service.get_by_code` → check `active` → compare versions → mint new access token (fresh `AccessClaims`) | `AccessTokenView` |
-| `Logout { code }` | validate → `credentials.bump_token_version(code)` | `LogoutAck { code }` |
+| `LoginWithPassword { code, password }` | validate → `credentials.find_by_code` → `user_service.get_by_code` → check `active` → `argon2::verify_password` → write `credentials.token_version` into the cache → mint access + refresh JWTs | `TokenPairView` |
+| `LoginWithDomainUserInfo { code, domain_name, hostname, sid }` | validate → `identities.find` → `user_service.get_by_code` → check `active` → `credentials.find_by_code` → write its `token_version` into the cache → mint tokens | `TokenPairView` |
+| `VerifyAccessToken { access_token }` | decode JWT as `AccessClaims` → check signature + expiry → resolve current `token_version` (cache hit, or `credentials.find_by_code` on miss + cache write) → `user_service.get_by_code` → check `active` → compare `jwt.ver == current_version` → project to `AuthClaimsView` | `AuthClaimsView` |
+| `RefreshAccessToken { refresh_token }` | decode JWT as `RefreshClaims` → check signature + expiry → resolve current `token_version` (cache hit, or `credentials.find_by_code` on miss + cache write) → `user_service.get_by_code` → check `active` → compare versions → mint new access token (fresh `AccessClaims`) | `AccessTokenView` |
+| `Logout { code }` | validate → `credentials.bump_token_version(code)` → write the returned new version into the cache under `code` | `LogoutAck { code }` |
 
 `logout` does not consult `user_service`; bumping `token_version` invalidates
 every outstanding JWT regardless of current active state, and `Inactive` only
@@ -310,6 +354,15 @@ Four kinds of tests, in the order listed in the lib-crate guideline:
    - `token_version` mismatch → `Verification`.
    - `logout` bumps `token_version`; subsequent `verify` of the old access
      token fails.
+   - Cache hit path: a `verify` call after `login_with_password` does NOT
+     touch `MockUserCredentialsRepo::find_by_code` (assert the mock's call
+     counter stays at zero for the post-login verify).
+   - Cache miss path: a `verify` call with no prior login for that code
+     falls back to `MockUserCredentialsRepo::find_by_code` once and
+     populates the cache (next `verify` for the same code is a hit).
+   - Logout updates both the repo and the cache: a freshly-issued token
+     that bypassed the repo (via direct mint) is rejected by `verify`
+     after `logout`.
 4. **Facade unit tests** (`src/adapter/facade/in_memory/tests.rs`): wire
    `AuthServiceImpl` on top of the mocks + `FakeUserService`. Exercise every
    `AuthService` method; assert:
