@@ -11,8 +11,8 @@ use apis::auth::AuthService;
 use apis::user::UserService;
 use auth::{
     AccessTokenView, AuthClaimsView, AuthServiceImpl, AuthUsecase, AuthUsecaseConfig,
-    DomainIdentityRepo, DomainIdentityRepository, LogoutAck, Role, TokenPairView,
-    UserCredentialsRepo, UserCredentialsRepository,
+    DomainIdentityRepo, DomainIdentityRepository, InMemoryTokenVersionCache, LogoutAck, Role,
+    TokenPairView, TokenVersionCache, UserCredentialsRepo, UserCredentialsRepository,
 };
 
 #[test]
@@ -56,6 +56,7 @@ fn auth_usecase_config_has_expected_field_shape() {
             let _: &UserCredentialsRepo = &cfg.credentials;
             let _: &DomainIdentityRepo = &cfg.identities;
             let _: &Arc<dyn UserService> = &cfg.user_service;
+            let _: &Arc<dyn TokenVersionCache> = &cfg.cache;
             let _: &[u8] = &cfg.signing_key;
             let _: Duration = cfg.access_ttl;
             let _: Duration = cfg.refresh_ttl;
@@ -66,10 +67,18 @@ fn auth_usecase_config_has_expected_field_shape() {
 fn auth_usecase_new_accepts_an_auth_usecase_config() {
     fn assert_user_service_is_send_sync<T: Send + Sync>() {}
     assert_user_service_is_send_sync::<Box<dyn UserService>>();
+    assert_user_service_is_send_sync::<Box<dyn TokenVersionCache>>();
 
     fn assert_repo_bounds<R: UserCredentialsRepository, D: DomainIdentityRepository>() {}
     assert_repo_bounds::<UserCredentialsRepo, DomainIdentityRepo>();
     let _ = AuthUsecase::<UserCredentialsRepo, DomainIdentityRepo>::new;
+}
+
+#[test]
+fn in_memory_token_version_cache_is_nameable() {
+    let _: InMemoryTokenVersionCache = InMemoryTokenVersionCache::new();
+    fn assert_cache<T: TokenVersionCache>() {}
+    assert_cache::<InMemoryTokenVersionCache>();
 }
 
 #[test]

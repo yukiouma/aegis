@@ -14,10 +14,14 @@ contract through an in-memory facade.
 ```text
 src/
   domain/                       # UserCredentials, DomainIdentity, Role, ports
+                                # (UserCredentialsRepository, DomainIdentityRepository,
+                                # TokenVersionCache)
   usecase/                      # AuthUsecase, command DTOs, errors, JWT mint/verify
   adapter/
     persistence/
       postgres/                 # SQLx-backed UserCredentialsRepo, DomainIdentityRepo
+    cache/
+      in_memory/                # InMemoryTokenVersionCache (Arc<RwLock<HashMap>>)
     facade/
       in_memory/                # AuthServiceImpl wiring usecase -> apis::auth::AuthService
 migrations/                     # SQLx migrations applied to the database
@@ -25,7 +29,8 @@ migrations/                     # SQLx migrations applied to the database
 
 The crate root re-exports the public surface (`UserCredentials`,
 `DomainIdentity`, `Role`, `DomainError`, `UserCredentialsRepository`,
-`DomainIdentityRepository`, `UserCredentialsRepo`, `DomainIdentityRepo`,
+`DomainIdentityRepository`, `TokenVersionCache`,
+`InMemoryTokenVersionCache`, `UserCredentialsRepo`, `DomainIdentityRepo`,
 `AuthUsecase`, `AuthUsecaseConfig`, `AuthServiceImpl`, the command DTOs
 `LoginWithPassword` / `LoginWithDomainUserInfo` / `VerifyAccessToken` /
 `RefreshAccessToken` / `Logout`, and the view DTOs `TokenPairView` /
@@ -51,19 +56,21 @@ use std::time::Duration;
 
 use auth::{
     AuthServiceImpl, AuthUsecase, AuthUsecaseConfig, DomainIdentityRepo,
-    UserCredentialsRepo,
+    InMemoryTokenVersionCache, TokenVersionCache, UserCredentialsRepo,
 };
 use apis::user::UserService; // production wiring uses the user crate's facade
 
 let credentials_repo = UserCredentialsRepo::new(pool.clone());
 let identities_repo = DomainIdentityRepo::new(pool);
 let user_service: Arc<dyn UserService> = Arc::new(/* … */);
+let cache: Arc<dyn TokenVersionCache> = Arc::new(InMemoryTokenVersionCache::new());
 let signing_key = b"<32 random bytes>".to_vec();
 
 let usecase = AuthUsecase::new(AuthUsecaseConfig {
     credentials: credentials_repo,
     identities: identities_repo,
     user_service,
+    cache,
     signing_key,
     access_ttl: Duration::from_secs(15 * 60),
     refresh_ttl: Duration::from_secs(7 * 24 * 60 * 60),
@@ -95,12 +102,17 @@ cargo test -p auth -- --ignored
 
 ## Token-version cache
 
-`AuthUsecase` keeps an in-memory `Arc<RwLock<HashMap<String, u32>>>`
-mapping `code -> token_version`. The cache is populated lazily on the
-first `verify` / `refresh` for a code, refreshed on every successful
-login, and replaced on every `logout` (which calls
-`credentials.bump_token_version` and writes the returned new version
-back). The DB is the source of truth; the cache is only invalidated
-in-process. In a multi-process deployment each process owns its own
-cache and cross-process revocation relies on the next cold-miss DB
-read — see the spec for the full discussion.
+`AuthUsecase` plumbs through `Arc<dyn TokenVersionCache>`. The
+in-memory backend
+([`InMemoryTokenVersionCache`](adapter/cache/in_memory/)) is the default;
+a future Redis backend can be added under `adapter/cache/redis.rs`
+without touching the usecase, the repository, or any consumer.
+
+`verify` and `refresh` go `cache.get → credentials.find_by_code (on
+miss) + cache.put`. Login paths warm the cache with
+`row.token_version`. `logout` calls `credentials.bump_token_version` and
+then writes the returned version into the cache via `cache.put`, so
+subsequent verifies in the same process reject tokens minted before
+the bump. Cross-process revocation still relies on a shared backend
+(Redis) when one is wired in; in a single-process deployment the
+in-memory cache is the source of truth within that process.

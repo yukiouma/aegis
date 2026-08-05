@@ -4,7 +4,9 @@ use std::time::Duration;
 use apis::user::{UserApiError, UserService};
 use serde::{Deserialize, Serialize};
 
-use crate::domain::{DomainError, DomainIdentityRepository, UserCredentialsRepository};
+use crate::domain::{
+    DomainError, DomainIdentityRepository, TokenVersionCache, UserCredentialsRepository,
+};
 
 use super::commands::{
     AccessTokenView, AuthClaimsView, LoginWithDomainUserInfo, LoginWithPassword, Logout, LogoutAck,
@@ -19,6 +21,11 @@ pub struct AuthUsecaseConfig<R: UserCredentialsRepository, D: DomainIdentityRepo
     pub credentials: R,
     pub identities: D,
     pub user_service: Arc<dyn UserService>,
+    /// Token-version cache. The in-memory backend
+    /// ([`crate::InMemoryTokenVersionCache`]) is the default; a future
+    /// Redis backend will swap in here without touching the rest of
+    /// the layer.
+    pub cache: Arc<dyn TokenVersionCache>,
     /// HS256 secret bytes. The caller owns the entropy; we never log it.
     pub signing_key: Vec<u8>,
     pub access_ttl: Duration,
@@ -54,14 +61,16 @@ struct RefreshClaims {
 
 /// Async orchestration for the auth flow.
 ///
-/// The token-version cache lives inside the
-/// [`UserCredentialsRepository`](crate::domain::UserCredentialsRepository)
-/// implementation — see the `current_token_version` port method. The
-/// usecase calls it directly; no cache state of its own.
+/// The token-version cache is a separate port
+/// ([`TokenVersionCache`]) reached via `Arc<dyn TokenVersionCache>`.
+/// `verify` and `refresh` go through `cache.get` with
+/// `credentials.find_by_code` as the fallback; `logout` updates the
+/// cache after `credentials.bump_token_version`.
 pub struct AuthUsecase<R: UserCredentialsRepository, D: DomainIdentityRepository> {
     credentials: R,
     identities: D,
     user_service: Arc<dyn UserService>,
+    cache: Arc<dyn TokenVersionCache>,
     signing_key: Vec<u8>,
     access_ttl: Duration,
     refresh_ttl: Duration,
@@ -73,10 +82,23 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             credentials: config.credentials,
             identities: config.identities,
             user_service: config.user_service,
+            cache: config.cache,
             signing_key: config.signing_key,
             access_ttl: config.access_ttl,
             refresh_ttl: config.refresh_ttl,
         }
+    }
+
+    /// Resolve the current `token_version` for `code` via the cache,
+    /// falling back to the repository on miss. The fallback populates
+    /// the cache with the value just read.
+    async fn current_token_version(&self, code: &str) -> Result<u32, UsecaseError> {
+        if let Some(v) = self.cache.get(code).await {
+            return Ok(v);
+        }
+        let creds = self.credentials.find_by_code(code).await?;
+        self.cache.put(code, creds.token_version).await;
+        Ok(creds.token_version)
     }
 
     pub async fn login_with_password(
@@ -108,6 +130,9 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         {
             return Err(UsecaseError::Repository(DomainError::InvalidCredentials));
         }
+
+        // Warm the cache so the freshly-minted tokens verify without a miss.
+        self.cache.put(&cmd.code, creds.token_version).await;
 
         let role = role_from_api(user.role);
         let access = self.mint_access_token(&cmd.code, role, creds.token_version)?;
@@ -144,6 +169,8 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             return Err(UsecaseError::Repository(DomainError::Inactive));
         }
         let creds = self.credentials.find_by_code(&cmd.code).await?;
+        // Warm the cache so the freshly-minted tokens verify without a miss.
+        self.cache.put(&cmd.code, creds.token_version).await;
         let role = role_from_api(user.role);
         let access = self.mint_access_token(&cmd.code, role, creds.token_version)?;
         let refresh = self.mint_refresh_token(&cmd.code, creds.token_version)?;
@@ -163,7 +190,7 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             .map_err(|e| UsecaseError::Verification(format!("decode access: {e}")))?;
         let claims = data.claims;
 
-        let current = self.credentials.current_token_version(&claims.sub).await?;
+        let current = self.current_token_version(&claims.sub).await?;
         if current != claims.ver {
             return Err(UsecaseError::Verification(format!(
                 "token_version mismatch (current = {current}, jwt.ver = {})",
@@ -198,7 +225,7 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             .map_err(|e| UsecaseError::Verification(format!("decode refresh: {e}")))?;
         let claims = data.claims;
 
-        let current = self.credentials.current_token_version(&claims.sub).await?;
+        let current = self.current_token_version(&claims.sub).await?;
         if current != claims.ver {
             return Err(UsecaseError::Verification(format!(
                 "token_version mismatch (current = {current}, jwt.ver = {})",
@@ -226,10 +253,12 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         if cmd.code.trim().is_empty() {
             return Err(UsecaseError::Repository(DomainError::EmptyCode));
         }
-        // The repository atomically bumps the database and writes the new
-        // version into its in-memory cache, so subsequent verify / refresh
-        // calls in this process reject tokens minted before the bump.
-        self.credentials.bump_token_version(&cmd.code).await?;
+        // The repository bumps the database; the cache update is best-effort
+        // and does not block the response. Subsequent verify / refresh calls
+        // in this process see the new version via the cache; a missing cache
+        // entry falls back to the DB and re-warms the cache.
+        let new_version = self.credentials.bump_token_version(&cmd.code).await?;
+        self.cache.put(&cmd.code, new_version).await;
         Ok(LogoutAck { code: cmd.code })
     }
 

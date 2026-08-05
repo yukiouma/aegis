@@ -33,7 +33,6 @@ struct MockCredState {
     by_code: HashMap<String, UserCredentials>,
     find_calls: usize,
     bump_calls: usize,
-    current_version_calls: usize,
 }
 
 #[derive(Clone, Default)]
@@ -81,15 +80,6 @@ impl UserCredentialsRepository for MockUserCredentialsRepo {
         let entry = s.by_code.get_mut(code).ok_or(DomainError::NotFound)?;
         entry.token_version += 1;
         Ok(entry.token_version)
-    }
-
-    async fn current_token_version(&self, code: &str) -> Result<u32, DomainError> {
-        let mut s = self.state.lock().unwrap();
-        s.current_version_calls += 1;
-        s.by_code
-            .get(code)
-            .map(|c| c.token_version)
-            .ok_or(DomainError::NotFound)
     }
 }
 
@@ -179,7 +169,8 @@ impl UserService for FakeUserService {
     }
 }
 
-/// Build a usecase wired to the mocks + a freshly-derived HMAC key.
+/// Build a usecase wired to the mocks + a freshly-derived HMAC key
+/// + an in-memory token-version cache.
 pub fn make_usecase(
     creds: MockUserCredentialsRepo,
     ids: MockDomainIdentityRepo,
@@ -189,6 +180,7 @@ pub fn make_usecase(
         credentials: creds,
         identities: ids,
         user_service: Arc::new(users),
+        cache: Arc::new(crate::InMemoryTokenVersionCache::new()),
         signing_key: b"0123456789abcdef0123456789abcdef".to_vec(),
         access_ttl: std::time::Duration::from_secs(60),
         refresh_ttl: std::time::Duration::from_secs(3600),
@@ -443,9 +435,9 @@ async fn verify_returns_claims_for_freshly_minted_access_token() {
 }
 
 #[tokio::test]
-async fn verify_uses_current_token_version_port_not_find_by_code() {
-    // The token-version cache lives inside the repository; verify
-    // goes through `current_token_version`, not `find_by_code`.
+async fn verify_hits_cache_after_login_without_calling_find_by_code() {
+    // login_with_password warms the cache, so the first verify must
+    // succeed without touching `find_by_code`.
     let creds = MockUserCredentialsRepo::default();
     creds.seed_hash("u1", &hash_password("hunter2"), 3);
     let ids = MockDomainIdentityRepo::default();
@@ -465,10 +457,6 @@ async fn verify_uses_current_token_version_port_not_find_by_code() {
         let s = creds.state.lock().unwrap();
         s.find_calls
     };
-    let current_version_before = {
-        let s = creds.state.lock().unwrap();
-        s.current_version_calls
-    };
 
     usecase
         .verify(VerifyAccessToken {
@@ -477,36 +465,119 @@ async fn verify_uses_current_token_version_port_not_find_by_code() {
         .await
         .expect("verify succeeds");
 
-    {
-        let s = creds.state.lock().unwrap();
-        assert_eq!(
-            s.find_calls, find_calls_before,
-            "verify must not call find_by_code"
-        );
-        assert!(
-            s.current_version_calls > current_version_before,
-            "verify must call current_token_version"
-        );
-    }
+    let s = creds.state.lock().unwrap();
+    assert_eq!(
+        s.find_calls, find_calls_before,
+        "verify must hit the cache, not find_by_code"
+    );
+}
 
-    // Same for refresh.
-    let current_version_before = {
-        let s = creds.state.lock().unwrap();
-        s.current_version_calls
-    };
-    usecase
-        .refresh(RefreshAccessToken {
-            refresh_token: pair.refresh_token,
+#[tokio::test]
+async fn verify_falls_back_to_repo_on_cache_miss_and_populates_cache() {
+    // Fresh usecase with an empty cache: the first verify hits the
+    // repo for the version; the second hits the cache.
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", &hash_password("hunter2"), 3);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    users.seed("u1", ApiRole::Admin, true);
+
+    // Build a usecase, mint a token by logging in through it, then
+    // build a SECOND usecase that shares the same repo but starts
+    // with an empty cache (simulating a cold restart in the same
+    // process). The first verify through the cold usecase must hit
+    // the repo; the second must hit the cache.
+    let warm_usecase = make_usecase(creds.clone(), ids.clone(), users.clone());
+    let pair = warm_usecase
+        .login_with_password(LoginWithPassword {
+            code: "u1".into(),
+            password: "hunter2".into(),
         })
         .await
-        .expect("refresh succeeds");
-    {
+        .expect("login succeeds");
+
+    let cold_usecase = make_usecase(creds.clone(), ids, users);
+
+    let find_calls_before = {
         let s = creds.state.lock().unwrap();
-        assert!(
-            s.current_version_calls > current_version_before,
-            "refresh must call current_token_version"
-        );
-    }
+        s.find_calls
+    };
+
+    cold_usecase
+        .verify(VerifyAccessToken {
+            access_token: pair.access_token.clone(),
+        })
+        .await
+        .expect("verify succeeds after cold restart");
+
+    let find_calls_after_first = {
+        let s = creds.state.lock().unwrap();
+        s.find_calls
+    };
+    assert!(
+        find_calls_after_first > find_calls_before,
+        "first verify after cold restart must hit the repo"
+    );
+
+    cold_usecase
+        .verify(VerifyAccessToken {
+            access_token: pair.access_token,
+        })
+        .await
+        .expect("verify succeeds again");
+
+    let find_calls_after_second = {
+        let s = creds.state.lock().unwrap();
+        s.find_calls
+    };
+    assert_eq!(
+        find_calls_after_second, find_calls_after_first,
+        "second verify must hit the cache"
+    );
+}
+
+#[tokio::test]
+async fn logout_invalidates_cached_token_version() {
+    // After logout, the cache holds the bumped version. A token
+    // minted before the logout must fail verify because the
+    // cached version > jwt.ver.
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", &hash_password("hunter2"), 1);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    users.seed("u1", ApiRole::Admin, true);
+    let usecase = make_usecase(creds, ids, users);
+
+    let pair = usecase
+        .login_with_password(LoginWithPassword {
+            code: "u1".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect("login succeeds");
+
+    usecase
+        .verify(VerifyAccessToken {
+            access_token: pair.access_token.clone(),
+        })
+        .await
+        .expect("pre-logout verify passes");
+
+    usecase
+        .logout(crate::usecase::Logout { code: "u1".into() })
+        .await
+        .expect("logout succeeds");
+
+    let err = usecase
+        .verify(VerifyAccessToken {
+            access_token: pair.access_token,
+        })
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(err, UsecaseError::Verification(_)),
+        "post-logout verify must reject; got {err:?}"
+    );
 }
 
 #[tokio::test]

@@ -1,6 +1,3 @@
-use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
-
 use async_trait::async_trait;
 use sqlx::PgPool;
 
@@ -16,19 +13,11 @@ const SQLSTATE_UNIQUE_VIOLATION: &str = "23505";
 
 pub struct UserCredentialsRepo {
     pool: PgPool,
-    /// In-memory cache of `(code -> token_version)` for the verify / refresh
-    /// hot path. `bump_token_version` writes the new version into the cache
-    /// after the database UPDATE; `current_token_version` populates the
-    /// cache on a miss with the value just read from the database.
-    token_versions: Arc<RwLock<HashMap<String, u32>>>,
 }
 
 impl UserCredentialsRepo {
     pub fn new(pool: PgPool) -> Self {
-        Self {
-            pool,
-            token_versions: Arc::new(RwLock::new(HashMap::new())),
-        }
+        Self { pool }
     }
 }
 
@@ -79,49 +68,14 @@ impl UserCredentialsRepository for UserCredentialsRepo {
             sqlx::Error::RowNotFound => DomainError::NotFound,
             other => map_db_error(other),
         })?;
-        let v = read_version(row.0)?;
-        // Refresh the cache so the next `current_token_version` call sees
-        // the bumped value without re-reading the database.
-        self.token_versions
-            .write()
-            .unwrap()
-            .insert(code.to_string(), v);
-        Ok(v)
-    }
-
-    async fn current_token_version(&self, code: &str) -> Result<u32, DomainError> {
-        if let Some(v) = self.token_versions.read().unwrap().get(code).copied() {
-            return Ok(v);
+        if row.0 < 0 {
+            return Err(DomainError::Repository(format!(
+                "negative token_version after bump: {}",
+                row.0
+            )));
         }
-        // Cache miss: read just the version column from the database.
-        let row: (i32,) = sqlx::QueryBuilder::new(
-            "SELECT token_version FROM auth_user_credentials WHERE code = ",
-        )
-        .push_bind(code)
-        .build_query_as::<(i32,)>()
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(map_db_error)?
-        .ok_or(DomainError::NotFound)?;
-        let v = read_version(row.0)?;
-        self.token_versions
-            .write()
-            .unwrap()
-            .insert(code.to_string(), v);
-        Ok(v)
+        Ok(row.0 as u32)
     }
-}
-
-/// Defensively reject negative `token_version` values from the database
-/// before casting to `u32`. A negative value would indicate schema
-/// corruption or a misconfigured column.
-fn read_version(raw: i32) -> Result<u32, DomainError> {
-    if raw < 0 {
-        return Err(DomainError::Repository(format!(
-            "negative token_version: {raw}"
-        )));
-    }
-    Ok(raw as u32)
 }
 
 pub struct DomainIdentityRepo {

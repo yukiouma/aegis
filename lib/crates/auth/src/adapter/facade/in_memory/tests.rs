@@ -27,6 +27,7 @@ fn make_service(
         credentials: creds,
         identities: ids,
         user_service: std::sync::Arc::new(users),
+        cache: std::sync::Arc::new(crate::InMemoryTokenVersionCache::new()),
         signing_key: b"0123456789abcdef0123456789abcdef".to_vec(),
         access_ttl: Duration::from_secs(60),
         refresh_ttl: Duration::from_secs(3600),

@@ -217,6 +217,7 @@ async fn usecase_can_be_constructed_from_real_repos() {
             credentials: creds,
             identities: ids,
             user_service: Arc::new(FakeUserService::new()),
+            cache: Arc::new(auth::InMemoryTokenVersionCache::new()),
             signing_key: b"0123456789abcdef0123456789abcdef".to_vec(),
             access_ttl: std::time::Duration::from_secs(60),
             refresh_ttl: std::time::Duration::from_secs(3600),
