@@ -73,3 +73,63 @@ pub enum AuthApiError {
     #[error("repository error: {0}")]
     Repository(String),
 }
+
+/// Outbound port for authentication.
+///
+/// `Send + Sync` so a `Box<dyn AuthService>` can be shared state in
+/// an async server (axum, tarpc, etc.). Object-safe: no generic
+/// methods, no `Self` in return position beyond `&self`.
+///
+/// Implementations adapt a backend's usecase layer into this
+/// contract, translating between backend-specific DTOs / errors
+/// and the `apis` types defined above.
+#[async_trait::async_trait]
+pub trait AuthService: Send + Sync {
+    /// Authenticate with a user code + password.
+    ///
+    /// On success mints a fresh access token and refresh token and
+    /// returns them. Implementations check the password against
+    /// the persisted hash and surface `InvalidCredentials` (not
+    /// `NotFound`) for a code that exists with the wrong password.
+    async fn login_with_password(
+        &self,
+        code: &str,
+        password: &str,
+    ) -> Result<TokenPair, AuthApiError>;
+
+    /// Authenticate with Windows-domain user info (AD / NTLM style).
+    ///
+    /// `domain_name`, `hostname`, and `sid` identify the domain
+    /// account. On success mints a fresh access token and refresh
+    /// token and returns them. Implementations surface `NotFound`
+    /// when no user maps to the supplied domain-identity triple.
+    async fn login_with_domain_user_info(
+        &self,
+        code: &str,
+        domain_name: &str,
+        hostname: &str,
+        sid: &str,
+    ) -> Result<TokenPair, AuthApiError>;
+
+    /// Invalidate any server-side session state for `code`.
+    ///
+    /// Returns `Ok(())` even if the user had no active session.
+    /// Storage failures surface as `AuthApiError::Repository`.
+    async fn logout(&self, code: &str) -> Result<(), AuthApiError>;
+
+    /// Verify an access token and recover the identity it was minted for.
+    ///
+    /// Returns `AuthClaims` on success. Token-format, signature,
+    /// and expiry failures all surface as
+    /// `AuthApiError::Verification`.
+    async fn verify(&self, access_token: &str) -> Result<AuthClaims, AuthApiError>;
+
+    /// Exchange a still-valid refresh token for a brand-new access token.
+    ///
+    /// Returns the freshly minted access token as a `String`.
+    /// Expired or tampered-with refresh tokens surface as
+    /// `AuthApiError::Verification`. The refresh token itself is
+    /// not rotated — callers keep using the same refresh token
+    /// until it expires.
+    async fn refresh(&self, refresh_token: &str) -> Result<String, AuthApiError>;
+}
