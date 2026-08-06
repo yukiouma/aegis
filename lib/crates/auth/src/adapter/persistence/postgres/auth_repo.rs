@@ -76,6 +76,39 @@ impl UserCredentialsRepository for UserCredentialsRepo {
         }
         Ok(row.0 as u32)
     }
+
+    async fn update_password_hash(
+        &self,
+        code: &str,
+        password_hash: &str,
+    ) -> Result<UserCredentials, DomainError> {
+        let row: Option<CredentialRow> =
+            sqlx::QueryBuilder::new("UPDATE auth_user_credentials SET password_hash = ")
+                .push_bind(password_hash)
+                .push(" WHERE code = ")
+                .push_bind(code)
+                .push(" RETURNING code, password_hash, token_version, created_at, updated_at")
+                .build_query_as::<CredentialRow>()
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(map_db_error)?;
+        let row = row.ok_or(DomainError::NotFound)?;
+        row.try_into()
+    }
+
+    async fn delete_by_code(&self, code: &str) -> Result<(), DomainError> {
+        let rows = sqlx::QueryBuilder::new("DELETE FROM auth_user_credentials WHERE code = ")
+            .push_bind(code)
+            .build()
+            .execute(&self.pool)
+            .await
+            .map_err(map_db_error)?
+            .rows_affected();
+        if rows == 0 {
+            return Err(DomainError::NotFound);
+        }
+        Ok(())
+    }
 }
 
 pub struct DomainIdentityRepo {

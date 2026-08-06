@@ -19,6 +19,21 @@ pub trait UserCredentialsRepository: Send + Sync {
     /// `verify` / `refresh` calls in the same process reject tokens
     /// minted before the bump.
     async fn bump_token_version(&self, code: &str) -> Result<u32, DomainError>;
+
+    /// Update `password_hash` for `code`. Returns the refreshed row,
+    /// or `DomainError::NotFound` if no such credential exists. Does
+    /// NOT bump `token_version` — callers that want the password
+    /// change to invalidate outstanding tokens go through
+    /// `bump_token_version` separately.
+    async fn update_password_hash(
+        &self,
+        code: &str,
+        password_hash: &str,
+    ) -> Result<UserCredentials, DomainError>;
+
+    /// Delete the credential row for `code`. Returns
+    /// `DomainError::NotFound` if no such row exists.
+    async fn delete_by_code(&self, code: &str) -> Result<(), DomainError>;
 }
 
 /// Outbound port for persistence of `DomainIdentity`.

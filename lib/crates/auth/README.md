@@ -110,8 +110,9 @@ without touching the usecase, the repository, or any consumer.
 
 `verify` and `refresh` go `cache.get → credentials.find_by_code (on
 miss) + cache.put`. Login paths warm the cache with
-`row.token_version`. `logout` calls `credentials.bump_token_version` and
-then writes the returned version into the cache via `cache.put`, so
+`row.token_version`. `logout` decodes the supplied refresh token to
+extract the user code, calls `credentials.bump_token_version`, then
+writes the returned version into the cache via `cache.put`, so
 subsequent verifies in the same process reject tokens minted before
 the bump. Cross-process revocation still relies on a shared backend
 (Redis) when one is wired in; in a single-process deployment the

@@ -18,7 +18,8 @@ pub use domain::{
     UserCredentials, UserCredentialsRepository,
 };
 pub use usecase::{
-    AccessTokenView, AuthClaimsView, AuthUsecase, AuthUsecaseConfig, LoginWithDomainUserInfo,
-    LoginWithPassword, Logout, LogoutAck, RefreshAccessToken, TokenPairView, UsecaseError,
-    VerifyAccessToken,
+    AccessTokenView, AuthClaimsView, AuthUsecase, AuthUsecaseConfig, CreateUserCredential,
+    FindUserCredential, LoginWithDomainUserInfo, LoginWithPassword, Logout, LogoutAck,
+    RefreshAccessToken, RemoveUserCredential, RemoveUserCredentialAck, TokenPairView,
+    UpdateUserCredential, UsecaseError, UserCredentialView, VerifyAccessToken,
 };

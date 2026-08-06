@@ -175,7 +175,7 @@ async fn refresh_returns_new_access_token() {
 }
 
 #[tokio::test]
-async fn logout_echoes_the_user_code() {
+async fn logout_returns_empty_response() {
     let creds = MockUserCredentialsRepo::default();
     creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
@@ -183,11 +183,108 @@ async fn logout_echoes_the_user_code() {
     users.seed("u1", ApiRole::Admin, true);
     let svc = make_service(creds, ids, users);
 
+    let pair = svc
+        .login_with_password(LoginWithPasswordRequest {
+            code: "u1".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect("login succeeds");
     let ack = svc
-        .logout(LogoutRequest { code: "u1".into() })
+        .logout(LogoutRequest {
+            refresh_token: pair.refresh_token,
+        })
         .await
         .expect("logout succeeds");
-    assert_eq!(ack.code, "u1");
+    assert_eq!(ack, apis::auth::LogoutResponse {});
+}
+
+#[tokio::test]
+async fn find_user_credential_returns_view_for_known_code() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", "hash", 7);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let svc = make_service(creds, ids, users);
+
+    let view = svc
+        .find_user_credential_by_code("u1")
+        .await
+        .expect("find succeeds");
+    assert_eq!(view.user_code, "u1");
+    assert_eq!(view.password_hash, "hash");
+    assert_eq!(view.token_version, 7);
+}
+
+#[tokio::test]
+async fn find_user_credential_returns_not_found_for_unknown_code() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let svc = make_service(creds, ids, users);
+
+    let err = svc.find_user_credential_by_code("ghost").await.unwrap_err();
+    assert!(matches!(err, AuthApiError::NotFound));
+}
+
+#[tokio::test]
+async fn create_user_credential_round_trips_via_find() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let svc = make_service(creds, ids, users);
+
+    let created = svc
+        .create_user_credential(apis::auth::CreateUserCredentialRequest {
+            user_code: "u1".into(),
+            password_hash: "hash".into(),
+        })
+        .await
+        .expect("create succeeds");
+    assert_eq!(created.token_version, 0);
+
+    let fetched = svc
+        .find_user_credential_by_code("u1")
+        .await
+        .expect("find succeeds");
+    assert_eq!(fetched.user_code, "u1");
+    assert_eq!(fetched.password_hash, "hash");
+}
+
+#[tokio::test]
+async fn update_user_credential_changes_password_hash() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", "old", 1);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let svc = make_service(creds, ids, users);
+
+    let view = svc
+        .update_user_credential(apis::auth::UpdateUserCredentialRequest {
+            user_code: "u1".into(),
+            password_hash: Some("new".into()),
+        })
+        .await
+        .expect("update succeeds");
+    assert_eq!(view.password_hash, "new");
+}
+
+#[tokio::test]
+async fn remove_user_credential_returns_empty_response() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", "hash", 1);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let svc = make_service(creds, ids, users);
+
+    let ack = svc
+        .remove_user_credential("u1")
+        .await
+        .expect("remove succeeds");
+    assert_eq!(ack, apis::auth::RemoveUserCredentialResponse {});
+
+    let err = svc.find_user_credential_by_code("u1").await.unwrap_err();
+    assert!(matches!(err, AuthApiError::NotFound));
 }
 
 #[tokio::test]

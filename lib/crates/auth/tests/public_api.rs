@@ -36,7 +36,7 @@ fn public_types_are_nameable_from_crate_root() {
     assert_token(AccessTokenView {
         access_token: "a".into(),
     });
-    assert_ack(LogoutAck { code: "u1".into() });
+    assert_ack(LogoutAck {});
 }
 
 #[test]

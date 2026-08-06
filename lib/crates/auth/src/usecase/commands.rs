@@ -28,10 +28,11 @@ pub struct RefreshAccessToken {
     pub refresh_token: String,
 }
 
-/// Input for `AuthUsecase::logout`.
+/// Input for `AuthUsecase::logout`. The implementation decodes the
+/// refresh token to extract the user code and bumps the token_version.
 #[derive(Debug, Clone)]
 pub struct Logout {
-    pub code: String,
+    pub refresh_token: String,
 }
 
 /// Output of `login_with_*` — opaque JWT strings.
@@ -55,11 +56,51 @@ pub struct AccessTokenView {
     pub access_token: String,
 }
 
-/// Output of `logout`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LogoutAck {
+/// Output of `logout`. Empty by design — a successful logout carries
+/// no payload.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct LogoutAck {}
+
+/// Input for `AuthUsecase::find_user_credential`.
+#[derive(Debug, Clone)]
+pub struct FindUserCredential {
     pub code: String,
 }
+
+/// Input for `AuthUsecase::create_user_credential`. The implementation
+/// picks the initial `token_version`.
+#[derive(Debug, Clone)]
+pub struct CreateUserCredential {
+    pub code: String,
+    pub password_hash: String,
+}
+
+/// Input for `AuthUsecase::update_user_credential`. Only `password_hash`
+/// is mutable through this command.
+#[derive(Debug, Clone, Default)]
+pub struct UpdateUserCredential {
+    pub code: String,
+    pub password_hash: Option<String>,
+}
+
+/// Input for `AuthUsecase::remove_user_credential`.
+#[derive(Debug, Clone)]
+pub struct RemoveUserCredential {
+    pub code: String,
+}
+
+/// Output of `find_user_credential` / `create_user_credential` /
+/// `update_user_credential`. Same shape as the apis `UserCredentialView`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UserCredentialView {
+    pub code: String,
+    pub password_hash: String,
+    pub token_version: u32,
+}
+
+/// Output of `remove_user_credential`. Empty by design.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct RemoveUserCredentialAck {}
 
 // `Role` re-exported for `AuthClaimsView`'s public surface.
 pub use crate::domain::Role;

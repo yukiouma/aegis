@@ -5,12 +5,15 @@ use apis::user::{UserApiError, UserService};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{
-    DomainError, DomainIdentityRepository, TokenVersionCache, UserCredentialsRepository,
+    DomainError, DomainIdentityRepository, TokenVersionCache, UserCredentials,
+    UserCredentialsRepository,
 };
 
 use super::commands::{
-    AccessTokenView, AuthClaimsView, LoginWithDomainUserInfo, LoginWithPassword, Logout, LogoutAck,
-    RefreshAccessToken, Role, TokenPairView, VerifyAccessToken,
+    AccessTokenView, AuthClaimsView, CreateUserCredential, FindUserCredential,
+    LoginWithDomainUserInfo, LoginWithPassword, Logout, LogoutAck, RefreshAccessToken,
+    RemoveUserCredential, RemoveUserCredentialAck, Role, TokenPairView, UpdateUserCredential,
+    UserCredentialView, VerifyAccessToken,
 };
 use super::error::UsecaseError;
 
@@ -250,16 +253,93 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
     }
 
     pub async fn logout(&self, cmd: Logout) -> Result<LogoutAck, UsecaseError> {
+        if cmd.refresh_token.trim().is_empty() {
+            return Err(UsecaseError::Verification("empty refresh_token".into()));
+        }
+        // Decode the refresh token to extract the user code; signature
+        // and expiry failures surface as Verification. A token whose
+        // `ver` no longer matches the current `token_version` is
+        // accepted here too — logout is meant to be idempotent, so a
+        // second call with the same (stale) refresh token still
+        // succeeds and bumps the version further.
+        let code = self.extract_code_from_refresh_token(&cmd.refresh_token)?;
+        let new_version = self.credentials.bump_token_version(&code).await?;
+        self.cache.put(&code, new_version).await;
+        Ok(LogoutAck {})
+    }
+
+    /// Decode + validate a refresh token and return the user code.
+    /// Shared by `logout` (which only needs the `sub` claim).
+    fn extract_code_from_refresh_token(&self, refresh_token: &str) -> Result<String, UsecaseError> {
+        use jsonwebtoken::{Algorithm, DecodingKey, Validation, decode};
+        let mut validation = Validation::new(Algorithm::HS256);
+        validation.leeway = 5;
+        validation.required_spec_claims = std::collections::HashSet::new();
+        let key = DecodingKey::from_secret(&self.signing_key);
+        decode::<RefreshClaims>(refresh_token, &key, &validation)
+            .map(|d| d.claims.sub)
+            .map_err(|e| UsecaseError::Verification(format!("decode refresh: {e}")))
+    }
+
+    pub async fn find_user_credential(
+        &self,
+        cmd: FindUserCredential,
+    ) -> Result<UserCredentialView, UsecaseError> {
+        let creds = self.credentials.find_by_code(&cmd.code).await?;
+        Ok(creds_to_view(&creds))
+    }
+
+    pub async fn create_user_credential(
+        &self,
+        cmd: CreateUserCredential,
+    ) -> Result<UserCredentialView, UsecaseError> {
         if cmd.code.trim().is_empty() {
             return Err(UsecaseError::Repository(DomainError::EmptyCode));
         }
-        // The repository bumps the database; the cache update is best-effort
-        // and does not block the response. Subsequent verify / refresh calls
-        // in this process see the new version via the cache; a missing cache
-        // entry falls back to the DB and re-warms the cache.
-        let new_version = self.credentials.bump_token_version(&cmd.code).await?;
-        self.cache.put(&cmd.code, new_version).await;
-        Ok(LogoutAck { code: cmd.code })
+        if cmd.password_hash.is_empty() {
+            return Err(UsecaseError::Repository(DomainError::EmptyPasswordHash));
+        }
+        let now = chrono::Utc::now();
+        let creds = UserCredentials::for_repository(
+            cmd.code,
+            cmd.password_hash,
+            // Initial token_version — the spec / apis doc-comment notes
+            // "typically 0". We pick 0 explicitly rather than letting
+            // the schema default to 1 so callers can reason about the
+            // first login's verify step.
+            0,
+            now,
+            now,
+        );
+        let created = self.credentials.create(creds).await?;
+        Ok(creds_to_view(&created))
+    }
+
+    pub async fn update_user_credential(
+        &self,
+        cmd: UpdateUserCredential,
+    ) -> Result<UserCredentialView, UsecaseError> {
+        // Surface NotFound early by looking up the credential before
+        // any write. `update_password_hash` also returns NotFound, but
+        // a no-op update (every optional field is None) needs the
+        // lookup path to surface the error.
+        let creds = self.credentials.find_by_code(&cmd.code).await?;
+        let updated = if let Some(ref hash) = cmd.password_hash {
+            self.credentials
+                .update_password_hash(&cmd.code, hash)
+                .await?
+        } else {
+            creds
+        };
+        Ok(creds_to_view(&updated))
+    }
+
+    pub async fn remove_user_credential(
+        &self,
+        cmd: RemoveUserCredential,
+    ) -> Result<RemoveUserCredentialAck, UsecaseError> {
+        self.credentials.delete_by_code(&cmd.code).await?;
+        Ok(RemoveUserCredentialAck {})
     }
 
     fn mint_access_token(
@@ -314,4 +394,15 @@ fn role_from_api(r: apis::user::Role) -> Role {
 
 fn role_from_str(s: &str) -> Result<Role, UsecaseError> {
     Role::try_from(s).map_err(UsecaseError::Repository)
+}
+
+/// Project a domain `UserCredentials` into the usecase-layer view.
+/// The shape is identical to `apis::auth::UserCredentialView`; the
+/// facade maps straight through.
+fn creds_to_view(c: &UserCredentials) -> UserCredentialView {
+    UserCredentialView {
+        code: c.code.clone(),
+        password_hash: c.password_hash.clone(),
+        token_version: c.token_version,
+    }
 }

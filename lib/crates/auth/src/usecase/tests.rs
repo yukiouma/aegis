@@ -81,6 +81,25 @@ impl UserCredentialsRepository for MockUserCredentialsRepo {
         entry.token_version += 1;
         Ok(entry.token_version)
     }
+
+    async fn update_password_hash(
+        &self,
+        code: &str,
+        password_hash: &str,
+    ) -> Result<UserCredentials, DomainError> {
+        let mut s = self.state.lock().unwrap();
+        let entry = s.by_code.get_mut(code).ok_or(DomainError::NotFound)?;
+        entry.password_hash = password_hash.to_string();
+        Ok(entry.clone())
+    }
+
+    async fn delete_by_code(&self, code: &str) -> Result<(), DomainError> {
+        let mut s = self.state.lock().unwrap();
+        if s.by_code.remove(code).is_none() {
+            return Err(DomainError::NotFound);
+        }
+        Ok(())
+    }
 }
 
 #[derive(Default)]
@@ -564,7 +583,9 @@ async fn logout_invalidates_cached_token_version() {
         .expect("pre-logout verify passes");
 
     usecase
-        .logout(crate::usecase::Logout { code: "u1".into() })
+        .logout(crate::usecase::Logout {
+            refresh_token: pair.refresh_token,
+        })
         .await
         .expect("logout succeeds");
 
@@ -722,10 +743,21 @@ async fn logout_bumps_token_version_and_invalidates_outstanding_tokens() {
         .expect("pre-logout verify passes");
 
     let ack = usecase
-        .logout(Logout { code: "u1".into() })
+        .logout(Logout {
+            refresh_token: pair.refresh_token.clone(),
+        })
         .await
         .expect("logout succeeds");
-    assert_eq!(ack.code, "u1");
+    assert_eq!(ack, crate::usecase::LogoutAck {});
+
+    // Idempotent: a second logout with the same (now stale) refresh
+    // token still succeeds.
+    usecase
+        .logout(Logout {
+            refresh_token: pair.refresh_token,
+        })
+        .await
+        .expect("second logout succeeds (idempotent)");
 
     // Post-logout verify rejects.
     let err = usecase
@@ -738,20 +770,231 @@ async fn logout_bumps_token_version_and_invalidates_outstanding_tokens() {
 }
 
 #[tokio::test]
-async fn logout_with_empty_code_is_validation_error() {
+async fn logout_with_empty_refresh_token_is_verification_error() {
     let creds = MockUserCredentialsRepo::default();
-    creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
     let usecase = make_usecase(creds, ids, users);
 
     let err = usecase
-        .logout(Logout { code: "  ".into() })
+        .logout(Logout {
+            refresh_token: "  ".into(),
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(err, UsecaseError::Verification(_)));
+}
+
+#[tokio::test]
+async fn logout_with_garbage_refresh_token_is_verification_error() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_usecase(creds, ids, users);
+
+    let err = usecase
+        .logout(Logout {
+            refresh_token: "not.a.real.jwt".into(),
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(err, UsecaseError::Verification(_)));
+}
+
+// -- credential management --------------------------------------------
+
+#[tokio::test]
+async fn find_user_credential_returns_view_for_known_code() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", "hash", 3);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_usecase(creds, ids, users);
+
+    let view = usecase
+        .find_user_credential(crate::usecase::FindUserCredential { code: "u1".into() })
+        .await
+        .expect("find succeeds");
+    assert_eq!(view.code, "u1");
+    assert_eq!(view.password_hash, "hash");
+    assert_eq!(view.token_version, 3);
+}
+
+#[tokio::test]
+async fn find_user_credential_returns_not_found_for_unknown_code() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_usecase(creds, ids, users);
+
+    let err = usecase
+        .find_user_credential(crate::usecase::FindUserCredential {
+            code: "ghost".into(),
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        UsecaseError::Repository(DomainError::NotFound)
+    ));
+}
+
+#[tokio::test]
+async fn create_user_credential_persists_with_initial_token_version_zero() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_usecase(creds, ids, users);
+
+    let view = usecase
+        .create_user_credential(crate::usecase::CreateUserCredential {
+            code: "u1".into(),
+            password_hash: "hash".into(),
+        })
+        .await
+        .expect("create succeeds");
+    assert_eq!(view.code, "u1");
+    assert_eq!(view.password_hash, "hash");
+    assert_eq!(view.token_version, 0);
+}
+
+#[tokio::test]
+async fn create_user_credential_rejects_empty_code() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_usecase(creds, ids, users);
+
+    let err = usecase
+        .create_user_credential(crate::usecase::CreateUserCredential {
+            code: "  ".into(),
+            password_hash: "hash".into(),
+        })
         .await
         .unwrap_err();
     assert!(matches!(
         err,
         UsecaseError::Repository(DomainError::EmptyCode)
+    ));
+}
+
+#[tokio::test]
+async fn create_user_credential_rejects_empty_password_hash() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_usecase(creds, ids, users);
+
+    let err = usecase
+        .create_user_credential(crate::usecase::CreateUserCredential {
+            code: "u1".into(),
+            password_hash: "".into(),
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        UsecaseError::Repository(DomainError::EmptyPasswordHash)
+    ));
+}
+
+#[tokio::test]
+async fn update_user_credential_changes_password_hash_when_some() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", "old", 1);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_usecase(creds, ids, users);
+
+    let view = usecase
+        .update_user_credential(crate::usecase::UpdateUserCredential {
+            code: "u1".into(),
+            password_hash: Some("new".into()),
+        })
+        .await
+        .expect("update succeeds");
+    assert_eq!(view.password_hash, "new");
+    assert_eq!(view.token_version, 1, "update must not bump token_version");
+}
+
+#[tokio::test]
+async fn update_user_credential_returns_unchanged_view_when_no_fields_set() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", "hash", 5);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_usecase(creds, ids, users);
+
+    let view = usecase
+        .update_user_credential(crate::usecase::UpdateUserCredential {
+            code: "u1".into(),
+            ..Default::default()
+        })
+        .await
+        .expect("update succeeds");
+    assert_eq!(view.password_hash, "hash");
+    assert_eq!(view.token_version, 5);
+}
+
+#[tokio::test]
+async fn update_user_credential_returns_not_found_for_unknown_code() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_usecase(creds, ids, users);
+
+    let err = usecase
+        .update_user_credential(crate::usecase::UpdateUserCredential {
+            code: "ghost".into(),
+            ..Default::default()
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        UsecaseError::Repository(DomainError::NotFound)
+    ));
+}
+
+#[tokio::test]
+async fn remove_user_credential_deletes_the_row() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", "hash", 1);
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_usecase(creds, ids, users);
+
+    usecase
+        .remove_user_credential(crate::usecase::RemoveUserCredential { code: "u1".into() })
+        .await
+        .expect("remove succeeds");
+
+    // Subsequent find returns NotFound.
+    let err = usecase
+        .find_user_credential(crate::usecase::FindUserCredential { code: "u1".into() })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        UsecaseError::Repository(DomainError::NotFound)
+    ));
+}
+
+#[tokio::test]
+async fn remove_user_credential_returns_not_found_for_unknown_code() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_usecase(creds, ids, users);
+
+    let err = usecase
+        .remove_user_credential(crate::usecase::RemoveUserCredential {
+            code: "ghost".into(),
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        UsecaseError::Repository(DomainError::NotFound)
     ));
 }
