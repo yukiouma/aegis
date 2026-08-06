@@ -122,8 +122,9 @@ pub trait AuthService: Send + Sync {
 
     /// Apply the optional fields on `req` to the credential
     /// identified by `req.user_code`. Returns `NotFound` if no such
-    /// credential exists. An all-`None` `req` (other than
-    /// `user_code`) is permitted and behaves as a read.
+    /// credential exists. A `req` whose only set field is
+    /// `user_code` (every other field is `None`) is permitted and
+    /// returns the unchanged credential view.
     async fn update_user_credential(
         &self,
         req: UpdateUserCredentialRequest,
