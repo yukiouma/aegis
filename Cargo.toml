@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "apps/desktop/aegis-desktop/src-tauri",
-    "apps/server/aegis-server", "lib/crates/apis",
+    "apps/server/aegis-server", "lib/crates/apis", "lib/crates/auth",
     "lib/crates/user", "lib/crates/windows-utils",
 ]
 resolver = "3"
@@ -21,3 +21,4 @@ thiserror = "2"
 rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
 dotenvy = "0.15"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
+jsonwebtoken = { version = "11", features = ["rust_crypto"] }
