@@ -10,7 +10,7 @@ pub mod adapter;
 pub mod domain;
 pub mod usecase;
 
-pub use adapter::cache::in_memory::InMemoryTokenVersionCache;
+pub use adapter::cache::in_memory::token_version::InMemoryTokenVersionCache;
 pub use adapter::facade::in_memory::AuthServiceImpl;
 pub use adapter::persistence::postgres::{DomainIdentityRepo, UserCredentialsRepo};
 pub use domain::{

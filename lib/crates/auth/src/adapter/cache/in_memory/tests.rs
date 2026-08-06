@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use crate::domain::TokenVersionCache;
 
-use super::InMemoryTokenVersionCache;
+use super::token_version::InMemoryTokenVersionCache;
 
 #[tokio::test]
 async fn get_returns_none_for_unknown_code() {
