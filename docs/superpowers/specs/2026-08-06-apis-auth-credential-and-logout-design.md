@@ -107,7 +107,7 @@ pub struct UpdateUserCredentialRequest {
 /// explicit at the API boundary and can be extended later
 /// without a breaking trait change.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct RemoveUserCredential {}
+pub struct RemoveUserCredentialResponse {}
 ```
 
 ### New `AuthService` methods
@@ -151,7 +151,7 @@ pub trait AuthService: Send + Sync {
     async fn remove_user_credential(
         &self,
         code: &str,
-    ) -> Result<RemoveUserCredential, AuthApiError>;
+    ) -> Result<RemoveUserCredentialResponse, AuthApiError>;
 
     // -- session lifecycle --------------------------------------------
 
@@ -173,8 +173,8 @@ Extend `lib/crates/apis/tests/public_api.rs` to lock the new surface:
 - Update the `LogoutRequest` construction to use `refresh_token: "r".into()` (was `code: "u1".into()`).
 - Update the `LogoutResponse` assertion to construct the empty struct (was `LogoutResponse { code: "u1".into() }`).
 - Update `FakeAuthService::logout` to return `Result<LogoutResponse, AuthApiError>`.
-- Update `FakeAuthService::remove_user_credential` to return `Result<RemoveUserCredential, AuthApiError>`.
-- Add imports for `CreateUserCredentialRequest`, `RemoveUserCredential`, `UpdateUserCredentialRequest`, `UserCredentialView`.
+- Update `FakeAuthService::remove_user_credential` to return `Result<RemoveUserCredentialResponse, AuthApiError>`.
+- Add imports for `CreateUserCredentialRequest`, `RemoveUserCredentialResponse`, `UpdateUserCredentialRequest`, `UserCredentialView`.
 - Add field-by-field construction calls for each new DTO in the `auth_public_types_are_nameable` test.
 - Add the four new `FakeAuthService` method stubs returning `todo!()`.
 - Touch `AuthApiError::DuplicateCode("".into())` in the variant-reachability block.
