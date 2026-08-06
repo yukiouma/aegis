@@ -1,8 +1,8 @@
 //! Outbound port for authentication.
 //!
 //! See [`AuthService`] for the trait surface. All supporting types
-//! (`TokenPair`, `AuthClaims`, the login request DTOs, and
-//! `AuthApiError`) are defined alongside the trait so a single
+//! (`TokenPair`, `AuthClaims`, the request / view / response DTOs,
+//! and `AuthApiError`) are defined alongside the trait so a single
 //! `use apis::auth::*;` brings the whole contract into scope.
 
 use thiserror::Error;
@@ -24,18 +24,6 @@ pub struct AuthClaims {
     pub token_version: u32,
 }
 
-/// Response DTO for [`AuthService::logout`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LogoutResponse {
-    pub code: String,
-}
-
-/// Response DTO for [`AuthService::refresh`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RefreshResponse {
-    pub access_token: String,
-}
-
 /// Input DTO for [`AuthService::login_with_password`].
 #[derive(Debug, Clone)]
 pub struct LoginWithPasswordRequest {
@@ -55,7 +43,7 @@ pub struct LoginWithDomainUserInfoRequest {
 /// Input DTO for [`AuthService::logout`].
 #[derive(Debug, Clone)]
 pub struct LogoutRequest {
-    pub code: String,
+    pub refresh_token: String,
 }
 
 /// Input DTO for [`AuthService::verify`].
@@ -69,6 +57,65 @@ pub struct VerifyRequest {
 pub struct RefreshRequest {
     pub refresh_token: String,
 }
+
+/// Input DTO for [`AuthService::create_user_credential`].
+///
+/// `token_version` is intentionally absent: the implementation picks
+/// the initial value (typically `0`).
+#[derive(Debug, Clone)]
+pub struct CreateUserCredentialRequest {
+    pub user_code: String,
+    pub password_hash: String,
+}
+
+/// Input DTO for [`AuthService::update_user_credential`].
+///
+/// Only `password_hash` is mutable through this DTO. To change
+/// `token_version` callers go through a future admin-facing API
+/// (out of scope here).
+#[derive(Debug, Clone, Default)]
+pub struct UpdateUserCredentialRequest {
+    pub user_code: String,
+    pub password_hash: Option<String>,
+}
+
+/// Response DTO for [`AuthService::logout`].
+///
+/// Empty by design — a successful logout carries no payload. Kept
+/// as a named type (rather than `()`) so the response shape is
+/// explicit at the API boundary and can be extended later
+/// without a breaking trait change.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct LogoutResponse {}
+
+/// Response DTO for [`AuthService::refresh`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RefreshResponse {
+    pub access_token: String,
+}
+
+/// Safe projection of a user's credential.
+///
+/// `password_hash` is always a hashed representation (Argon2 in the
+/// canonical backend); the trait does not constrain the hashing
+/// algorithm. `token_version` is read-only through this trait
+/// surface — see [`CreateUserCredentialRequest`] and
+/// [`UpdateUserCredentialRequest`] for what callers may set.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UserCredentialView {
+    pub user_code: String,
+    pub password_hash: String,
+    pub token_version: u32,
+}
+
+/// Response DTO for [`AuthService::remove_user_credential`].
+///
+/// Empty by design — a successful removal carries no payload. Kept
+/// as a named type (rather than `()`) so the response shape is
+/// explicit at the API boundary and can be extended later
+/// without a breaking trait change.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct RemoveUserCredentialResponse {}
 
 /// Error surface returned by every [`AuthService`] method.
 ///
@@ -98,6 +145,9 @@ pub enum AuthApiError {
 
     #[error("repository error: {0}")]
     Repository(String),
+
+    #[error("user credential already exists: {0}")]
+    DuplicateCode(String),
 }
 
 /// Outbound port for authentication.
@@ -133,13 +183,6 @@ pub trait AuthService: Send + Sync {
         req: LoginWithDomainUserInfoRequest,
     ) -> Result<TokenPair, AuthApiError>;
 
-    /// Invalidate any server-side session state for `code`.
-    ///
-    /// Returns `LogoutResponse` echoing the user code on success,
-    /// even if the user had no active session. Storage failures
-    /// surface as `AuthApiError::Repository`.
-    async fn logout(&self, req: LogoutRequest) -> Result<LogoutResponse, AuthApiError>;
-
     /// Verify an access token and recover the identity it was minted for.
     ///
     /// Returns `AuthClaims` on success. Token-format, signature,
@@ -155,4 +198,53 @@ pub trait AuthService: Send + Sync {
     /// not rotated — callers keep using the same refresh token
     /// until it expires.
     async fn refresh(&self, req: RefreshRequest) -> Result<RefreshResponse, AuthApiError>;
+
+    // -- credential management -----------------------------------------
+
+    /// Look up the credential row attached to `code`. Returns
+    /// `NotFound` if no credential exists for that code.
+    async fn find_user_credential_by_code(
+        &self,
+        code: &str,
+    ) -> Result<UserCredentialView, AuthApiError>;
+
+    /// Persist a new credential row. The implementation picks the
+    /// initial `token_version`. Returns `DuplicateCode(code)` if a
+    /// credential already exists for that `user_code`.
+    async fn create_user_credential(
+        &self,
+        req: CreateUserCredentialRequest,
+    ) -> Result<UserCredentialView, AuthApiError>;
+
+    /// Apply the optional fields on `req` to the credential
+    /// identified by `req.user_code`. Returns `NotFound` if no such
+    /// credential exists. A `req` whose only set field is
+    /// `user_code` (every other field is `None`) is permitted and
+    /// returns the unchanged credential view.
+    async fn update_user_credential(
+        &self,
+        req: UpdateUserCredentialRequest,
+    ) -> Result<UserCredentialView, AuthApiError>;
+
+    /// Delete the credential row for `code`. Returns `NotFound` if
+    /// no such credential exists.
+    async fn remove_user_credential(
+        &self,
+        code: &str,
+    ) -> Result<RemoveUserCredentialResponse, AuthApiError>;
+
+    // -- session lifecycle --------------------------------------------
+
+    /// Invalidate the session identified by `req.refresh_token`.
+    ///
+    /// The implementation looks up the token, removes any stored
+    /// refresh-token entry, and returns `Ok(LogoutResponse::default())`.
+    /// Returns `Ok(...)` even when the token had no active session
+    /// (idempotent). A malformed or already-revoked refresh token
+    /// surfaces as `AuthApiError::Verification`. Storage failures
+    /// surface as `AuthApiError::Repository`.
+    async fn logout(
+        &self,
+        req: LogoutRequest,
+    ) -> Result<LogoutResponse, AuthApiError>;
 }

@@ -90,9 +90,10 @@ fn user_service_is_send_sync() {
 // -- apis::auth ---------------------------------------------------------
 
 use apis::auth::{
-    AuthApiError, AuthClaims, AuthService, LoginWithDomainUserInfoRequest,
-    LoginWithPasswordRequest, LogoutRequest, LogoutResponse, RefreshRequest, RefreshResponse,
-    TokenPair, VerifyRequest,
+    AuthApiError, AuthClaims, AuthService, CreateUserCredentialRequest,
+    LoginWithDomainUserInfoRequest, LoginWithPasswordRequest, LogoutRequest, LogoutResponse,
+    RefreshRequest, RefreshResponse, RemoveUserCredentialResponse, TokenPair,
+    UpdateUserCredentialRequest, UserCredentialView, VerifyRequest,
 };
 
 /// Every public type in `apis::auth` is nameable from the test.
@@ -107,6 +108,10 @@ fn auth_public_types_are_nameable() {
     fn assert_verify_req(_: VerifyRequest) {}
     fn assert_refresh_req(_: RefreshRequest) {}
     fn assert_refresh_res(_: RefreshResponse) {}
+    fn assert_create_cred(_: CreateUserCredentialRequest) {}
+    fn assert_update_cred(_: UpdateUserCredentialRequest) {}
+    fn assert_cred_view(_: UserCredentialView) {}
+    fn assert_remove_cred_res(_: RemoveUserCredentialResponse) {}
     fn assert_err(_: AuthApiError) {}
 
     // `TokenPair` is constructible field-by-field.
@@ -133,7 +138,9 @@ fn auth_public_types_are_nameable() {
         hostname: "h".into(),
         sid: "s".into(),
     });
-    assert_logout_req(LogoutRequest { code: "u1".into() });
+    assert_logout_req(LogoutRequest {
+        refresh_token: "r".into(),
+    });
     assert_verify_req(VerifyRequest {
         access_token: "a".into(),
     });
@@ -141,10 +148,24 @@ fn auth_public_types_are_nameable() {
         refresh_token: "r".into(),
     });
     // Every response DTO is constructible field-by-field.
-    assert_logout_res(LogoutResponse { code: "u1".into() });
+    assert_logout_res(LogoutResponse {});
     assert_refresh_res(RefreshResponse {
         access_token: "a".into(),
     });
+    assert_create_cred(CreateUserCredentialRequest {
+        user_code: "u1".into(),
+        password_hash: "h".into(),
+    });
+    assert_update_cred(UpdateUserCredentialRequest {
+        user_code: "u1".into(),
+        ..Default::default()
+    });
+    assert_cred_view(UserCredentialView {
+        user_code: "u1".into(),
+        password_hash: "h".into(),
+        token_version: 0,
+    });
+    assert_remove_cred_res(RemoveUserCredentialResponse {});
 
     // Touch every variant of the error type to keep it from being
     // dead-code-eliminated by the test build's analysis.
@@ -155,6 +176,7 @@ fn auth_public_types_are_nameable() {
     let _: AuthApiError = AuthApiError::Signing("".into());
     let _: AuthApiError = AuthApiError::Verification("".into());
     let _: AuthApiError = AuthApiError::Repository("".into());
+    let _: AuthApiError = AuthApiError::DuplicateCode("".into());
     let _ = assert_err;
 }
 
@@ -194,6 +216,30 @@ impl AuthService for FakeAuthService {
         &self,
         _req: RefreshRequest,
     ) -> Result<RefreshResponse, AuthApiError> {
+        todo!()
+    }
+    async fn find_user_credential_by_code(
+        &self,
+        _code: &str,
+    ) -> Result<UserCredentialView, AuthApiError> {
+        todo!()
+    }
+    async fn create_user_credential(
+        &self,
+        _req: CreateUserCredentialRequest,
+    ) -> Result<UserCredentialView, AuthApiError> {
+        todo!()
+    }
+    async fn update_user_credential(
+        &self,
+        _req: UpdateUserCredentialRequest,
+    ) -> Result<UserCredentialView, AuthApiError> {
+        todo!()
+    }
+    async fn remove_user_credential(
+        &self,
+        _code: &str,
+    ) -> Result<RemoveUserCredentialResponse, AuthApiError> {
         todo!()
     }
 }
