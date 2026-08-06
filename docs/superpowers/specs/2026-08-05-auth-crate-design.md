@@ -101,7 +101,9 @@ pub use usecase::{
     AuthUsecase, AuthUsecaseConfig, UsecaseError,
     LoginWithPassword, LoginWithDomainUserInfo, VerifyAccessToken,
     RefreshAccessToken, Logout, AuthClaimsView, TokenPairView,
-    AccessTokenView, LogoutAck,
+    AccessTokenView, LogoutAck, FindUserCredential, CreateUserCredential,
+    UpdateUserCredential, RemoveUserCredential, UserCredentialView,
+    RemoveUserCredentialAck,
 };
 ```
 
@@ -338,15 +340,22 @@ through `cache.get` with `credentials.find_by_code` as the fall back;
 
 | Command | Steps | Returns |
 | --- | --- | --- |
-| `LoginWithPassword { code, password }` | validate → `credentials.find_by_code` → `user_service.get_by_code` → check `active` → `argon2::verify_password` → mint access + refresh JWTs (uses `row.token_version` directly; the repo's cache populates lazily on the first verify/refresh) | `TokenPairView` |
-| `LoginWithDomainUserInfo { code, domain_name, hostname, sid }` | validate → `identities.find` → `user_service.get_by_code` → check `active` → `credentials.find_by_code` → mint tokens (uses `row.token_version` directly) | `TokenPairView` |
-| `VerifyAccessToken { access_token }` | decode JWT as `AccessClaims` → check signature + expiry → resolve current `token_version` (cache hit via `cache.get(sub)`, or `credentials.find_by_code(sub)` + `cache.put(sub, version)` on miss) → `user_service.get_by_code` → check `active` → compare `jwt.ver == current_version` → project to `AuthClaimsView` | `AuthClaimsView` |
-| `RefreshAccessToken { refresh_token }` | decode JWT as `RefreshClaims` → check signature + expiry → resolve current `token_version` (cache hit via `cache.get(sub)`, or `credentials.find_by_code(sub)` + `cache.put(sub, version)` on miss) → `user_service.get_by_code` → check `active` → compare versions → mint new access token (fresh `AccessClaims`) | `AccessTokenView` |
-| `Logout { code }` | validate → `credentials.bump_token_version(code)` (DB) → `cache.put(code, new_version)` (cache) | `LogoutAck { code }` |
+| `LoginWithPassword { code, password }` | validate → `credentials.find_by_code` → `user_service.get_by_code` → check `active` → `argon2::verify_password` → `cache.put(code, version)` → mint access + refresh JWTs | `TokenPairView` |
+| `LoginWithDomainUserInfo { code, domain_name, hostname, sid }` | validate → `identities.find` → `user_service.get_by_code` → check `active` → `credentials.find_by_code` → `cache.put(code, version)` → mint tokens | `TokenPairView` |
+| `VerifyAccessToken { access_token }` | decode JWT as `AccessClaims` → signature + expiry → resolve current `token_version` (cache hit via `cache.get(code)`, or `credentials.find_by_code(code)` + `cache.put(code, version)` on miss) → `user_service.get_by_code` → check `active` → compare `jwt.ver == current_version` → project to `AuthClaimsView` | `AuthClaimsView` |
+| `RefreshAccessToken { refresh_token }` | decode JWT as `RefreshClaims` → signature + expiry → resolve current `token_version` (cache hit via `cache.get(code)`, or `credentials.find_by_code(code)` + `cache.put(code, version)` on miss) → `user_service.get_by_code` → check `active` → compare versions → mint new access token | `AccessTokenView` |
+| `Logout { refresh_token }` | decode JWT as `RefreshClaims` → signature + expiry → extract `code` from `claims.sub` → `credentials.bump_token_version(code)` → `cache.put(code, new_version)` | `LogoutAck {}` |
+| `FindUserCredential { code }` | `credentials.find_by_code(code)` → project to `UserCredentialView` | `UserCredentialView` |
+| `CreateUserCredential { code, password_hash }` | validate (non-empty `code`, non-empty `password_hash`) → `credentials.create(UserCredentials { code, password_hash, token_version: 0, … })` → project to `UserCredentialView` | `UserCredentialView` |
+| `UpdateUserCredential { code, password_hash }` | `credentials.find_by_code(code)` (`NotFound` on miss) → if `password_hash` is `Some(hash)`, `credentials.update_password_hash(code, hash)`; otherwise leave the row untouched → project to `UserCredentialView` | `UserCredentialView` |
+| `RemoveUserCredential { code }` | `credentials.delete_by_code(code)` (`NotFound` on miss) | `RemoveUserCredentialAck {}` |
 
-`logout` does not consult `user_service`; bumping `token_version` invalidates
-every outstanding JWT regardless of current active state, and `Inactive` only
-matters for new logins.
+`logout` operates on a refresh token rather than a user code. The JWT
+decode extracts the user code; the cache + DB bump invalidates any
+outstanding tokens for that user. Malformed or expired refresh tokens
+surface as `Verification`. Calling `logout` with the same refresh
+token twice is idempotent (both calls bump the version, both return
+`Ok`).
 
 `UsecaseError`:
 
