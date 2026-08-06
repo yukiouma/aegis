@@ -4,8 +4,8 @@
 
 Extend the `apis::auth` port in two ways:
 
-1. **Logout by refresh token, not by user code.** Switch `LogoutRequest` to carry the refresh token, drop the `LogoutResponse` DTO, and have `logout` return `Result<(), AuthApiError>`.
-2. **Add a credential-management surface to `AuthService`.** Four new methods (find by code, create, update, remove) plus the supporting request / view DTOs.
+1. **Logout by refresh token, not by user code.** Switch `LogoutRequest` to carry the refresh token. `LogoutResponse` is kept as an empty response struct (no fields). The `logout` method's return type becomes `Result<LogoutResponse, AuthApiError>`.
+2. **Add a credential-management surface to `AuthService`.** Four new methods (find by code, create, update, remove) plus the supporting request / view / response DTOs.
 
 Scope is the `apis` crate only — no `user`-crate domain type, no migration, no `AuthService` adapter against a real backend. The trait stays a self-contained contract; a follow-up task wires it to persistence.
 
@@ -24,7 +24,7 @@ lib/crates/apis/src/
 
 ### Logout signature change
 
-The current `LogoutRequest { code }` is replaced with `LogoutRequest { refresh_token }`. `LogoutResponse` is removed. The `logout` method's return type becomes `Result<(), AuthApiError>`.
+The current `LogoutRequest { code }` is replaced with `LogoutRequest { refresh_token }`. `LogoutResponse` is kept as an empty response struct (no fields — a successful logout carries no payload). The `logout` method's return type becomes `Result<LogoutResponse, AuthApiError>`.
 
 ```rust
 /// Input DTO for [`AuthService::logout`].
@@ -33,13 +33,20 @@ pub struct LogoutRequest {
     pub refresh_token: String,
 }
 
-// (LogoutResponse removed.)
+/// Response DTO for [`AuthService::logout`].
+///
+/// Empty by design — a successful logout carries no payload. Kept
+/// as a named type (rather than `()`) so the response shape is
+/// explicit at the API boundary and can be extended later
+/// without a breaking trait change.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct LogoutResponse {}
 
 // In the trait:
-async fn logout(&self, req: LogoutRequest) -> Result<(), AuthApiError>;
+async fn logout(&self, req: LogoutRequest) -> Result<LogoutResponse, AuthApiError>;
 ```
 
-The doc on `logout` is rewritten to: "Invalidate the session identified by `req.refresh_token`. The implementation looks up the token, removes any stored refresh-token entry, and returns `Ok(())`. Returns `Ok(())` even when the token had no active session (idempotent). A malformed or already-revoked refresh token surfaces as `AuthApiError::Verification`. Storage failures surface as `AuthApiError::Repository`."
+The doc on `logout` is rewritten to: "Invalidate the session identified by `req.refresh_token`. The implementation looks up the token, removes any stored refresh-token entry, and returns `Ok(LogoutResponse::default())`. Returns `Ok(...)` even when the token had no active session (idempotent). A malformed or already-revoked refresh token surfaces as `AuthApiError::Verification`. Storage failures surface as `AuthApiError::Repository`."
 
 ### New error variant
 
@@ -92,6 +99,15 @@ pub struct UpdateUserCredentialRequest {
     pub user_code: String,
     pub password_hash: Option<String>,
 }
+
+/// Response DTO for [`AuthService::remove_user_credential`].
+///
+/// Empty by design — a successful removal carries no payload. Kept
+/// as a named type (rather than `()`) so the response shape is
+/// explicit at the API boundary and can be extended later
+/// without a breaking trait change.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct RemoveUserCredential {}
 ```
 
 ### New `AuthService` methods
@@ -135,12 +151,12 @@ pub trait AuthService: Send + Sync {
     async fn remove_user_credential(
         &self,
         code: &str,
-    ) -> Result<(), AuthApiError>;
+    ) -> Result<RemoveUserCredential, AuthApiError>;
 
     // -- session lifecycle --------------------------------------------
 
     /// (signature updated; see above)
-    async fn logout(&self, req: LogoutRequest) -> Result<(), AuthApiError>;
+    async fn logout(&self, req: LogoutRequest) -> Result<LogoutResponse, AuthApiError>;
 }
 ```
 
@@ -154,9 +170,11 @@ Single-arg methods (`find_user_credential_by_code`, `remove_user_credential`) ta
 
 Extend `lib/crates/apis/tests/public_api.rs` to lock the new surface:
 
-- Remove the `LogoutResponse` import and the `assert_logout_res` helper. Remove the `assert_logout_res(LogoutResponse { code: "u1".into() })` call.
-- Update `FakeAuthService::logout` to return `Result<(), AuthApiError>`.
-- Add imports for `CreateUserCredentialRequest`, `UpdateUserCredentialRequest`, `UserCredentialView`.
+- Update the `LogoutRequest` construction to use `refresh_token: "r".into()` (was `code: "u1".into()`).
+- Update the `LogoutResponse` assertion to construct the empty struct (was `LogoutResponse { code: "u1".into() }`).
+- Update `FakeAuthService::logout` to return `Result<LogoutResponse, AuthApiError>`.
+- Update `FakeAuthService::remove_user_credential` to return `Result<RemoveUserCredential, AuthApiError>`.
+- Add imports for `CreateUserCredentialRequest`, `RemoveUserCredential`, `UpdateUserCredentialRequest`, `UserCredentialView`.
 - Add field-by-field construction calls for each new DTO in the `auth_public_types_are_nameable` test.
 - Add the four new `FakeAuthService` method stubs returning `todo!()`.
 - Touch `AuthApiError::DuplicateCode("".into())` in the variant-reachability block.
