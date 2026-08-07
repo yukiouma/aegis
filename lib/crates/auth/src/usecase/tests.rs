@@ -1,8 +1,8 @@
 //! Unit tests for `AuthUsecase`.
 //!
-//! Mock repos and a `FakeUserService` (mirroring the apis `UserService`
-//! surface) stand in for the real adapters so the usecase can be
-//! exercised without PostgreSQL.
+//! Mock repos and a `FakeUserService` (implementing the domain
+//! `UserService` port) stand in for the real adapters so the usecase
+//! can be exercised without PostgreSQL.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -10,13 +10,9 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 
-use apis::user::{
-    CreateUserRequest, Role as ApiRole, UpdateUserRequest, UserApiError, UserService, UserView,
-};
-
 use crate::domain::{
     DomainError, DomainIdentity, DomainIdentityRepository, Role, UserCredentials,
-    UserCredentialsRepository,
+    UserCredentialsRepository, UserService, UserSummary,
 };
 use crate::usecase::commands::{
     AuthClaimsView, LoginWithDomainUserInfo, LoginWithPassword, Logout, RefreshAccessToken,
@@ -145,46 +141,29 @@ impl DomainIdentityRepository for MockDomainIdentityRepo {
 
 #[derive(Clone, Default)]
 pub struct FakeUserService {
-    by_code: Arc<Mutex<HashMap<String, UserView>>>,
+    by_code: Arc<Mutex<HashMap<String, UserSummary>>>,
 }
 
 impl FakeUserService {
-    pub fn seed(&self, code: &str, role: ApiRole, active: bool) {
-        let now = fixed_now();
-        let view = UserView {
-            id: 1,
+    pub fn seed(&self, code: &str, role: Role, active: bool) {
+        let summary = UserSummary {
             code: code.to_string(),
-            name: code.to_string(),
-            role,
             active,
-            created_at: now,
-            updated_at: now,
+            role,
         };
-        self.by_code.lock().unwrap().insert(code.to_string(), view);
+        self.by_code.lock().unwrap().insert(code.to_string(), summary);
     }
 }
 
 #[async_trait]
 impl UserService for FakeUserService {
-    async fn create(&self, _req: CreateUserRequest) -> Result<UserView, UserApiError> {
-        unimplemented!()
-    }
-    async fn get_by_id(&self, _id: i32) -> Result<UserView, UserApiError> {
-        unimplemented!()
-    }
-    async fn get_by_code(&self, code: &str) -> Result<UserView, UserApiError> {
+    async fn get_by_code(&self, code: &str) -> Result<UserSummary, DomainError> {
         self.by_code
             .lock()
             .unwrap()
             .get(code)
             .cloned()
-            .ok_or(UserApiError::NotFound)
-    }
-    async fn list(&self) -> Result<Vec<UserView>, UserApiError> {
-        unimplemented!()
-    }
-    async fn update(&self, _req: UpdateUserRequest) -> Result<UserView, UserApiError> {
-        unimplemented!()
+            .ok_or(DomainError::NotFound)
     }
 }
 
@@ -235,7 +214,7 @@ fn make_seeded_usecase_for_password_login(
     creds.seed_hash("u1", &hash_password(plain_password), initial_token_version);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let usecase = make_usecase(creds.clone(), ids.clone(), users.clone());
     (creds, ids, users, usecase)
 }
@@ -292,7 +271,7 @@ async fn login_with_password_rejects_inactive_user() {
     creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, false);
+    users.seed("u1", Role::Admin, false);
     let usecase = make_usecase(creds, ids, users);
 
     let err = usecase
@@ -356,7 +335,7 @@ async fn login_with_domain_user_info_mints_token_pair_for_matching_identity() {
         "S-1-5".into(),
     ));
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let usecase = make_usecase(creds, ids, users);
 
     let pair = usecase
@@ -378,7 +357,7 @@ async fn login_with_domain_user_info_returns_not_found_for_unmatched_triple() {
     creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let usecase = make_usecase(creds, ids, users);
 
     let err = usecase
@@ -408,7 +387,7 @@ async fn login_with_domain_user_info_rejects_inactive_user() {
         "S-1-5".into(),
     ));
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, false);
+    users.seed("u1", Role::Admin, false);
     let usecase = make_usecase(creds, ids, users);
 
     let err = usecase
@@ -432,7 +411,7 @@ async fn verify_returns_claims_for_freshly_minted_access_token() {
     creds.seed_hash("u1", &hash_password("hunter2"), 7);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let usecase = make_usecase(creds, ids, users);
 
     let pair = usecase
@@ -461,7 +440,7 @@ async fn verify_hits_cache_after_login_without_calling_find_by_code() {
     creds.seed_hash("u1", &hash_password("hunter2"), 3);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let usecase = make_usecase(creds.clone(), ids, users);
 
     let pair = usecase
@@ -499,7 +478,7 @@ async fn verify_falls_back_to_repo_on_cache_miss_and_populates_cache() {
     creds.seed_hash("u1", &hash_password("hunter2"), 3);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
 
     // Build a usecase, mint a token by logging in through it, then
     // build a SECOND usecase that shares the same repo but starts
@@ -564,7 +543,7 @@ async fn logout_invalidates_cached_token_version() {
     creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let usecase = make_usecase(creds, ids, users);
 
     let pair = usecase
@@ -607,7 +586,7 @@ async fn verify_rejects_refresh_token_presented_as_access_token() {
     creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let usecase = make_usecase(creds, ids, users);
 
     let pair = usecase
@@ -632,7 +611,7 @@ async fn verify_rejects_inactive_user() {
     creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let usecase = make_usecase(creds, ids, users.clone());
 
     let pair = usecase
@@ -644,7 +623,7 @@ async fn verify_rejects_inactive_user() {
         .expect("login succeeds");
 
     // Flip the user to inactive and verify fails.
-    users.seed("u1", ApiRole::Admin, false);
+    users.seed("u1", Role::Admin, false);
     let err = usecase
         .verify(VerifyAccessToken {
             access_token: pair.access_token,
@@ -663,7 +642,7 @@ async fn refresh_mints_new_access_token_with_current_version() {
     creds.seed_hash("u1", &hash_password("hunter2"), 4);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let usecase = make_usecase(creds, ids, users);
 
     let pair = usecase
@@ -698,7 +677,7 @@ async fn refresh_rejects_access_token_presented_as_refresh_token() {
     creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let usecase = make_usecase(creds, ids, users);
 
     let pair = usecase
@@ -723,7 +702,7 @@ async fn logout_bumps_token_version_and_invalidates_outstanding_tokens() {
     creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let usecase = make_usecase(creds, ids, users);
 
     let pair = usecase
