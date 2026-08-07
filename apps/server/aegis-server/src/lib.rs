@@ -12,5 +12,6 @@
 //! `aegis_server::run(config)`.
 
 pub mod config;
+pub mod run;
 pub mod state;
 pub mod transport;
