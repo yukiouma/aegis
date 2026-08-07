@@ -7,6 +7,7 @@
 pub(crate) mod cache;
 pub(crate) mod facade;
 pub(crate) mod persistence;
+pub(crate) mod service;
 
 pub use cache::in_memory::token_version::InMemoryTokenVersionCache;
 pub use facade::in_memory::AuthServiceImpl;
