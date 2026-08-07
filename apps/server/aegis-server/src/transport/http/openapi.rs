@@ -13,6 +13,7 @@
 
 use utoipa::OpenApi;
 
+use crate::transport::http::auth::handlers;
 use crate::transport::http::dto;
 use crate::transport::http::error::ErrorBody;
 
@@ -28,10 +29,10 @@ use crate::transport::http::error::ErrorBody;
         description = "HTTP transport for the aegis auth + user services."
     ),
     paths(
-        // Each route's `#[utoipa::path]` is bound here by path once
-        // Task 8 lands. healthz stays inline; the auth endpoints
-        // (login / login_domain / refresh / logout) are added in
-        // Task 8 alongside their handlers.
+        handlers::login,
+        handlers::login_domain,
+        handlers::refresh,
+        handlers::logout,
     ),
     components(schemas(
         dto::LoginRequest,

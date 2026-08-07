@@ -123,7 +123,7 @@ pub struct RemoveUserCredentialResponse {}
 /// implementation boundary. The shape intentionally combines
 /// validation, lookup, credential, and token concerns into a
 /// single type so handlers can match exhaustively.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum AuthApiError {
     #[error("validation failed: {0}")]
     Validation(String),
