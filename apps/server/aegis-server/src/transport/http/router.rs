@@ -1,60 +1,50 @@
 //! Top-level HTTP router.
 //!
 //! Layout:
-//! - `/healthz`                              liveness probe
-//! - `/api/auth/login`                       auth flows
+//! - `/api/auth/login`                  auth flows
 //! - `/api/auth/login-domain`
 //! - `/api/auth/refresh`
 //! - `/api/auth/logout`
-//! - `/swagger-ui/`                          swagger-ui HTML
-//! - `/swagger-ui/{*rest}`                   swagger-ui assets
-//! - `/api-docs/openapi.json`                OpenAPI v3 JSON document
+//! - `/healthz`                         liveness probe
+//! - `/swagger-ui/`                      swagger-ui HTML
+//! - `/swagger-ui/{*rest}`               swagger-ui assets
+//! - `/api-docs/openapi.json`            OpenAPI v3 JSON document
 //!
 //! All `/api/*` routes are also wrapped in a `TraceLayer` so every
 //! request emits a tracing span.
 
-use axum::Router;
-use axum::routing::{get, post};
-use tower_http::trace::TraceLayer;
+use utoipa::OpenApi;
+use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
 use crate::state::AppState;
-use crate::transport::http::auth::handlers;
-use crate::transport::http::healthz::healthz;
-use crate::transport::http::openapi;
+use crate::transport::http::auth;
+use crate::transport::http::healthz;
+use crate::transport::http::openapi::ApiDoc;
 
 /// Build the full HTTP router with `state` attached.
 ///
-/// The return type is intentionally `Router<()>` — once `with_state`
-/// has consumed the [`AppState`], the router no longer needs
-/// anything else added before it can run (`Router<()>` is what
-/// implements `Service`, not `Router<AppState>`).
-pub fn router(state: AppState) -> Router {
-    // The OpenApi document is built up by `openapi::openapi()` (which
-    // calls `ApiDoc::openapi()` and records each handler's
-    // `#[utoipa::path]` annotation). The schema registry + info block
-    // are shared with the static copy; the route paths come from the
-    // handler attribute macros.
-    let api_router = Router::new()
-        .route("/api/auth/login", post(handlers::login))
-        .route("/api/auth/login-domain", post(handlers::login_domain))
-        .route("/api/auth/refresh", post(handlers::refresh))
-        .route("/api/auth/logout", post(handlers::logout))
-        .route("/healthz", get(healthz))
-        .with_state(state);
+/// The return type is `axum::Router` (the consumer-side type after
+/// `split_for_parts()`). The `OpenApiRouter` is composed internally
+/// so the per-handler `#[utoipa::path]` annotations are auto-
+/// collected into the OpenAPI document; the swagger-ui is then
+/// merged on top, and the resulting `Router` is wrapped in a
+/// `TraceLayer` for tracing.
+pub fn router(state: AppState) -> axum::Router {
+    let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
+        .nest("/api/auth", auth::router())
+        .nest("/healthz", healthz::router())
+        .with_state(state)
+        .split_for_parts();
 
-    // Swagger-ui mounts the HTML + assets at `/swagger-ui/` and the
-    // openapi JSON at `/api-docs/openapi.json`. Its `Into<Router>`
-    // impl is generic over the state type, so it infers `Router<()>`
-    // from the surrounding `merge` call.
-    let swagger: Router = Router::from(
-        SwaggerUi::new("/swagger-ui")
-            .url("/api-docs/openapi.json", openapi::openapi()),
-    );
-
-    api_router
-        .merge(swagger)
-        .layer(TraceLayer::new_for_http())
+    // `SwaggerUi::new("/swagger-ui").url(...)` returns `SwaggerUi`,
+    // which has `From<SwaggerUi> for Router<S>` so we can convert
+    // it into a `Router<()>`. `OpenApiRouter::merge` then takes
+    // any `Router<S>` (the swagger-ui uses `S = ()` because its
+    // handlers do not extract state).
+    router
+        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api))
+        .layer(tower_http::trace::TraceLayer::new_for_http())
 }
 
 #[cfg(test)]
@@ -263,5 +253,6 @@ mod tests {
         assert!(doc["paths"]["/api/auth/login-domain"].is_object());
         assert!(doc["paths"]["/api/auth/refresh"].is_object());
         assert!(doc["paths"]["/api/auth/logout"].is_object());
+        assert!(doc["paths"]["/healthz"].is_object());
     }
 }

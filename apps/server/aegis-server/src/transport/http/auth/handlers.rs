@@ -24,7 +24,7 @@ use crate::transport::http::error::ApiError;
 /// access + refresh token pair.
 #[utoipa::path(
     post,
-    path = "/api/auth/login",
+    path = "/login",
     tag = "auth",
     request_body = dto::LoginRequest,
     responses(
@@ -57,7 +57,7 @@ pub async fn login(
 /// hostname, sid)` for a token pair.
 #[utoipa::path(
     post,
-    path = "/api/auth/login-domain",
+    path = "/login-domain",
     tag = "auth",
     request_body = dto::LoginDomainRequest,
     responses(
@@ -91,7 +91,7 @@ pub async fn login_domain(
 /// for a fresh access token.
 #[utoipa::path(
     post,
-    path = "/api/auth/refresh",
+    path = "/refresh",
     tag = "auth",
     request_body = dto::RefreshRequest,
     responses(
@@ -119,7 +119,7 @@ pub async fn refresh(
 /// `refresh_token`. Always returns `200 OK` with `{}` on success.
 #[utoipa::path(
     post,
-    path = "/api/auth/logout",
+    path = "/logout",
     tag = "auth",
     request_body = dto::LogoutRequest,
     responses(
