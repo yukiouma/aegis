@@ -19,8 +19,11 @@ use crate::transport::http::error::ErrorBody;
 
 /// OpenAPI document for the aegis-server HTTP transport.
 ///
-/// New routes must be added to `paths = [...]` here. New DTOs and
-/// `ErrorBody` are picked up automatically through `components.schemas`.
+/// Handlers are listed in `paths = [...]` so their `#[utoipa::path]`
+/// annotations are recorded into the document. The actual axum
+/// routes are registered in `transport::http::router::router` via
+/// `Router::route` (the `routes!` macro cannot combine multiple
+/// POST handlers).
 #[derive(OpenApi)]
 #[openapi(
     info(
