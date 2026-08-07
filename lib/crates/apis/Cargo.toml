@@ -5,27 +5,5 @@ edition = "2024"
 
 [dependencies]
 async-trait = { workspace = true }
-# `chrono` provides the `DateTime<Utc>` carried by `UserView`. The
-# `serde` feature is added on top of the workspace pin (which sets
-# `default-features = false`) so timestamps round-trip as RFC 3339.
-chrono = { workspace = true, features = ["serde"] }
-# `serde` is unconditional: every DTO in this crate is a wire type.
-# Gating it behind a feature would allow an `openapi`-only build to
-# derive `ToSchema` without the `#[serde(rename_all)]` attributes in
-# scope, emitting a schema that disagrees with the wire.
-serde = { workspace = true }
+chrono = { workspace = true }
 thiserror = { workspace = true }
-# `utoipa` is optional because only an OpenAPI-producing consumer (the
-# axum server) needs it. `features = ["chrono"]` is a utoipa-gen
-# codegen flag — it declares no dependency of its own — and is required
-# for `DateTime<Utc>` to render as `string` / `date-time`.
-utoipa = { workspace = true, optional = true, features = ["chrono"] }
-
-[dev-dependencies]
-# Used by `tests/wire_format.rs` and `tests/openapi_schema.rs` to assert
-# the exact JSON shape of every DTO and every generated schema.
-serde_json = { workspace = true }
-
-[features]
-default = []
-openapi = ["dep:utoipa"]

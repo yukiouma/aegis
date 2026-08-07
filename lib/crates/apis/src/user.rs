@@ -15,9 +15,7 @@ use thiserror::Error;
 /// Mirrors `user::Role` so adapters between the two crates can
 /// convert losslessly. Kept independent here so `apis` does not
 /// depend on the `user` crate.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Role {
     Root,
     Admin,
@@ -31,7 +29,6 @@ pub enum Role {
 /// intentionally combines validation, lookup, and infrastructure
 /// concerns into a single type so handlers can match exhaustively.
 #[derive(Debug, Error)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum UserApiError {
     #[error("validation failed: {0}")]
     Validation(String),
@@ -52,9 +49,7 @@ pub enum UserApiError {
 /// Safe projection of a user — no password / hash field, by
 /// construction. This is what adapters hand back to whatever
 /// consumes the API.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserView {
     pub id: i32,
     pub code: String,
@@ -71,9 +66,6 @@ pub struct UserView {
 /// lives in the backend's usecase layer. Adapters receive this
 /// shape from outside and translate it into a backend-specific
 /// create DTO that includes the password.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CreateUserRequest {
     pub code: String,
     pub name: String,
@@ -85,9 +77,7 @@ pub struct CreateUserRequest {
 /// Every field except `id` is optional; only the fields that
 /// actually changed need to be supplied. Same rationale as
 /// [`CreateUserRequest`] for the omission of `password`.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[derive(Default)]
 pub struct UpdateUserRequest {
     pub id: i32,
     pub code: Option<String>,
