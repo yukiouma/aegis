@@ -15,7 +15,7 @@ pub use adapter::facade::in_memory::AuthServiceImpl;
 pub use adapter::persistence::postgres::{DomainIdentityRepo, UserCredentialsRepo};
 pub use domain::{
     DomainError, DomainIdentity, DomainIdentityRepository, Role, TokenVersionCache,
-    UserCredentials, UserCredentialsRepository,
+    UserCredentials, UserCredentialsRepository, UserService, UserSummary,
 };
 pub use usecase::{
     AccessTokenView, AuthClaimsView, AuthUsecase, AuthUsecaseConfig, CreateUserCredential,

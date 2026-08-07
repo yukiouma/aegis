@@ -22,10 +22,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use apis::user::{CreateUserRequest, UpdateUserRequest, UserApiError, UserService, UserView};
 use auth::{
-    AuthUsecase, AuthUsecaseConfig, DomainIdentity, DomainIdentityRepo, DomainIdentityRepository,
-    UserCredentialsRepo, UserCredentialsRepository,
+    AuthUsecase, AuthUsecaseConfig, DomainError, DomainIdentity, DomainIdentityRepo,
+    DomainIdentityRepository, UserCredentialsRepo, UserCredentialsRepository, UserService,
+    UserSummary,
 };
 
 async fn with_pool<F, Fut, T>(f: F) -> T
@@ -230,7 +230,7 @@ async fn usecase_can_be_constructed_from_real_repos() {
 /// Minimal fake `UserService` for the integration smoke test only.
 pub struct FakeUserService {
     #[allow(dead_code)]
-    by_code: Mutex<HashMap<String, UserView>>,
+    by_code: Mutex<HashMap<String, UserSummary>>,
 }
 
 impl Default for FakeUserService {
@@ -250,19 +250,7 @@ impl FakeUserService {
 
 #[async_trait]
 impl UserService for FakeUserService {
-    async fn create(&self, _: CreateUserRequest) -> Result<UserView, UserApiError> {
-        unimplemented!()
-    }
-    async fn get_by_id(&self, _: i32) -> Result<UserView, UserApiError> {
-        unimplemented!()
-    }
-    async fn get_by_code(&self, _: &str) -> Result<UserView, UserApiError> {
-        Err(UserApiError::NotFound)
-    }
-    async fn list(&self) -> Result<Vec<UserView>, UserApiError> {
-        unimplemented!()
-    }
-    async fn update(&self, _: UpdateUserRequest) -> Result<UserView, UserApiError> {
-        unimplemented!()
+    async fn get_by_code(&self, _code: &str) -> Result<UserSummary, DomainError> {
+        Err(DomainError::NotFound)
     }
 }
