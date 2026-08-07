@@ -226,14 +226,21 @@ keeps compiling.
 
 ## Public API
 
-After this refactor, `auth::*` adds two names:
+After this refactor, `auth::*` adds three names:
 
 - `auth::domain::UserService` (trait).
 - `auth::domain::UserSummary` (struct).
+- `auth::UserServiceImpl` (the adapter; re-exported at the crate root
+  next to the other wiring types — `AuthServiceImpl`,
+  `InMemoryTokenVersionCache`, `UserCredentialsRepo`,
+  `DomainIdentityRepo`). Consumers need a public path to construct
+  the domain port from an `Arc<dyn apis::user::UserService>`; the
+  adapter is the only bridge between the two traits, so it must be
+  reachable from outside the crate. The `adapter::service` and
+  `adapter::service::user` modules are `pub` (not `pub(crate)`)
+  for the same reason.
 
-No other public surface changes. `UserServiceImpl` is reachable as
-`auth::adapter::service::user::UserServiceImpl` for wiring code but
-is not re-exported at the crate root.
+No other public surface changes.
 
 ## Testing
 
@@ -270,4 +277,3 @@ is not re-exported at the crate root.
 - A new dedicated `UserServiceError` enum — `DomainError`
   already has `NotFound` and `Repository(String)` which cover
   every variant of `UserApiError`.
-- Re-exporting `UserServiceImpl` at the auth crate root.
