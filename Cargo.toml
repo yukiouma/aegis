@@ -36,3 +36,11 @@ utoipa = { version = "5.5.0", features = ["axum_extras", "debug"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 utoipa-axum = { version = "0.2.0", features = ["debug"] }
 tower = "0.5.3"
+# `serde` provides Serialize / Deserialize for wire-level DTOs (HTTP
+# request / response bodies). Centralized here so every workspace
+# crate that needs serialization inherits the same version and feature
+# set.
+serde      = { version = "1", features = ["derive"] }
+# `serde_json` is the JSON codec used by axum's Json extractor. Pinned
+# in the workspace so every consumer resolves the same version.
+serde_json = "1"
