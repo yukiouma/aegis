@@ -17,6 +17,7 @@ use thiserror::Error;
 /// depend on the `user` crate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum Role {
     Root,
     Admin,
@@ -30,6 +31,7 @@ pub enum Role {
 /// intentionally combines validation, lookup, and infrastructure
 /// concerns into a single type so handlers can match exhaustively.
 #[derive(Debug, Error)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum UserApiError {
     #[error("validation failed: {0}")]
     Validation(String),
@@ -52,6 +54,7 @@ pub enum UserApiError {
 /// consumes the API.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct UserView {
     pub id: i32,
     pub code: String,
@@ -70,6 +73,7 @@ pub struct UserView {
 /// create DTO that includes the password.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CreateUserRequest {
     pub code: String,
     pub name: String,
@@ -83,6 +87,7 @@ pub struct CreateUserRequest {
 /// [`CreateUserRequest`] for the omission of `password`.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct UpdateUserRequest {
     pub id: i32,
     pub code: Option<String>,
