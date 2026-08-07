@@ -6,36 +6,32 @@
 //! `utoipa::openapi::OpenApi` document so `router()` can serve
 //! `/swagger-ui/` and `/api-docs/openapi.json`.
 //!
-//! Each route will subsequently be registered under
-//! `#[utoipa::path(...)]` next to its handler. The full
-//! `#[derive(OpenApi)]` struct lives here so the route attributes
-//! stay close to the handler bodies.
+//! Per-route paths are NOT listed here. The
+//! `OpenApiRouter::with_openapi(...)` call in `transport::http::router`
+//! wires the handlers via `routes!`, and `utoipa-axum` auto-collects
+//! each handler's `#[utoipa::path]` into the document with the
+//! `nest("/api/auth", ...)` prefix applied. Listing the handlers here
+//! as well would double-register them under the un-prefixed relative
+//! path (`/login`, `/login-domain`, `/refresh`, `/logout`).
 
 use utoipa::OpenApi;
 
-use crate::transport::http::auth::handlers;
 use crate::transport::http::dto;
 use crate::transport::http::error::ErrorBody;
 
 /// OpenAPI document for the aegis-server HTTP transport.
 ///
-/// Handlers are listed in `paths = [...]` so their `#[utoipa::path]`
-/// annotations are recorded into the document. The actual axum
-/// routes are registered in `transport::http::router::router` via
-/// `Router::route` (the `routes!` macro cannot combine multiple
-/// POST handlers).
+/// `paths(...)` is intentionally omitted: the `OpenApiRouter` in
+/// `transport::http::router` already registers every handler via
+/// `routes!`, and the `nest("/api/auth", ...)` prefix is applied
+/// there. The schema registry below still has to be explicit
+/// because `utoipa-axum` only collects paths, not schemas.
 #[derive(OpenApi)]
 #[openapi(
     info(
         title = "aegis-server API",
         version = "0.1.0",
         description = "HTTP transport for the aegis auth + user services."
-    ),
-    paths(
-        handlers::login,
-        handlers::login_domain,
-        handlers::refresh,
-        handlers::logout,
     ),
     components(schemas(
         dto::LoginRequest,
