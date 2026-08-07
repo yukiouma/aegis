@@ -4,3 +4,62 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+# axum 0.8 is the HTTP framework. The default features include
+# tokio + tower + http; we pin the workspace's choice.
+axum = { workspace = true }
+# tower hosts ServiceExt::oneshot, used by handler tests to drive
+# the router without binding a TCP listener.
+tower = { workspace = true }
+# tower-http's TraceLayer adds a tracing span around every request.
+# The `trace` feature is required for the layer constructor.
+tower-http = { workspace = true, features = ["trace"] }
+# tokio with macros + rt-multi-thread for `#[tokio::main]` in main.rs
+# + the spawn / signal utilities used by axum::serve.
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
+# utoipa's OpenApi derive generates the OpenAPI v3 document from
+# paths(...) and components(schemas(...)) listings.
+utoipa = { workspace = true }
+# utoipa-axum's OpenApiRouter composes handlers + auto-registers
+# paths in the generated OpenAPI document.
+utoipa-axum = { workspace = true }
+# utoipa-swagger-ui mounts the swagger-ui HTML at /swagger-ui and
+# points it at the openapi.json URL.
+utoipa-swagger-ui = { workspace = true }
+# tracing + tracing-subscriber log every request via TraceLayer; the
+# subscriber is initialized in main.rs.
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+# sqlx provides the PgPool used by the AuthUsecase / UserUsecase
+# wiring. The runtime-tokio + postgres features come from the
+# workspace dep.
+sqlx = { workspace = true }
+# serde provides Serialize / Deserialize for wire-level DTOs.
+serde = { workspace = true }
+# serde_json is the JSON codec used by axum's Json extractor.
+serde_json = { workspace = true }
+# chrono provides DateTime<Utc> for any future DTO timestamps.
+chrono = { workspace = true }
+# thiserror provides #[derive(Error)] for ConfigError + ApiError.
+thiserror = { workspace = true }
+# async-trait implements #[async_trait] for AppState::Clone +
+# AuthClaims FromRequestParts.
+async-trait = { workspace = true }
+# dotenvy loads .env at startup so AEGIS_DATABASE_URL etc. can be
+# set in a file during development.
+dotenvy = { workspace = true }
+# auth provides AuthServiceImpl, AuthUsecase, AuthUsecaseConfig,
+# UserServiceImpl (the apis->domain adapter), InMemoryTokenVersionCache,
+# UserCredentialsRepo, DomainIdentityRepo.
+auth = { path = "../../../lib/crates/auth" }
+# apis provides the AuthService / UserService ports + DTOs (no
+# serde / utoipa derives — those live on the wire DTOs in this crate).
+apis = { path = "../../../lib/crates/apis" }
+# user provides UserRepo (Postgres) + UserServiceImpl
+# (UserUsecase -> apis::user::UserService).
+user = { path = "../../../lib/crates/user" }
+
+[dev-dependencies]
+# `argon2` is used by `tests/integration_auth.rs` to seed a real
+# credential row whose hash matches the password the test logs in
+# with. Inherits the workspace version.
+argon2 = { workspace = true }
