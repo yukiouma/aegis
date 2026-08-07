@@ -17,6 +17,7 @@ use axum::extract::State;
 use axum::http::StatusCode;
 
 use crate::state::AppState;
+use crate::transport::http::auth::middleware::AuthClaims;
 use crate::transport::http::dto;
 use crate::transport::http::error::ApiError;
 
@@ -88,7 +89,8 @@ pub async fn login_domain(
 }
 
 /// `POST /api/auth/refresh` — exchange a still-valid refresh token
-/// for a fresh access token.
+/// for a fresh access token. Requires a valid access token in
+/// `Authorization: Bearer <token>`.
 #[utoipa::path(
     post,
     path = "/refresh",
@@ -96,14 +98,20 @@ pub async fn login_domain(
     request_body = dto::RefreshRequest,
     responses(
         (status = 200, description = "Fresh access token", body = dto::AccessTokenResponse),
-        (status = 401, description = "Refresh token rejected", body = crate::transport::http::error::ErrorBody),
+        (status = 401, description = "Missing / invalid access token, or refresh token rejected", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository / signing failure", body = crate::transport::http::error::ErrorBody),
     ),
+    security(("BearerAuth" = [])),
 )]
 pub async fn refresh(
     State(state): State<AppState>,
+    claims: AuthClaims,
     Json(req): Json<dto::RefreshRequest>,
 ) -> Result<Json<dto::AccessTokenResponse>, ApiError> {
+    // `claims` is unused in the handler body — its presence alone
+    // proves the caller presented a valid access token. The actual
+    // session identity is carried by the refresh token in the body.
+    let _ = claims;
     let response = state
         .auth
         .refresh(RefreshRequest {
@@ -117,6 +125,7 @@ pub async fn refresh(
 
 /// `POST /api/auth/logout` — invalidate the session identified by
 /// `refresh_token`. Always returns `200 OK` with `{}` on success.
+/// Requires a valid access token in `Authorization: Bearer <token>`.
 #[utoipa::path(
     post,
     path = "/logout",
@@ -124,14 +133,17 @@ pub async fn refresh(
     request_body = dto::LogoutRequest,
     responses(
         (status = 200, description = "Logged out", body = dto::LogoutResponse),
-        (status = 401, description = "Refresh token rejected", body = crate::transport::http::error::ErrorBody),
+        (status = 401, description = "Missing / invalid access token, or refresh token rejected", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
+    security(("BearerAuth" = [])),
 )]
 pub async fn logout(
     State(state): State<AppState>,
+    claims: AuthClaims,
     Json(req): Json<dto::LogoutRequest>,
 ) -> Result<(StatusCode, Json<dto::LogoutResponse>), ApiError> {
+    let _ = claims;
     state
         .auth
         .logout(LogoutRequest {
@@ -161,7 +173,10 @@ mod tests {
 
     /// Mock `AuthService` whose login / refresh / logout methods
     /// return a preconfigured value. Each method stores the success
-    /// variant and the failure variant separately.
+    /// variant and the failure variant separately. `verify` is
+    /// exercised by the `AuthClaims` extractor on refresh / logout
+    /// and returns either a successful claims value or a
+    /// preconfigured error.
     #[derive(Clone, Default)]
     struct MockAuth {
         login_with_password: Option<TokenPair>,
@@ -172,6 +187,8 @@ mod tests {
         refresh_err: Option<AuthApiError>,
         logout_ok: bool,
         logout_err: Option<AuthApiError>,
+        verify_ok: bool,
+        verify_err: Option<AuthApiError>,
     }
 
     #[async_trait]
@@ -201,7 +218,15 @@ mod tests {
                 .expect("login_with_domain_user_info result configured"))
         }
         async fn verify(&self, _req: VerifyRequest) -> Result<AuthClaims, AuthApiError> {
-            unimplemented!("verify not used by these handlers")
+            if let Some(err) = self.verify_err.clone() {
+                return Err(err);
+            }
+            assert!(self.verify_ok, "verify_ok must be set when no error is configured");
+            Ok(AuthClaims {
+                code: "u1".into(),
+                role: apis::user::Role::Admin,
+                token_version: 0,
+            })
         }
         async fn refresh(&self, _req: RefreshRequest) -> Result<RefreshResponse, AuthApiError> {
             if let Some(err) = self.refresh_err.clone() {
@@ -415,6 +440,7 @@ mod tests {
     #[tokio::test]
     async fn refresh_returns_access_token() {
         let mock = MockAuth {
+            verify_ok: true,
             refresh: Some(RefreshResponse {
                 access_token: "NEW".into(),
             }),
@@ -426,6 +452,7 @@ mod tests {
                 Request::builder()
                     .method("POST")
                     .uri("/api/auth/refresh")
+                    .header("authorization", "Bearer good-access")
                     .header("content-type", "application/json")
                     .body(Body::from(r#"{"refresh_token":"r"}"#))
                     .unwrap(),
@@ -438,11 +465,38 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn refresh_maps_verification_to_401() {
+    async fn refresh_maps_verify_failure_to_401() {
+        // The access token is rejected by `verify` — refresh
+        // returns 401 with `token_verification_failed` before the
+        // handler body ever runs.
         let mock = MockAuth {
-            refresh_err: Some(AuthApiError::Verification("expired".into())),
+            verify_err: Some(AuthApiError::Verification("expired".into())),
             ..Default::default()
         };
+        let app = router(test_state(mock));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/auth/refresh")
+                    .header("authorization", "Bearer expired-access")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"refresh_token":"r"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::UNAUTHORIZED);
+        assert_eq!(body["code"], "token_verification_failed");
+    }
+
+    #[tokio::test]
+    async fn refresh_without_authorization_returns_401() {
+        // No Authorization header — the AuthClaims extractor
+        // returns 401 `token_verification_failed` before the
+        // handler body runs.
+        let mock = MockAuth::default();
         let app = router(test_state(mock));
         let response = app
             .oneshot(
@@ -460,11 +514,40 @@ mod tests {
         assert_eq!(body["code"], "token_verification_failed");
     }
 
+    #[tokio::test]
+    async fn refresh_maps_refresh_token_failure_to_401() {
+        // The access token verifies fine, but the refresh token
+        // itself is rejected by the auth usecase — same 401 + same
+        // code, but reached via the handler body.
+        let mock = MockAuth {
+            verify_ok: true,
+            refresh_err: Some(AuthApiError::Verification("refresh expired".into())),
+            ..Default::default()
+        };
+        let app = router(test_state(mock));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/auth/refresh")
+                    .header("authorization", "Bearer good-access")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"refresh_token":"expired-refresh"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::UNAUTHORIZED);
+        assert_eq!(body["code"], "token_verification_failed");
+    }
+
     // ---- logout ---------------------------------------------------
 
     #[tokio::test]
     async fn logout_returns_empty_object() {
         let mock = MockAuth {
+            verify_ok: true,
             logout_ok: true,
             ..Default::default()
         };
@@ -474,6 +557,7 @@ mod tests {
                 Request::builder()
                     .method("POST")
                     .uri("/api/auth/logout")
+                    .header("authorization", "Bearer good-access")
                     .header("content-type", "application/json")
                     .body(Body::from(r#"{"refresh_token":"r"}"#))
                     .unwrap(),
@@ -488,9 +572,33 @@ mod tests {
     #[tokio::test]
     async fn logout_maps_repository_to_500() {
         let mock = MockAuth {
+            verify_ok: true,
             logout_err: Some(AuthApiError::Repository("oops".into())),
             ..Default::default()
         };
+        let app = router(test_state(mock));
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/auth/logout")
+                    .header("authorization", "Bearer good-access")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"refresh_token":"r"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::INTERNAL_SERVER_ERROR);
+        assert_eq!(body["code"], "repository_error");
+    }
+
+    #[tokio::test]
+    async fn logout_without_authorization_returns_401() {
+        // No Authorization header — AuthClaims rejects the request
+        // before the handler body runs.
+        let mock = MockAuth::default();
         let app = router(test_state(mock));
         let response = app
             .oneshot(
@@ -504,7 +612,7 @@ mod tests {
             .await
             .unwrap();
         let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::INTERNAL_SERVER_ERROR);
-        assert_eq!(body["code"], "repository_error");
+        assert_eq!(status, AxStatus::UNAUTHORIZED);
+        assert_eq!(body["code"], "token_verification_failed");
     }
 }

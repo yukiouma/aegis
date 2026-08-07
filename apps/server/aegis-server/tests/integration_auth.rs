@@ -246,12 +246,14 @@ async fn happy_path_login_refresh_logout() {
     assert!(!refresh.is_empty());
 
     // 2. refresh -> new access token (refresh token itself is unchanged
-    // in the current contract; we still re-use it).
+    // in the current contract; we still re-use it). Requires the
+    // access token from step 1 in `Authorization: Bearer`.
     let (status, body) = send(
         app.clone(),
         Request::builder()
             .method("POST")
             .uri("/api/auth/refresh")
+            .header("authorization", format!("Bearer {access}"))
             .header("content-type", "application/json")
             .body(Body::from(format!(
                 r#"{{"refresh_token":"{refresh}"}}"#
@@ -266,12 +268,15 @@ async fn happy_path_login_refresh_logout() {
     assert!(!new_access.is_empty());
     assert_ne!(new_access, access, "refresh should mint a new access token");
 
-    // 3. logout -> 200 OK with empty JSON body
+    // 3. logout -> 200 OK with empty JSON body. Requires the access
+    // token from step 1 in `Authorization: Bearer` (the refresh
+    // token alone is no longer enough).
     let (status, body) = send(
         app.clone(),
         Request::builder()
             .method("POST")
             .uri("/api/auth/logout")
+            .header("authorization", format!("Bearer {access}"))
             .header("content-type", "application/json")
             .body(Body::from(format!(
                 r#"{{"refresh_token":"{refresh}"}}"#
@@ -284,13 +289,17 @@ async fn happy_path_login_refresh_logout() {
 
     // 4. After logout, the refresh token is technically decodable
     // (signature + expiry are still valid) but its `ver` no longer
-    // matches the bumped `token_version`. `refresh` therefore
-    // returns 401 with `token_verification_failed`.
+    // matches the bumped `token_version`. The access token from
+    // step 1 has the pre-bump version too, so the AuthClaims
+    // extractor rejects it at the verify step — refresh returns
+    // 401 with `token_verification_failed` before the refresh
+    // usecase is even considered.
     let (status, body) = send(
         app,
         Request::builder()
             .method("POST")
             .uri("/api/auth/refresh")
+            .header("authorization", format!("Bearer {access}"))
             .header("content-type", "application/json")
             .body(Body::from(format!(
                 r#"{{"refresh_token":"{refresh}"}}"#
@@ -329,6 +338,37 @@ async fn login_with_wrong_password_returns_401() {
     .await;
     assert_eq!(status, AxStatus::UNAUTHORIZED, "wrong-password body: {body}");
     assert_eq!(body["code"], "invalid_credentials");
+
+    cleanup_user(&pool, &code).await;
+}
+
+#[tokio::test]
+#[ignore = "requires a live Postgres; run with `cargo test -- --ignored`"]
+async fn refresh_without_authorization_returns_401() {
+    // Confirms the AuthClaims extractor runs against the real
+    // AuthServiceImpl (not a mock): no Authorization header means
+    // the extractor short-circuits with 401 before the refresh
+    // usecase is considered.
+    init_tracing_once();
+    let pool = pool_or_skip().await;
+    run_migrations(&pool).await;
+
+    let code = format!("itest-{}", uuid_like_suffix());
+    seed_user(&pool, &code, "admin").await;
+    let app = build_app(pool.clone());
+
+    let (status, body) = send(
+        app,
+        Request::builder()
+            .method("POST")
+            .uri("/api/auth/refresh")
+            .header("content-type", "application/json")
+            .body(Body::from(r#"{"refresh_token":"any"}"#))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, AxStatus::UNAUTHORIZED, "missing-auth body: {body}");
+    assert_eq!(body["code"], "token_verification_failed");
 
     cleanup_user(&pool, &code).await;
 }

@@ -13,8 +13,15 @@
 //! `nest("/api/auth", ...)` prefix applied. Listing the handlers here
 //! as well would double-register them under the un-prefixed relative
 //! path (`/login`, `/login-domain`, `/refresh`, `/logout`).
+//!
+//! The `BearerAuth` security scheme is registered via a [`Modify`]
+//! impl (the same pattern the utoipa-axum README uses). Routes that
+//! reference it via `security(("BearerAuth" = []))` are then marked
+//! as requiring an `Authorization: Bearer <token>` header in the
+//! generated document; swagger-ui renders the lock icon on them.
 
-use utoipa::OpenApi;
+use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::{Modify, OpenApi};
 
 use crate::transport::http::dto;
 use crate::transport::http::error::ErrorBody;
@@ -25,7 +32,10 @@ use crate::transport::http::error::ErrorBody;
 /// `transport::http::router` already registers every handler via
 /// `routes!`, and the `nest("/api/auth", ...)` prefix is applied
 /// there. The schema registry below still has to be explicit
-/// because `utoipa-axum` only collects paths, not schemas.
+/// because `utoipa-axum` only collects paths, not schemas. The
+/// `SecurityAddon` modifier registers the `BearerAuth` security
+/// scheme that `refresh` and `logout` reference via
+/// `security(("BearerAuth" = []))`.
 #[derive(OpenApi)]
 #[openapi(
     info(
@@ -33,6 +43,7 @@ use crate::transport::http::error::ErrorBody;
         version = "0.1.0",
         description = "HTTP transport for the aegis auth + user services."
     ),
+    modifiers(&SecurityAddon),
     components(schemas(
         dto::LoginRequest,
         dto::LoginDomainRequest,
@@ -51,6 +62,29 @@ use crate::transport::http::error::ErrorBody;
     ),
 )]
 pub struct ApiDoc;
+
+/// `Modify` impl that registers the `BearerAuth` HTTP security
+/// scheme in the OpenAPI document's `components.securitySchemes`.
+/// Refresh and logout reference it via
+/// `security(("BearerAuth" = []))` from their `#[utoipa::path]`
+/// annotations.
+struct SecurityAddon;
+
+impl Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        if let Some(components) = openapi.components.as_mut() {
+            components.add_security_scheme(
+                "BearerAuth",
+                SecurityScheme::Http(
+                    HttpBuilder::new()
+                        .scheme(HttpAuthScheme::Bearer)
+                        .bearer_format("JWT")
+                        .build(),
+                ),
+            );
+        }
+    }
+}
 
 /// Build the OpenAPI document used by both the swagger-ui and the
 /// `/api-docs/openapi.json` endpoint.

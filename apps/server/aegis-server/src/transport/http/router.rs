@@ -254,5 +254,23 @@ mod tests {
         assert!(doc["paths"]["/api/auth/refresh"].is_object());
         assert!(doc["paths"]["/api/auth/logout"].is_object());
         assert!(doc["paths"]["/healthz"].is_object());
+
+        // The Bearer security scheme must be registered so
+        // refresh / logout advertise the BearerAuth requirement.
+        let schemes = &doc["components"]["securitySchemes"];
+        assert!(schemes["BearerAuth"].is_object(), "BearerAuth scheme missing");
+        assert_eq!(schemes["BearerAuth"]["type"], "http");
+        assert_eq!(schemes["BearerAuth"]["scheme"], "bearer");
+        assert_eq!(schemes["BearerAuth"]["bearerFormat"], "JWT");
+
+        // refresh + logout must reference the security scheme;
+        // login + login-domain + healthz must not.
+        let refresh = &doc["paths"]["/api/auth/refresh"]["post"];
+        assert_eq!(refresh["security"][0]["BearerAuth"], serde_json::json!([]));
+        let logout = &doc["paths"]["/api/auth/logout"]["post"];
+        assert_eq!(logout["security"][0]["BearerAuth"], serde_json::json!([]));
+        assert!(doc["paths"]["/api/auth/login"]["post"]["security"].is_null());
+        assert!(doc["paths"]["/api/auth/login-domain"]["post"]["security"].is_null());
+        assert!(doc["paths"]["/healthz"]["get"]["security"].is_null());
     }
 }
