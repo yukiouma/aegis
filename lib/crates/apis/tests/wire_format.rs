@@ -141,3 +141,151 @@ fn update_user_request_treats_missing_optionals_as_none() {
     assert!(req.role.is_none());
     assert!(req.active.is_none());
 }
+// -- apis::auth ---------------------------------------------------------
+
+use apis::auth::{
+    AuthClaims, CreateUserCredentialRequest, LoginWithDomainUserInfoRequest,
+    LoginWithPasswordRequest, LogoutRequest, LogoutResponse, RefreshRequest, RefreshResponse,
+    RemoveUserCredentialResponse, TokenPair, UpdateUserCredentialRequest, UserCredentialView,
+    VerifyRequest,
+};
+
+#[test]
+fn token_pair_serializes_to_camel_case() {
+    assert_eq!(
+        serde_json::to_value(TokenPair {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+        })
+        .unwrap(),
+        json!({ "accessToken": "a", "refreshToken": "r" })
+    );
+}
+
+#[test]
+fn auth_claims_serializes_to_camel_case() {
+    assert_eq!(
+        serde_json::to_value(AuthClaims {
+            code: "u1".into(),
+            role: Role::Admin,
+            token_version: 3,
+        })
+        .unwrap(),
+        json!({ "code": "u1", "role": "admin", "tokenVersion": 3 })
+    );
+}
+
+#[test]
+fn user_credential_view_serializes_to_camel_case() {
+    assert_eq!(
+        serde_json::to_value(UserCredentialView {
+            user_code: "u1".into(),
+            password_hash: "h".into(),
+            token_version: 0,
+        })
+        .unwrap(),
+        json!({ "userCode": "u1", "passwordHash": "h", "tokenVersion": 0 })
+    );
+}
+
+#[test]
+fn login_with_domain_user_info_serializes_to_camel_case() {
+    assert_eq!(
+        serde_json::to_value(LoginWithDomainUserInfoRequest {
+            code: "u1".into(),
+            domain_name: "d".into(),
+            hostname: "h".into(),
+            sid: "s".into(),
+        })
+        .unwrap(),
+        json!({ "code": "u1", "domainName": "d", "hostname": "h", "sid": "s" })
+    );
+}
+
+#[test]
+fn auth_dtos_omit_snake_case_keys() {
+    let payloads = [
+        serde_json::to_string(&TokenPair {
+            access_token: "a".into(),
+            refresh_token: "r".into(),
+        })
+        .unwrap(),
+        serde_json::to_string(&AuthClaims {
+            code: "u1".into(),
+            role: Role::Admin,
+            token_version: 3,
+        })
+        .unwrap(),
+        serde_json::to_string(&UserCredentialView {
+            user_code: "u1".into(),
+            password_hash: "h".into(),
+            token_version: 0,
+        })
+        .unwrap(),
+        serde_json::to_string(&LoginWithDomainUserInfoRequest {
+            code: "u1".into(),
+            domain_name: "d".into(),
+            hostname: "h".into(),
+            sid: "s".into(),
+        })
+        .unwrap(),
+    ];
+    for s in payloads {
+        for leaked in [
+            "access_token",
+            "refresh_token",
+            "token_version",
+            "user_code",
+            "password_hash",
+            "domain_name",
+        ] {
+            assert!(!s.contains(leaked), "snake_case key `{leaked}` leaked: {s}");
+        }
+    }
+}
+
+#[test]
+fn auth_request_dtos_round_trip() {
+    assert_round_trip::<LoginWithPasswordRequest>(json!({ "code": "u1", "password": "p" }));
+    assert_round_trip::<LoginWithDomainUserInfoRequest>(json!({
+        "code": "u1", "domainName": "d", "hostname": "h", "sid": "s"
+    }));
+    assert_round_trip::<LogoutRequest>(json!({ "refreshToken": "r" }));
+    assert_round_trip::<VerifyRequest>(json!({ "accessToken": "a" }));
+    assert_round_trip::<RefreshRequest>(json!({ "refreshToken": "r" }));
+    assert_round_trip::<CreateUserCredentialRequest>(json!({
+        "userCode": "u1", "passwordHash": "h"
+    }));
+    assert_round_trip::<UpdateUserCredentialRequest>(json!({
+        "userCode": "u1", "passwordHash": "h"
+    }));
+}
+
+#[test]
+fn auth_response_dtos_round_trip() {
+    assert_round_trip::<TokenPair>(json!({ "accessToken": "a", "refreshToken": "r" }));
+    assert_round_trip::<AuthClaims>(json!({
+        "code": "u1", "role": "general", "tokenVersion": 0
+    }));
+    assert_round_trip::<RefreshResponse>(json!({ "accessToken": "a" }));
+    assert_round_trip::<UserCredentialView>(json!({
+        "userCode": "u1", "passwordHash": "h", "tokenVersion": 0
+    }));
+}
+
+#[test]
+fn empty_response_dtos_serialize_to_empty_objects() {
+    assert_eq!(serde_json::to_value(LogoutResponse {}).unwrap(), json!({}));
+    assert_eq!(
+        serde_json::to_value(RemoveUserCredentialResponse {}).unwrap(),
+        json!({})
+    );
+}
+
+#[test]
+fn update_user_credential_request_treats_missing_hash_as_none() {
+    let req: UpdateUserCredentialRequest =
+        serde_json::from_value(json!({ "userCode": "u1" })).unwrap();
+    assert_eq!(req.user_code, "u1");
+    assert!(req.password_hash.is_none());
+}
