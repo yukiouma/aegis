@@ -8,11 +8,10 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use apis::auth::AuthService;
-use apis::user::UserService;
 use auth::{
     AccessTokenView, AuthClaimsView, AuthServiceImpl, AuthUsecase, AuthUsecaseConfig,
     DomainIdentityRepo, DomainIdentityRepository, InMemoryTokenVersionCache, LogoutAck, Role,
-    TokenPairView, TokenVersionCache, UserCredentialsRepo, UserCredentialsRepository,
+    TokenPairView, TokenVersionCache, UserCredentialsRepo, UserCredentialsRepository, UserService,
 };
 
 #[test]

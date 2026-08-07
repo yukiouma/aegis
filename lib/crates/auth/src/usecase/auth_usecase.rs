@@ -1,12 +1,11 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use apis::user::{UserApiError, UserService};
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{
     DomainError, DomainIdentityRepository, TokenVersionCache, UserCredentials,
-    UserCredentialsRepository,
+    UserCredentialsRepository, UserService,
 };
 
 use super::commands::{
@@ -115,12 +114,11 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             return Err(UsecaseError::Repository(DomainError::EmptyPasswordHash));
         }
         let creds = self.credentials.find_by_code(&cmd.code).await?;
-        let user = self
+        let summary = self
             .user_service
             .get_by_code(&cmd.code)
-            .await
-            .map_err(map_user_service_error)?;
-        if !user.active {
+            .await?;
+        if !summary.active {
             return Err(UsecaseError::Repository(DomainError::Inactive));
         }
         let parsed_hash = argon2::PasswordHash::new(&creds.password_hash).map_err(|e| {
@@ -137,7 +135,7 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         // Warm the cache so the freshly-minted tokens verify without a miss.
         self.cache.put(&cmd.code, creds.token_version).await;
 
-        let role = role_from_api(user.role);
+        let role = summary.role;
         let access = self.mint_access_token(&cmd.code, role, creds.token_version)?;
         let refresh = self.mint_refresh_token(&cmd.code, creds.token_version)?;
 
@@ -163,18 +161,17 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         self.identities
             .find(&cmd.code, &cmd.domain_name, &cmd.hostname, &cmd.sid)
             .await?;
-        let user = self
+        let summary = self
             .user_service
             .get_by_code(&cmd.code)
-            .await
-            .map_err(map_user_service_error)?;
-        if !user.active {
+            .await?;
+        if !summary.active {
             return Err(UsecaseError::Repository(DomainError::Inactive));
         }
         let creds = self.credentials.find_by_code(&cmd.code).await?;
         // Warm the cache so the freshly-minted tokens verify without a miss.
         self.cache.put(&cmd.code, creds.token_version).await;
-        let role = role_from_api(user.role);
+        let role = summary.role;
         let access = self.mint_access_token(&cmd.code, role, creds.token_version)?;
         let refresh = self.mint_refresh_token(&cmd.code, creds.token_version)?;
         Ok(TokenPairView {
@@ -201,12 +198,11 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             )));
         }
 
-        let user = self
+        let summary = self
             .user_service
             .get_by_code(&claims.sub)
-            .await
-            .map_err(map_user_service_error)?;
-        if !user.active {
+            .await?;
+        if !summary.active {
             return Err(UsecaseError::Repository(DomainError::Inactive));
         }
 
@@ -236,16 +232,15 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             )));
         }
 
-        let user = self
+        let summary = self
             .user_service
             .get_by_code(&claims.sub)
-            .await
-            .map_err(map_user_service_error)?;
-        if !user.active {
+            .await?;
+        if !summary.active {
             return Err(UsecaseError::Repository(DomainError::Inactive));
         }
 
-        let role = role_from_api(user.role);
+        let role = summary.role;
         let access = self.mint_access_token(&claims.sub, role, current)?;
         Ok(AccessTokenView {
             access_token: access,
@@ -374,21 +369,6 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         let enc = EncodingKey::from_secret(&self.signing_key);
         encode(&Header::new(jsonwebtoken::Algorithm::HS256), &claims, &enc)
             .map_err(|e| UsecaseError::Verification(format!("encode refresh: {e}")))
-    }
-}
-
-fn map_user_service_error(err: UserApiError) -> UsecaseError {
-    match err {
-        UserApiError::NotFound => UsecaseError::Repository(DomainError::NotFound),
-        other => UsecaseError::Repository(DomainError::Repository(other.to_string())),
-    }
-}
-
-fn role_from_api(r: apis::user::Role) -> Role {
-    match r {
-        apis::user::Role::Root => Role::Root,
-        apis::user::Role::Admin => Role::Admin,
-        apis::user::Role::General => Role::General,
     }
 }
 

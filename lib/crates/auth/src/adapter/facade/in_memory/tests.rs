@@ -12,6 +12,7 @@ use apis::auth::{
 };
 use apis::user::Role as ApiRole;
 
+use crate::domain::Role;
 use crate::usecase::tests::{
     FakeUserService, MockDomainIdentityRepo, MockUserCredentialsRepo, hash_password,
 };
@@ -49,7 +50,7 @@ async fn login_with_password_returns_token_pair_for_valid_credentials() {
     creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let svc = make_service(creds, ids, users);
 
     let pair = svc
@@ -69,7 +70,7 @@ async fn login_with_password_returns_invalid_credentials_for_wrong_password() {
     creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let svc = make_service(creds, ids, users);
 
     let err = svc
@@ -88,7 +89,7 @@ async fn login_with_password_returns_inactive_when_user_is_disabled() {
     creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, false);
+    users.seed("u1", Role::Admin, false);
     let svc = make_service(creds, ids, users);
 
     let err = svc
@@ -107,7 +108,7 @@ async fn login_with_domain_user_info_returns_not_found_for_unmatched_triple() {
     creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let svc = make_service(creds, ids, users);
 
     let err = svc
@@ -128,7 +129,7 @@ async fn verify_returns_claims_for_freshly_minted_access_token() {
     creds.seed_hash("u1", &hash_password("hunter2"), 9);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Root, true);
+    users.seed("u1", Role::Root, true);
     let svc = make_service(creds, ids, users);
 
     let pair = svc
@@ -155,7 +156,7 @@ async fn refresh_returns_new_access_token() {
     creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let svc = make_service(creds, ids, users);
 
     let pair = svc
@@ -180,7 +181,7 @@ async fn logout_returns_empty_response() {
     creds.seed_hash("u1", &hash_password("hunter2"), 1);
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    users.seed("u1", ApiRole::Admin, true);
+    users.seed("u1", Role::Admin, true);
     let svc = make_service(creds, ids, users);
 
     let pair = svc
