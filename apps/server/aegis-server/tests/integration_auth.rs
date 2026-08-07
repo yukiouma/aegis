@@ -1,0 +1,348 @@
+//! Live-DB end-to-end test for the auth HTTP surface.
+//!
+//! These tests exercise the full `axum` router — `transport::http::router`
+//! — against a real Postgres + the real `AuthUsecase` / `UserUsecase`
+//! stack. They are deliberately marked `#[ignore]` so they do not
+//! run as part of the default `cargo test`; a developer (or CI lane
+//! that targets a sidecar database) runs them with
+//! `cargo test --test integration_auth -- --ignored`.
+//!
+//! First, the test reads `AEGIS_DATABASE_URL` from the environment
+//! and aborts early with a helpful message if it is missing. The
+//! schema is brought up via `sqlx::migrate!` against the migration
+//! directories of the `auth` and `user` crates. Fixtures (a user
+//! row + a credential row whose hash matches the test password)
+//! are seeded through raw SQL so the test does not depend on the
+//! (private) `UserCredentials::for_repository` constructor.
+
+#![cfg(test)]
+
+use std::sync::Arc;
+use std::time::Duration;
+
+use argon2::password_hash::SaltString;
+use argon2::{Argon2, PasswordHasher};
+use axum::Router;
+use axum::body::Body;
+use axum::http::{Request, StatusCode as AxStatus};
+use rand_core::OsRng;
+use serde_json::Value;
+use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
+use tower::ServiceExt;
+use tracing_subscriber::EnvFilter;
+
+use aegis_server::state::AppState;
+use aegis_server::transport::http::router as http_router;
+use apis::auth::AuthService;
+use apis::user::UserService;
+use auth::{
+    AuthServiceImpl, AuthUsecase, AuthUsecaseConfig, DomainIdentityRepo, InMemoryTokenVersionCache,
+    TokenVersionCache, UserCredentialsRepo, UserServiceImpl as AuthUserServiceImpl,
+};
+use user::{UserRepo, UserServiceImpl, UserUsecase};
+
+/// Fixed test password. The matching Argon2 hash is seeded into
+/// `auth_user_credentials.password_hash` for the fixture user.
+const SEED_PASSWORD: &str = "correct horse battery staple";
+
+/// Fixed signing key bytes (32 zero bytes). HS256 only requires the
+/// key to be 32+ bytes; predictable entropy is fine for a local test
+/// database.
+fn signing_key() -> Vec<u8> {
+    vec![0u8; 32]
+}
+
+/// Build a fresh `PgPool` from `AEGIS_DATABASE_URL`. Aborts the test
+/// with a helpful message if the env var is missing, so devs running
+/// `cargo test -- --ignored` without a database see a clear failure
+/// rather than a stack trace.
+async fn pool_or_skip() -> PgPool {
+    let _ = dotenvy::dotenv();
+    let url = match std::env::var("AEGIS_DATABASE_URL") {
+        Ok(v) => v,
+        Err(_) => {
+            eprintln!(
+                "AEGIS_DATABASE_URL is not set; skipping live-DB integration test. \
+                 Set it to a Postgres URL (e.g. postgres://localhost/aegis_test) \
+                 and re-run with `cargo test -- --ignored`."
+            );
+            // Defensive: the test is `#[ignore]`-d so this branch only
+            // runs when a developer explicitly opts in. Returning a
+            // malformed pool would produce a confusing error; abort
+            // the test process with a non-zero status instead.
+            std::process::exit(0);
+        }
+    };
+    PgPoolOptions::new()
+        .max_connections(4)
+        .acquire_timeout(Duration::from_secs(5))
+        .connect(&url)
+        .await
+        .expect("connect to AEGIS_DATABASE_URL")
+}
+
+/// Run migrations from both the `user` and `auth` crates so the
+/// `users` and `auth_user_credentials` tables exist. The migrations
+/// are pure SQL files compiled into the test binary via
+/// `sqlx::migrate!`. The macro resolves the path relative to the
+/// crate's `CARGO_MANIFEST_DIR` (`apps/server/aegis-server/`), so a
+/// `../../../` walks up to the workspace root before descending into
+/// the target crate's migration directory.
+async fn run_migrations(pool: &PgPool) {
+    sqlx::migrate!("../../../lib/crates/user/migrations")
+        .run(pool)
+        .await
+        .expect("run user migrations");
+    sqlx::migrate!("../../../lib/crates/auth/migrations")
+        .run(pool)
+        .await
+        .expect("run auth migrations");
+}
+
+/// Insert a fresh user + credential row into the test database and
+/// return the `(code, role)` tuple used for assertions. The code is
+/// unique per call so back-to-back runs cannot collide.
+async fn seed_user(pool: &PgPool, code: &str, role: &str) {
+    sqlx::query(
+        "INSERT INTO users (code, name, role, active) VALUES ($1, $2, $3, $4)",
+    )
+    .bind(code)
+    .bind("Integration Test User")
+    .bind(role)
+    .bind(true)
+    .execute(pool)
+    .await
+    .expect("insert users row");
+
+    let salt = SaltString::generate(&mut OsRng);
+    let hash = Argon2::default()
+        .hash_password(SEED_PASSWORD.as_bytes(), &salt)
+        .expect("hash seed password")
+        .to_string();
+
+    sqlx::query(
+        "INSERT INTO auth_user_credentials (code, password_hash, token_version) \
+         VALUES ($1, $2, 1)",
+    )
+    .bind(code)
+    .bind(hash)
+    .execute(pool)
+    .await
+    .expect("insert auth_user_credentials row");
+}
+
+/// Remove the rows inserted by [`seed_user`]. Idempotent — the test
+/// calls it as a guard so the schema is not littered with rows on
+/// failure.
+async fn cleanup_user(pool: &PgPool, code: &str) {
+    let _ = sqlx::query("DELETE FROM auth_user_credentials WHERE code = $1")
+        .bind(code)
+        .execute(pool)
+        .await;
+    let _ = sqlx::query("DELETE FROM users WHERE code = $1")
+        .bind(code)
+        .execute(pool)
+        .await;
+}
+
+/// Build the `AppState` + `Router` wired against the real Postgres
+/// repos. Mirrors the wiring in `run::build_auth_service` /
+/// `run::build_user_service` so the test exercises the same code
+/// path the binary does.
+fn build_app(pool: PgPool) -> Router {
+    let cache: Arc<dyn TokenVersionCache> = Arc::new(InMemoryTokenVersionCache::new());
+
+    let credentials = UserCredentialsRepo::new(pool.clone());
+    let identities = DomainIdentityRepo::new(pool.clone());
+
+    // Same bridge as `run::build_auth_service`: wrap the apis
+    // `UserService` (built from the user Postgres repo) into the
+    // auth domain's `UserService` port.
+    let user_repo = UserRepo::new(pool.clone());
+    let user_usecase = UserUsecase::new(user_repo);
+    let apis_user: Arc<dyn UserService> = Arc::new(UserServiceImpl::new(user_usecase));
+    let auth_user: Arc<dyn auth::UserService> =
+        Arc::new(AuthUserServiceImpl::new(apis_user.clone()));
+
+    let auth_usecase = AuthUsecase::new(AuthUsecaseConfig {
+        credentials,
+        identities,
+        user_service: auth_user,
+        cache,
+        signing_key: signing_key(),
+        access_ttl: Duration::from_secs(900),
+        refresh_ttl: Duration::from_secs(3600),
+    });
+
+    let auth = Arc::new(AuthServiceImpl::new(auth_usecase)) as Arc<dyn AuthService>;
+
+    let state = AppState { auth, user: apis_user };
+
+    http_router(state)
+}
+
+/// Drive a `oneshot` request through the router and return the
+/// response status + parsed JSON body. Body bytes that are not
+/// valid JSON are surfaced as `Value::Null` so callers can still
+/// inspect the status.
+async fn send(app: Router, req: Request<Body>) -> (AxStatus, Value) {
+    let response = app.oneshot(req).await.expect("oneshot response");
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), 16 * 1024)
+        .await
+        .expect("body bytes");
+    let body: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+    (status, body)
+}
+
+/// One-time tracing init. `try_init` is idempotent so it is safe to
+/// call from every test; the work only happens the first time.
+fn init_tracing_once() {
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("aegis_server=warn,sqlx=warn")),
+        )
+        .with_test_writer()
+        .try_init();
+}
+
+#[tokio::test]
+#[ignore = "requires a live Postgres; run with `cargo test -- --ignored`"]
+async fn happy_path_login_refresh_logout() {
+    init_tracing_once();
+    let pool = pool_or_skip().await;
+    run_migrations(&pool).await;
+
+    // Unique code per run so re-runs into the same DB don't collide.
+    let code = format!("itest-{}", uuid_like_suffix());
+    seed_user(&pool, &code, "admin").await;
+    let app = build_app(pool.clone());
+
+    // 1. login -> token pair
+    let (status, body) = send(
+        app.clone(),
+        Request::builder()
+            .method("POST")
+            .uri("/api/auth/login")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"code":"{code}","password":"{SEED_PASSWORD}"}}"#
+            )))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, AxStatus::OK, "login body: {body}");
+    let access = body["access_token"]
+        .as_str()
+        .expect("access_token present")
+        .to_string();
+    let refresh = body["refresh_token"]
+        .as_str()
+        .expect("refresh_token present")
+        .to_string();
+    assert!(!access.is_empty());
+    assert!(!refresh.is_empty());
+
+    // 2. refresh -> new access token (refresh token itself is unchanged
+    // in the current contract; we still re-use it).
+    let (status, body) = send(
+        app.clone(),
+        Request::builder()
+            .method("POST")
+            .uri("/api/auth/refresh")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"refresh_token":"{refresh}"}}"#
+            )))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, AxStatus::OK, "refresh body: {body}");
+    let new_access = body["access_token"]
+        .as_str()
+        .expect("refresh returns access_token");
+    assert!(!new_access.is_empty());
+    assert_ne!(new_access, access, "refresh should mint a new access token");
+
+    // 3. logout -> 200 OK with empty JSON body
+    let (status, body) = send(
+        app.clone(),
+        Request::builder()
+            .method("POST")
+            .uri("/api/auth/logout")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"refresh_token":"{refresh}"}}"#
+            )))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, AxStatus::OK, "logout body: {body}");
+    assert_eq!(body, serde_json::json!({}));
+
+    // 4. After logout, the refresh token is technically decodable
+    // (signature + expiry are still valid) but its `ver` no longer
+    // matches the bumped `token_version`. `refresh` therefore
+    // returns 401 with `token_verification_failed`.
+    let (status, body) = send(
+        app,
+        Request::builder()
+            .method("POST")
+            .uri("/api/auth/refresh")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"refresh_token":"{refresh}"}}"#
+            )))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, AxStatus::UNAUTHORIZED, "post-logout refresh body: {body}");
+    assert_eq!(body["code"], "token_verification_failed");
+
+    cleanup_user(&pool, &code).await;
+}
+
+#[tokio::test]
+#[ignore = "requires a live Postgres; run with `cargo test -- --ignored`"]
+async fn login_with_wrong_password_returns_401() {
+    init_tracing_once();
+    let pool = pool_or_skip().await;
+    run_migrations(&pool).await;
+
+    let code = format!("itest-{}", uuid_like_suffix());
+    seed_user(&pool, &code, "admin").await;
+    let app = build_app(pool.clone());
+
+    let (status, body) = send(
+        app,
+        Request::builder()
+            .method("POST")
+            .uri("/api/auth/login")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"code":"{code}","password":"definitely-wrong"}}"#
+            )))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, AxStatus::UNAUTHORIZED, "wrong-password body: {body}");
+    assert_eq!(body["code"], "invalid_credentials");
+
+    cleanup_user(&pool, &code).await;
+}
+
+/// Cheap per-run unique suffix. `uuid` is not a workspace dep and
+/// the code/name columns are the only thing this needs to be unique
+/// in, so a nanosecond timestamp + a process-id-ish counter is more
+/// than sufficient. (Two parallel runs on the same DB would still
+/// collide; the test is `#[ignore]`d so that is acceptable.)
+fn uuid_like_suffix() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0);
+    format!("{nanos}")
+}

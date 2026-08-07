@@ -63,3 +63,16 @@ user = { path = "../../../lib/crates/user" }
 # credential row whose hash matches the password the test logs in
 # with. Inherits the workspace version.
 argon2 = { workspace = true }
+# `rand_core` powers argon2's `SaltString::generate` (`OsRng`).
+# The runtime / derive-features come from the workspace dep.
+rand_core = { workspace = true }
+# `dotenvy` lets the integration test load `.env` so `AEGIS_DATABASE_URL`
+# can be set in a file during development.
+dotenvy = { workspace = true }
+# `sqlx::migrate!` + `PgPoolOptions` are used by the integration test
+# to bring up the schema and connect to the live database. The runtime
+# + postgres features come from the workspace dep.
+sqlx = { workspace = true }
+# `tracing-subscriber` is used by the integration test to silence
+# sqlx warnings during the live-DB run.
+tracing-subscriber = { workspace = true }
