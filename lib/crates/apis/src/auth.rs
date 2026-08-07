@@ -4,20 +4,32 @@
 //! (`TokenPair`, `AuthClaims`, the request / view / response DTOs,
 //! and `AuthApiError`) are defined alongside the trait so a single
 //! `use apis::auth::*;` brings the whole contract into scope.
+//!
+//! # Security
+//!
+//! Every DTO here derives `Serialize` / `Deserialize`, but not every
+//! DTO is safe to route. [`UserCredentialView`],
+//! [`CreateUserCredentialRequest`], and [`UpdateUserCredentialRequest`]
+//! carry a `password_hash` and are admin-plane only; serializing one
+//! to a client leaks a credential secret.
 
 use thiserror::Error;
 
 use crate::user::Role;
 
 /// Access + refresh token pair returned by the login methods.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct TokenPair {
     pub access_token: String,
     pub refresh_token: String,
 }
 
 /// Authenticated identity recovered from a verified access token.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct AuthClaims {
     pub code: String,
     pub role: Role,
@@ -25,14 +37,18 @@ pub struct AuthClaims {
 }
 
 /// Input DTO for [`AuthService::login_with_password`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct LoginWithPasswordRequest {
     pub code: String,
     pub password: String,
 }
 
 /// Input DTO for [`AuthService::login_with_domain_user_info`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct LoginWithDomainUserInfoRequest {
     pub code: String,
     pub domain_name: String,
@@ -41,19 +57,25 @@ pub struct LoginWithDomainUserInfoRequest {
 }
 
 /// Input DTO for [`AuthService::logout`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct LogoutRequest {
     pub refresh_token: String,
 }
 
 /// Input DTO for [`AuthService::verify`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct VerifyRequest {
     pub access_token: String,
 }
 
 /// Input DTO for [`AuthService::refresh`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RefreshRequest {
     pub refresh_token: String,
 }
@@ -62,7 +84,15 @@ pub struct RefreshRequest {
 ///
 /// `token_version` is intentionally absent: the implementation picks
 /// the initial value (typically `0`).
-#[derive(Debug, Clone)]
+/// # Security
+///
+/// Admin-plane type. `passwordHash` is a credential secret: never
+/// return this type from a client-facing HTTP handler, and never log
+/// it. `Debug` is derived and prints the hash **unredacted** — prefer
+/// naming individual safe fields over `{:?}` on the whole value.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CreateUserCredentialRequest {
     pub user_code: String,
     pub password_hash: String,
@@ -73,7 +103,15 @@ pub struct CreateUserCredentialRequest {
 /// Only `password_hash` is mutable through this DTO. To change
 /// `token_version` callers go through a future admin-facing API
 /// (out of scope here).
-#[derive(Debug, Clone, Default)]
+/// # Security
+///
+/// Admin-plane type. `passwordHash` is a credential secret: never
+/// return this type from a client-facing HTTP handler, and never log
+/// it. `Debug` is derived and prints the hash **unredacted** — prefer
+/// naming individual safe fields over `{:?}` on the whole value.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct UpdateUserCredentialRequest {
     pub user_code: String,
     pub password_hash: Option<String>,
@@ -85,11 +123,15 @@ pub struct UpdateUserCredentialRequest {
 /// as a named type (rather than `()`) so the response shape is
 /// explicit at the API boundary and can be extended later
 /// without a breaking trait change.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct LogoutResponse {}
 
 /// Response DTO for [`AuthService::refresh`].
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RefreshResponse {
     pub access_token: String,
 }
@@ -101,7 +143,15 @@ pub struct RefreshResponse {
 /// algorithm. `token_version` is read-only through this trait
 /// surface — see [`CreateUserCredentialRequest`] and
 /// [`UpdateUserCredentialRequest`] for what callers may set.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// # Security
+///
+/// Admin-plane type. `passwordHash` is a credential secret: never
+/// return this type from a client-facing HTTP handler, and never log
+/// it. `Debug` is derived and prints the hash **unredacted** — prefer
+/// naming individual safe fields over `{:?}` on the whole value.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct UserCredentialView {
     pub user_code: String,
     pub password_hash: String,
@@ -114,7 +164,9 @@ pub struct UserCredentialView {
 /// as a named type (rather than `()`) so the response shape is
 /// explicit at the API boundary and can be extended later
 /// without a breaking trait change.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct RemoveUserCredentialResponse {}
 
 /// Error surface returned by every [`AuthService`] method.
@@ -124,6 +176,7 @@ pub struct RemoveUserCredentialResponse {}
 /// validation, lookup, credential, and token concerns into a
 /// single type so handlers can match exhaustively.
 #[derive(Debug, Error)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub enum AuthApiError {
     #[error("validation failed: {0}")]
     Validation(String),

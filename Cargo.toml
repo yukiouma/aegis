@@ -1,12 +1,17 @@
 [workspace]
 members = [
     "apps/desktop/aegis-desktop/src-tauri",
-    "apps/server/aegis-server", "lib/crates/apis", "lib/crates/auth",
-    "lib/crates/user", "lib/crates/windows-utils",
+    "apps/server/aegis-server",
+    "lib/crates/apis",
+    "lib/crates/auth",
+    "lib/crates/user",
+    "lib/crates/windows-utils",
 ]
 resolver = "3"
 
 [workspace.dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1"
 sqlx = { version = "0.9", default-features = false, features = [
     "postgres",
     "runtime-tokio",
@@ -14,11 +19,21 @@ sqlx = { version = "0.9", default-features = false, features = [
     "migrate",
     "chrono",
 ] }
-tokio = { version = "1.53", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.53", features = ["full"] }
 argon2 = "0.5.3"
 async-trait = "0.1.91"
 thiserror = "2"
-rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
+rand_core = { version = "0.6", default-features = false, features = [
+    "getrandom",
+] }
 dotenvy = "0.15"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 jsonwebtoken = { version = "11", features = ["rust_crypto"] }
+axum = { version = "0.8.9", features = ["multipart"] }
+tracing = "0.1.44"
+tracing_subscriber = { version = "0.3.23", features = ["json"] }
+tracing-appender = "0.2"
+tower_http = { version = "0.7.0", features = ["trace"] }
+utoipa = { version = "5.5.0", features = ["axum_extras", "debug"] }
+utoipa_swagger_ui = { version = "9.0.2", features = ["axum"] }
+utoipa-axum = { version = "0.2.0", features = ["debug"] }
