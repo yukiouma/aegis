@@ -32,7 +32,7 @@ use crate::transport;
 /// `config` is normally built via [`Config::from_env`] in `main.rs`.
 /// The function only returns on bind / serve failure or shutdown.
 pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    init_tracing();
+    let _log_guard = init_tracing();
 
     let pool = build_pool(&config.database_url).await?;
     let cache: Arc<dyn TokenVersionCache> = Arc::new(InMemoryTokenVersionCache::new());
@@ -79,15 +79,42 @@ async fn shutdown_signal() {
     }
 }
 
-/// Initialise tracing. Honors `RUST_LOG`; falls back to `info` for
-/// the `aegis_server` crate and `warn` for everything else.
-fn init_tracing() {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("aegis_server=info,axum=info,sqlx=warn,tower_http=info"));
+/// Build the global `EnvFilter` from `AEGIS_LOG_LEVEL`. Defaults to
+/// `info` when the variable is unset. The previous `RUST_LOG` escape
+/// hatch is intentionally dropped — `AEGIS_LOG_LEVEL` is the only
+/// knob documented in `.env`.
+fn build_env_filter() -> EnvFilter {
+    let level = std::env::var("AEGIS_LOG_LEVEL").unwrap_or_else(|_| "info".to_string());
+    EnvFilter::new(level)
+}
+
+/// Initialise tracing. Writes JSON-formatted events to a daily
+/// rotating file under `$AEGIS_LOG_DIR` (defaults to `./logs` if
+/// unset, which only happens in tests). Returns the
+/// `WorkerGuard` for the non-blocking writer — it MUST be held for
+/// the lifetime of the program or the buffered writes are lost on
+/// shutdown. The returned guard is `let _guard = …;` in [`run`].
+///
+/// `try_init` swallows the "already initialized" error, so calling
+/// `init_tracing` more than once is a no-op (not a panic).
+fn init_tracing() -> tracing_appender::non_blocking::WorkerGuard {
+    let dir = std::env::var("AEGIS_LOG_DIR").unwrap_or_else(|_| "./logs".to_string());
+    let filter = build_env_filter();
+
+    // Daily rotation produces files named
+    // `{prefix}.YYYY-MM-DD` (e.g. `aegis-server.log.2026-08-09`).
+    let file_appender = tracing_appender::rolling::daily(&dir, "aegis-server.log");
+    let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+
     let _ = tracing_subscriber::fmt()
         .with_env_filter(filter)
-        .with_target(true)
+        .json()
+        .with_current_span(true)
+        .with_span_list(false)
+        .with_writer(non_blocking)
         .try_init();
+
+    guard
 }
 
 /// Build a Postgres connection pool with a sensible timeout /
@@ -143,12 +170,65 @@ fn build_user_service(pool: PgPool) -> Arc<dyn UserService> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard};
+
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+    fn lock_env() -> MutexGuard<'static, ()> {
+        ENV_LOCK.lock().unwrap_or_else(|e| e.into_inner())
+    }
+    struct EnvGuard {
+        key: &'static str,
+        prev: Option<String>,
+    }
+    impl Drop for EnvGuard {
+        fn drop(&mut self) {
+            // SAFETY: env vars are process-global; ENV_LOCK serializes.
+            unsafe {
+                match &self.prev {
+                    Some(v) => std::env::set_var(self.key, v),
+                    None => std::env::remove_var(self.key),
+                }
+            }
+        }
+    }
+    fn set_env(key: &'static str, value: &str) -> EnvGuard {
+        let prev = std::env::var(key).ok();
+        // SAFETY: serialized via ENV_LOCK.
+        unsafe { std::env::set_var(key, value); }
+        EnvGuard { key, prev }
+    }
 
     #[test]
     fn init_tracing_is_idempotent() {
         // Calling `init_tracing` twice shouldn't panic — the
         // `try_init` path swallows the "already initialized" error.
-        init_tracing();
-        init_tracing();
+        // AEGIS_LOG_DIR is pointed at a temp dir so the file appender
+        // does not write into the repo's working tree.
+        let tmp = std::env::temp_dir().join("aegis-server-logger-test-idempotent");
+        let _ = std::fs::create_dir_all(&tmp);
+        let _g = lock_env();
+        let _dir = set_env("AEGIS_LOG_DIR", tmp.to_str().unwrap());
+        let _lvl = set_env("AEGIS_LOG_LEVEL", "info");
+        let _a = init_tracing();
+        let _b = init_tracing();
+    }
+
+    #[test]
+    fn init_tracing_defaults_level_to_info_when_env_missing() {
+        let _g = lock_env();
+        // SAFETY: serialized via ENV_LOCK.
+        unsafe { std::env::remove_var("AEGIS_LOG_LEVEL"); }
+        let filter = build_env_filter();
+        // The default directive ("info") is present somewhere in the
+        // directive list, and the filter is parseable.
+        assert_eq!(filter.to_string(), "info");
+    }
+
+    #[test]
+    fn init_tracing_uses_aegis_log_level_when_set() {
+        let _g = lock_env();
+        let _lvl = set_env("AEGIS_LOG_LEVEL", "debug");
+        let filter = build_env_filter();
+        assert_eq!(filter.to_string(), "debug");
     }
 }
