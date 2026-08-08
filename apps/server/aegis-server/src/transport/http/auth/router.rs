@@ -27,14 +27,14 @@ use crate::transport::http::auth::user_credential;
 /// The returned `OpenApiRouter<AppState>` is ready to be passed to
 /// [`OpenApiRouter::nest`]. The handlers are reachable under:
 ///
-/// - `POST   /api/auth/login`
-/// - `POST   /api/auth/login-domain`
-/// - `POST   /api/auth/refresh`
-/// - `POST   /api/auth/logout`
-/// - `POST   /api/auth/user-credential`
-/// - `GET    /api/auth/user-credential/{code}`
-/// - `PATCH  /api/auth/user-credential/{code}`
-/// - `DELETE /api/auth/user-credential/{code}`
+/// - `POST  /api/auth/login`
+/// - `POST  /api/auth/login-domain`
+/// - `POST  /api/auth/refresh`
+/// - `POST  /api/auth/logout`
+/// - `PATCH /api/auth/user-credential`
+///
+/// (There is no `POST /api/auth/user-credential` — credential
+/// creation happens out of band.)
 pub fn router() -> OpenApiRouter<AppState> {
     // Each `routes!` call registers a single POST handler. The
     // `routes!` macro panics when two handlers of the same HTTP

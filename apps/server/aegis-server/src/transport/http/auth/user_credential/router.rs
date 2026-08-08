@@ -3,16 +3,16 @@
 //!
 //! Mounted by [`crate::transport::http::auth::router`] under the
 //! `/user-credential` prefix so the URL surface reads as
-//! `/api/auth/user-credential/*`. Every handler here requires
-//! `AuthClaims` (the per-handler `#[utoipa::path]` annotations
-//! advertise the `BearerAuth` security scheme).
+//! `/api/auth/user-credential/*`. The handler here requires
+//! `AuthClaims` (the per-handler `#[utoipa::path]` annotation
+//! advertises the `BearerAuth` security scheme).
 //!
-//! Each `routes!` call registers a single handler. The `routes!`
-//! macro panics when two handlers of the same HTTP method appear in
-//! the same invocation, so we issue one call per handler. Today the
-//! four handlers span four HTTP methods (POST on `/`, GET + PATCH +
-//! DELETE on `/{code}`) — no two share an HTTP method, so each
-//! registration is single-handler by construction.
+//! Each `routes!` call registers a single handler. Today only
+//! `PATCH` is exposed — the handler operates on the caller's own
+//! credential only, with `user_code` derived from the bearer token
+//! (never from the URL or body). Credential creation is out of
+//! scope for this HTTP surface and happens through a seed script
+//! or admin tool.
 
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
@@ -23,14 +23,9 @@ use crate::transport::http::auth::user_credential::handlers;
 /// Build the `/api/auth/user-credential` sub-router.
 ///
 /// The returned `OpenApiRouter<AppState>` is ready to be passed to
-/// [`OpenApiRouter::nest`]. The handlers are reachable under:
+/// [`OpenApiRouter::nest`]. The handler is reachable under:
 ///
-/// - `POST   /api/auth/user-credential`
-/// - `GET    /api/auth/user-credential/{code}`
-/// - `PATCH  /api/auth/user-credential/{code}`
-/// - `DELETE /api/auth/user-credential/{code}`
+/// - `PATCH /api/auth/user-credential`
 pub fn router() -> OpenApiRouter<AppState> {
-    OpenApiRouter::new()
-        .routes(routes!(handlers::create))
-        .routes(routes!(handlers::update))
+    OpenApiRouter::new().routes(routes!(handlers::update))
 }

@@ -5,8 +5,7 @@
 //! - `/api/auth/login-domain`
 //! - `/api/auth/refresh`
 //! - `/api/auth/logout`
-//! - `/api/auth/user-credential`        user-credential management
-//! - `/api/auth/user-credential/{code}`
+//! - `/api/auth/user-credential`        user-credential (self-service: PATCH only — creation is out of band)
 //! - `/api/user`                         user CRUD
 //! - `/api/user/{code}`
 //! - `/healthz`                         liveness probe
@@ -337,7 +336,6 @@ mod tests {
         assert!(doc["paths"]["/api/auth/refresh"].is_object());
         assert!(doc["paths"]["/api/auth/logout"].is_object());
         assert!(doc["paths"]["/api/auth/user-credential"].is_object());
-        assert!(doc["paths"]["/api/auth/user-credential/{code}"].is_object());
         assert!(doc["paths"]["/healthz"].is_object());
 
         // The Bearer security scheme must be registered so
@@ -379,22 +377,27 @@ mod tests {
             );
         }
 
-        // /api/auth/user-credential namespace likewise advertises
-        // all four CRUD verbs under the BearerAuth requirement.
-        for (method, path) in [
-            ("post", "/api/auth/user-credential"),
-            ("get", "/api/auth/user-credential/{code}"),
-            ("patch", "/api/auth/user-credential/{code}"),
-            ("delete", "/api/auth/user-credential/{code}"),
-        ] {
-            let op = &doc["paths"][path][method];
-            assert!(op.is_object(), "missing {method} {path} in openapi");
-            assert_eq!(
-                op["security"][0]["BearerAuth"],
-                serde_json::json!([]),
-                "{method} {path} must require BearerAuth",
-            );
-        }
+        // /api/auth/user-credential namespace advertises its single
+        // self-service verb (PATCH) under the BearerAuth requirement —
+        // `user_code` is derived from the token, so there is no
+        // `/{code}` path. There is intentionally no POST: credential
+        // creation is out of band, so the openapi document must NOT
+        // expose one.
+        let op = &doc["paths"]["/api/auth/user-credential"]["patch"];
+        assert!(
+            op.is_object(),
+            "missing patch /api/auth/user-credential in openapi"
+        );
+        assert_eq!(
+            op["security"][0]["BearerAuth"],
+            serde_json::json!([]),
+            "patch /api/auth/user-credential must require BearerAuth",
+        );
+        assert!(
+            doc["paths"]["/api/auth/user-credential"]["post"].is_null(),
+            "POST /api/auth/user-credential must NOT be advertised — \
+             credential creation happens out of band"
+        );
     }
 
     // ---- /api/user integration --------------------------------------
@@ -479,40 +482,16 @@ mod tests {
 
     // ---- /api/auth/user-credential integration ----------------------
 
-    /// `GET /api/auth/user-credential/{code}` round-trips through
-    /// the top-level router: `AuthClaims` verifies the bearer, the
-    /// auth router hands off to `MockAuth.find_user_credential_by_code`,
-    /// and the projected body comes back as 200 OK with the expected
-    /// shape.
+    /// `POST /api/auth/user-credential` is intentionally NOT a
+    /// supported method — only `PATCH` exists for the user-credential
+    /// namespace (creation happens out of band). The router therefore
+    /// answers with `405 Method Not Allowed` (the path is registered
+    /// for PATCH, just not for POST), not `401` (which would mean the
+    /// request reached a handler gated by `AuthClaims`) and not
+    /// `404` (which would mean the path is not registered at all —
+    /// PATCH is, so 404 is wrong).
     #[tokio::test]
-    async fn user_credential_find_by_code_route_is_wired() {
-        let app = router(test_state());
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("GET")
-                    .uri("/api/auth/user-credential/u1")
-                    .header("authorization", "Bearer good")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(response.status(), AxStatus::OK);
-        let body = axum::body::to_bytes(response.into_body(), 4096)
-            .await
-            .unwrap();
-        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        assert_eq!(value["user_code"], "u1");
-    }
-
-    /// No bearer at all: the top-level router must reject every
-    /// `/api/auth/user-credential/*` route with 401, regardless of
-    /// HTTP method. Sample one representative method (POST) — the
-    /// AuthClaims extractor gates all four user-credential routes
-    /// uniformly.
-    #[tokio::test]
-    async fn user_credential_route_without_authorization_returns_401() {
+    async fn user_credential_create_route_is_unregistered() {
         let app = router(test_state());
         let response = app
             .oneshot(
@@ -520,7 +499,34 @@ mod tests {
                     .method("POST")
                     .uri("/api/auth/user-credential")
                     .header("content-type", "application/json")
-                    .body(Body::from(r#"{"user_code":"u1","password_hash":"x"}"#))
+                    .header("authorization", "Bearer good")
+                    .body(Body::from(r#"{"password":"hunter2"}"#))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::METHOD_NOT_ALLOWED);
+        assert!(
+            response.headers().get("allow").is_some(),
+            "405 response must include an Allow header listing PATCH"
+        );
+    }
+
+    /// No bearer at all: the top-level router must reject the
+    /// `/api/auth/user-credential` PATCH route with 401. (There is no
+    /// POST route to gate — creation is out of band — so its absence
+    /// is covered by `user_credential_create_route_is_unregistered`.)
+    #[tokio::test]
+    async fn user_credential_route_without_authorization_returns_401() {
+        let app = router(test_state());
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri("/api/auth/user-credential")
+                    .header("content-type", "application/json")
+                    .body(Body::from("{}"))
                     .unwrap(),
             )
             .await

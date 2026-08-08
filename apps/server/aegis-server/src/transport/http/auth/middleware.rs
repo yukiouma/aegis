@@ -36,7 +36,9 @@ impl FromRequestParts<AppState> for AuthClaims {
         let token = bearer_token(&parts.headers)?;
         let claims = state
             .auth
-            .verify(VerifyRequest { access_token: token })
+            .verify(VerifyRequest {
+                access_token: token,
+            })
             .await?;
         Ok(Self(claims))
     }
@@ -49,14 +51,24 @@ impl FromRequestParts<AppState> for AuthClaims {
 fn bearer_token(headers: &axum::http::HeaderMap) -> Result<String, ApiError> {
     let header = headers
         .get(axum::http::header::AUTHORIZATION)
-        .ok_or_else(|| ApiError::from(apis::auth::AuthApiError::Verification("missing Authorization header".into())))?;
-    let value = header
-        .to_str()
-        .map_err(|_| ApiError::from(apis::auth::AuthApiError::Verification("non-ASCII Authorization header".into())))?;
+        .ok_or_else(|| {
+            ApiError::from(apis::auth::AuthApiError::Verification(
+                "missing Authorization header".into(),
+            ))
+        })?;
+    let value = header.to_str().map_err(|_| {
+        ApiError::from(apis::auth::AuthApiError::Verification(
+            "non-ASCII Authorization header".into(),
+        ))
+    })?;
     let token = value
         .strip_prefix("Bearer ")
         .or_else(|| value.strip_prefix("bearer "))
-        .ok_or_else(|| ApiError::from(apis::auth::AuthApiError::Verification("Authorization header is not Bearer".into())))?
+        .ok_or_else(|| {
+            ApiError::from(apis::auth::AuthApiError::Verification(
+                "Authorization header is not Bearer".into(),
+            ))
+        })?
         .trim();
     if token.is_empty() {
         return Err(ApiError::from(apis::auth::AuthApiError::Verification(
@@ -272,7 +284,9 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), AxStatus::OK);
-        let body = axum::body::to_bytes(response.into_body(), 64).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), 64)
+            .await
+            .unwrap();
         assert_eq!(&body[..], b"u1:1:7");
     }
 
@@ -288,7 +302,9 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), AxStatus::UNAUTHORIZED);
-        let body = axum::body::to_bytes(response.into_body(), 256).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), 256)
+            .await
+            .unwrap();
         let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(json["code"], "token_verification_failed");
     }

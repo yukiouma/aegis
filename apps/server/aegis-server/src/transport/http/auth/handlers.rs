@@ -221,7 +221,10 @@ mod tests {
             if let Some(err) = self.verify_err.clone() {
                 return Err(err);
             }
-            assert!(self.verify_ok, "verify_ok must be set when no error is configured");
+            assert!(
+                self.verify_ok,
+                "verify_ok must be set when no error is configured"
+            );
             Ok(AuthClaims {
                 code: "u1".into(),
                 role: apis::user::Role::Admin,
@@ -246,6 +249,7 @@ mod tests {
         ) -> Result<UserCredentialView, AuthApiError> {
             unimplemented!()
         }
+
         async fn update_user_credential(
             &self,
             _req: UpdateUserCredentialRequest,
@@ -323,7 +327,9 @@ mod tests {
 
     async fn read_json(response: axum::response::Response) -> (AxStatus, serde_json::Value) {
         let status = response.status();
-        let body = axum::body::to_bytes(response.into_body(), 4096).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
         let value = serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null);
         (status, value)
     }

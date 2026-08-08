@@ -191,9 +191,9 @@ mod tests {
 
     use apis::auth::{
         AuthApiError, AuthClaims, AuthService, CreateUserCredentialRequest,
-        LoginWithDomainUserInfoRequest, LoginWithPasswordRequest, LogoutRequest,
-        LogoutResponse, RefreshRequest, RefreshResponse, RemoveUserCredentialResponse,
-        TokenPair, UpdateUserCredentialRequest, UserCredentialView, VerifyRequest,
+        LoginWithDomainUserInfoRequest, LoginWithPasswordRequest, LogoutRequest, LogoutResponse,
+        RefreshRequest, RefreshResponse, RemoveUserCredentialResponse, TokenPair,
+        UpdateUserCredentialRequest, UserCredentialView, VerifyRequest,
     };
 
     /// Configurable mock for [`apis::user::UserService`]. Each method
@@ -240,7 +240,10 @@ mod tests {
             if let Some(err) = self.get_by_code_err.clone() {
                 return Err(err);
             }
-            Ok(self.get_by_code.clone().expect("get_by_code result configured"))
+            Ok(self
+                .get_by_code
+                .clone()
+                .expect("get_by_code result configured"))
         }
         async fn list(&self) -> Result<Vec<apis::user::UserView>, apis::user::UserApiError> {
             if let Some(err) = self.list_err.clone() {
@@ -287,7 +290,10 @@ mod tests {
             if let Some(err) = self.verify_err.clone() {
                 return Err(err);
             }
-            assert!(self.verify_ok, "verify_ok must be set when no error is configured");
+            assert!(
+                self.verify_ok,
+                "verify_ok must be set when no error is configured"
+            );
             Ok(AuthClaims {
                 code: "u1".into(),
                 role: apis::user::Role::Admin,
@@ -348,7 +354,9 @@ mod tests {
     /// Decode a response into (status, JSON body) for assertions.
     pub async fn read_json(response: axum::response::Response) -> (AxStatus, serde_json::Value) {
         let status = response.status();
-        let body = axum::body::to_bytes(response.into_body(), 4096).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
         let value = serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null);
         (status, value)
     }
@@ -386,7 +394,8 @@ mod tests {
         if body.is_some() {
             b = b.header("content-type", "application/json");
         }
-        b.body(body.map(Body::from).unwrap_or(Body::empty())).unwrap()
+        b.body(body.map(Body::from).unwrap_or(Body::empty()))
+            .unwrap()
     }
 
     // ---- create ----------------------------------------------------
@@ -402,7 +411,10 @@ mod tests {
             create: Some(alice),
             ..Default::default()
         };
-        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let auth = MockAuth {
+            verify_ok: true,
+            ..Default::default()
+        };
         let app = app(test_state(user.clone(), auth));
         let response = app
             .oneshot(build_request(
@@ -434,7 +446,10 @@ mod tests {
             create_err: Some(apis::user::UserApiError::DuplicateCode("u1".into())),
             ..Default::default()
         };
-        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let auth = MockAuth {
+            verify_ok: true,
+            ..Default::default()
+        };
         let app = app(test_state(user, auth));
         let response = app
             .oneshot(build_request(
@@ -456,7 +471,10 @@ mod tests {
             create_err: Some(apis::user::UserApiError::Validation("empty code".into())),
             ..Default::default()
         };
-        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let auth = MockAuth {
+            verify_ok: true,
+            ..Default::default()
+        };
         let app = app(test_state(user, auth));
         let response = app
             .oneshot(build_request(
@@ -505,7 +523,10 @@ mod tests {
             ]),
             ..Default::default()
         };
-        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let auth = MockAuth {
+            verify_ok: true,
+            ..Default::default()
+        };
         let app = app(test_state(user, auth));
         let response = app
             .oneshot(build_request("GET", "/api/user", None, Some("Bearer good")))
@@ -529,7 +550,10 @@ mod tests {
             list: Some(vec![]),
             ..Default::default()
         };
-        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let auth = MockAuth {
+            verify_ok: true,
+            ..Default::default()
+        };
         let app = app(test_state(user, auth));
         let response = app
             .oneshot(build_request("GET", "/api/user", None, Some("Bearer good")))
@@ -562,7 +586,10 @@ mod tests {
             get_by_code: Some(sample_user(42, "u1")),
             ..Default::default()
         };
-        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let auth = MockAuth {
+            verify_ok: true,
+            ..Default::default()
+        };
         let app = app(test_state(user, auth));
         let response = app
             .oneshot(build_request(
@@ -588,7 +615,10 @@ mod tests {
             get_by_code_err: Some(apis::user::UserApiError::NotFound),
             ..Default::default()
         };
-        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let auth = MockAuth {
+            verify_ok: true,
+            ..Default::default()
+        };
         let app = app(test_state(user, auth));
         let response = app
             .oneshot(build_request(
@@ -633,7 +663,10 @@ mod tests {
             update: Some(updated),
             ..Default::default()
         };
-        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let auth = MockAuth {
+            verify_ok: true,
+            ..Default::default()
+        };
         let app = app(test_state(user.clone(), auth));
         let response = app
             .oneshot(build_request(
@@ -667,7 +700,10 @@ mod tests {
             update_err: Some(apis::user::UserApiError::Validation("bad".into())),
             ..Default::default()
         };
-        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let auth = MockAuth {
+            verify_ok: true,
+            ..Default::default()
+        };
         let app = app(test_state(user, auth));
         let response = app
             .oneshot(build_request(
@@ -691,7 +727,10 @@ mod tests {
             get_by_code_err: Some(apis::user::UserApiError::NotFound),
             ..Default::default()
         };
-        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let auth = MockAuth {
+            verify_ok: true,
+            ..Default::default()
+        };
         let app = app(test_state(user, auth));
         let response = app
             .oneshot(build_request(

@@ -59,17 +59,15 @@ use crate::transport::http::error::ErrorBody;
         dto::PathCode,
         dto::UserViewResponse,
         dto::UserListResponse,
-        dto::CreateUserCredentialRequest,
         dto::UpdateUserCredentialRequest,
         dto::UserCredentialViewResponse,
-        dto::RemoveUserCredentialResponse,
         ErrorBody,
     )),
     tags(
         (name = "auth", description = "Authentication endpoints"),
         (name = "system", description = "Operational endpoints"),
         (name = "user", description = "User CRUD endpoints"),
-        (name = "user-credential", description = "User credential management endpoints"),
+        (name = "user-credential", description = "User credential self-service endpoints"),
     ),
 )]
 pub struct ApiDoc;
@@ -153,10 +151,8 @@ mod tests {
             "PathCode",
             "UserViewResponse",
             "UserListResponse",
-            "CreateUserCredentialRequest",
             "UpdateUserCredentialRequest",
             "UserCredentialViewResponse",
-            "RemoveUserCredentialResponse",
         ] {
             let entry: &RefOr<_> = schemas
                 .get(name)
