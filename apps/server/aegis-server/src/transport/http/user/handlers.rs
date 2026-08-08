@@ -70,13 +70,28 @@ pub async fn create(
     Ok((StatusCode::CREATED, Json(view.into())))
 }
 
-/// `GET /api/user` — list users.
-#[utoipa::path(get, path = "/", tag = "user")]
+/// `GET /api/user` — list all users.
+///
+/// The backend's `list` returns every user; the response wraps the
+/// vector in [`dto::UserListResponse`] so future pagination metadata
+/// (`total`, `next_cursor`, …) can land without breaking the wire
+/// shape.
+#[utoipa::path(
+    get, path = "/", tag = "user",
+    responses(
+        (status = 200, description = "Users list", body = dto::UserListResponse),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn list(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     _claims: AuthClaims,
 ) -> Result<Json<dto::UserListResponse>, ApiError> {
-    unimplemented!("populated in Task 6")
+    let views = state.user.list().await?;
+    let users = views.into_iter().map(Into::into).collect();
+    Ok(Json(dto::UserListResponse { users }))
 }
 
 /// `GET /api/user/{code}` — fetch a user by code.
@@ -416,6 +431,67 @@ mod tests {
                 Some(r#"{"code":"u1","name":"Alice","role":"admin"}"#.to_string()),
                 None,
             ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::UNAUTHORIZED);
+        assert_eq!(body["code"], "token_verification_failed");
+    }
+
+    // ---- list ------------------------------------------------------
+
+    #[tokio::test]
+    async fn list_returns_200_with_users_on_success() {
+        let user = MockUserService {
+            list: Some(vec![
+                sample_user(1, "u1"),
+                sample_user(2, "u2"),
+                sample_user(3, "u3"),
+            ]),
+            ..Default::default()
+        };
+        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let app = app(test_state(user, auth));
+        let response = app
+            .oneshot(build_request("GET", "/api/user", None, Some("Bearer good")))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::OK);
+        let users = body["users"].as_array().expect("users array");
+        assert_eq!(users.len(), 3);
+        assert_eq!(users[0]["code"], "u1");
+        assert_eq!(users[1]["code"], "u2");
+        assert_eq!(users[2]["code"], "u3");
+        assert_eq!(users[0]["id"], 1);
+        assert_eq!(users[1]["id"], 2);
+        assert_eq!(users[2]["id"], 3);
+    }
+
+    #[tokio::test]
+    async fn list_returns_200_with_empty_array_when_no_users() {
+        let user = MockUserService {
+            list: Some(vec![]),
+            ..Default::default()
+        };
+        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let app = app(test_state(user, auth));
+        let response = app
+            .oneshot(build_request("GET", "/api/user", None, Some("Bearer good")))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::OK);
+        assert_eq!(body["users"].as_array().map(|a| a.len()), Some(0));
+    }
+
+    #[tokio::test]
+    async fn list_without_authorization_returns_401() {
+        let user = MockUserService::default();
+        let auth = MockAuth::default();
+        let app = app(test_state(user, auth));
+        let response = app
+            .oneshot(build_request("GET", "/api/user", None, None))
             .await
             .unwrap();
         let (status, body) = read_json(response).await;
