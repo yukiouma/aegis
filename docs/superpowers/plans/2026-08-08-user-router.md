@@ -806,7 +806,7 @@ use axum::http::StatusCode;
 
 use crate::state::AppState;
 use crate::transport::http::auth::middleware::AuthClaims;
-use crate::transport::http::dto;
+use crate::transport::http::dto::{self, PathCode};
 use crate::transport::http::error::ApiError;
 
 // Stubs: Tasks 5-8 replace these bodies with real implementations.
@@ -851,7 +851,6 @@ pub async fn update(
 // Path extractor alias: the wire `dto::PathCode` shadows the handler
 // arg's name so axum can resolve the `{code}` URL segment. Aliasing
 // here keeps the handler signatures terse.
-use crate::transport::http::dto::PathCode;
 
 #[cfg(test)]
 mod tests {
@@ -1741,7 +1740,7 @@ Also add `use crate::transport::http::user;` next to the existing `use crate::tr
 
 - [ ] **Step 2: Write the failing integration test**
 
-Inside the existing `#[cfg(test)] mod tests { … }` block in `router.rs`, add the new integration tests after `openapi_json_returns_200_with_valid_doc`:
+Inside the existing `#[cfg(test)] mod tests { … }` block in `router.rs`, add the new integration test after `openapi_json_returns_200_with_valid_doc`:
 
 ```rust
     #[tokio::test]
@@ -1764,7 +1763,7 @@ Inside the existing `#[cfg(test)] mod tests { … }` block in `router.rs`, add t
     }
 ```
 
-And extend the `openapi_json_returns_200_with_valid_doc` test's body assertion block. Find the existing assertion block (it currently checks the four `/api/auth/*` paths + `/healthz` and the `BearerAuth` security scheme). Add user-route assertions immediately after the `assert!(doc["paths"]["/healthz"]["get"]["security"].is_null());` line:
+Also extend the existing `openapi_json_returns_200_with_valid_doc` test by appending the user-route assertions immediately before its final closing `}` (i.e. after the existing `assert!(doc["paths"]["/healthz"]["get"]["security"].is_null());` line):
 
 ```rust
         // User CRUD routes must be registered, and all four must
@@ -1786,12 +1785,9 @@ And extend the `openapi_json_returns_200_with_valid_doc` test's body assertion b
                 "{method} {path} must reference BearerAuth",
             );
         }
-
-        // /healthz remains the only unauthenticated route.
-        assert!(doc["paths"]["/healthz"]["get"]["security"].is_null());
 ```
 
-Note: the original assertion that `assert!(doc["paths"]["/healthz"]["get"]["security"].is_null());` was at the end of the existing block stays as-is — the new healthz check is a verbatim copy moved to the end of the new block. If the original assertion already covers it, leave the original in place and only add the new user-route assertions immediately before it.
+(The existing `assert!(doc["paths"]["/healthz"]["get"]["security"].is_null());` line stays in place — no need to duplicate it.)
 
 - [ ] **Step 3: Run the new tests to verify the user-route ones fail**
 
