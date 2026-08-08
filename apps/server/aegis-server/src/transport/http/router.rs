@@ -34,9 +34,12 @@ use crate::transport::http::user;
 /// merged on top, and the resulting `Router` is wrapped in a
 /// `TraceLayer` for tracing.
 pub fn router(state: AppState) -> axum::Router {
+    let api_routers = OpenApiRouter::new()
+        .nest("/auth", auth::router())
+        .nest("/user", user::router());
+
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
-        .nest("/api/auth", auth::router())
-        .nest("/api/user", user::router())
+        .nest("/api", api_routers)
         .nest("/healthz", healthz::router())
         .with_state(state)
         .split_for_parts();
@@ -241,7 +244,12 @@ mod tests {
     async fn healthz_returns_200() {
         let app = router(test_state());
         let response = app
-            .oneshot(Request::builder().uri("/healthz").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/healthz")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), AxStatus::OK);
@@ -327,7 +335,10 @@ mod tests {
         // The Bearer security scheme must be registered so
         // refresh / logout advertise the BearerAuth requirement.
         let schemes = &doc["components"]["securitySchemes"];
-        assert!(schemes["BearerAuth"].is_object(), "BearerAuth scheme missing");
+        assert!(
+            schemes["BearerAuth"].is_object(),
+            "BearerAuth scheme missing"
+        );
         assert_eq!(schemes["BearerAuth"]["type"], "http");
         assert_eq!(schemes["BearerAuth"]["scheme"], "bearer");
         assert_eq!(schemes["BearerAuth"]["bearerFormat"], "JWT");
