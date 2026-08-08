@@ -64,9 +64,10 @@ apps/server/aegis-server/
             ├── error.rs                # ApiError refactor: enum variants
             │                           # (Auth / User) with helper tables
             ├── openapi.rs              # +user DTO schemas, +user tag
+            ├── auth.rs                 # unchanged
             ├── auth/                   # unchanged — From<AuthApiError> still works
+            ├── user.rs                 # new: pub mod handlers; pub mod router;
             └── user/                   # new
-                ├── user.rs             # pub mod handlers; pub mod router;
                 ├── router.rs           # OpenApiRouter composition
                 └── handlers.rs         # create / list / get_by_code / update + tests
 ```
@@ -198,7 +199,7 @@ pub fn router() -> OpenApiRouter<AppState> {
 
 The top-level `transport/http/router.rs` adds
 `.nest("/api/user", user::router())` to the existing
-`OpenApiRouter::with_openpi(ApiDoc::openapi()).nest("/api/auth", …)`
+`OpenApiRouter::with_openapi(ApiDoc::openapi()).nest("/api/auth", …)`
 chain.
 
 ## Error Model Refactor (`transport/http/error.rs`)
