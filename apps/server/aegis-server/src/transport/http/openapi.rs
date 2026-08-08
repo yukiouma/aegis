@@ -54,11 +54,17 @@ use crate::transport::http::error::ErrorBody;
         dto::LogoutResponse,
         dto::AuthClaimsResponse,
         dto::Role,
+        dto::CreateUserRequest,
+        dto::UpdateUserRequest,
+        dto::PathCode,
+        dto::UserViewResponse,
+        dto::UserListResponse,
         ErrorBody,
     )),
     tags(
         (name = "auth", description = "Authentication endpoints"),
         (name = "system", description = "Operational endpoints"),
+        (name = "user", description = "User CRUD endpoints"),
     ),
 )]
 pub struct ApiDoc;
@@ -137,6 +143,11 @@ mod tests {
             "LogoutResponse",
             "AuthClaimsResponse",
             "Role",
+            "CreateUserRequest",
+            "UpdateUserRequest",
+            "PathCode",
+            "UserViewResponse",
+            "UserListResponse",
         ] {
             let entry: &RefOr<_> = schemas
                 .get(name)
