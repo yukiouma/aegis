@@ -66,6 +66,7 @@ pub struct UserView {
 /// lives in the backend's usecase layer. Adapters receive this
 /// shape from outside and translate it into a backend-specific
 /// create DTO that includes the password.
+#[derive(Debug, Clone)]
 pub struct CreateUserRequest {
     pub code: String,
     pub name: String,
@@ -77,7 +78,7 @@ pub struct CreateUserRequest {
 /// Every field except `id` is optional; only the fields that
 /// actually changed need to be supplied. Same rationale as
 /// [`CreateUserRequest`] for the omission of `password`.
-#[derive(Default)]
+#[derive(Debug, Default, Clone)]
 pub struct UpdateUserRequest {
     pub id: i32,
     pub code: Option<String>,

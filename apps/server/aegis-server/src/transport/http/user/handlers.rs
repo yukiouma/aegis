@@ -36,13 +36,38 @@ use crate::transport::http::error::ApiError;
 // with the right method, path, and request/response schemas.
 
 /// `POST /api/user` — create a user.
-#[utoipa::path(post, path = "/", tag = "user")]
+///
+/// Wire DTO → apis DTO translation happens at the boundary; the
+/// backend adapter receives an `apis::user::CreateUserRequest`
+/// (which deliberately omits `password`) and returns a full
+/// [`apis::user::UserView`]. The 201 response body is the wire
+/// projection of that view.
+#[utoipa::path(
+    post, path = "/", tag = "user",
+    request_body = dto::CreateUserRequest,
+    responses(
+        (status = 201, description = "User created", body = dto::UserViewResponse),
+        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 409, description = "User code already exists", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository / hashing failure", body = crate::transport::http::error::ErrorBody),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn create(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     _claims: AuthClaims,
-    Json(_req): Json<dto::CreateUserRequest>,
+    Json(req): Json<dto::CreateUserRequest>,
 ) -> Result<(StatusCode, Json<dto::UserViewResponse>), ApiError> {
-    unimplemented!("populated in Task 5")
+    let view = state
+        .user
+        .create(apis::user::CreateUserRequest {
+            code: req.code,
+            name: req.name,
+            role: req.role.into(),
+        })
+        .await?;
+    Ok((StatusCode::CREATED, Json(view.into())))
 }
 
 /// `GET /api/user` — list users.
@@ -292,5 +317,109 @@ mod tests {
             b = b.header("content-type", "application/json");
         }
         b.body(body.map(Body::from).unwrap_or(Body::empty())).unwrap()
+    }
+
+    // ---- create ----------------------------------------------------
+
+    #[tokio::test]
+    async fn create_returns_201_with_user_view_on_success() {
+        // Build the mock's response with `name = "Alice"` so the
+        // response assertion matches the request body — this test
+        // exercises end-to-end translation, not just the DTO pass.
+        let mut alice = sample_user(42, "u1");
+        alice.name = "Alice".to_string();
+        let user = MockUserService {
+            create: Some(alice),
+            ..Default::default()
+        };
+        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let app = app(test_state(user.clone(), auth));
+        let response = app
+            .oneshot(build_request(
+                "POST",
+                "/api/user",
+                Some(r#"{"code":"u1","name":"Alice","role":"admin"}"#.to_string()),
+                Some("Bearer good"),
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::CREATED);
+        assert_eq!(body["id"], 42);
+        assert_eq!(body["code"], "u1");
+        assert_eq!(body["name"], "Alice");
+        assert_eq!(body["role"], "admin");
+        assert_eq!(body["active"], true);
+
+        // Verify the wire->apis translation captured the right DTO.
+        let captured = user.last_create_args.lock().unwrap().clone().unwrap();
+        assert_eq!(captured.code, "u1");
+        assert_eq!(captured.name, "Alice");
+        assert!(matches!(captured.role, apis::user::Role::Admin));
+    }
+
+    #[tokio::test]
+    async fn create_maps_duplicate_code_to_409() {
+        let user = MockUserService {
+            create_err: Some(apis::user::UserApiError::DuplicateCode("u1".into())),
+            ..Default::default()
+        };
+        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let app = app(test_state(user, auth));
+        let response = app
+            .oneshot(build_request(
+                "POST",
+                "/api/user",
+                Some(r#"{"code":"u1","name":"Alice","role":"admin"}"#.to_string()),
+                Some("Bearer good"),
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::CONFLICT);
+        assert_eq!(body["code"], "duplicate_code");
+    }
+
+    #[tokio::test]
+    async fn create_maps_validation_to_400() {
+        let user = MockUserService {
+            create_err: Some(apis::user::UserApiError::Validation("empty code".into())),
+            ..Default::default()
+        };
+        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let app = app(test_state(user, auth));
+        let response = app
+            .oneshot(build_request(
+                "POST",
+                "/api/user",
+                Some(r#"{"code":"","name":"Alice","role":"admin"}"#.to_string()),
+                Some("Bearer good"),
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::BAD_REQUEST);
+        assert_eq!(body["code"], "validation_failed");
+    }
+
+    #[tokio::test]
+    async fn create_without_authorization_returns_401() {
+        // No Authorization header — `AuthClaims` rejects the request
+        // before the handler body runs.
+        let user = MockUserService::default();
+        let auth = MockAuth::default();
+        let app = app(test_state(user, auth));
+        let response = app
+            .oneshot(build_request(
+                "POST",
+                "/api/user",
+                Some(r#"{"code":"u1","name":"Alice","role":"admin"}"#.to_string()),
+                None,
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::UNAUTHORIZED);
+        assert_eq!(body["code"], "token_verification_failed");
     }
 }
