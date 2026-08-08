@@ -1,6 +1,6 @@
 //! `OpenApiRouter` sub-router for the user CRUD namespace.
 //!
-//! Mirrors [`crate::transport::http::auth::router`] composition but
+//! Mirrors [`mod@crate::transport::http::auth::router`] composition but
 //! scoped to the `/api/user/*` prefix. The top-level router composes
 //! this via [`OpenApiRouter::nest`] so the user namespace can grow
 //! without inflating `router.rs`.

@@ -1,10 +1,10 @@
 //! HTTP handlers for the user CRUD namespace.
 //!
 //! Each handler is a thin adapter that:
-//! 1. Translates the wire DTO (from [`dto`](crate::transport::http::dto))
+//! 1. Translates the wire DTO (from [`crate::transport::http::dto`])
 //!    into an apis DTO.
 //! 2. Calls the corresponding [`apis::user::UserService`] method on
-//!    [`AppState`](crate::state::AppState).
+//!    [`crate::state::AppState`].
 //! 3. Translates the apis response back into a wire DTO.
 //!
 //! `UserApiError` is funnelled through [`ApiError::from`] so each

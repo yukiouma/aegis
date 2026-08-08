@@ -9,7 +9,7 @@
 //!
 //! The router here is an `OpenApiRouter<AppState>` composed from the
 //! per-handler `routes!()` registrations; the top-level
-//! [`crate::transport::http::router`] nests it under `/api/user`.
+//! [`mod@crate::transport::http::router`] nests it under `/api/user`.
 
 pub mod handlers;
 pub mod router;
