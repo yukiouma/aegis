@@ -94,14 +94,31 @@ pub async fn list(
     Ok(Json(dto::UserListResponse { users }))
 }
 
-/// `GET /api/user/{code}` — fetch a user by code.
-#[utoipa::path(get, path = "/{code}", tag = "user")]
+/// `GET /api/user/{code}` — fetch a user by their `code`.
+///
+/// The `{code}` URL parameter is extracted via
+/// [`dto::PathCode`]; the handler threads the bare `code` string
+/// into `state.user.get_by_code` and returns the projected view.
+#[utoipa::path(
+    get, path = "/{code}", tag = "user",
+    params(
+        ("code" = String, Path, description = "User code to fetch"),
+    ),
+    responses(
+        (status = 200, description = "User found", body = dto::UserViewResponse),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 404, description = "User not found", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn get_by_code(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     _claims: AuthClaims,
-    Path(PathCode { .. }): Path<PathCode>,
+    Path(PathCode { code }): Path<PathCode>,
 ) -> Result<Json<dto::UserViewResponse>, ApiError> {
-    unimplemented!("populated in Task 7")
+    let view = state.user.get_by_code(&code).await?;
+    Ok(Json(view.into()))
 }
 
 /// `PATCH /api/user/{code}` — update a user.
@@ -492,6 +509,70 @@ mod tests {
         let app = app(test_state(user, auth));
         let response = app
             .oneshot(build_request("GET", "/api/user", None, None))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::UNAUTHORIZED);
+        assert_eq!(body["code"], "token_verification_failed");
+    }
+
+    // ---- get_by_code -----------------------------------------------
+
+    #[tokio::test]
+    async fn get_by_code_returns_200_with_user_view_on_success() {
+        let user = MockUserService {
+            get_by_code: Some(sample_user(42, "u1")),
+            ..Default::default()
+        };
+        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let app = app(test_state(user, auth));
+        let response = app
+            .oneshot(build_request(
+                "GET",
+                "/api/user/u1",
+                None,
+                Some("Bearer good"),
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::OK);
+        assert_eq!(body["id"], 42);
+        assert_eq!(body["code"], "u1");
+        assert_eq!(body["name"], "User u1");
+        assert_eq!(body["role"], "admin");
+        assert_eq!(body["active"], true);
+    }
+
+    #[tokio::test]
+    async fn get_by_code_maps_not_found_to_404() {
+        let user = MockUserService {
+            get_by_code_err: Some(apis::user::UserApiError::NotFound),
+            ..Default::default()
+        };
+        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let app = app(test_state(user, auth));
+        let response = app
+            .oneshot(build_request(
+                "GET",
+                "/api/user/missing",
+                None,
+                Some("Bearer good"),
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::NOT_FOUND);
+        assert_eq!(body["code"], "not_found");
+    }
+
+    #[tokio::test]
+    async fn get_by_code_without_authorization_returns_401() {
+        let user = MockUserService::default();
+        let auth = MockAuth::default();
+        let app = app(test_state(user, auth));
+        let response = app
+            .oneshot(build_request("GET", "/api/user/u1", None, None))
             .await
             .unwrap();
         let (status, body) = read_json(response).await;
