@@ -165,7 +165,7 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthService
             .usecase
             .create_user_credential(CreateUserCredential {
                 code: req.user_code,
-                password_hash: req.password_hash,
+                password: req.password,
             })
             .await
             .map_err(map_error)?;
@@ -180,7 +180,7 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthService
             .usecase
             .update_user_credential(UpdateUserCredential {
                 code: req.user_code,
-                password_hash: req.password_hash,
+                password: req.password,
             })
             .await
             .map_err(map_error)?;

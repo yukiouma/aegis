@@ -68,19 +68,21 @@ pub struct FindUserCredential {
 }
 
 /// Input for `AuthUsecase::create_user_credential`. The implementation
-/// picks the initial `token_version`.
+/// picks the initial `token_version`, hashes `password` with Argon2,
+/// and persists the resulting PHC string.
 #[derive(Debug, Clone)]
 pub struct CreateUserCredential {
     pub code: String,
-    pub password_hash: String,
+    pub password: String,
 }
 
-/// Input for `AuthUsecase::update_user_credential`. Only `password_hash`
-/// is mutable through this command.
+/// Input for `AuthUsecase::update_user_credential`. When `password` is
+/// `Some` the implementation hashes it with Argon2 before writing;
+/// `None` leaves the stored hash untouched.
 #[derive(Debug, Clone, Default)]
 pub struct UpdateUserCredential {
     pub code: String,
-    pub password_hash: Option<String>,
+    pub password: Option<String>,
 }
 
 /// Input for `AuthUsecase::remove_user_credential`.

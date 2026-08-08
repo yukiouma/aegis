@@ -154,7 +154,7 @@ fn auth_public_types_are_nameable() {
     });
     assert_create_cred(CreateUserCredentialRequest {
         user_code: "u1".into(),
-        password_hash: "h".into(),
+        password: "p".into(),
     });
     assert_update_cred(UpdateUserCredentialRequest {
         user_code: "u1".into(),

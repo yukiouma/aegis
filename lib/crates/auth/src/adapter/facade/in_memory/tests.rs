@@ -229,7 +229,7 @@ async fn find_user_credential_returns_not_found_for_unknown_code() {
 }
 
 #[tokio::test]
-async fn create_user_credential_round_trips_via_find() {
+async fn create_user_credential_hashes_raw_password_before_persisting() {
     let creds = MockUserCredentialsRepo::default();
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
@@ -238,22 +238,26 @@ async fn create_user_credential_round_trips_via_find() {
     let created = svc
         .create_user_credential(apis::auth::CreateUserCredentialRequest {
             user_code: "u1".into(),
-            password_hash: "hash".into(),
+            password: "hunter2".into(),
         })
         .await
         .expect("create succeeds");
     assert_eq!(created.token_version, 0);
+    assert_ne!(
+        created.password_hash, "hunter2",
+        "raw password must not round-trip into the view"
+    );
 
     let fetched = svc
         .find_user_credential_by_code("u1")
         .await
         .expect("find succeeds");
     assert_eq!(fetched.user_code, "u1");
-    assert_eq!(fetched.password_hash, "hash");
+    assert_eq!(fetched.password_hash, created.password_hash);
 }
 
 #[tokio::test]
-async fn update_user_credential_changes_password_hash() {
+async fn update_user_credential_hashes_raw_password() {
     let creds = MockUserCredentialsRepo::default();
     creds.seed_hash("u1", "old", 1);
     let ids = MockDomainIdentityRepo::default();
@@ -263,11 +267,14 @@ async fn update_user_credential_changes_password_hash() {
     let view = svc
         .update_user_credential(apis::auth::UpdateUserCredentialRequest {
             user_code: "u1".into(),
-            password_hash: Some("new".into()),
+            password: Some("new".into()),
         })
         .await
         .expect("update succeeds");
-    assert_eq!(view.password_hash, "new");
+    assert_ne!(
+        view.password_hash, "new",
+        "raw password must not round-trip into the view"
+    );
 }
 
 #[tokio::test]

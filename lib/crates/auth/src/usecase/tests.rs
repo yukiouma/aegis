@@ -10,6 +10,8 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 
+use argon2::PasswordVerifier;
+
 use crate::domain::{
     DomainError, DomainIdentity, DomainIdentityRepository, Role, UserCredentials,
     UserCredentialsRepository, UserService, UserSummary,
@@ -819,7 +821,7 @@ async fn find_user_credential_returns_not_found_for_unknown_code() {
 }
 
 #[tokio::test]
-async fn create_user_credential_persists_with_initial_token_version_zero() {
+async fn create_user_credential_hashes_raw_password_before_persisting() {
     let creds = MockUserCredentialsRepo::default();
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
@@ -828,13 +830,20 @@ async fn create_user_credential_persists_with_initial_token_version_zero() {
     let view = usecase
         .create_user_credential(crate::usecase::CreateUserCredential {
             code: "u1".into(),
-            password_hash: "hash".into(),
+            password: "hunter2".into(),
         })
         .await
         .expect("create succeeds");
     assert_eq!(view.code, "u1");
-    assert_eq!(view.password_hash, "hash");
     assert_eq!(view.token_version, 0);
+    assert_ne!(
+        view.password_hash, "hunter2",
+        "raw password must not round-trip into the view"
+    );
+    let parsed = argon2::PasswordHash::new(&view.password_hash).expect("valid phc string");
+    argon2::Argon2::default()
+        .verify_password(b"hunter2", &parsed)
+        .expect("stored hash must verify against the original password");
 }
 
 #[tokio::test]
@@ -847,7 +856,7 @@ async fn create_user_credential_rejects_empty_code() {
     let err = usecase
         .create_user_credential(crate::usecase::CreateUserCredential {
             code: "  ".into(),
-            password_hash: "hash".into(),
+            password: "hunter2".into(),
         })
         .await
         .unwrap_err();
@@ -858,7 +867,7 @@ async fn create_user_credential_rejects_empty_code() {
 }
 
 #[tokio::test]
-async fn create_user_credential_rejects_empty_password_hash() {
+async fn create_user_credential_rejects_empty_password() {
     let creds = MockUserCredentialsRepo::default();
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
@@ -867,7 +876,7 @@ async fn create_user_credential_rejects_empty_password_hash() {
     let err = usecase
         .create_user_credential(crate::usecase::CreateUserCredential {
             code: "u1".into(),
-            password_hash: "".into(),
+            password: "".into(),
         })
         .await
         .unwrap_err();
@@ -878,7 +887,7 @@ async fn create_user_credential_rejects_empty_password_hash() {
 }
 
 #[tokio::test]
-async fn update_user_credential_changes_password_hash_when_some() {
+async fn update_user_credential_hashes_raw_password_when_some() {
     let creds = MockUserCredentialsRepo::default();
     creds.seed_hash("u1", "old", 1);
     let ids = MockDomainIdentityRepo::default();
@@ -888,11 +897,18 @@ async fn update_user_credential_changes_password_hash_when_some() {
     let view = usecase
         .update_user_credential(crate::usecase::UpdateUserCredential {
             code: "u1".into(),
-            password_hash: Some("new".into()),
+            password: Some("new".into()),
         })
         .await
         .expect("update succeeds");
-    assert_eq!(view.password_hash, "new");
+    assert_ne!(
+        view.password_hash, "new",
+        "raw password must not round-trip into the view"
+    );
+    let parsed = argon2::PasswordHash::new(&view.password_hash).expect("valid phc string");
+    argon2::Argon2::default()
+        .verify_password(b"new", &parsed)
+        .expect("stored hash must verify against the original password");
     assert_eq!(view.token_version, 1, "update must not bump token_version");
 }
 

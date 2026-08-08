@@ -60,23 +60,24 @@ pub struct RefreshRequest {
 
 /// Input DTO for [`AuthService::create_user_credential`].
 ///
-/// `token_version` is intentionally absent: the implementation picks
-/// the initial value (typically `0`).
+/// `password` is the raw user-supplied password; the implementation
+/// hashes it before persisting. `token_version` is intentionally
+/// absent: the implementation picks the initial value (typically `0`).
 #[derive(Debug, Clone)]
 pub struct CreateUserCredentialRequest {
     pub user_code: String,
-    pub password_hash: String,
+    pub password: String,
 }
 
 /// Input DTO for [`AuthService::update_user_credential`].
 ///
-/// Only `password_hash` is mutable through this DTO. To change
-/// `token_version` callers go through a future admin-facing API
-/// (out of scope here).
+/// `password` is the raw user-supplied password; when `Some` the
+/// implementation hashes it before writing. To change `token_version`
+/// callers go through a future admin-facing API (out of scope here).
 #[derive(Debug, Clone, Default)]
 pub struct UpdateUserCredentialRequest {
     pub user_code: String,
-    pub password_hash: Option<String>,
+    pub password: Option<String>,
 }
 
 /// Response DTO for [`AuthService::logout`].

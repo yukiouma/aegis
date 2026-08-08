@@ -291,13 +291,16 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         if cmd.code.trim().is_empty() {
             return Err(UsecaseError::Repository(DomainError::EmptyCode));
         }
-        if cmd.password_hash.is_empty() {
+        if cmd.password.is_empty() {
             return Err(UsecaseError::Repository(DomainError::EmptyPasswordHash));
         }
+        // The command carries the raw user-supplied password. Hash
+        // it here so the repository never sees plaintext.
+        let password_hash = Self::hash_password(&cmd.password)?;
         let now = chrono::Utc::now();
         let creds = UserCredentials::for_repository(
             cmd.code,
-            cmd.password_hash,
+            password_hash,
             // Initial token_version — the spec / apis doc-comment notes
             // "typically 0". We pick 0 explicitly rather than letting
             // the schema default to 1 so callers can reason about the
@@ -319,14 +322,40 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         // a no-op update (every optional field is None) needs the
         // lookup path to surface the error.
         let creds = self.credentials.find_by_code(&cmd.code).await?;
-        let updated = if let Some(ref hash) = cmd.password_hash {
+        let updated = if let Some(ref password) = cmd.password {
+            if password.is_empty() {
+                return Err(UsecaseError::Repository(DomainError::EmptyPasswordHash));
+            }
+            // Hash the raw password before handing it to the repo so
+            // the repository never stores plaintext.
+            let password_hash = Self::hash_password(password)?;
             self.credentials
-                .update_password_hash(&cmd.code, hash)
+                .update_password_hash(&cmd.code, &password_hash)
                 .await?
         } else {
             creds
         };
         Ok(creds_to_view(&updated))
+    }
+
+    /// Hash a raw password with Argon2 (default params, fresh random
+    /// salt) and return the PHC-encoded string. Synchronous because
+    /// Argon2 hashing is CPU-bound and must run on the executor
+    /// thread — the operation is not I/O.
+    ///
+    /// Failures here mean the hashing primitive itself errored (very
+    /// rare, e.g. RNG exhaustion); surfacing them through
+    /// `UsecaseError::Repository` keeps the existing error envelope
+    /// without introducing a new variant.
+    fn hash_password(plain: &str) -> Result<String, UsecaseError> {
+        use argon2::password_hash::{PasswordHasher, SaltString, rand_core::OsRng};
+        let salt = SaltString::generate(&mut OsRng);
+        argon2::Argon2::default()
+            .hash_password(plain.as_bytes(), &salt)
+            .map(|h| h.to_string())
+            .map_err(|e| {
+                UsecaseError::Repository(DomainError::Repository(format!("argon2 hash: {e}")))
+            })
     }
 
     pub async fn remove_user_credential(
