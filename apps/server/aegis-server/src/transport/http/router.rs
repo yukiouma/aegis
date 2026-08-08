@@ -5,6 +5,8 @@
 //! - `/api/auth/login-domain`
 //! - `/api/auth/refresh`
 //! - `/api/auth/logout`
+//! - `/api/user`                         user CRUD
+//! - `/api/user/{code}`
 //! - `/healthz`                         liveness probe
 //! - `/swagger-ui/`                      swagger-ui HTML
 //! - `/swagger-ui/{*rest}`               swagger-ui assets
@@ -21,6 +23,7 @@ use crate::state::AppState;
 use crate::transport::http::auth;
 use crate::transport::http::healthz;
 use crate::transport::http::openapi::ApiDoc;
+use crate::transport::http::user;
 
 /// Build the full HTTP router with `state` attached.
 ///
@@ -33,6 +36,7 @@ use crate::transport::http::openapi::ApiDoc;
 pub fn router(state: AppState) -> axum::Router {
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/api/auth", auth::router())
+        .nest("/api/user", user::router())
         .nest("/healthz", healthz::router())
         .with_state(state)
         .split_for_parts();
@@ -161,10 +165,75 @@ mod tests {
         }
     }
 
+    /// User mock for integration tests. Returns a fixed one-user
+    /// list from `list()` and a fixed view from `get_by_code` /
+    /// `create` / `update`; any other method panics. This is
+    /// deliberately minimal — the per-handler tests in
+    /// `user::handlers` cover the translation surface in detail.
+    #[derive(Clone)]
+    struct StubUserService;
+
+    #[async_trait]
+    impl apis::user::UserService for StubUserService {
+        async fn create(
+            &self,
+            _req: apis::user::CreateUserRequest,
+        ) -> Result<apis::user::UserView, apis::user::UserApiError> {
+            Ok(sample_user_view(1, "u1"))
+        }
+        async fn get_by_id(
+            &self,
+            _id: i32,
+        ) -> Result<apis::user::UserView, apis::user::UserApiError> {
+            unimplemented!()
+        }
+        async fn get_by_code(
+            &self,
+            _code: &str,
+        ) -> Result<apis::user::UserView, apis::user::UserApiError> {
+            Ok(sample_user_view(1, "u1"))
+        }
+        async fn list(&self) -> Result<Vec<apis::user::UserView>, apis::user::UserApiError> {
+            Ok(vec![sample_user_view(1, "u1")])
+        }
+        async fn update(
+            &self,
+            _req: apis::user::UpdateUserRequest,
+        ) -> Result<apis::user::UserView, apis::user::UserApiError> {
+            Ok(sample_user_view(1, "u1"))
+        }
+    }
+
+    fn sample_user_view(id: i32, code: &str) -> apis::user::UserView {
+        apis::user::UserView {
+            id,
+            code: code.to_string(),
+            name: format!("User {code}"),
+            role: apis::user::Role::Admin,
+            active: true,
+            created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+            updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        }
+    }
+
     fn test_state() -> AppState {
         AppState {
             auth: Arc::new(MockAuth) as Arc<dyn AuthService>,
             user: Arc::new(NullUserService) as Arc<dyn apis::user::UserService>,
+        }
+    }
+
+    /// State builder for user-integration tests: same `MockAuth`
+    /// (so verify returns OK), but a `StubUserService` that returns
+    /// positive responses for the user routes.
+    fn test_state_with_user() -> AppState {
+        AppState {
+            auth: Arc::new(MockAuth) as Arc<dyn AuthService>,
+            user: Arc::new(StubUserService) as Arc<dyn apis::user::UserService>,
         }
     }
 
@@ -272,5 +341,103 @@ mod tests {
         assert!(doc["paths"]["/api/auth/login"]["post"]["security"].is_null());
         assert!(doc["paths"]["/api/auth/login-domain"]["post"]["security"].is_null());
         assert!(doc["paths"]["/healthz"]["get"]["security"].is_null());
+
+        // /api/user namespace must advertise every CRUD verb with
+        // the BearerAuth requirement — the gate is the whole point
+        // of the router.
+        for (method, path) in [
+            ("post", "/api/user"),
+            ("get", "/api/user"),
+            ("get", "/api/user/{code}"),
+            ("patch", "/api/user/{code}"),
+        ] {
+            let op = &doc["paths"][path][method];
+            assert!(op.is_object(), "missing {method} {path} in openapi");
+            assert_eq!(
+                op["security"][0]["BearerAuth"],
+                serde_json::json!([]),
+                "{method} {path} must require BearerAuth",
+            );
+        }
+    }
+
+    // ---- /api/user integration --------------------------------------
+
+    /// `GET /api/user` round-trips through the top-level router:
+    /// `AuthClaims` verifies the bearer, the user router hands off
+    /// to `StubUserService.list()`, and the projected body comes
+    /// back as 200 OK with the expected shape.
+    #[tokio::test]
+    async fn user_list_route_is_wired() {
+        let app = router(test_state_with_user());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/user")
+                    .header("authorization", "Bearer good")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::OK);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let users = value["users"].as_array().expect("users array");
+        assert_eq!(users.len(), 1);
+        assert_eq!(users[0]["code"], "u1");
+        assert_eq!(users[0]["role"], "admin");
+    }
+
+    /// `GET /api/user/{code}` round-trips through the top-level
+    /// router: 200 OK with the projected body.
+    #[tokio::test]
+    async fn user_get_by_code_route_is_wired() {
+        let app = router(test_state_with_user());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/user/u1")
+                    .header("authorization", "Bearer good")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::OK);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(value["code"], "u1");
+    }
+
+    /// No bearer at all: the top-level router must reject every
+    /// `/api/user/*` route with 401, regardless of HTTP method.
+    /// Sample one representative method (GET) — the AuthClaims
+    /// extractor gates all four user routes uniformly.
+    #[tokio::test]
+    async fn user_route_without_authorization_returns_401() {
+        let app = router(test_state_with_user());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/user")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::UNAUTHORIZED);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(value["code"], "token_verification_failed");
     }
 }
