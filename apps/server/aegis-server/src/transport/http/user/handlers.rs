@@ -121,15 +121,53 @@ pub async fn get_by_code(
     Ok(Json(view.into()))
 }
 
-/// `PATCH /api/user/{code}` — update a user.
-#[utoipa::path(patch, path = "/{code}", tag = "user")]
+/// `PATCH /api/user/{code}` — partial update of a user.
+///
+/// The wire DTO is `UpdateUserRequest` (every field optional,
+/// `skip_serializing_if = "Option::is_none"` for lossless
+/// round-trips). The handler:
+/// 1. Resolves the URL `{code}` to an internal `id` via
+///    `state.user.get_by_code` — this is what makes the URL
+///    contract stable while the backend identity model can evolve.
+/// 2. Threads the optional fields through `From<Role>` so the
+///    wire `Role` enum maps cleanly to `apis::user::Role`.
+/// 3. Calls `state.user.update`, which returns the projected view.
+#[utoipa::path(
+    patch, path = "/{code}", tag = "user",
+    params(
+        ("code" = String, Path, description = "User code to update"),
+    ),
+    request_body = dto::UpdateUserRequest,
+    responses(
+        (status = 200, description = "User updated", body = dto::UserViewResponse),
+        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 404, description = "User not found", body = crate::transport::http::error::ErrorBody),
+        (status = 409, description = "User code already exists", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository / hashing failure", body = crate::transport::http::error::ErrorBody),
+    ),
+    security(("BearerAuth" = [])),
+)]
 pub async fn update(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     _claims: AuthClaims,
-    Path(PathCode { .. }): Path<PathCode>,
-    Json(_req): Json<dto::UpdateUserRequest>,
+    Path(PathCode { code }): Path<PathCode>,
+    Json(req): Json<dto::UpdateUserRequest>,
 ) -> Result<Json<dto::UserViewResponse>, ApiError> {
-    unimplemented!("populated in Task 8")
+    // Resolve URL `{code}` to internal `id` so the wire contract
+    // is stable even if the backend's identity model evolves.
+    let id = state.user.get_by_code(&code).await?.id;
+    let view = state
+        .user
+        .update(apis::user::UpdateUserRequest {
+            id,
+            code: req.code,
+            name: req.name,
+            role: req.role.map(Into::into),
+            active: req.active,
+        })
+        .await?;
+    Ok(Json(view.into()))
 }
 
 #[cfg(test)]
@@ -147,7 +185,7 @@ mod tests {
     use axum::Router;
     use axum::body::Body;
     use axum::http::{Request, StatusCode as AxStatus};
-    use axum::routing::{get, patch, post};
+    use axum::routing::{get, post};
     use std::sync::{Arc, Mutex};
     use tower::ServiceExt;
 
@@ -573,6 +611,114 @@ mod tests {
         let app = app(test_state(user, auth));
         let response = app
             .oneshot(build_request("GET", "/api/user/u1", None, None))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::UNAUTHORIZED);
+        assert_eq!(body["code"], "token_verification_failed");
+    }
+
+    // ---- update ----------------------------------------------------
+
+    #[tokio::test]
+    async fn update_returns_200_with_user_view_on_success() {
+        // `update` first resolves the URL `{code}` to an internal
+        // `id` via `get_by_code`, then forwards the partial update
+        // to `state.user.update`. The mock returns id=42 for
+        // get_by_code("u1") and the resulting UserView from update.
+        let mut updated = sample_user(42, "u1");
+        updated.name = "Alice".to_string();
+        let user = MockUserService {
+            get_by_code: Some(sample_user(42, "u1")),
+            update: Some(updated),
+            ..Default::default()
+        };
+        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let app = app(test_state(user.clone(), auth));
+        let response = app
+            .oneshot(build_request(
+                "PATCH",
+                "/api/user/u1",
+                Some(r#"{"name":"Alice"}"#.to_string()),
+                Some("Bearer good"),
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::OK);
+        assert_eq!(body["id"], 42);
+        assert_eq!(body["code"], "u1");
+        assert_eq!(body["name"], "Alice");
+
+        // Verify the handler resolved the URL code to id=42 and
+        // forwarded only the supplied `name` field.
+        let captured = user.last_update_args.lock().unwrap().clone().unwrap();
+        assert_eq!(captured.id, 42);
+        assert!(captured.code.is_none());
+        assert_eq!(captured.name.as_deref(), Some("Alice"));
+        assert!(captured.role.is_none());
+        assert!(captured.active.is_none());
+    }
+
+    #[tokio::test]
+    async fn update_maps_validation_to_400() {
+        let user = MockUserService {
+            get_by_code: Some(sample_user(42, "u1")),
+            update_err: Some(apis::user::UserApiError::Validation("bad".into())),
+            ..Default::default()
+        };
+        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let app = app(test_state(user, auth));
+        let response = app
+            .oneshot(build_request(
+                "PATCH",
+                "/api/user/u1",
+                Some(r#"{"name":"x"}"#.to_string()),
+                Some("Bearer good"),
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::BAD_REQUEST);
+        assert_eq!(body["code"], "validation_failed");
+    }
+
+    #[tokio::test]
+    async fn update_maps_not_found_to_404() {
+        // If the URL code doesn't resolve, the update never runs;
+        // get_by_code's NotFound bubbles out.
+        let user = MockUserService {
+            get_by_code_err: Some(apis::user::UserApiError::NotFound),
+            ..Default::default()
+        };
+        let auth = MockAuth { verify_ok: true, ..Default::default() };
+        let app = app(test_state(user, auth));
+        let response = app
+            .oneshot(build_request(
+                "PATCH",
+                "/api/user/missing",
+                Some(r#"{"name":"x"}"#.to_string()),
+                Some("Bearer good"),
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::NOT_FOUND);
+        assert_eq!(body["code"], "not_found");
+    }
+
+    #[tokio::test]
+    async fn update_without_authorization_returns_401() {
+        let user = MockUserService::default();
+        let auth = MockAuth::default();
+        let app = app(test_state(user, auth));
+        let response = app
+            .oneshot(build_request(
+                "PATCH",
+                "/api/user/u1",
+                Some(r#"{"name":"x"}"#.to_string()),
+                None,
+            ))
             .await
             .unwrap();
         let (status, body) = read_json(response).await;
