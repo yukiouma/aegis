@@ -92,6 +92,82 @@ impl From<Role> for apis::user::Role {
     }
 }
 
+// -- user requests / responses ---------------------------------------------
+
+/// Wire-level request body for `POST /api/user`. Mirrors
+/// `apis::user::CreateUserRequest`; the handler translates at the
+/// boundary so the apis crate stays free of serde / utoipa.
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct CreateUserRequest {
+    pub code: String,
+    pub name: String,
+    pub role: Role,
+}
+
+/// Wire-level request body for `PATCH /api/user/{code}`. Every field
+/// is optional — only the fields that actually changed need to be
+/// supplied. Deliberately omits `id`: the handler resolves the URL
+/// `{code}` to a `UserView` via `get_by_code` and threads the
+/// resulting `id` into `apis::user::UpdateUserRequest` internally.
+///
+/// Each `Option` field is `skip_serializing_if = "Option::is_none"`
+/// so a partial update round-trips losslessly: deserializing
+/// `{"name":"Alice"}` and re-serializing it produces the same JSON.
+#[derive(Serialize, Deserialize, ToSchema, Default)]
+pub struct UpdateUserRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<Role>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active: Option<bool>,
+}
+
+/// Wire-level extractor for the `{code}` URL parameter.
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct PathCode {
+    pub code: String,
+}
+
+/// Wire-level projection of a user — mirrors `apis::user::UserView`
+/// field-for-field. Carries `Serialize` / `Deserialize` / `ToSchema`
+/// so utoipa can document the response shape and the handler can
+/// return it directly via `Json<UserViewResponse>`.
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct UserViewResponse {
+    pub id: i32,
+    pub code: String,
+    pub name: String,
+    pub role: Role,
+    pub active: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Wire-level wrapper for `GET /api/user` responses. Wrapping the
+/// vector in a struct leaves room for future pagination metadata
+/// (`total`, `next_cursor`, …) without breaking the response shape.
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct UserListResponse {
+    pub users: Vec<UserViewResponse>,
+}
+
+impl From<apis::user::UserView> for UserViewResponse {
+    fn from(view: apis::user::UserView) -> Self {
+        Self {
+            id: view.id,
+            code: view.code,
+            name: view.name,
+            role: view.role.into(),
+            active: view.active,
+            created_at: view.created_at,
+            updated_at: view.updated_at,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,5 +253,92 @@ mod tests {
         assert!(matches!(Role::from(apis::user::Role::Root), Role::Root));
         assert!(matches!(Role::from(apis::user::Role::Admin), Role::Admin));
         assert!(matches!(Role::from(apis::user::Role::General), Role::General));
+    }
+
+    // ---- user DTO round-trips (new) -----
+
+    #[test]
+    fn create_user_request_roundtrip() {
+        let json = r#"{"code":"u1","name":"Alice","role":"admin"}"#;
+        let req: CreateUserRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.code, "u1");
+        assert_eq!(req.name, "Alice");
+        assert!(matches!(req.role, Role::Admin));
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn update_user_request_partial_roundtrip() {
+        let json = r#"{"name":"Alice"}"#;
+        let req: UpdateUserRequest = serde_json::from_str(json).unwrap();
+        assert!(req.code.is_none());
+        assert_eq!(req.name.as_deref(), Some("Alice"));
+        assert!(req.role.is_none());
+        assert!(req.active.is_none());
+        let out = serde_json::to_string(&req).unwrap();
+        assert_eq!(out, json);
+    }
+
+    #[test]
+    fn update_user_request_full_roundtrip() {
+        let json = r#"{"code":"u2","name":"Bob","role":"root","active":true}"#;
+        let req: UpdateUserRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.code.as_deref(), Some("u2"));
+        assert_eq!(req.name.as_deref(), Some("Bob"));
+        assert!(matches!(req.role, Some(Role::Root)));
+        assert_eq!(req.active, Some(true));
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn path_code_roundtrip() {
+        let json = r#"{"code":"u1"}"#;
+        let p: PathCode = serde_json::from_str(json).unwrap();
+        assert_eq!(p.code, "u1");
+        assert_eq!(serde_json::to_string(&p).unwrap(), json);
+    }
+
+    #[test]
+    fn user_view_response_roundtrip() {
+        let json = r#"{"id":42,"code":"u1","name":"Alice","role":"admin","active":true,"created_at":"2026-01-02T03:04:05Z","updated_at":"2026-01-02T03:04:05Z"}"#;
+        let v: UserViewResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(v.id, 42);
+        assert_eq!(v.code, "u1");
+        assert_eq!(v.name, "Alice");
+        assert!(matches!(v.role, Role::Admin));
+        assert!(v.active);
+        assert_eq!(serde_json::to_string(&v).unwrap(), json);
+    }
+
+    #[test]
+    fn user_list_response_roundtrip() {
+        let json = r#"{"users":[{"id":1,"code":"u1","name":"A","role":"admin","active":true,"created_at":"2026-01-02T03:04:05Z","updated_at":"2026-01-02T03:04:05Z"}]}"#;
+        let v: UserListResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(v.users.len(), 1);
+        assert_eq!(v.users[0].code, "u1");
+        assert_eq!(serde_json::to_string(&v).unwrap(), json);
+    }
+
+    #[test]
+    fn user_view_response_from_apis_user_view() {
+        let apis_view = apis::user::UserView {
+            id: 7,
+            code: "u7".into(),
+            name: "Seven".into(),
+            role: apis::user::Role::General,
+            active: false,
+            created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+            updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        };
+        let resp: UserViewResponse = apis_view.into();
+        assert_eq!(resp.id, 7);
+        assert_eq!(resp.code, "u7");
+        assert_eq!(resp.name, "Seven");
+        assert!(matches!(resp.role, Role::General));
+        assert!(!resp.active);
     }
 }

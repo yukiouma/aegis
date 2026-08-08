@@ -25,14 +25,14 @@ rand_core = { version = "0.6", default-features = false, features = [
     "getrandom",
 ] }
 dotenvy = "0.15"
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 jsonwebtoken = { version = "11", features = ["rust_crypto"] }
 axum = { version = "0.8.9", features = ["multipart"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
 tower-http = { version = "0.7.0", features = ["trace"] }
-utoipa = { version = "5.5.0", features = ["axum_extras", "debug"] }
+utoipa = { version = "5.5.0", features = ["axum_extras", "debug", "chrono"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 utoipa-axum = { version = "0.2.0", features = ["debug"] }
 tower = "0.5.3"
