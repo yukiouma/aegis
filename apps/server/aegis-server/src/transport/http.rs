@@ -13,5 +13,6 @@ pub mod error;
 pub mod healthz;
 pub mod openapi;
 pub mod router;
+pub mod user;
 
 pub use router::router;

@@ -28,7 +28,7 @@ pub enum Role {
 /// into this type at the implementation boundary. The shape
 /// intentionally combines validation, lookup, and infrastructure
 /// concerns into a single type so handlers can match exhaustively.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum UserApiError {
     #[error("validation failed: {0}")]
     Validation(String),
