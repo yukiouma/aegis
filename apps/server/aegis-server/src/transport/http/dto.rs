@@ -168,6 +168,64 @@ impl From<apis::user::UserView> for UserViewResponse {
     }
 }
 
+// -- user-credential requests / responses -----------------------------------
+
+/// Wire-level request body for `POST /api/auth/user-credential`.
+///
+/// Mirrors `apis::auth::CreateUserCredentialRequest` field-for-field
+/// (`user_code`, `password_hash`). The handler translates to the apis
+/// DTO at the boundary.
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct CreateUserCredentialRequest {
+    pub user_code: String,
+    pub password_hash: String,
+}
+
+/// Wire-level request body for `PATCH /api/auth/user-credential/{code}`.
+///
+/// Deliberately omits `user_code`: the URL `{code}` is the single
+/// source of truth and is forwarded into the apis DTO by the handler.
+/// `password_hash` is the only mutable field today — the apis trait
+/// narrows this explicitly in its doc-comment. The
+/// `skip_serializing_if` keeps a partial update round-trip lossless
+/// (a `{}` body stays `{}` on re-serialization).
+#[derive(Serialize, Deserialize, ToSchema, Default)]
+pub struct UpdateUserCredentialRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password_hash: Option<String>,
+}
+
+/// Wire-level projection of a user's credential.
+///
+/// Mirrors `apis::auth::UserCredentialView` field-for-field
+/// (`user_code`, `password_hash`, `token_version`). The handler
+/// translates from the apis view via the `From` impl below.
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct UserCredentialViewResponse {
+    pub user_code: String,
+    pub password_hash: String,
+    pub token_version: u32,
+}
+
+/// Wire-level response for `DELETE /api/auth/user-credential/{code}`.
+///
+/// Empty by design — a successful removal carries no payload. Kept
+/// as a named type (rather than `()`) so the response shape is
+/// explicit at the API boundary and can be extended later without
+/// a breaking trait change.
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct RemoveUserCredentialResponse {}
+
+impl From<apis::auth::UserCredentialView> for UserCredentialViewResponse {
+    fn from(view: apis::auth::UserCredentialView) -> Self {
+        Self {
+            user_code: view.user_code,
+            password_hash: view.password_hash,
+            token_version: view.token_version,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -340,5 +398,64 @@ mod tests {
         assert_eq!(resp.name, "Seven");
         assert!(matches!(resp.role, Role::General));
         assert!(!resp.active);
+    }
+
+    // ---- user-credential DTO round-trips (new) -----
+
+    #[test]
+    fn create_user_credential_request_roundtrip() {
+        let json = r#"{"user_code":"u1","password_hash":"argon2id$..."}"#;
+        let req: CreateUserCredentialRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.user_code, "u1");
+        assert_eq!(req.password_hash, "argon2id$...");
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn update_user_credential_request_partial_roundtrip() {
+        // An empty update body must round-trip losslessly — the
+        // handler uses the URL `{code}` for identity and an
+        // absent `password_hash` means "no change".
+        let json = r#"{}"#;
+        let req: UpdateUserCredentialRequest = serde_json::from_str(json).unwrap();
+        assert!(req.password_hash.is_none());
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn update_user_credential_request_full_roundtrip() {
+        let json = r#"{"password_hash":"argon2id$..."}"#;
+        let req: UpdateUserCredentialRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.password_hash.as_deref(), Some("argon2id$..."));
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn user_credential_view_response_roundtrip() {
+        let json = r#"{"user_code":"u1","password_hash":"argon2id$...","token_version":7}"#;
+        let v: UserCredentialViewResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(v.user_code, "u1");
+        assert_eq!(v.password_hash, "argon2id$...");
+        assert_eq!(v.token_version, 7);
+        assert_eq!(serde_json::to_string(&v).unwrap(), json);
+    }
+
+    #[test]
+    fn remove_user_credential_response_roundtrip() {
+        let v: RemoveUserCredentialResponse = serde_json::from_str("{}").unwrap();
+        assert_eq!(serde_json::to_string(&v).unwrap(), "{}");
+    }
+
+    #[test]
+    fn user_credential_view_response_from_apis_view() {
+        let apis_view = apis::auth::UserCredentialView {
+            user_code: "u7".into(),
+            password_hash: "argon2id$...".into(),
+            token_version: 5,
+        };
+        let resp: UserCredentialViewResponse = apis_view.into();
+        assert_eq!(resp.user_code, "u7");
+        assert_eq!(resp.password_hash, "argon2id$...");
+        assert_eq!(resp.token_version, 5);
     }
 }

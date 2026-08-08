@@ -5,6 +5,8 @@
 //! - `/api/auth/login-domain`
 //! - `/api/auth/refresh`
 //! - `/api/auth/logout`
+//! - `/api/auth/user-credential`        user-credential management
+//! - `/api/auth/user-credential/{code}`
 //! - `/api/user`                         user CRUD
 //! - `/api/user/{code}`
 //! - `/healthz`                         liveness probe
@@ -109,7 +111,11 @@ mod tests {
             &self,
             _code: &str,
         ) -> Result<UserCredentialView, AuthApiError> {
-            unimplemented!()
+            Ok(UserCredentialView {
+                user_code: "u1".into(),
+                password_hash: "argon2id$v=19$m=...$...".into(),
+                token_version: 0,
+            })
         }
         async fn create_user_credential(
             &self,
@@ -330,6 +336,8 @@ mod tests {
         assert!(doc["paths"]["/api/auth/login-domain"].is_object());
         assert!(doc["paths"]["/api/auth/refresh"].is_object());
         assert!(doc["paths"]["/api/auth/logout"].is_object());
+        assert!(doc["paths"]["/api/auth/user-credential"].is_object());
+        assert!(doc["paths"]["/api/auth/user-credential/{code}"].is_object());
         assert!(doc["paths"]["/healthz"].is_object());
 
         // The Bearer security scheme must be registered so
@@ -361,6 +369,23 @@ mod tests {
             ("get", "/api/user"),
             ("get", "/api/user/{code}"),
             ("patch", "/api/user/{code}"),
+        ] {
+            let op = &doc["paths"][path][method];
+            assert!(op.is_object(), "missing {method} {path} in openapi");
+            assert_eq!(
+                op["security"][0]["BearerAuth"],
+                serde_json::json!([]),
+                "{method} {path} must require BearerAuth",
+            );
+        }
+
+        // /api/auth/user-credential namespace likewise advertises
+        // all four CRUD verbs under the BearerAuth requirement.
+        for (method, path) in [
+            ("post", "/api/auth/user-credential"),
+            ("get", "/api/auth/user-credential/{code}"),
+            ("patch", "/api/auth/user-credential/{code}"),
+            ("delete", "/api/auth/user-credential/{code}"),
         ] {
             let op = &doc["paths"][path][method];
             assert!(op.is_object(), "missing {method} {path} in openapi");
@@ -440,6 +465,62 @@ mod tests {
                     .method("GET")
                     .uri("/api/user")
                     .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::UNAUTHORIZED);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(value["code"], "token_verification_failed");
+    }
+
+    // ---- /api/auth/user-credential integration ----------------------
+
+    /// `GET /api/auth/user-credential/{code}` round-trips through
+    /// the top-level router: `AuthClaims` verifies the bearer, the
+    /// auth router hands off to `MockAuth.find_user_credential_by_code`,
+    /// and the projected body comes back as 200 OK with the expected
+    /// shape.
+    #[tokio::test]
+    async fn user_credential_find_by_code_route_is_wired() {
+        let app = router(test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/auth/user-credential/u1")
+                    .header("authorization", "Bearer good")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::OK);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(value["user_code"], "u1");
+    }
+
+    /// No bearer at all: the top-level router must reject every
+    /// `/api/auth/user-credential/*` route with 401, regardless of
+    /// HTTP method. Sample one representative method (POST) — the
+    /// AuthClaims extractor gates all four user-credential routes
+    /// uniformly.
+    #[tokio::test]
+    async fn user_credential_route_without_authorization_returns_401() {
+        let app = router(test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/auth/user-credential")
+                    .header("content-type", "application/json")
+                    .body(Body::from(r#"{"user_code":"u1","password_hash":"x"}"#))
                     .unwrap(),
             )
             .await
