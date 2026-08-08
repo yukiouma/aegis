@@ -177,7 +177,6 @@ impl From<apis::user::UserView> for UserViewResponse {
 /// DTO at the boundary.
 #[derive(Serialize, Deserialize, ToSchema)]
 pub struct CreateUserCredentialRequest {
-    pub user_code: String,
     pub password_hash: String,
 }
 
@@ -310,7 +309,10 @@ mod tests {
     fn role_from_apis_role_all_variants() {
         assert!(matches!(Role::from(apis::user::Role::Root), Role::Root));
         assert!(matches!(Role::from(apis::user::Role::Admin), Role::Admin));
-        assert!(matches!(Role::from(apis::user::Role::General), Role::General));
+        assert!(matches!(
+            Role::from(apis::user::Role::General),
+            Role::General
+        ));
     }
 
     // ---- user DTO round-trips (new) -----
@@ -406,7 +408,6 @@ mod tests {
     fn create_user_credential_request_roundtrip() {
         let json = r#"{"user_code":"u1","password_hash":"argon2id$..."}"#;
         let req: CreateUserCredentialRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.user_code, "u1");
         assert_eq!(req.password_hash, "argon2id$...");
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
     }

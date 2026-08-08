@@ -25,12 +25,12 @@ use apis::auth::{
     CreateUserCredentialRequest, RemoveUserCredentialResponse, UpdateUserCredentialRequest,
 };
 use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::http::StatusCode;
 
 use crate::state::AppState;
 use crate::transport::http::auth::middleware::AuthClaims;
-use crate::transport::http::dto::{self, PathCode};
+use crate::transport::http::dto;
 use crate::transport::http::error::ApiError;
 
 // Stubs: GREEN step replaces these bodies with real implementations.
@@ -53,13 +53,14 @@ use crate::transport::http::error::ApiError;
 )]
 pub async fn create(
     State(state): State<AppState>,
-    _claims: AuthClaims,
+    claims: AuthClaims,
     Json(req): Json<dto::CreateUserCredentialRequest>,
 ) -> Result<(StatusCode, Json<dto::UserCredentialViewResponse>), ApiError> {
+    let user_code = claims.0.code.clone();
     let view = state
         .auth
         .create_user_credential(CreateUserCredentialRequest {
-            user_code: req.user_code,
+            user_code,
             password_hash: req.password_hash,
         })
         .await?;
@@ -67,32 +68,7 @@ pub async fn create(
 }
 
 #[utoipa::path(
-    get, path = "/{code}", tag = "user-credential",
-    params(
-        ("code" = String, Path, description = "User code to fetch credential for"),
-    ),
-    responses(
-        (status = 200, description = "User credential found", body = dto::UserCredentialViewResponse),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "User credential not found", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn find_by_code(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-    Path(PathCode { code }): Path<PathCode>,
-) -> Result<Json<dto::UserCredentialViewResponse>, ApiError> {
-    let view = state.auth.find_user_credential_by_code(&code).await?;
-    Ok(Json(view.into()))
-}
-
-#[utoipa::path(
-    patch, path = "/{code}", tag = "user-credential",
-    params(
-        ("code" = String, Path, description = "User code to update"),
-    ),
+    patch, path = "/", tag = "user-credential",
     request_body = dto::UpdateUserCredentialRequest,
     responses(
         (status = 200, description = "User credential updated", body = dto::UserCredentialViewResponse),
@@ -105,40 +81,18 @@ pub async fn find_by_code(
 )]
 pub async fn update(
     State(state): State<AppState>,
-    _claims: AuthClaims,
-    Path(PathCode { code }): Path<PathCode>,
+    claims: AuthClaims,
     Json(req): Json<dto::UpdateUserCredentialRequest>,
 ) -> Result<Json<dto::UserCredentialViewResponse>, ApiError> {
+    let user_code = claims.0.code.clone();
     let view = state
         .auth
         .update_user_credential(UpdateUserCredentialRequest {
-            user_code: code,
+            user_code,
             password_hash: req.password_hash,
         })
         .await?;
     Ok(Json(view.into()))
-}
-
-#[utoipa::path(
-    delete, path = "/{code}", tag = "user-credential",
-    params(
-        ("code" = String, Path, description = "User code to remove credential for"),
-    ),
-    responses(
-        (status = 200, description = "User credential removed", body = dto::RemoveUserCredentialResponse),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "User credential not found", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn remove(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-    Path(PathCode { code }): Path<PathCode>,
-) -> Result<Json<dto::RemoveUserCredentialResponse>, ApiError> {
-    state.auth.remove_user_credential(&code).await?;
-    Ok(Json(dto::RemoveUserCredentialResponse {}))
 }
 
 #[cfg(test)]
@@ -148,7 +102,7 @@ mod tests {
     use axum::Router;
     use axum::body::Body;
     use axum::http::{Request, StatusCode as AxStatus};
-    use axum::routing::{get, post};
+    use axum::routing::{patch, post};
     use std::sync::{Arc, Mutex};
     use tower::ServiceExt;
 
@@ -200,7 +154,10 @@ mod tests {
             if let Some(err) = self.verify_err.clone() {
                 return Err(err);
             }
-            assert!(self.verify_ok, "verify_ok must be set when no error is configured");
+            assert!(
+                self.verify_ok,
+                "verify_ok must be set when no error is configured"
+            );
             Ok(AuthClaims {
                 code: "admin".into(),
                 role: apis::user::Role::Admin,
@@ -231,10 +188,7 @@ mod tests {
             if let Some(err) = self.create_err.clone() {
                 return Err(err);
             }
-            Ok(self
-                .create
-                .clone()
-                .expect("create result configured"))
+            Ok(self.create.clone().expect("create result configured"))
         }
         async fn update_user_credential(
             &self,
@@ -244,10 +198,7 @@ mod tests {
             if let Some(err) = self.update_err.clone() {
                 return Err(err);
             }
-            Ok(self
-                .update
-                .clone()
-                .expect("update result configured"))
+            Ok(self.update.clone().expect("update result configured"))
         }
         async fn remove_user_credential(
             &self,
@@ -257,7 +208,10 @@ mod tests {
             if let Some(err) = self.remove_err.clone() {
                 return Err(err);
             }
-            assert!(self.remove, "remove_ok must be set when no error is configured");
+            assert!(
+                self.remove,
+                "remove_ok must be set when no error is configured"
+            );
             Ok(RemoveUserCredentialResponse::default())
         }
         async fn logout(&self, _req: LogoutRequest) -> Result<LogoutResponse, AuthApiError> {
@@ -313,18 +267,25 @@ mod tests {
     fn app(state: AppState) -> Router {
         Router::new()
             .route("/api/auth/user-credential", post(create))
-            .route("/api/auth/user-credential/{code}", get(find_by_code).patch(update).delete(remove))
+            .route("/api/auth/user-credential/{code}", patch(update))
             .with_state(state)
     }
 
     async fn read_json(response: axum::response::Response) -> (AxStatus, serde_json::Value) {
         let status = response.status();
-        let body = axum::body::to_bytes(response.into_body(), 4096).await.unwrap();
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
         let value = serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null);
         (status, value)
     }
 
-    fn build_request(method: &str, uri: &str, body: Option<String>, auth: Option<&str>) -> Request<Body> {
+    fn build_request(
+        method: &str,
+        uri: &str,
+        body: Option<String>,
+        auth: Option<&str>,
+    ) -> Request<Body> {
         let mut b = Request::builder().method(method).uri(uri);
         if let Some(token) = auth {
             b = b.header("authorization", token);
@@ -332,7 +293,8 @@ mod tests {
         if body.is_some() {
             b = b.header("content-type", "application/json");
         }
-        b.body(body.map(Body::from).unwrap_or(Body::empty())).unwrap()
+        b.body(body.map(Body::from).unwrap_or(Body::empty()))
+            .unwrap()
     }
 
     fn sample_credential(code: &str, token_version: u32) -> apis::auth::UserCredentialView {
@@ -343,7 +305,9 @@ mod tests {
         }
     }
 
-    fn empty_token() -> &'static str { "Bearer good" }
+    fn empty_token() -> &'static str {
+        "Bearer good"
+    }
 
     // ---- create ----------------------------------------------------
 

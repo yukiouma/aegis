@@ -32,7 +32,5 @@ use crate::transport::http::auth::user_credential::handlers;
 pub fn router() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
         .routes(routes!(handlers::create))
-        .routes(routes!(handlers::find_by_code))
         .routes(routes!(handlers::update))
-        .routes(routes!(handlers::remove))
 }
