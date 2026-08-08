@@ -1,9 +1,13 @@
 //! HTTP error mapping.
 //!
-//! [`ApiError`] wraps [`apis::auth::AuthApiError`] and adds an HTTP
-//! status code + a JSON [`ErrorBody`] shape. Every handler returns
-//! `Result<Json<T>, ApiError>` and uses `?` on `AuthApiError`; the
-//! [`From`] impl does the wrapping.
+//! [`ApiError`] is an enum that wraps every apis error type the HTTP
+//! layer surfaces today — [`apis::auth::AuthApiError`] and
+//! [`apis::user::UserApiError`]. Every handler returns
+//! `Result<Json<T>, ApiError>` and uses `?` on either inner error; the
+//! [`From`] impls (derived via `#[from]`) do the wrapping.
+//!
+//! New apis services land as additional enum variants; the `status()`
+//! and `code()` dispatch tables pick them up.
 
 use axum::Json;
 use axum::http::StatusCode;
@@ -23,45 +27,87 @@ pub struct ErrorBody {
     pub message: String,
 }
 
-/// Newtype around [`apis::auth::AuthApiError`] that adds an HTTP
-/// status code and renders as JSON [`ErrorBody`].
+/// Error type returned by every HTTP handler.
+///
+/// Each variant wraps an apis-level error and implements
+/// [`IntoResponse`] so handlers can return `Result<_, ApiError>` and
+/// let the `?` operator do the conversion. The dispatch tables live
+/// in private `*_status` / `*_code` helpers so the public `status()`
+/// and `code()` methods stay table-shaped.
 #[derive(Debug, Error)]
-#[error("{0}")]
-pub struct ApiError(pub apis::auth::AuthApiError);
+pub enum ApiError {
+    #[error("{0}")]
+    Auth(#[from] apis::auth::AuthApiError),
+
+    #[error("{0}")]
+    User(#[from] apis::user::UserApiError),
+}
 
 impl ApiError {
     /// HTTP status code for this error variant.
     pub fn status(&self) -> StatusCode {
-        match &self.0 {
-            apis::auth::AuthApiError::Validation(_) => StatusCode::BAD_REQUEST,
-            apis::auth::AuthApiError::NotFound => StatusCode::NOT_FOUND,
-            apis::auth::AuthApiError::Inactive => StatusCode::FORBIDDEN,
-            apis::auth::AuthApiError::InvalidCredentials => StatusCode::UNAUTHORIZED,
-            apis::auth::AuthApiError::Verification(_) => StatusCode::UNAUTHORIZED,
-            apis::auth::AuthApiError::DuplicateCode(_) => StatusCode::CONFLICT,
-            apis::auth::AuthApiError::Signing(_) => StatusCode::INTERNAL_SERVER_ERROR,
-            apis::auth::AuthApiError::Repository(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        match self {
+            Self::Auth(e) => auth_status(e),
+            Self::User(e) => user_status(e),
         }
     }
 
     /// Stable machine-readable code used as `ErrorBody.code`.
     pub fn code(&self) -> &'static str {
-        match &self.0 {
-            apis::auth::AuthApiError::Validation(_) => "validation_failed",
-            apis::auth::AuthApiError::NotFound => "not_found",
-            apis::auth::AuthApiError::Inactive => "user_inactive",
-            apis::auth::AuthApiError::InvalidCredentials => "invalid_credentials",
-            apis::auth::AuthApiError::Verification(_) => "token_verification_failed",
-            apis::auth::AuthApiError::DuplicateCode(_) => "duplicate_code",
-            apis::auth::AuthApiError::Signing(_) => "signing_failed",
-            apis::auth::AuthApiError::Repository(_) => "repository_error",
+        match self {
+            Self::Auth(e) => auth_code(e),
+            Self::User(e) => user_code(e),
         }
     }
 }
 
-impl From<apis::auth::AuthApiError> for ApiError {
-    fn from(err: apis::auth::AuthApiError) -> Self {
-        Self(err)
+fn auth_status(e: &apis::auth::AuthApiError) -> StatusCode {
+    use apis::auth::AuthApiError;
+    match e {
+        AuthApiError::Validation(_) => StatusCode::BAD_REQUEST,
+        AuthApiError::NotFound => StatusCode::NOT_FOUND,
+        AuthApiError::Inactive => StatusCode::FORBIDDEN,
+        AuthApiError::InvalidCredentials => StatusCode::UNAUTHORIZED,
+        AuthApiError::Verification(_) => StatusCode::UNAUTHORIZED,
+        AuthApiError::DuplicateCode(_) => StatusCode::CONFLICT,
+        AuthApiError::Signing(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        AuthApiError::Repository(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn auth_code(e: &apis::auth::AuthApiError) -> &'static str {
+    use apis::auth::AuthApiError;
+    match e {
+        AuthApiError::Validation(_) => "validation_failed",
+        AuthApiError::NotFound => "not_found",
+        AuthApiError::Inactive => "user_inactive",
+        AuthApiError::InvalidCredentials => "invalid_credentials",
+        AuthApiError::Verification(_) => "token_verification_failed",
+        AuthApiError::DuplicateCode(_) => "duplicate_code",
+        AuthApiError::Signing(_) => "signing_failed",
+        AuthApiError::Repository(_) => "repository_error",
+    }
+}
+
+fn user_status(e: &apis::user::UserApiError) -> StatusCode {
+    use apis::user::UserApiError;
+    match e {
+        UserApiError::Validation(_) => StatusCode::BAD_REQUEST,
+        UserApiError::NotFound => StatusCode::NOT_FOUND,
+        UserApiError::DuplicateCode(_) => StatusCode::CONFLICT,
+        UserApiError::Hashing(_) => StatusCode::INTERNAL_SERVER_ERROR,
+        UserApiError::Repository(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn user_code(e: &apis::user::UserApiError) -> &'static str {
+    use apis::user::UserApiError;
+    match e {
+        UserApiError::Validation(_) => "validation_failed",
+        UserApiError::NotFound => "not_found",
+        UserApiError::DuplicateCode(_) => "duplicate_code",
+        UserApiError::Hashing(_) => "hashing_failed",
+        UserApiError::Repository(_) => "repository_error",
     }
 }
 
@@ -71,13 +117,13 @@ impl IntoResponse for ApiError {
         if status.is_server_error() {
             tracing::error!(
                 code = self.code(),
-                error = %self.0,
+                error = %self,
                 "api error",
             );
         }
         let body = ErrorBody {
             code: self.code().to_string(),
-            message: self.0.to_string(),
+            message: self.to_string(),
         };
         (status, Json(body)).into_response()
     }
@@ -88,9 +134,9 @@ mod tests {
     use super::*;
 
     /// Drive `IntoResponse::into_response` and recover the status +
-    /// JSON body so each variant can be asserted directly. The body
-    /// bytes are re-parsed into `ErrorBody` for a structured
-    /// comparison.
+    /// JSON body so each `AuthApiError` variant can be asserted
+    /// directly. The body bytes are re-parsed into `ErrorBody` for a
+    /// structured comparison.
     async fn render(err: apis::auth::AuthApiError) -> (StatusCode, ErrorBody) {
         let api = ApiError::from(err);
         let response = api.into_response();
@@ -101,6 +147,22 @@ mod tests {
         let parsed: ErrorBody = serde_json::from_slice(&body).unwrap();
         (status, parsed)
     }
+
+    /// Drive `IntoResponse::into_response` for a `UserApiError` and
+    /// recover the status + JSON body so each variant can be
+    /// asserted directly.
+    async fn render_user(err: apis::user::UserApiError) -> (StatusCode, ErrorBody) {
+        let api = ApiError::from(err);
+        let response = api.into_response();
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap();
+        let parsed: ErrorBody = serde_json::from_slice(&body).unwrap();
+        (status, parsed)
+    }
+
+    // ---- AuthApiError mapping (unchanged from prior behaviour) -----
 
     #[tokio::test]
     async fn validation_maps_to_400() {
@@ -168,5 +230,43 @@ mod tests {
         // unit-style variants.
         assert_eq!(outer.status(), StatusCode::NOT_FOUND);
         assert_eq!(outer.code(), "not_found");
+    }
+
+    // ---- UserApiError mapping (new) -----
+
+    #[tokio::test]
+    async fn user_validation_maps_to_400() {
+        let (status, body) = render_user(apis::user::UserApiError::Validation("bad".into())).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body.code, "validation_failed");
+        assert_eq!(body.message, "validation failed: bad");
+    }
+
+    #[tokio::test]
+    async fn user_not_found_maps_to_404() {
+        let (status, body) = render_user(apis::user::UserApiError::NotFound).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "not_found");
+    }
+
+    #[tokio::test]
+    async fn user_duplicate_code_maps_to_409() {
+        let (status, body) = render_user(apis::user::UserApiError::DuplicateCode("u1".into())).await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body.code, "duplicate_code");
+    }
+
+    #[tokio::test]
+    async fn user_hashing_maps_to_500() {
+        let (status, body) = render_user(apis::user::UserApiError::Hashing("oops".into())).await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body.code, "hashing_failed");
+    }
+
+    #[tokio::test]
+    async fn user_repository_maps_to_500() {
+        let (status, body) = render_user(apis::user::UserApiError::Repository("db down".into())).await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body.code, "repository_error");
     }
 }
