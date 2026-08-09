@@ -6,3 +6,4 @@
 //! `apis::project::ProjectService` port.
 
 pub mod domain;
+pub mod usecase;
