@@ -5,5 +5,16 @@
 //! `ProjectUsecase` that orchestrates them and adapts to the
 //! `apis::project::ProjectService` port.
 
+pub mod adapter;
 pub mod domain;
 pub mod usecase;
+
+pub use adapter::persistence::postgres::{ProductRepo, ProjectRepo};
+pub use domain::{
+    DomainError, Product, ProductNew, ProductRepository, ProductUpdate, Project, ProjectMember,
+    ProjectNew, ProjectRepository, ProjectUpdate, RoleType, TeamType, UserService, UserSummary,
+};
+pub use usecase::{
+    CreateProduct, CreateProject, ProductView, ProjectMemberView, ProjectUsecase,
+    ProjectUsecaseConfig, ProjectView, UpdateProduct, UpdateProject, UsecaseError, UserSummaryView,
+};
