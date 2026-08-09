@@ -1,0 +1,34 @@
+[package]
+name = "project"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sqlx = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+# `chrono` provides `DateTime<Utc>` for the `created_at` / `updated_at`
+# columns surfaced by `Product` and `Project` and carried by every view
+# DTO in the crate. The `clock` feature keeps the binary small while
+# still enabling `NOW()`-style integration through `chrono::Utc`.
+chrono = { workspace = true }
+# `apis` provides the outbound `apis::project::ProjectService` port
+# the facade implements and the `apis::user::UserService` port the
+# domain-level `UserService` adapter delegates to. Path-dep because
+# both crates share the workspace.
+apis = { path = "../apis" }
+
+[dev-dependencies]
+# Loads `.env` at test startup so live-DB integration tests can find
+# `AEGIS_PROJECT_DATABASE_URL` without the user having to `source` it
+# manually.
+dotenvy = { workspace = true }
+# Re-export the SQLx driver in `[dev-dependencies]` so the integration
+# tests can build their own `PgPool` without going through the public
+# API for connection setup. The library itself only needs `PgPool` as
+# an opaque type behind `ProductRepo::new` / `ProjectRepo::new`.
+sqlx = { workspace = true }
+# `tokio` macros + multi-thread runtime are needed for `#[tokio::test]`
+# in unit + integration tests.
+tokio = { workspace = true }
