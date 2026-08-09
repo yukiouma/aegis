@@ -110,4 +110,3 @@ pub trait ProductRepository: Send + Sync {
     async fn list(&self) -> Result<Vec<Product>, DomainError>;
     async fn update(&self, input: ProductUpdate) -> Result<Product, DomainError>;
 }
-

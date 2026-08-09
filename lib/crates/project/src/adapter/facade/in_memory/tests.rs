@@ -88,7 +88,14 @@ impl ProductRepository for InMemProductRepo {
             .ok_or(DomainError::NotFound)
     }
     async fn list(&self) -> Result<Vec<Product>, DomainError> {
-        Ok(self.state.lock().unwrap().products.values().cloned().collect())
+        Ok(self
+            .state
+            .lock()
+            .unwrap()
+            .products
+            .values()
+            .cloned()
+            .collect())
     }
     async fn update(&self, input: ProductUpdate) -> Result<Product, DomainError> {
         let mut s = self.state.lock().unwrap();
@@ -183,7 +190,14 @@ impl ProjectRepository for InMemProjectRepo {
             .ok_or(DomainError::NotFound)
     }
     async fn list(&self) -> Result<Vec<Project>, DomainError> {
-        Ok(self.state.lock().unwrap().projects.values().cloned().collect())
+        Ok(self
+            .state
+            .lock()
+            .unwrap()
+            .projects
+            .values()
+            .cloned()
+            .collect())
     }
     async fn update(&self, input: ProjectUpdate) -> Result<Project, DomainError> {
         let mut s = self.state.lock().unwrap();
@@ -254,9 +268,18 @@ fn make_service() -> ProjectServiceImpl<InMemProductRepo, InMemProjectRepo, InMe
     let products = InMemProductRepo::new();
     let projects = InMemProjectRepo::new();
     let users = InMemUserService::with_users(vec![
-        UserSummary { code: "u1".into(), name: "Alice".into() },
-        UserSummary { code: "u2".into(), name: "Bob".into() },
-        UserSummary { code: "u3".into(), name: "Carol".into() },
+        UserSummary {
+            code: "u1".into(),
+            name: "Alice".into(),
+        },
+        UserSummary {
+            code: "u2".into(),
+            name: "Bob".into(),
+        },
+        UserSummary {
+            code: "u3".into(),
+            name: "Carol".into(),
+        },
     ]);
     let usecase = ProjectUsecase::new(ProjectUsecaseConfig {
         product_repo: products,

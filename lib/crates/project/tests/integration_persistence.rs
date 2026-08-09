@@ -207,13 +207,12 @@ async fn project_create_with_membership_then_update_replaces_it() {
 
         // Spot-check via direct query that no `unblind_members` rows
         // remain after the wipe.
-        let rows: Vec<(String,)> = sqlx::query_as(
-            "SELECT team_type FROM project_members WHERE project_id = $1",
-        )
-        .bind(created.id)
-        .fetch_all(&pool)
-        .await
-        .expect("query members");
+        let rows: Vec<(String,)> =
+            sqlx::query_as("SELECT team_type FROM project_members WHERE project_id = $1")
+                .bind(created.id)
+                .fetch_all(&pool)
+                .await
+                .expect("query members");
         assert!(rows.iter().all(|(t,)| t != "unblind_members"));
     })
     .await;

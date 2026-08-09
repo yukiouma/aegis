@@ -80,22 +80,46 @@ fn project_member_accepts_empty_lists() {
 
 #[test]
 fn product_new_rejects_empty_code() {
-    let err = Product::new(1, "".into(), "Alice".into(), "".into(), true, test_now(), test_now())
-        .unwrap_err();
+    let err = Product::new(
+        1,
+        "".into(),
+        "Alice".into(),
+        "".into(),
+        true,
+        test_now(),
+        test_now(),
+    )
+    .unwrap_err();
     assert!(matches!(err, DomainError::EmptyCode));
 }
 
 #[test]
 fn product_new_rejects_empty_name() {
-    let err = Product::new(1, "p1".into(), "".into(), "".into(), true, test_now(), test_now())
-        .unwrap_err();
+    let err = Product::new(
+        1,
+        "p1".into(),
+        "".into(),
+        "".into(),
+        true,
+        test_now(),
+        test_now(),
+    )
+    .unwrap_err();
     assert!(matches!(err, DomainError::EmptyName));
 }
 
 #[test]
 fn product_new_accepts_valid_input() {
-    let p = Product::new(7, "p7".into(), "Alice".into(), "desc".into(), true, test_now(), test_now())
-        .unwrap();
+    let p = Product::new(
+        7,
+        "p7".into(),
+        "Alice".into(),
+        "desc".into(),
+        true,
+        test_now(),
+        test_now(),
+    )
+    .unwrap();
     assert_eq!(p.id, 7);
     assert_eq!(p.code, "p7");
 }

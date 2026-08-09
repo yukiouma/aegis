@@ -3,9 +3,9 @@ mod product;
 mod project;
 mod project_member;
 mod team_role;
-mod user;
 #[cfg(test)]
 mod tests;
+mod user;
 
 pub use error::DomainError;
 pub use product::{Product, ProductNew, ProductRepository, ProductUpdate};

@@ -32,10 +32,7 @@ impl<P: ProductRepository, R: ProjectRepository, U: UserService> ProjectUsecase<
 
     // -------- Products --------
 
-    pub async fn create_product(
-        &self,
-        cmd: CreateProduct,
-    ) -> Result<ProductView, UsecaseError> {
+    pub async fn create_product(&self, cmd: CreateProduct) -> Result<ProductView, UsecaseError> {
         validate_create_product(&cmd)?;
         let product = self
             .product_repo
@@ -66,10 +63,7 @@ impl<P: ProductRepository, R: ProjectRepository, U: UserService> ProjectUsecase<
         Ok(products.into_iter().map(ProductView::from).collect())
     }
 
-    pub async fn update_product(
-        &self,
-        cmd: UpdateProduct,
-    ) -> Result<ProductView, UsecaseError> {
+    pub async fn update_product(&self, cmd: UpdateProduct) -> Result<ProductView, UsecaseError> {
         validate_update_product(&cmd)?;
         let product = self
             .product_repo
@@ -86,23 +80,20 @@ impl<P: ProductRepository, R: ProjectRepository, U: UserService> ProjectUsecase<
 
     // -------- Projects --------
 
-    pub async fn create_project(
-        &self,
-        cmd: CreateProject,
-    ) -> Result<ProjectView, UsecaseError> {
+    pub async fn create_project(&self, cmd: CreateProject) -> Result<ProjectView, UsecaseError> {
         validate_create_project(&cmd)?;
         // Surface `ProductNotFound` early; the FK would catch it later
         // but failing here gives a clearer error path.
-        let product = self
-            .product_repo
-            .find_by_id(cmd.product_id)
-            .await
-            .map_err(|err| match err {
-                DomainError::NotFound => UsecaseError::Repository(DomainError::ProductNotFound(
-                    cmd.product_id.to_string(),
-                )),
-                other => UsecaseError::Repository(other),
-            })?;
+        let product =
+            self.product_repo
+                .find_by_id(cmd.product_id)
+                .await
+                .map_err(|err| match err {
+                    DomainError::NotFound => UsecaseError::Repository(
+                        DomainError::ProductNotFound(cmd.product_id.to_string()),
+                    ),
+                    other => UsecaseError::Repository(other),
+                })?;
 
         let new_project = self
             .project_repo
@@ -145,10 +136,7 @@ impl<P: ProductRepository, R: ProjectRepository, U: UserService> ProjectUsecase<
         Ok(out)
     }
 
-    pub async fn update_project(
-        &self,
-        cmd: UpdateProject,
-    ) -> Result<ProjectView, UsecaseError> {
+    pub async fn update_project(&self, cmd: UpdateProject) -> Result<ProjectView, UsecaseError> {
         validate_update_project(&cmd)?;
         let updated = self
             .project_repo
@@ -189,8 +177,7 @@ fn hydrate_with(
     project: Project,
     product: Product,
 ) -> Result<ProjectView, UsecaseError> {
-    let by_code: HashMap<&str, &UserSummary> =
-        users.iter().map(|u| (u.code.as_str(), u)).collect();
+    let by_code: HashMap<&str, &UserSummary> = users.iter().map(|u| (u.code.as_str(), u)).collect();
     let members = project.members.clone();
     let unblind_members = project.unblind_members.clone();
 
@@ -201,10 +188,8 @@ fn hydrate_with(
         workers: workers.into_iter().map(Into::into).collect(),
     };
 
-    let unblind_leaders: Vec<UserSummary> =
-        lookup_set(&by_code, &unblind_members.leaders)?;
-    let unblind_workers: Vec<UserSummary> =
-        lookup_set(&by_code, &unblind_members.workers)?;
+    let unblind_leaders: Vec<UserSummary> = lookup_set(&by_code, &unblind_members.leaders)?;
+    let unblind_workers: Vec<UserSummary> = lookup_set(&by_code, &unblind_members.workers)?;
     let unblind_view = ProjectMemberView {
         leaders: unblind_leaders.into_iter().map(Into::into).collect(),
         workers: unblind_workers.into_iter().map(Into::into).collect(),

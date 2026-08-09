@@ -11,10 +11,9 @@ use apis::project::{
 };
 use project::{
     CreateProduct, CreateProject, DomainError, ProductNew, ProductRepo, ProductRepository,
-    ProductUpdate, ProjectMember, ProjectNew, ProjectRepo, ProjectRepository,
-    ProjectServiceImpl, ProjectUpdate, ProjectUsecaseConfig, ProjectView, RoleType, TeamType,
-    UpdateProduct, UpdateProject, UsecaseError, UserService, UserServiceImpl, UserSummary,
-    UserSummaryView,
+    ProductUpdate, ProjectMember, ProjectNew, ProjectRepo, ProjectRepository, ProjectServiceImpl,
+    ProjectUpdate, ProjectUsecaseConfig, ProjectView, RoleType, TeamType, UpdateProduct,
+    UpdateProject, UsecaseError, UserService, UserServiceImpl, UserSummary, UserSummaryView,
 };
 use sqlx::PgPool;
 

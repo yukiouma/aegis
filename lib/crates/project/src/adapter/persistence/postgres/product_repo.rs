@@ -23,8 +23,7 @@ impl ProductRepo {
 #[async_trait]
 impl ProductRepository for ProductRepo {
     async fn create(&self, input: ProductNew) -> Result<Product, DomainError> {
-        const SQL: &str =
-            "INSERT INTO products (code, name, description, active) \
+        const SQL: &str = "INSERT INTO products (code, name, description, active) \
              VALUES ($1, $2, $3, $4) \
              RETURNING id, code, name, description, active, created_at, updated_at";
         let row: ProductRow = sqlx::query_as(SQL)
@@ -108,9 +107,7 @@ impl ProductRepository for ProductRepo {
             return self.find_by_id(input.id).await;
         }
         qb.push(" WHERE id = ").push_bind(input.id);
-        qb.push(
-            " RETURNING id, code, name, description, active, created_at, updated_at",
-        );
+        qb.push(" RETURNING id, code, name, description, active, created_at, updated_at");
         let row: ProductRow = qb
             .build_query_as::<ProductRow>()
             .fetch_optional(&self.pool)

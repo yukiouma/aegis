@@ -149,9 +149,7 @@ impl ProjectRepository for ProjectRepo {
         }
         if !first {
             qb.push(" WHERE id = ").push_bind(input.id);
-            qb.push(
-                " RETURNING id, code, description, product_id, active, created_at, updated_at",
-            );
+            qb.push(" RETURNING id, code, description, product_id, active, created_at, updated_at");
             let row: ProjectRow = qb
                 .build_query_as::<ProjectRow>()
                 .fetch_optional(&mut *tx)
@@ -167,12 +165,13 @@ impl ProjectRepository for ProjectRepo {
         if input.members.is_some() || input.unblind_members.is_some() {
             // Ensure the project exists before we touch membership,
             // otherwise `DELETE` on an unknown id silently succeeds.
-            let exists: Option<(i32,)> = sqlx::QueryBuilder::new("SELECT id FROM projects WHERE id = ")
-                .push_bind(input.id)
-                .build_query_as::<(i32,)>()
-                .fetch_optional(&mut *tx)
-                .await
-                .map_err(map_db_error)?;
+            let exists: Option<(i32,)> =
+                sqlx::QueryBuilder::new("SELECT id FROM projects WHERE id = ")
+                    .push_bind(input.id)
+                    .build_query_as::<(i32,)>()
+                    .fetch_optional(&mut *tx)
+                    .await
+                    .map_err(map_db_error)?;
             if exists.is_none() {
                 return Err(DomainError::NotFound);
             }

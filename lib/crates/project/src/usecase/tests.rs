@@ -103,7 +103,14 @@ impl ProductRepository for MockProductRepo {
             .ok_or(DomainError::NotFound)
     }
     async fn list(&self) -> Result<Vec<Product>, DomainError> {
-        Ok(self.state.lock().unwrap().products.values().cloned().collect())
+        Ok(self
+            .state
+            .lock()
+            .unwrap()
+            .products
+            .values()
+            .cloned()
+            .collect())
     }
     async fn update(&self, input: ProductUpdate) -> Result<Product, DomainError> {
         let mut s = self.state.lock().unwrap();
@@ -208,7 +215,14 @@ impl ProjectRepository for MockProjectRepo {
             .ok_or(DomainError::NotFound)
     }
     async fn list(&self) -> Result<Vec<Project>, DomainError> {
-        Ok(self.state.lock().unwrap().projects.values().cloned().collect())
+        Ok(self
+            .state
+            .lock()
+            .unwrap()
+            .projects
+            .values()
+            .cloned()
+            .collect())
     }
     async fn update(&self, input: ProjectUpdate) -> Result<Project, DomainError> {
         let mut s = self.state.lock().unwrap();
@@ -289,9 +303,18 @@ fn make_usecase() -> (
     let products = MockProductRepo::new();
     let projects = MockProjectRepo::new();
     let users = MockUserService::with_users(vec![
-        UserSummary { code: "u1".into(), name: "Alice".into() },
-        UserSummary { code: "u2".into(), name: "Bob".into() },
-        UserSummary { code: "u3".into(), name: "Carol".into() },
+        UserSummary {
+            code: "u1".into(),
+            name: "Alice".into(),
+        },
+        UserSummary {
+            code: "u2".into(),
+            name: "Bob".into(),
+        },
+        UserSummary {
+            code: "u3".into(),
+            name: "Carol".into(),
+        },
     ]);
     let usecase = ProjectUsecase::new(ProjectUsecaseConfig {
         product_repo: products.clone(),
@@ -336,7 +359,10 @@ async fn create_product_rejects_empty_code() {
         })
         .await
         .expect_err("blank code rejected");
-    assert!(matches!(err, UsecaseError::Validation(DomainError::EmptyCode)));
+    assert!(matches!(
+        err,
+        UsecaseError::Validation(DomainError::EmptyCode)
+    ));
 }
 
 #[tokio::test]
@@ -354,10 +380,8 @@ async fn get_product_by_code_returns_view() {
 
 #[tokio::test]
 async fn list_products_returns_all_views() {
-    let products = MockProductRepo::with_products(vec![
-        seed_product(1, "p1"),
-        seed_product(2, "p2"),
-    ]);
+    let products =
+        MockProductRepo::with_products(vec![seed_product(1, "p1"), seed_product(2, "p2")]);
     let usecase = ProjectUsecase::new(ProjectUsecaseConfig {
         product_repo: products,
         project_repo: MockProjectRepo::new(),
@@ -419,8 +443,14 @@ async fn create_project_hydrates_membership() {
         product_repo: products,
         project_repo: MockProjectRepo::new(),
         users: MockUserService::with_users(vec![
-            UserSummary { code: "u1".into(), name: "Alice".into() },
-            UserSummary { code: "u2".into(), name: "Bob".into() },
+            UserSummary {
+                code: "u1".into(),
+                name: "Alice".into(),
+            },
+            UserSummary {
+                code: "u2".into(),
+                name: "Bob".into(),
+            },
         ]),
     });
     let view = usecase
@@ -501,9 +531,18 @@ async fn update_project_replaces_membership_whole_list() {
         product_repo: products,
         project_repo: MockProjectRepo::new(),
         users: MockUserService::with_users(vec![
-            UserSummary { code: "u1".into(), name: "Alice".into() },
-            UserSummary { code: "u2".into(), name: "Bob".into() },
-            UserSummary { code: "u3".into(), name: "Carol".into() },
+            UserSummary {
+                code: "u1".into(),
+                name: "Alice".into(),
+            },
+            UserSummary {
+                code: "u2".into(),
+                name: "Bob".into(),
+            },
+            UserSummary {
+                code: "u3".into(),
+                name: "Carol".into(),
+            },
         ]),
     });
     let created = usecase

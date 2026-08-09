@@ -101,7 +101,9 @@ fn projects_migration_has_updated_at_trigger() {
 fn project_members_migration_has_composite_pk_and_checks() {
     let sql = load_migration("0002_create_projects.sql");
     let upper = sql.to_uppercase();
-    let start = upper.find("CREATE TABLE PROJECT_MEMBERS").expect("project_members");
+    let start = upper
+        .find("CREATE TABLE PROJECT_MEMBERS")
+        .expect("project_members");
     let close = upper[start..].find(");").expect("close") + start + 2;
     let block = &sql[start..close];
     let upper_block = block.to_uppercase();
@@ -127,7 +129,7 @@ fn project_members_migration_cascades_on_delete() {
 mod row_tests {
     use chrono::{TimeZone, Utc};
 
-    use super::super::row::{ProjectMemberRow, ProductRow, ProjectRow};
+    use super::super::row::{ProductRow, ProjectMemberRow, ProjectRow};
     use crate::domain::{ProjectMember, RoleType, TeamType};
 
     fn ts() -> chrono::DateTime<Utc> {
