@@ -245,8 +245,12 @@ pub struct ProjectNew {
     pub code: String,
     pub description: String,
     pub product_id: i32,
-    pub members: ProjectMember,
-    pub unblind_members: ProjectMember,
+    /// Optional. `None` and `Some(empty)` are equivalent — neither inserts
+    /// any `project_members` rows for that team. Letting the field be
+    /// absent keeps the common "create the project shell, add members
+    /// later" path ergonomic.
+    pub members: Option<ProjectMember>,
+    pub unblind_members: Option<ProjectMember>,
 }
 pub struct ProjectUpdate {
     pub id: i32,
@@ -254,18 +258,22 @@ pub struct ProjectUpdate {
     pub description: Option<String>,
     pub product_id: Option<i32>,
     pub active: Option<bool>,
-    /// `None` = leave that team unchanged; `Some(vec)` = replace that team's
-    /// membership rows atomically.
+    /// `None` = leave that team unchanged; `Some(empty)` = wipe that
+    /// team's rows. The two are distinct on update (you can express
+    /// "don't touch" vs "remove everyone") so the field stays optional
+    /// rather than defaulting to an empty `ProjectMember`.
     pub members: Option<ProjectMember>,
     pub unblind_members: Option<ProjectMember>,
 }
 ```
 
 `ProjectRepo::create` opens a transaction, inserts the `projects` row,
-inserts the `project_members` rows (four small `INSERT` loops keyed by
-the four `(team_type, role_type)` combinations), and commits. `update`
-does the same shape: `UPDATE` the `projects` row, then for each `Some`
-team wipe-and-rewrite that team's rows in the same transaction.
+and for each membership field (`members`, `unblind_members`) inserts the
+`project_members` rows when the field is `Some`; `None` skips that team
+entirely. `update` does the same shape: `UPDATE` the `projects` row, then
+for each `Some` team wipe-and-rewrite that team's rows in the same
+transaction (`None` leaves that team alone — distinct from
+`Some(empty)` which wipes it).
 
 `map_db_error` translates SQLSTATE `23503` on `product_id` into
 `DomainError::ProductNotFound(product_id)`, SQLSTATE `23505` into
@@ -317,7 +325,11 @@ validates any `Some` fields the same way.
 the referenced product via `ProductRepo::find_by_id` to surface
 `ProductNotFound` early (the FK would catch it later, but failing early
 gives a clearer error path). Membership validation in the domain
-(`ProjectMember::new`) runs before any repository call.
+(`ProjectMember::new`) runs for each `Some` team before any repository
+call; a `None` team is allowed and produces no rows. This keeps the
+common "create the project shell now, assign members later" flow
+ergonomic — the caller can omit both membership fields and follow up
+with `update_project`.
 
 `ProjectUsecase::get_project_*` resolves the view in three steps:
 read project row → `ProductRepo::find_by_id` to fill `ProjectView::product`
@@ -402,7 +414,16 @@ pub struct UserSummaryView { pub code: String, pub name: String }
 // Request DTOs mirror the usecase command DTOs.
 pub struct CreateProductRequest { pub code, pub name, pub description }
 pub struct UpdateProductRequest { pub id, pub code?, pub name?, pub description?, pub active? }
-pub struct CreateProjectRequest { pub code, pub description, pub product_id, pub members, pub unblind_members }
+pub struct CreateProjectRequest {
+    pub code,
+    pub description,
+    pub product_id,
+    /// Optional. Omit (or pass an empty `ProjectMemberData`) to create the
+    /// project with no membership rows; the shell can be filled in via a
+    /// later `update_project` call.
+    pub members: Option<ProjectMemberData>,
+    pub unblind_members: Option<ProjectMemberData>,
+}
 pub struct ProjectMemberData { pub leaders: Vec<String>, pub workers: Vec<String> }
 pub struct UpdateProjectRequest {
     pub id,
@@ -523,7 +544,11 @@ Following the guideline's tier order:
      project with full membership hydration; `UserNotFound` when a
      member code is unknown; `ProductNotFound` when `product_id` FK
      misses; membership replacement on update; full-list membership
-     delivery on read.
+     delivery on read; **create project with both `members` and
+     `unblind_members` set to `None` produces a project with zero
+     membership rows** (and the read-back view shows empty
+     `ProjectMemberView`s); the same call with `Some(empty)` produces
+     the same observable result.
    - `Box<dyn ProjectService>` compiles; `Send + Sync` is asserted in a
      compile-only test.
 
