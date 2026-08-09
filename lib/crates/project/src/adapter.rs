@@ -8,5 +8,6 @@
 //!
 //! Storage-specific implementations live under `persistence/<backend>/`.
 
+pub mod facade;
 pub mod persistence;
 pub mod service;
