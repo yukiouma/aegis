@@ -10,6 +10,7 @@ pub mod domain;
 pub mod usecase;
 
 pub use adapter::persistence::postgres::{ProductRepo, ProjectRepo};
+pub use adapter::service::user::UserServiceImpl;
 pub use domain::{
     DomainError, Product, ProductNew, ProductRepository, ProductUpdate, Project, ProjectMember,
     ProjectNew, ProjectRepository, ProjectUpdate, RoleType, TeamType, UserService, UserSummary,
