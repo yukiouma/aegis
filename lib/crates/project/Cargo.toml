@@ -21,8 +21,9 @@ apis = { path = "../apis" }
 
 [dev-dependencies]
 # Loads `.env` at test startup so live-DB integration tests can find
-# `AEGIS_PROJECT_DATABASE_URL` without the user having to `source` it
-# manually.
+# the workspace-shared `AEGIS_DATABASE_URL` without the user having
+# to `source` it manually. Same convention as the `auth` / `user`
+# crates.
 dotenvy = { workspace = true }
 # Re-export the SQLx driver in `[dev-dependencies]` so the integration
 # tests can build their own `PgPool` without going through the public

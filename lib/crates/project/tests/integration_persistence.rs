@@ -1,9 +1,11 @@
 //! Live-database integration tests for the PostgreSQL adapter.
 //!
 //! `#[ignore]`-gated; opt in with `cargo test -p project -- --ignored`.
-//! Reads `AEGIS_PROJECT_DATABASE_URL`; loads `.env` via dotenvy. Drops
-//! the live tables + `_sqlx_migrations` before each run so the
-//! migration starts fresh.
+//! Reads the workspace-shared `AEGIS_DATABASE_URL` (same convention
+//! as the `auth` and `user` crates); loads `.env` at the workspace
+//! root via `dotenvy` so the variable only needs to live in `.env`.
+//! Drops the live tables + `_sqlx_migrations` before each run so
+//! the migration starts fresh.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -19,15 +21,15 @@ where
     Fut: std::future::Future<Output = T>,
 {
     let _ = dotenvy::dotenv();
-    let url = std::env::var("AEGIS_PROJECT_DATABASE_URL").unwrap_or_else(|_| {
+    let url = std::env::var("AEGIS_DATABASE_URL").unwrap_or_else(|_| {
         panic!(
-            "AEGIS_PROJECT_DATABASE_URL must be set (or present in .env at the workspace root) \
+            "AEGIS_DATABASE_URL must be set (or present in .env at the workspace root) \
              to run --ignored tests"
         )
     });
     let pool = PgPool::connect(&url)
         .await
-        .expect("connect to PostgreSQL via AEGIS_PROJECT_DATABASE_URL");
+        .expect("connect to PostgreSQL via AEGIS_DATABASE_URL");
 
     // Destructive cleanup. The integration tests own the schema; if
     // you point them at production by mistake you will lose data.
@@ -67,7 +69,7 @@ fn unique_code(prefix: &str) -> String {
 }
 
 #[tokio::test]
-#[ignore = "requires AEGIS_PROJECT_DATABASE_URL pointing at a live PostgreSQL"]
+#[ignore = "requires AEGIS_DATABASE_URL pointing at a live PostgreSQL"]
 async fn product_create_find_list_round_trip() {
     with_pool(|pool| async move {
         let repo = ProductRepo::new(pool);
@@ -93,7 +95,7 @@ async fn product_create_find_list_round_trip() {
 }
 
 #[tokio::test]
-#[ignore = "requires AEGIS_PROJECT_DATABASE_URL pointing at a live PostgreSQL"]
+#[ignore = "requires AEGIS_DATABASE_URL pointing at a live PostgreSQL"]
 async fn product_update_flips_active_and_keeps_created_at() {
     with_pool(|pool| async move {
         let repo = ProductRepo::new(pool);
@@ -125,7 +127,7 @@ async fn product_update_flips_active_and_keeps_created_at() {
 }
 
 #[tokio::test]
-#[ignore = "requires AEGIS_PROJECT_DATABASE_URL pointing at a live PostgreSQL"]
+#[ignore = "requires AEGIS_DATABASE_URL pointing at a live PostgreSQL"]
 async fn project_create_with_no_membership_round_trip() {
     with_pool(|pool| async move {
         let products = ProductRepo::new(pool.clone());
@@ -158,7 +160,7 @@ async fn project_create_with_no_membership_round_trip() {
 }
 
 #[tokio::test]
-#[ignore = "requires AEGIS_PROJECT_DATABASE_URL pointing at a live PostgreSQL"]
+#[ignore = "requires AEGIS_DATABASE_URL pointing at a live PostgreSQL"]
 async fn project_create_with_membership_then_update_replaces_it() {
     with_pool(|pool| async move {
         let products = ProductRepo::new(pool.clone());

@@ -122,9 +122,10 @@ Run them against a local PostgreSQL with:
 
 ```bash
 # .env at the workspace root is sourced automatically by the tests
-# via dotenvy; AEGIS_PROJECT_DATABASE_URL must point at a reachable
-# server (and ideally an empty schema — the tests drop their own
-# tables at the end of each run).
+# via dotenvy; AEGIS_DATABASE_URL (the workspace-shared env var,
+# same as the auth / user crates) must point at a reachable server
+# (and ideally an empty schema — the tests drop their own tables
+# at the end of each run).
 cargo test -p project -- --ignored
 ```
 
