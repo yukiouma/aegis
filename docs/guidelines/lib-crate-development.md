@@ -1,75 +1,195 @@
-# Library Crate Development Guideline
+# Business Library Crate Development
 
-Opinionated, distilled from the `lib/crates/user` crate. Apply to every
-new library crate that lands under `lib/crates/`.
+Applies to every business lib crate under `lib/crates/` (e.g. `user`, `auth`).
+Not every lib crate is a business lib crate — `apis` is a port-defining crate
+and uses a different layout; the user will say "this is a business lib crate"
+when one is to be added.
 
-## 1. Workspace membership and edition
+Two principles, then specific conventions:
 
-- Register the crate in the root [`Cargo.toml`](../../Cargo.toml) `[workspace].members` array and inherit all dependencies from `[workspace.dependencies]` via `{ workspace = true }`. Centralises version selection and prevents drift between crates.
-- Set `edition = "2024"` and `resolver = "3"` at the workspace root. The 2024 edition requires `rust-version >= 1.85`; pin the toolchain via `rust-toolchain.toml` if a specific version is needed by the build, otherwise rely on whatever the developer / CI image ships.
-- Keep the crate's `Cargo.toml` minimal. If a dependency looks unused after `cargo build -p <crate>`, drop it; non-obvious dependencies get a one-line comment explaining why they are still there (see the `chrono` and `apis` justifications in `lib/crates/user/Cargo.toml`).
-- Path-dependencies between sibling workspace crates (`apis = { path = "../apis" }`) are allowed when the two crates share the workspace, and the comment should say so explicitly so reviewers do not try to "promote" the dep to a crates.io version.
+1. **Domain-driven design.** Code is organised by *layer* (`domain`, `usecase`,
+   `adapter`) and by *direction of dependency* inside the adapter layer. The
+   domain layer never imports infrastructure crates; only `usecase` and
+   `adapter` do.
+2. **Clean architecture / ports-and-adapters.** All I/O goes through a port
+   (trait) declared in `domain`. Concrete implementations live in `adapter`
+   and are swappable per backend (e.g. PostgreSQL, in-memory, Redis). The
+   `usecase` is generic over ports so tests can inject in-memory fakes.
 
-## 2. Module layout — no `mod.rs`
+## 1. Workspace wiring
 
-- Use `src/<module>.rs` plus a `src/<module>/` directory of child files. `mod.rs` is the deprecated style on the 2024 edition.
-- Each top-level module (`domain`, `usecase`, `adapter`) exposes its public surface via `pub use …;` at the bottom of `<module>.rs`. Consumers write `use crate::Type` rather than reaching into nested module paths.
-- Private implementation details (`row`, internal helpers) are `pub(crate)` or private. The crate root only re-exports what consumers are allowed to name. A layer boundary like `adapter::persistence` may be `pub(crate)` if callers reach concrete implementations via a re-export at the layer above (e.g. `adapter::UserRepo`), and `pub` on the `postgres` child so the re-export is well-formed.
+- Register the crate in the root `Cargo.toml` `[workspace].members` array and
+  inherit every shared dep via `{ workspace = true }`.
+- Pin `edition = "2024"` and `resolver = "3"` at the workspace root.
+- Drop unused deps after `cargo build -p <crate>`. Non-obvious deps (e.g.
+  `chrono` for the timestamp column, `apis` for the outbound port the facade
+  implements) get a one-line comment explaining *why* they are there.
+- Path-deps between sibling workspace crates (`apis = { path = "../apis" }`)
+  are allowed; the comment should say so explicitly.
 
-## 3. Layered design
+## 2. Module layout (no `mod.rs`)
 
-- Default to a ports-and-adapters split with three top-level modules:
-  - `domain` — pure types, value objects, ports (traits), and domain errors. No I/O, no `sqlx`, no `tokio`.
-  - `usecase` — orchestration, command DTOs (`CreateUser`, `UpdateUser`), the `UserView` projection, and a `UsecaseError` enum that wraps `DomainError`. Generic over the repository port so tests can inject in-memory fakes.
-  - `adapter` — concrete implementations of the domain ports. Sub-organised by direction:
-    - `adapter::persistence::<backend>` for storage adapters (`UserRepo`).
-    - `adapter::facade::<backend>` for outbound-port adapters that adapt the usecase to API-facing traits defined in *other* workspace crates (e.g. `apis::user::UserService`).
-- The domain layer must not depend on any external service crate. Only the usecase and adapter layers touch `sqlx`, `tokio`, `chrono` (for the `DateTime<Utc>` column type), etc.
-- Validate inputs and enforce invariants in the domain layer (e.g. `User::new` rejects empty `code` / `name`). The usecase layer projects domain types into safe view types (`User` → `UserView` via `From`) and re-validates command inputs before reaching the repository. The adapter layer translates driver errors into domain errors.
-- A second storage backend (e.g. `sqlite`) or a second facade backend (e.g. a future gRPC adapter) must be additive: a new `adapter/persistence/<backend>/` or `adapter/facade/<backend>/` directory that implements the port, plus a re-export at the `adapter` boundary. No edits to the existing backends.
+- `src/<module>.rs` plus a `src/<module>/` directory. `mod.rs` is deprecated
+  on the 2024 edition.
+- Each layer module (`src/domain.rs`, `src/usecase.rs`, `src/adapter.rs`)
+  declares its children with `mod …;` and re-exports the public surface via
+  `pub use …;` at the bottom. Consumers write `use crate::Foo`, never reach
+  into nested paths.
+- Private details are `pub(crate)`; a layer boundary may be `pub(crate)` when
+  callers reach concrete types through a re-export at the layer above plus the
+  crate root. Children intended for re-export must be `pub` so the upstream
+  `pub use` compiles.
 
-## 4. Public API surface
+## 3. Three DDD layers
 
-- Re-export everything consumers need from the crate root: the data types (`User`, `Role`), the request/response DTOs (`UserNew`, `UserUpdate`, `CreateUser`, `UpdateUser`, `UserView`), the error variants (`DomainError`, `UsecaseError`), the trait (`UserRepository`), and the constructors (`UserRepo`, `UserUsecase`, `UserServiceImpl`).
-- Hide fields that carry sensitive data behind `pub(crate)` and redact them in `Debug` implementations. Hand-roll `Debug` whenever a `derive(Debug)` would leak a secret; today every field on `User` is safe to log, so the manual impl is structural rather than redact-and-reveal.
-- Keep two domain constructors for every aggregate:
-  - `User::new(...)` — the public-facing validating constructor that the rest of the crate uses. Returns `Result<Self, DomainError>` and rejects empty / whitespace-only fields.
-  - `User::for_repository(...)` — a `pub(crate)` constructor reserved for the adapter layer. Skips domain validation because the data is assumed to have been validated on the way in. The `FromRow` row bridge calls this and the doc-comment names the rule so future code does not call it from outside `adapter::persistence`.
-- Keep the constructor signature obvious: `UserRepo::new(pool)`, `UserUsecase::new(repo)`, `UserServiceImpl::new(usecase)`. No builder ceremony, no async constructors.
+```
+domain   ← pure types, value objects, ports (traits), domain errors. No I/O,
+           no sqlx, no tokio. Validates inputs and enforces invariants.
+usecase  ← orchestrates ports. Holds command DTOs, view DTOs, and a
+           *UsecaseError that wraps *DomainError. Generic over the repository
+           port so tests can inject in-memory fakes. Projects domain → view
+           via From impls. Re-validates command inputs before reaching the
+           repository.
+adapter  ← concrete implementations of domain ports. Sub-organised by the
+           *direction* of the dependency, not by feature:
+             adapter/persistence/<backend>/   storage adapters (Postgres, …)
+             adapter/facade/<backend>/        outbound-port adapters that
+                                              adapt usecase → API-facing
+                                              traits in other workspace crates
+             adapter/cache/<backend>/         cache ports (in-memory, Redis, …)
+             adapter/service/<other_port>/    adapt *another* workspace crate's
+                                              port into a *domain* port, so the
+                                              usecase never reaches the apis crate
+```
 
-## 5. Async and error handling
+Add a new backend by adding a sibling directory (`persistence/sqlite/`,
+`cache/redis/`, …) and a re-export at the adapter boundary. No edits to
+existing backends.
 
-- Async trait methods get `#[async_trait]` from a workspace dep when the trait must be object-safe (e.g. for `Box<dyn UserRepository>` injection in tests or `Box<dyn UserService>` for the facade). Plain `pub async fn` on concrete types is fine.
-- Define a single `*Error` enum per layer with `#[derive(thiserror::Error)]` and `#[source]` on every inner-error variant so `Error::source()` keeps the chain (`UsecaseError::Validation(#[source] DomainError)`, `UsecaseError::Repository(#[source] DomainError)`). Map driver errors into the layer's enum at the boundary.
-- Implement `From<DomainError> for UsecaseError` so the usecase can `?` straight through repository calls. The `From` impl must choose the right variant (`Repository`, not `Validation`); a domain validation error that surfaces from the repository is treated as a `Repository` error.
-- Never panic on I/O failure. The repository's `map_db_error` is the canonical pattern:
-  - `sqlx::Error::RowNotFound` → `DomainError::NotFound`.
-  - `sqlx::Error::Database` whose SQLSTATE is `23505` (unique violation) → `DomainError::DuplicateCode(constraint_name)`. SQLx does not surface the offending bound value, so the payload is the constraint name (e.g. `(constraint users_code_unique)`); the usecase surfaces the original `code` alongside the error if the caller needs it.
-  - Every other error → `DomainError::Repository(driver_message)`.
+## 4. Public API surface at the crate root
 
-## 6. Database schema
+`src/lib.rs` declares the three layers (`pub mod domain; pub mod usecase;
+pub mod adapter;`) and then `pub use`s every type, error variant, trait,
+command DTO, view DTO, and constructor that a consumer is allowed to name.
+The crate-level doc-comment shows the canonical `use` line.
 
-- One migration file per schema change. Place migrations under `<crate>/migrations/` and consume them via `sqlx::migrate!("./migrations")` so the file inventory is the source of truth.
-- Use SQLx runtime API (`sqlx::query_as`, `QueryBuilder`) when the workspace lacks a `sqlx-data.json` cache or a live `DATABASE_URL` at build time. Document the choice in a module-level comment (see the header on `adapter::persistence::postgres`) so the next reviewer can switch to compile-time macros when the cache is wired in.
-- For tables with auto-managed timestamps, prefer `DEFAULT NOW()` on `created_at` / `updated_at` plus a `BEFORE UPDATE` trigger that refreshes `updated_at`. The trigger covers every code path including direct SQL and removes the obligation to remember to bind `NOW()` from each caller.
-- Add CHECK constraints for every enum-shaped column. The application-level `Role::try_from` is the single source of truth for the allowed values; the CHECK constraint is belt-and-braces so an out-of-band insert cannot smuggle an unknown value past the type system.
+Constructors stay obvious: `UserRepo::new(pool)`, `UserUsecase::new(repo)`,
+`AuthServiceImpl::new(usecase)`. No builders, no async constructors.
 
-## 7. Tests
+Sensitive fields are `pub(crate)` and redacted in hand-rolled `Debug` impls.
+Today every field on every aggregate is safe to log; the manual `Debug` is
+structural rather than redact-and-reveal, but the pattern is reserved for
+when a future aggregate gains one.
 
-- Four kinds of tests, in this order:
-  1. **Domain unit tests** inside `src/domain/tests.rs` (and one per layer that has its own logic). Cover value-object conversions (`Role::try_from`), invariant enforcement (`User::new` rejects empty inputs), and any pure logic.
-  2. **Adapter unit tests** inside `src/adapter/<backend>/tests.rs`. Cover the row-to-domain `TryFrom` impl, and — when the adapter owns a schema — **schema content tests** that read the migration file as a string (via `std::fs` + `env!("CARGO_MANIFEST_DIR")`) and assert the column / constraint / trigger set so the schema cannot regress silently.
-  3. **Facade unit tests** inside `src/adapter/facade/<backend>/tests.rs` that wire the adapter on top of an in-memory `UserRepository` (`Mutex<Vec<User>>` + an `AtomicI32` for ids). They exercise the public-facing behaviour of the API port without touching PostgreSQL and lock in object-safety / `Send + Sync` bounds.
-  4. **`tests/` directory tests**:
-     - `tests/public_api.rs` — a compile-only test that names every documented consumer import (`use user::Foo`), pins the constructor dependency chain (`fn(PgPool) -> _` / `fn(R) -> _` as function pointers), and asserts the trait bounds the usecase relies on (`UserRepo: UserRepository`).
-     - `tests/integration_persistence.rs` — live-database round-trips, `#[ignore]`-gated.
-- Live-database tests must be `#[ignore]`-gated so `cargo test -p <crate>` stays green without infrastructure. Load `.env` via `dotenvy::dotenv()` at test startup; read the connection URL from `AEGIS_<CRATE>_DATABASE_URL` (panic with a clear message if it is missing). Apply the migration via `sqlx::migrate!("./migrations").run(&pool).await`. Before applying, **drop the live table and the `_sqlx_migrations` bookkeeping table** so each run starts clean — this is destructive against a real production database, which is intentional so the failure is loud rather than silent.
-- Generate a per-run unique value (atomic counter + wall-clock nanoseconds) for any column that has a UNIQUE constraint, so concurrent runs do not collide on the unique index.
-- `tests/public_api.rs` is the safety net for refactors that touch the documented public surface: a removed re-export or a tightened trait bound shows up there before reviewers see it.
+## 5. Domain aggregates: two constructors
 
-## 8. Verification gate
+Every aggregate root has two constructors:
 
-Before any PR:
+- `Foo::new(...)` — the public-facing **validating** constructor. Returns
+  `Result<Self, DomainError>` and rejects empty / whitespace inputs. Used by
+  tests and any in-crate path that constructs from raw inputs.
+- `Foo::for_repository(...)` — `pub(crate)`, reserved for the adapter layer.
+  Skips validation because the data is assumed to have been validated on the
+  way in. The doc-comment names the rule so future code does not call it
+  from outside `adapter::`.
+
+The `FromRow` row bridge calls `for_repository`. Domain invariants are
+otherwise enforced in `domain`; the usecase re-validates command inputs;
+the adapter translates driver errors into domain errors.
+
+## 6. Errors: one enum per layer, with the chain preserved
+
+- `DomainError` and `UsecaseError` are `#[derive(thiserror::Error)]` enums.
+- Every variant that wraps an inner error carries `#[source] Inner` so
+  `Error::source()` keeps the chain (`UsecaseError::Repository(#[source] DomainError)`).
+- Implement `From<DomainError> for UsecaseError` so the usecase can `?`
+  straight through repository calls. The `From` impl maps a domain
+  validation error from the repository into `UsecaseError::Repository`
+  (not `Validation`), because the contract was already broken upstream.
+- Additional layer-specific variants are fine (`UsecaseError::Verification`
+  for JWT decode failures, etc.) when no existing variant fits.
+- Adapter `map_*_error` is the only place that knows about a driver's error
+  enum. `sqlx::Error::RowNotFound → DomainError::NotFound`;
+  `sqlx::Error::Database` with SQLSTATE `23505` →
+  `DomainError::DuplicateCode(constraint_name)`; everything else →
+  `DomainError::Repository(driver_message)`.
+- Never panic on I/O failure.
+
+## 7. Async and object safety
+
+- Port traits that must be object-safe (`Box<dyn Repo>` for injection,
+  `Arc<dyn Facade>` for cross-crate wiring) get `#[async_trait]` from a
+  workspace dep and a `Send + Sync` bound.
+- Concrete types use plain `pub async fn`.
+- Configuration for a usecase that has too many constructor args goes
+  through a `pub struct *UsecaseConfig<R, D> { /* pub fields */ }` so the
+  call site stays readable without builder ceremony.
+
+## 8. Database schema
+
+- One migration file per schema change, under `<crate>/migrations/`.
+  Consumed via `sqlx::migrate!("./migrations")` so the file inventory is
+  the source of truth.
+- SQLx runtime API (`sqlx::query_as`, `QueryBuilder`) until the workspace
+  ships a `sqlx-data.json` cache or a live `DATABASE_URL` at build time.
+  Document the choice in a module-level comment so the next reviewer can
+  switch to compile-time macros when the cache is wired in.
+- Auto-managed timestamps: prefer `DEFAULT NOW()` on `created_at` /
+  `updated_at` and a `BEFORE UPDATE` trigger that refreshes `updated_at`.
+  The trigger covers every code path including direct SQL.
+- Enum-shaped columns get a `CHECK` constraint. The Rust `Role::try_from`
+  is the source of truth for the allowed values; the CHECK is
+  belt-and-braces against out-of-band inserts.
+
+## 9. Tests, in this order
+
+1. **Domain unit tests** in `src/domain/tests.rs`. Cover value-object
+   conversions (`Role::try_from`), invariant enforcement
+   (`Foo::new` rejects empty inputs), and any pure logic.
+2. **Adapter unit tests** in `src/adapter/<direction>/<backend>/tests.rs`.
+   Cover the row-to-domain `TryFrom` impl, and when the adapter owns a
+   schema, read the migration file as a string (via
+   `std::fs::read_to_string` + `env!("CARGO_MANIFEST_DIR")`) and assert the
+   column / constraint / trigger set so the schema cannot regress silently.
+3. **Facade unit tests** in `src/adapter/facade/<backend>/tests.rs` that
+   wire the adapter on top of an in-memory port (`Arc<Mutex<Vec<Foo>>>`
+   + an `AtomicI32` for ids). They exercise the public-facing behaviour
+   without touching infrastructure and lock in object-safety / `Send + Sync`.
+4. **`tests/` directory**:
+   - `tests/public_api.rs` — compile-only. Names every documented consumer
+     import (`use <crate>::Foo`), pins the constructor chain
+     (`fn(PgPool) -> _`, `fn(R) -> _` as function pointers), and asserts the
+     trait bounds the usecase relies on. The safety net for re-export /
+     trait-bound refactors.
+   - `tests/integration_persistence.rs` — live-database round-trips,
+     `#[ignore]`-gated.
+
+Live-DB tests load `.env` via `dotenvy::dotenv()`, read
+`AEGIS_<CRATE>_DATABASE_URL` (panic with a clear message if missing), apply
+the migrations, then **drop the live table and the `_sqlx_migrations`
+bookkeeping table** so each run starts clean. This is destructive against
+a real production database; that is intentional. Run ignored tests with
+`cargo test -p <crate> -- --ignored --test-threads=1`.
+
+Generate a per-run unique value (atomic counter + wall-clock nanoseconds)
+for any column with a `UNIQUE` constraint so concurrent runs do not collide.
+
+## 10. README at the crate root
+
+Every business lib crate gets a `README.md` covering:
+
+- One-sentence purpose.
+- A `src/` tree matching the actual module shape (e.g. `domain/`,
+  `usecase/`, `adapter/persistence/postgres/`, `adapter/cache/in_memory/`,
+  `adapter/facade/in_memory/`).
+- Database setup if the crate owns a schema: the `sqlx migrate run --source
+  lib/crates/<crate>/migrations` command, the env var
+  (`AEGIS_<CRATE>_DATABASE_URL`), and a small constructor snippet.
+- How to run the ignored tests (`cargo test -p <crate> -- --ignored`).
+- A back-link to this guideline so newcomers find the cross-cutting
+  conventions.
+
+## 11. Verification gate, before any PR
 
 ```bash
 cargo fmt --all -- --check
@@ -79,21 +199,15 @@ cargo doc -p <crate> --no-deps
 cargo test -p <crate> -- --ignored --test-threads=1   # when AEGIS_<CRATE>_DATABASE_URL is set
 ```
 
-If the crate is the only workspace member, also run `cargo check --workspace` / `cargo clippy --workspace` and `cargo test --workspace`. If other workspace members have unrelated build issues (e.g. system-library failures), document them rather than working around them.
+Run `cargo check --workspace` / `cargo clippy --workspace` /
+`cargo test --workspace` when the crate is the only (or only-added)
+workspace member. If unrelated workspace members fail because of system
+libraries, document that rather than working around it.
 
-## 9. README and discoverability
+## 12. Commits and review
 
-Every library crate gets a `README.md` at its root covering:
-
-- One-sentence purpose.
-- `src/` layout tree (matching the actual module shape — e.g. `domain/`, `usecase/`, `adapter/persistence/postgres/`, `adapter/facade/in_memory/`).
-- Database setup if the crate owns a schema (the migration command and the env var, e.g. `sqlx migrate run --source lib/crates/<crate>/migrations` and `AEGIS_<CRATE>_DATABASE_URL`).
-- How to run the ignored tests (`cargo test -p <crate> -- --ignored`) and what env var they require.
-- A back-link to this guideline so newcomers find the cross-cutting conventions.
-
-Link the crate's README from any workspace-level documentation so newcomers can find it.
-
-## 10. Commits and review
-
-- One commit per logical change (scaffolding, domain, usecase, infrastructure, public-API integration, follow-up fix). Lockfile drift gets its own `chore:` commit.
-- Each commit message lists the spec coverage and the verification commands at the bottom so reviewers can run the same gate locally.
+- One commit per logical change (scaffolding, domain, usecase,
+  infrastructure, public-API integration, follow-up fix). Lockfile drift
+  gets its own `chore:` commit.
+- Each commit message lists the spec coverage and the verification commands
+  at the bottom so reviewers can run the same gate locally.
