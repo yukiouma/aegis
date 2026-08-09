@@ -41,6 +41,12 @@ pub enum ApiError {
 
     #[error("{0}")]
     User(#[from] apis::user::UserApiError),
+
+    #[error("{0}")]
+    Project(#[from] apis::project::ProjectApiError),
+
+    #[error("admin or root role required")]
+    Forbidden,
 }
 
 impl ApiError {
@@ -49,6 +55,8 @@ impl ApiError {
         match self {
             Self::Auth(e) => auth_status(e),
             Self::User(e) => user_status(e),
+            Self::Project(e) => project_status(e),
+            Self::Forbidden => StatusCode::FORBIDDEN,
         }
     }
 
@@ -57,6 +65,8 @@ impl ApiError {
         match self {
             Self::Auth(e) => auth_code(e),
             Self::User(e) => user_code(e),
+            Self::Project(e) => project_code(e),
+            Self::Forbidden => "forbidden",
         }
     }
 }
@@ -108,6 +118,30 @@ fn user_code(e: &apis::user::UserApiError) -> &'static str {
         UserApiError::DuplicateCode(_) => "duplicate_code",
         UserApiError::Hashing(_) => "hashing_failed",
         UserApiError::Repository(_) => "repository_error",
+    }
+}
+
+fn project_status(e: &apis::project::ProjectApiError) -> StatusCode {
+    use apis::project::ProjectApiError;
+    match e {
+        ProjectApiError::Validation(_) => StatusCode::BAD_REQUEST,
+        ProjectApiError::NotFound
+        | ProjectApiError::ProductNotFound(_)
+        | ProjectApiError::UserNotFound(_) => StatusCode::NOT_FOUND,
+        ProjectApiError::DuplicateCode(_) => StatusCode::CONFLICT,
+        ProjectApiError::Repository(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn project_code(e: &apis::project::ProjectApiError) -> &'static str {
+    use apis::project::ProjectApiError;
+    match e {
+        ProjectApiError::Validation(_) => "validation_failed",
+        ProjectApiError::NotFound => "not_found",
+        ProjectApiError::ProductNotFound(_) => "product_not_found",
+        ProjectApiError::UserNotFound(_) => "user_not_found",
+        ProjectApiError::DuplicateCode(_) => "duplicate_code",
+        ProjectApiError::Repository(_) => "repository_error",
     }
 }
 
@@ -251,7 +285,8 @@ mod tests {
 
     #[tokio::test]
     async fn user_duplicate_code_maps_to_409() {
-        let (status, body) = render_user(apis::user::UserApiError::DuplicateCode("u1".into())).await;
+        let (status, body) =
+            render_user(apis::user::UserApiError::DuplicateCode("u1".into())).await;
         assert_eq!(status, StatusCode::CONFLICT);
         assert_eq!(body.code, "duplicate_code");
     }
@@ -265,8 +300,83 @@ mod tests {
 
     #[tokio::test]
     async fn user_repository_maps_to_500() {
-        let (status, body) = render_user(apis::user::UserApiError::Repository("db down".into())).await;
+        let (status, body) =
+            render_user(apis::user::UserApiError::Repository("db down".into())).await;
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
         assert_eq!(body.code, "repository_error");
+    }
+
+    // ---- ProjectApiError mapping -----
+
+    async fn render_project(err: apis::project::ProjectApiError) -> (StatusCode, ErrorBody) {
+        let api = ApiError::from(err);
+        let response = api.into_response();
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap();
+        let parsed: ErrorBody = serde_json::from_slice(&body).unwrap();
+        (status, parsed)
+    }
+
+    #[tokio::test]
+    async fn project_validation_maps_to_400() {
+        let (status, body) =
+            render_project(apis::project::ProjectApiError::Validation("bad".into())).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body.code, "validation_failed");
+    }
+
+    #[tokio::test]
+    async fn project_not_found_maps_to_404() {
+        let (status, body) = render_project(apis::project::ProjectApiError::NotFound).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "not_found");
+    }
+
+    #[tokio::test]
+    async fn project_product_not_found_maps_to_404() {
+        let (status, body) =
+            render_project(apis::project::ProjectApiError::ProductNotFound("p1".into())).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "product_not_found");
+    }
+
+    #[tokio::test]
+    async fn project_user_not_found_maps_to_404() {
+        let (status, body) =
+            render_project(apis::project::ProjectApiError::UserNotFound("u1".into())).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "user_not_found");
+    }
+
+    #[tokio::test]
+    async fn project_duplicate_code_maps_to_409() {
+        let (status, body) =
+            render_project(apis::project::ProjectApiError::DuplicateCode("dup".into())).await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body.code, "duplicate_code");
+    }
+
+    #[tokio::test]
+    async fn project_repository_maps_to_500() {
+        let (status, body) =
+            render_project(apis::project::ProjectApiError::Repository("db down".into())).await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body.code, "repository_error");
+    }
+
+    // ---- Forbidden (authorization) -----
+
+    #[tokio::test]
+    async fn forbidden_maps_to_403() {
+        let response = ApiError::Forbidden.into_response();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+        let body = axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap();
+        let parsed: ErrorBody = serde_json::from_slice(&body).unwrap();
+        assert_eq!(parsed.code, "forbidden");
+        assert_eq!(parsed.message, "admin or root role required");
     }
 }

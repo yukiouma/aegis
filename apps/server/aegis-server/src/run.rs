@@ -17,8 +17,8 @@ use auth::{
     TokenVersionCache, UserCredentialsRepo,
 };
 use auth::{UserService as AuthUserService, UserServiceImpl as AuthUserServiceImpl};
-use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 use user::{UserRepo, UserServiceImpl, UserUsecase};
@@ -38,11 +38,13 @@ pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send 
     let cache: Arc<dyn TokenVersionCache> = Arc::new(InMemoryTokenVersionCache::new());
 
     let auth = build_auth_service(&config, pool.clone(), cache)?;
-    let user = build_user_service(pool);
+    let user = build_user_service(pool.clone());
+    let project = build_project_service(pool, user.clone());
 
     let state = AppState {
-        auth: auth as Arc<dyn AuthService>,
-        user: user as Arc<dyn UserService>,
+        auth,
+        user,
+        project,
     };
     let app = transport::http::router(state);
 
@@ -167,6 +169,25 @@ fn build_user_service(pool: PgPool) -> Arc<dyn UserService> {
     Arc::new(service)
 }
 
+/// Wire the project crate's adapters into the apis `ProjectService`
+/// trait object. The same shared `UserService` that drives user CRUD
+/// and auth also hydrates project membership, so it is cloned into
+/// the project-side adapter rather than rebuilt.
+fn build_project_service(
+    pool: PgPool,
+    user: Arc<dyn apis::user::UserService>,
+) -> Arc<dyn apis::project::ProjectService> {
+    let product_repo = project::ProductRepo::new(pool.clone());
+    let project_repo = project::ProjectRepo::new(pool);
+    let users = project::UserServiceImpl::new(user);
+    let usecase = project::ProjectUsecase::new(project::ProjectUsecaseConfig {
+        product_repo,
+        project_repo,
+        users,
+    });
+    Arc::new(project::ProjectServiceImpl::new(usecase))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -194,7 +215,9 @@ mod tests {
     fn set_env(key: &'static str, value: &str) -> EnvGuard {
         let prev = std::env::var(key).ok();
         // SAFETY: serialized via ENV_LOCK.
-        unsafe { std::env::set_var(key, value); }
+        unsafe {
+            std::env::set_var(key, value);
+        }
         EnvGuard { key, prev }
     }
 
@@ -217,7 +240,9 @@ mod tests {
     fn init_tracing_defaults_level_to_info_when_env_missing() {
         let _g = lock_env();
         // SAFETY: serialized via ENV_LOCK.
-        unsafe { std::env::remove_var("AEGIS_LOG_LEVEL"); }
+        unsafe {
+            std::env::remove_var("AEGIS_LOG_LEVEL");
+        }
         let filter = build_env_filter();
         // The default directive ("info") is present somewhere in the
         // directive list, and the filter is parseable.
