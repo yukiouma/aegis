@@ -22,6 +22,7 @@ use std::time::Duration;
 
 use argon2::password_hash::SaltString;
 use argon2::{Argon2, PasswordHasher};
+use async_trait::async_trait;
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode as AxStatus};
@@ -35,6 +36,7 @@ use tracing_subscriber::EnvFilter;
 use aegis_server::state::AppState;
 use aegis_server::transport::http::router as http_router;
 use apis::auth::AuthService;
+use apis::project::ProjectService;
 use apis::user::UserService;
 use auth::{
     AuthServiceImpl, AuthUsecase, AuthUsecaseConfig, DomainIdentityRepo, InMemoryTokenVersionCache,
@@ -104,16 +106,14 @@ async fn run_migrations(pool: &PgPool) {
 /// return the `(code, role)` tuple used for assertions. The code is
 /// unique per call so back-to-back runs cannot collide.
 async fn seed_user(pool: &PgPool, code: &str, role: &str) {
-    sqlx::query(
-        "INSERT INTO users (code, name, role, active) VALUES ($1, $2, $3, $4)",
-    )
-    .bind(code)
-    .bind("Integration Test User")
-    .bind(role)
-    .bind(true)
-    .execute(pool)
-    .await
-    .expect("insert users row");
+    sqlx::query("INSERT INTO users (code, name, role, active) VALUES ($1, $2, $3, $4)")
+        .bind(code)
+        .bind("Integration Test User")
+        .bind(role)
+        .bind(true)
+        .execute(pool)
+        .await
+        .expect("insert users row");
 
     let salt = SaltString::generate(&mut OsRng);
     let hash = Argon2::default()
@@ -177,9 +177,87 @@ fn build_app(pool: PgPool) -> Router {
 
     let auth = Arc::new(AuthServiceImpl::new(auth_usecase)) as Arc<dyn AuthService>;
 
-    let state = AppState { auth, user: apis_user };
+    // `AppState` requires a project service slot, but this test only
+    // exercises the auth surface. A null stub mirrors the pattern used
+    // by the per-namespace handler tests: any project-service method
+    // call would `unimplemented!()`, so accidentally exercising a
+    // project route here would fail loudly.
+    let project: Arc<dyn ProjectService> = Arc::new(NullProjectService);
+
+    let state = AppState {
+        auth,
+        user: apis_user,
+        project,
+    };
 
     http_router(state)
+}
+
+/// Stub [`ProjectService`] for the live-DB auth test. Every method
+/// `unimplemented!()`s — this test never exercises project routes.
+#[derive(Clone)]
+struct NullProjectService;
+
+#[async_trait]
+impl ProjectService for NullProjectService {
+    async fn create_product(
+        &self,
+        _req: apis::project::CreateProductRequest,
+    ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
+        unimplemented!()
+    }
+    async fn get_product_by_id(
+        &self,
+        _id: i32,
+    ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
+        unimplemented!()
+    }
+    async fn get_product_by_code(
+        &self,
+        _code: &str,
+    ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
+        unimplemented!()
+    }
+    async fn list_products(
+        &self,
+    ) -> Result<Vec<apis::project::ProductView>, apis::project::ProjectApiError> {
+        unimplemented!()
+    }
+    async fn update_product(
+        &self,
+        _req: apis::project::UpdateProductRequest,
+    ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
+        unimplemented!()
+    }
+    async fn create_project(
+        &self,
+        _req: apis::project::CreateProjectRequest,
+    ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+        unimplemented!()
+    }
+    async fn get_project_by_id(
+        &self,
+        _id: i32,
+    ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+        unimplemented!()
+    }
+    async fn get_project_by_code(
+        &self,
+        _code: &str,
+    ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+        unimplemented!()
+    }
+    async fn list_projects(
+        &self,
+    ) -> Result<Vec<apis::project::ProjectView>, apis::project::ProjectApiError> {
+        unimplemented!()
+    }
+    async fn update_project(
+        &self,
+        _req: apis::project::UpdateProjectRequest,
+    ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+        unimplemented!()
+    }
 }
 
 /// Drive a `oneshot` request through the router and return the
@@ -255,9 +333,7 @@ async fn happy_path_login_refresh_logout() {
             .uri("/api/auth/refresh")
             .header("authorization", format!("Bearer {access}"))
             .header("content-type", "application/json")
-            .body(Body::from(format!(
-                r#"{{"refresh_token":"{refresh}"}}"#
-            )))
+            .body(Body::from(format!(r#"{{"refresh_token":"{refresh}"}}"#)))
             .unwrap(),
     )
     .await;
@@ -278,9 +354,7 @@ async fn happy_path_login_refresh_logout() {
             .uri("/api/auth/logout")
             .header("authorization", format!("Bearer {access}"))
             .header("content-type", "application/json")
-            .body(Body::from(format!(
-                r#"{{"refresh_token":"{refresh}"}}"#
-            )))
+            .body(Body::from(format!(r#"{{"refresh_token":"{refresh}"}}"#)))
             .unwrap(),
     )
     .await;
@@ -301,13 +375,15 @@ async fn happy_path_login_refresh_logout() {
             .uri("/api/auth/refresh")
             .header("authorization", format!("Bearer {access}"))
             .header("content-type", "application/json")
-            .body(Body::from(format!(
-                r#"{{"refresh_token":"{refresh}"}}"#
-            )))
+            .body(Body::from(format!(r#"{{"refresh_token":"{refresh}"}}"#)))
             .unwrap(),
     )
     .await;
-    assert_eq!(status, AxStatus::UNAUTHORIZED, "post-logout refresh body: {body}");
+    assert_eq!(
+        status,
+        AxStatus::UNAUTHORIZED,
+        "post-logout refresh body: {body}"
+    );
     assert_eq!(body["code"], "token_verification_failed");
 
     cleanup_user(&pool, &code).await;
@@ -336,7 +412,11 @@ async fn login_with_wrong_password_returns_401() {
             .unwrap(),
     )
     .await;
-    assert_eq!(status, AxStatus::UNAUTHORIZED, "wrong-password body: {body}");
+    assert_eq!(
+        status,
+        AxStatus::UNAUTHORIZED,
+        "wrong-password body: {body}"
+    );
     assert_eq!(body["code"], "invalid_credentials");
 
     cleanup_user(&pool, &code).await;

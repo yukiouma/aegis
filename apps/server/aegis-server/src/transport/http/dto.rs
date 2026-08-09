@@ -210,6 +210,180 @@ impl From<apis::auth::UserCredentialView> for UserCredentialViewResponse {
     }
 }
 
+// -- product requests / responses ------------------------------------------
+
+/// Wire-level request body for `POST /api/product`.
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct CreateProductRequest {
+    pub code: String,
+    pub name: String,
+    pub description: String,
+}
+
+/// Wire-level request body for `PATCH /api/product/{code}`. Every
+/// field is optional; `skip_serializing_if` keeps a partial update
+/// round-trip lossless.
+#[derive(Serialize, Deserialize, ToSchema, Default)]
+pub struct UpdateProductRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active: Option<bool>,
+}
+
+/// Wire-level projection of a product.
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ProductViewResponse {
+    pub id: i32,
+    pub code: String,
+    pub name: String,
+    pub description: String,
+    pub active: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::project::ProductView> for ProductViewResponse {
+    fn from(view: apis::project::ProductView) -> Self {
+        Self {
+            id: view.id,
+            code: view.code,
+            name: view.name,
+            description: view.description,
+            active: view.active,
+            created_at: view.created_at,
+            updated_at: view.updated_at,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ProductListResponse {
+    pub products: Vec<ProductViewResponse>,
+}
+
+// -- project membership DTOs -----------------------------------------------
+
+/// Wire-level request payload for a project's membership. `default`
+/// on each vector lets a JSON `{}` deserialize to a present-but-empty
+/// membership, which is the difference between "leave alone" and
+/// "wipe the team" during project update. `skip_serializing_if` on
+/// each vector keeps empty membership objects round-tripping as `{}`
+/// rather than `{"leaders":[],"workers":[]}`.
+#[derive(Serialize, Deserialize, ToSchema, Default, Clone)]
+pub struct ProjectMemberDataRequest {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub leaders: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub workers: Vec<String>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct UserSummaryViewResponse {
+    pub code: String,
+    pub name: String,
+}
+
+impl From<apis::project::UserSummaryView> for UserSummaryViewResponse {
+    fn from(view: apis::project::UserSummaryView) -> Self {
+        Self {
+            code: view.code,
+            name: view.name,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, ToSchema, Default)]
+pub struct ProjectMemberViewResponse {
+    pub leaders: Vec<UserSummaryViewResponse>,
+    pub workers: Vec<UserSummaryViewResponse>,
+}
+
+impl From<apis::project::ProjectMemberView> for ProjectMemberViewResponse {
+    fn from(view: apis::project::ProjectMemberView) -> Self {
+        Self {
+            leaders: view.leaders.into_iter().map(Into::into).collect(),
+            workers: view.workers.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+// -- project requests / responses ------------------------------------------
+
+/// Wire-level request body for `POST /api/project`.
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct CreateProjectRequest {
+    pub code: String,
+    pub description: String,
+    pub product_id: i32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub members: Option<ProjectMemberDataRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unblind_members: Option<ProjectMemberDataRequest>,
+}
+
+/// Wire-level request body for `PATCH /api/project/{code}`.
+///
+/// Membership fields preserve the missing-vs-empty distinction the
+/// usecase relies on: `None` (field absent) leaves the team alone;
+/// `Some(empty)` (a present `{}`) wipes the team. Both vector
+/// fields use `#[serde(default)]` so a present `{}` deserializes to
+/// `Some(ProjectMemberDataRequest { leaders: vec![], workers: vec![] })`
+/// rather than failing on missing keys.
+#[derive(Serialize, Deserialize, ToSchema, Default)]
+pub struct UpdateProjectRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub product_id: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub members: Option<ProjectMemberDataRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unblind_members: Option<ProjectMemberDataRequest>,
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ProjectViewResponse {
+    pub id: i32,
+    pub code: String,
+    pub description: String,
+    pub product: ProductViewResponse,
+    pub members: ProjectMemberViewResponse,
+    pub unblind_members: ProjectMemberViewResponse,
+    pub active: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::project::ProjectView> for ProjectViewResponse {
+    fn from(view: apis::project::ProjectView) -> Self {
+        Self {
+            id: view.id,
+            code: view.code,
+            description: view.description,
+            product: view.product.into(),
+            members: view.members.into(),
+            unblind_members: view.unblind_members.into(),
+            active: view.active,
+            created_at: view.created_at,
+            updated_at: view.updated_at,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct ProjectListResponse {
+    pub projects: Vec<ProjectViewResponse>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -431,5 +605,220 @@ mod tests {
         assert_eq!(resp.user_code, "u7");
         assert_eq!(resp.password_hash, "argon2id$...");
         assert_eq!(resp.token_version, 5);
+    }
+
+    // ---- product DTO round-trips -----
+
+    fn sample_product_view() -> apis::project::ProductView {
+        apis::project::ProductView {
+            id: 1,
+            code: "product-1".into(),
+            name: "Atlas".into(),
+            description: "core platform".into(),
+            active: true,
+            created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+            updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        }
+    }
+
+    fn sample_project_view() -> apis::project::ProjectView {
+        apis::project::ProjectView {
+            id: 2,
+            code: "project-1".into(),
+            description: "alpha".into(),
+            product: sample_product_view(),
+            members: apis::project::ProjectMemberView {
+                leaders: vec![apis::project::UserSummaryView {
+                    code: "leader-1".into(),
+                    name: "Leader One".into(),
+                }],
+                workers: vec![],
+            },
+            unblind_members: apis::project::ProjectMemberView {
+                leaders: vec![],
+                workers: vec![apis::project::UserSummaryView {
+                    code: "worker-2".into(),
+                    name: "Worker Two".into(),
+                }],
+            },
+            active: true,
+            created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+            updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        }
+    }
+
+    #[test]
+    fn create_product_request_roundtrip() {
+        let json = r#"{"code":"p1","name":"Atlas","description":"core"}"#;
+        let req: CreateProductRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.code, "p1");
+        assert_eq!(req.name, "Atlas");
+        assert_eq!(req.description, "core");
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn update_product_request_partial_roundtrip() {
+        let json = r#"{"name":"Atlas v2"}"#;
+        let req: UpdateProductRequest = serde_json::from_str(json).unwrap();
+        assert!(req.code.is_none());
+        assert_eq!(req.name.as_deref(), Some("Atlas v2"));
+        assert!(req.description.is_none());
+        assert!(req.active.is_none());
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn update_product_request_full_roundtrip() {
+        let json = r#"{"code":"p2","name":"B","description":"d","active":false}"#;
+        let req: UpdateProductRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.code.as_deref(), Some("p2"));
+        assert_eq!(req.name.as_deref(), Some("B"));
+        assert_eq!(req.description.as_deref(), Some("d"));
+        assert_eq!(req.active, Some(false));
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn product_view_response_from_apis_view() {
+        let view = sample_product_view();
+        let resp: ProductViewResponse = view.into();
+        assert_eq!(resp.id, 1);
+        assert_eq!(resp.code, "product-1");
+        assert_eq!(resp.name, "Atlas");
+        assert_eq!(resp.description, "core platform");
+        assert!(resp.active);
+    }
+
+    #[test]
+    fn product_list_response_roundtrip() {
+        let json = r#"{"products":[]}"#;
+        let resp: ProductListResponse = serde_json::from_str(json).unwrap();
+        assert!(resp.products.is_empty());
+        assert_eq!(serde_json::to_string(&resp).unwrap(), json);
+    }
+
+    // ---- project DTO round-trips -----
+
+    #[test]
+    fn create_project_request_minimal_roundtrip() {
+        let json = r#"{"code":"pr1","description":"x","product_id":42}"#;
+        let req: CreateProjectRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.code, "pr1");
+        assert_eq!(req.description, "x");
+        assert_eq!(req.product_id, 42);
+        assert!(req.members.is_none());
+        assert!(req.unblind_members.is_none());
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn create_project_request_with_empty_members_roundtrip() {
+        let json =
+            r#"{"code":"pr1","description":"x","product_id":42,"members":{},"unblind_members":{}}"#;
+        let req: CreateProjectRequest = serde_json::from_str(json).unwrap();
+        let members = req.members.as_ref().expect("members present");
+        assert!(members.leaders.is_empty());
+        assert!(members.workers.is_empty());
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn update_project_request_omitted_membership_keeps_none() {
+        let json = r#"{"description":"new"}"#;
+        let req: UpdateProjectRequest = serde_json::from_str(json).unwrap();
+        assert!(req.members.is_none());
+        assert!(req.unblind_members.is_none());
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn update_project_request_empty_membership_becomes_some_empty() {
+        let json = r#"{"members":{},"unblind_members":{}}"#;
+        let req: UpdateProjectRequest = serde_json::from_str(json).unwrap();
+        let members = req.members.as_ref().expect("members present");
+        assert!(members.leaders.is_empty());
+        assert!(members.workers.is_empty());
+        let unblind = req
+            .unblind_members
+            .as_ref()
+            .expect("unblind members present");
+        assert!(unblind.leaders.is_empty());
+        assert!(unblind.workers.is_empty());
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn update_project_request_partial_with_membership_roundtrip() {
+        let json = r#"{"description":"y","active":false,"members":{"leaders":["l1"]}}"#;
+        let req: UpdateProjectRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.description.as_deref(), Some("y"));
+        assert_eq!(req.active, Some(false));
+        let members = req.members.as_ref().expect("members present");
+        assert_eq!(members.leaders, vec!["l1".to_string()]);
+        assert!(members.workers.is_empty());
+        assert!(req.unblind_members.is_none());
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn user_summary_view_response_from_apis_view() {
+        let view = apis::project::UserSummaryView {
+            code: "u1".into(),
+            name: "Alice".into(),
+        };
+        let resp: UserSummaryViewResponse = view.into();
+        assert_eq!(resp.code, "u1");
+        assert_eq!(resp.name, "Alice");
+    }
+
+    #[test]
+    fn project_member_view_response_from_apis_view() {
+        let view = apis::project::ProjectMemberView {
+            leaders: vec![apis::project::UserSummaryView {
+                code: "l1".into(),
+                name: "Leader".into(),
+            }],
+            workers: vec![apis::project::UserSummaryView {
+                code: "w1".into(),
+                name: "Worker".into(),
+            }],
+        };
+        let resp: ProjectMemberViewResponse = view.into();
+        assert_eq!(resp.leaders.len(), 1);
+        assert_eq!(resp.leaders[0].code, "l1");
+        assert_eq!(resp.workers.len(), 1);
+        assert_eq!(resp.workers[0].code, "w1");
+    }
+
+    #[test]
+    fn project_view_response_from_apis_view() {
+        let view = sample_project_view();
+        let resp: ProjectViewResponse = view.into();
+        assert_eq!(resp.id, 2);
+        assert_eq!(resp.code, "project-1");
+        assert_eq!(resp.product.code, "product-1");
+        assert_eq!(resp.members.leaders.len(), 1);
+        assert_eq!(resp.members.leaders[0].code, "leader-1");
+        assert!(resp.members.workers.is_empty());
+        assert!(resp.unblind_members.leaders.is_empty());
+        assert_eq!(resp.unblind_members.workers.len(), 1);
+        assert_eq!(resp.unblind_members.workers[0].code, "worker-2");
+    }
+
+    #[test]
+    fn project_list_response_roundtrip() {
+        let json = r#"{"projects":[]}"#;
+        let resp: ProjectListResponse = serde_json::from_str(json).unwrap();
+        assert!(resp.projects.is_empty());
+        assert_eq!(serde_json::to_string(&resp).unwrap(), json);
     }
 }

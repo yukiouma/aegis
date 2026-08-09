@@ -60,6 +60,9 @@ apis = { path = "../../../lib/crates/apis" }
 # user provides UserRepo (Postgres) + UserServiceImpl
 # (UserUsecase -> apis::user::UserService).
 user = { path = "../../../lib/crates/user" }
+# project provides product/project Postgres repositories, the user-service
+# adapter, usecase, and ProjectService implementation.
+project = { path = "../../../lib/crates/project" }
 
 [dev-dependencies]
 # `argon2` is used by `tests/integration_auth.rs` to seed a real

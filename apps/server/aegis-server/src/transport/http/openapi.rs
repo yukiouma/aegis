@@ -61,6 +61,17 @@ use crate::transport::http::error::ErrorBody;
         dto::UserListResponse,
         dto::UpdateUserCredentialRequest,
         dto::UserCredentialViewResponse,
+        dto::CreateProductRequest,
+        dto::UpdateProductRequest,
+        dto::ProductViewResponse,
+        dto::ProductListResponse,
+        dto::CreateProjectRequest,
+        dto::UpdateProjectRequest,
+        dto::ProjectMemberDataRequest,
+        dto::ProjectViewResponse,
+        dto::ProjectMemberViewResponse,
+        dto::UserSummaryViewResponse,
+        dto::ProjectListResponse,
         ErrorBody,
     )),
     tags(
@@ -68,6 +79,8 @@ use crate::transport::http::error::ErrorBody;
         (name = "system", description = "Operational endpoints"),
         (name = "user", description = "User CRUD endpoints"),
         (name = "user-credential", description = "User credential self-service endpoints"),
+        (name = "product", description = "Product lifecycle endpoints"),
+        (name = "project", description = "Project lifecycle endpoints"),
     ),
 )]
 pub struct ApiDoc;
@@ -131,11 +144,7 @@ mod tests {
     #[test]
     fn openapi_registers_wire_dto_schemas() {
         let doc = openapi();
-        let schemas = &doc
-            .components
-            .as_ref()
-            .unwrap()
-            .schemas;
+        let schemas = &doc.components.as_ref().unwrap().schemas;
         for name in [
             "LoginRequest",
             "LoginDomainRequest",
@@ -153,6 +162,17 @@ mod tests {
             "UserListResponse",
             "UpdateUserCredentialRequest",
             "UserCredentialViewResponse",
+            "CreateProductRequest",
+            "UpdateProductRequest",
+            "ProductViewResponse",
+            "ProductListResponse",
+            "CreateProjectRequest",
+            "UpdateProjectRequest",
+            "ProjectMemberDataRequest",
+            "ProjectViewResponse",
+            "ProjectMemberViewResponse",
+            "UserSummaryViewResponse",
+            "ProjectListResponse",
         ] {
             let entry: &RefOr<_> = schemas
                 .get(name)

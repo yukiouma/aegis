@@ -34,21 +34,33 @@ tests/
 
 ## Routes
 
-| Method | Path                          | Description                          |
-| ------ | ----------------------------- | ------------------------------------ |
-| POST   | `/api/auth/login`             | exchange `(code, password)` for tokens |
-| POST   | `/api/auth/login-domain`      | exchange domain identity for tokens  |
-| POST   | `/api/auth/refresh`           | exchange refresh token for access    |
-| POST   | `/api/auth/logout`            | invalidate a session                 |
-| GET    | `/healthz`                    | liveness probe                       |
-| GET    | `/swagger-ui/`                | swagger-ui HTML                      |
-| GET    | `/api-docs/openapi.json`      | OpenAPI v3 document                  |
+| Method | Path                          | Description                          | Auth                       |
+| ------ | ----------------------------- | ------------------------------------ | -------------------------- |
+| POST   | `/api/auth/login`             | exchange `(code, password)` for tokens | none                       |
+| POST   | `/api/auth/login-domain`      | exchange domain identity for tokens  | none                       |
+| POST   | `/api/auth/refresh`           | exchange refresh token for access    | Bearer                     |
+| POST   | `/api/auth/logout`            | invalidate a session                 | Bearer                     |
+| PATCH  | `/api/auth/user-credential`   | rotate own password                  | Bearer                     |
+| POST   | `/api/user`                   | create user                          | Bearer                     |
+| GET    | `/api/user`                   | list users                           | Bearer                     |
+| GET    | `/api/user/{code}`            | get user                             | Bearer                     |
+| PATCH  | `/api/user/{code}`            | partial update user                  | Bearer                     |
+| POST   | `/api/product`                | create product                       | Bearer (`Root`/`Admin`)    |
+| GET    | `/api/product`                | list products                        | Bearer                     |
+| GET    | `/api/product/{code}`         | get product by code                  | Bearer                     |
+| PATCH  | `/api/product/{code}`         | partial update product               | Bearer (`Root`/`Admin`)    |
+| POST   | `/api/project`                | create project                       | Bearer (`Root`/`Admin`)    |
+| GET    | `/api/project`                | list projects                        | Bearer                     |
+| GET    | `/api/project/{code}`         | get project by code                  | Bearer                     |
+| PATCH  | `/api/project/{code}`         | partial update project               | Bearer (`Root`/`Admin`)    |
+| GET    | `/healthz`                    | liveness probe                       | none                       |
+| GET    | `/swagger-ui/`                | swagger-ui HTML                      | none                       |
+| GET    | `/api-docs/openapi.json`      | OpenAPI v3 document                  | none                       |
 
 All `/api/*` routes emit a tracing span via `tower-http`'s
-`TraceLayer`. Auth is required for any future protected route:
-handlers take an `AuthClaims` extractor that pulls
-`Authorization: Bearer <token>` and verifies it before the handler
-body runs.
+`TraceLayer`. Bearer means `Authorization: Bearer <access-token>`.
+`Root`/`Admin` means the token's `role` claim must be `root` or
+`admin`; other authenticated callers receive `403 forbidden`.
 
 ## Configuration
 
@@ -114,9 +126,12 @@ Every error is rendered as a typed `ErrorBody`:
 | ---------------------------- | ---- | ------------------------------------ |
 | `validation_failed`          | 400  | request body failed validation       |
 | `not_found`                  | 404  | user / domain identity not found     |
+| `product_not_found`          | 404  | project references a missing product |
+| `user_not_found`             | 404  | project member references a missing user |
 | `user_inactive`              | 403  | user exists but `active = false`     |
 | `invalid_credentials`        | 401  | wrong password                       |
 | `token_verification_failed`  | 401  | bad / expired / stale-version token  |
+| `forbidden`                  | 403  | write attempted by non-`Root`/`Admin` |
 | `duplicate_code`             | 409  | credential row already exists        |
 | `signing_failed`             | 500  | JWT mint failure (call site bug)     |
 | `repository_error`           | 500  | wrapping any other backend error     |

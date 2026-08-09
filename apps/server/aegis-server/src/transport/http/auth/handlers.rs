@@ -278,6 +278,71 @@ mod tests {
     #[derive(Clone)]
     struct NullUserService;
 
+    #[derive(Clone)]
+    struct NullProjectService;
+
+    #[async_trait]
+    impl apis::project::ProjectService for NullProjectService {
+        async fn create_product(
+            &self,
+            _req: apis::project::CreateProductRequest,
+        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+        async fn get_product_by_id(
+            &self,
+            _id: i32,
+        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+        async fn get_product_by_code(
+            &self,
+            _code: &str,
+        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+        async fn list_products(
+            &self,
+        ) -> Result<Vec<apis::project::ProductView>, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+        async fn update_product(
+            &self,
+            _req: apis::project::UpdateProductRequest,
+        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+        async fn create_project(
+            &self,
+            _req: apis::project::CreateProjectRequest,
+        ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+        async fn get_project_by_id(
+            &self,
+            _id: i32,
+        ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+        async fn get_project_by_code(
+            &self,
+            _code: &str,
+        ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+        async fn list_projects(
+            &self,
+        ) -> Result<Vec<apis::project::ProjectView>, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+        async fn update_project(
+            &self,
+            _req: apis::project::UpdateProjectRequest,
+        ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+    }
+
     #[async_trait]
     impl apis::user::UserService for NullUserService {
         async fn create(
@@ -313,6 +378,7 @@ mod tests {
         AppState {
             auth: Arc::new(mock) as Arc<dyn AuthService>,
             user: Arc::new(NullUserService) as Arc<dyn apis::user::UserService>,
+            project: Arc::new(NullProjectService) as Arc<dyn apis::project::ProjectService>,
         }
     }
 

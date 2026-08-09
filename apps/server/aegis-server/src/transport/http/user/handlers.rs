@@ -332,11 +332,80 @@ mod tests {
         }
     }
 
+    /// Configurable mock for [`apis::project::ProjectService`]. User
+    /// router tests do not exercise project routes; the stub simply
+    /// returns `NotFound` so an accidental reference is loud.
+    #[derive(Clone)]
+    pub struct NullProjectService;
+
+    #[async_trait]
+    impl apis::project::ProjectService for NullProjectService {
+        async fn create_product(
+            &self,
+            _req: apis::project::CreateProductRequest,
+        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
+            Err(apis::project::ProjectApiError::NotFound)
+        }
+        async fn get_product_by_id(
+            &self,
+            _id: i32,
+        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
+            Err(apis::project::ProjectApiError::NotFound)
+        }
+        async fn get_product_by_code(
+            &self,
+            _code: &str,
+        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
+            Err(apis::project::ProjectApiError::NotFound)
+        }
+        async fn list_products(
+            &self,
+        ) -> Result<Vec<apis::project::ProductView>, apis::project::ProjectApiError> {
+            Ok(Vec::new())
+        }
+        async fn update_product(
+            &self,
+            _req: apis::project::UpdateProductRequest,
+        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
+            Err(apis::project::ProjectApiError::NotFound)
+        }
+        async fn create_project(
+            &self,
+            _req: apis::project::CreateProjectRequest,
+        ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+            Err(apis::project::ProjectApiError::NotFound)
+        }
+        async fn get_project_by_id(
+            &self,
+            _id: i32,
+        ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+            Err(apis::project::ProjectApiError::NotFound)
+        }
+        async fn get_project_by_code(
+            &self,
+            _code: &str,
+        ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+            Err(apis::project::ProjectApiError::NotFound)
+        }
+        async fn list_projects(
+            &self,
+        ) -> Result<Vec<apis::project::ProjectView>, apis::project::ProjectApiError> {
+            Ok(Vec::new())
+        }
+        async fn update_project(
+            &self,
+            _req: apis::project::UpdateProjectRequest,
+        ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+            Err(apis::project::ProjectApiError::NotFound)
+        }
+    }
+
     /// Build an `AppState` from the supplied mocks.
     pub fn test_state(user: MockUserService, auth: MockAuth) -> AppState {
         AppState {
             auth: Arc::new(auth) as Arc<dyn AuthService>,
             user: Arc::new(user) as Arc<dyn apis::user::UserService>,
+            project: Arc::new(NullProjectService) as Arc<dyn apis::project::ProjectService>,
         }
     }
 

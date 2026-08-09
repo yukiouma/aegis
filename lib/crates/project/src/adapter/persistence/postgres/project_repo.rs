@@ -28,8 +28,13 @@ impl ProjectRepository for ProjectRepo {
     async fn create(&self, input: ProjectNew) -> Result<Project, DomainError> {
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
 
+        // `QueryBuilder::push_bind` emits `$1`, `$2`, … placeholders
+        // — Postgres' `INSERT ... VALUES` requires those to be wrapped
+        // in `(...)`, so we open the parenthesis before the first
+        // bind and close it after the last. Comma separators stay
+        // inside the parens (between binds, not after).
         let row: ProjectRow = sqlx::QueryBuilder::new(
-            "INSERT INTO projects (code, description, product_id, active) VALUES ",
+            "INSERT INTO projects (code, description, product_id, active) VALUES (",
         )
         .push_bind(&input.code)
         .push(", ")
@@ -38,7 +43,7 @@ impl ProjectRepository for ProjectRepo {
         .push_bind(input.product_id)
         .push(", ")
         .push_bind(true)
-        .push(" RETURNING id, code, description, product_id, active, created_at, updated_at")
+        .push(") RETURNING id, code, description, product_id, active, created_at, updated_at")
         .build_query_as::<ProjectRow>()
         .fetch_one(&mut *tx)
         .await
