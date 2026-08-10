@@ -320,6 +320,7 @@ async fn usecase_create_and_get_by_code_returns_user_view() {
                 code: code.clone(),
                 name: "Usecase User".to_string(),
                 role: Role::Admin,
+                active: true,
             })
             .await
             .expect("usecase create");

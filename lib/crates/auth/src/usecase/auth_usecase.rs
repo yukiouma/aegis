@@ -10,9 +10,9 @@ use crate::domain::{
 
 use super::commands::{
     AccessTokenView, AuthClaimsView, CreateUserCredential, FindUserCredential,
-    LoginWithDomainUserInfo, LoginWithPassword, Logout, LogoutAck, RefreshAccessToken, RegisterUser,
-    RegisteredUserView, RemoveUserCredential, RemoveUserCredentialAck, Role, TokenPairView,
-    UpdateUserCredential, UserCredentialView, VerifyAccessToken,
+    LoginWithDomainUserInfo, LoginWithPassword, Logout, LogoutAck, RefreshAccessToken,
+    RegisterUser, RegisteredUserView, RemoveUserCredential, RemoveUserCredentialAck, Role,
+    TokenPairView, UpdateUserCredential, UserCredentialView, VerifyAccessToken,
 };
 use super::error::UsecaseError;
 
@@ -324,10 +324,11 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         // `General`/inactive defaults.
         let user = match self.user_service.get_by_code(&cmd.user_code).await {
             Ok(existing) => existing,
-            Err(DomainError::NotFound) => self
-                .user_service
-                .create(&cmd.user_code, &cmd.user_name)
-                .await?,
+            Err(DomainError::NotFound) => {
+                self.user_service
+                    .create(&cmd.user_code, &cmd.user_name)
+                    .await?
+            }
             Err(other) => return Err(other.into()),
         };
 
@@ -338,13 +339,8 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         if self.credentials.find_by_code(&cmd.user_code).await.is_err() {
             let password_hash = Self::hash_password(&cmd.password)?;
             let now = chrono::Utc::now();
-            let creds = UserCredentials::for_repository(
-                cmd.user_code.clone(),
-                password_hash,
-                0,
-                now,
-                now,
-            );
+            let creds =
+                UserCredentials::for_repository(cmd.user_code.clone(), password_hash, 0, now, now);
             self.credentials.create(creds).await?;
         }
 

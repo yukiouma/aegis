@@ -1066,12 +1066,7 @@ async fn register_user_rejects_unknown_domain() {
     let creds = MockUserCredentialsRepo::default();
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    let usecase = make_registration_usecase(
-        creds,
-        ids,
-        users,
-        vec!["example.com".into()],
-    );
+    let usecase = make_registration_usecase(creds, ids, users, vec!["example.com".into()]);
 
     let err = usecase
         .register_user(RegisterUser {
@@ -1095,12 +1090,7 @@ async fn register_user_accepts_domain_with_normalized_matching() {
     let creds = MockUserCredentialsRepo::default();
     let ids = MockDomainIdentityRepo::default();
     let users = FakeUserService::default();
-    let usecase = make_registration_usecase(
-        creds,
-        ids,
-        users,
-        vec!["  EXAMPLE.com ".into()],
-    );
+    let usecase = make_registration_usecase(creds, ids, users, vec!["  EXAMPLE.com ".into()]);
 
     let view = usecase
         .register_user(RegisterUser {
@@ -1143,11 +1133,12 @@ async fn register_user_persists_hashed_password_with_initial_token_version() {
         .await
         .expect("credential row exists");
     assert_eq!(stored.token_version, 0);
-    let parsed =
-        argon2::PasswordHash::new(&stored.password_hash).expect("phc hash parses");
-    assert!(argon2::Argon2::default()
-        .verify_password(b"hunter2", &parsed)
-        .is_ok());
+    let parsed = argon2::PasswordHash::new(&stored.password_hash).expect("phc hash parses");
+    assert!(
+        argon2::Argon2::default()
+            .verify_password(b"hunter2", &parsed)
+            .is_ok()
+    );
 }
 
 #[tokio::test]
@@ -1217,9 +1208,11 @@ async fn register_user_reuses_existing_user_credential_and_identity() {
     let stored = creds.find_by_code("u1").await.expect("cred");
     assert_eq!(stored.token_version, 7);
     let parsed = argon2::PasswordHash::new(&stored.password_hash).expect("phc");
-    assert!(argon2::Argon2::default()
-        .verify_password(b"previous", &parsed)
-        .is_ok());
+    assert!(
+        argon2::Argon2::default()
+            .verify_password(b"previous", &parsed)
+            .is_ok()
+    );
     // The existing identity is still present.
     assert_eq!(ids.state.lock().unwrap().rows.len(), 1);
 }

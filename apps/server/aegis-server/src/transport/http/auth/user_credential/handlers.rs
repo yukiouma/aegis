@@ -234,10 +234,7 @@ mod tests {
             if let Some(err) = self.register_err.clone() {
                 return Err(err);
             }
-            Ok(self
-                .register
-                .clone()
-                .expect("register result configured"))
+            Ok(self.register.clone().expect("register result configured"))
         }
     }
 
@@ -354,10 +351,7 @@ mod tests {
 
     fn app(state: AppState) -> Router {
         Router::new()
-            .route(
-                "/api/auth/user-credential",
-                post(register).patch(update),
-            )
+            .route("/api/auth/user-credential", post(register).patch(update))
             .with_state(state)
     }
 
