@@ -4,15 +4,15 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::{
-    DomainError, DomainIdentityRepository, TokenVersionCache, UserCredentials,
+    DomainError, DomainIdentity, DomainIdentityRepository, TokenVersionCache, UserCredentials,
     UserCredentialsRepository, UserService,
 };
 
 use super::commands::{
     AccessTokenView, AuthClaimsView, CreateUserCredential, FindUserCredential,
-    LoginWithDomainUserInfo, LoginWithPassword, Logout, LogoutAck, RefreshAccessToken,
-    RemoveUserCredential, RemoveUserCredentialAck, Role, TokenPairView, UpdateUserCredential,
-    UserCredentialView, VerifyAccessToken,
+    LoginWithDomainUserInfo, LoginWithPassword, Logout, LogoutAck, RefreshAccessToken, RegisterUser,
+    RegisteredUserView, RemoveUserCredential, RemoveUserCredentialAck, Role, TokenPairView,
+    UpdateUserCredential, UserCredentialView, VerifyAccessToken,
 };
 use super::error::UsecaseError;
 
@@ -282,6 +282,98 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
     ) -> Result<UserCredentialView, UsecaseError> {
         let creds = self.credentials.find_by_code(&cmd.code).await?;
         Ok(creds_to_view(&creds))
+    }
+
+    /// Register a new user, credential row, and domain identity.
+    ///
+    /// Validates inputs, enforces the configured `allow_domains`
+    /// (case-insensitive after trimming whitespace; empty list rejects
+    /// every registration), and creates any missing user, credential,
+    /// or identity rows. Existing rows are reused instead of
+    /// overwritten. The raw password is hashed with Argon2 before
+    /// persistence; only the freshly seeded user is forced to
+    /// `Role::General` and `active = false`.
+    pub async fn register_user(
+        &self,
+        cmd: RegisterUser,
+    ) -> Result<RegisteredUserView, UsecaseError> {
+        if cmd.user_code.trim().is_empty() {
+            return Err(UsecaseError::Repository(DomainError::EmptyCode));
+        }
+        if cmd.user_name.trim().is_empty() {
+            return Err(UsecaseError::Repository(DomainError::EmptyPasswordHash));
+        }
+        if cmd.hostname.trim().is_empty() || cmd.sid.trim().is_empty() {
+            return Err(UsecaseError::Repository(DomainError::EmptyPasswordHash));
+        }
+        if cmd.password.is_empty() {
+            return Err(UsecaseError::Repository(DomainError::EmptyPasswordHash));
+        }
+        let normalized_domain = cmd.domain_name.trim().to_ascii_lowercase();
+        if normalized_domain.is_empty() {
+            return Err(UsecaseError::Repository(DomainError::EmptyPasswordHash));
+        }
+        if !self.allow_domains.contains(&normalized_domain) {
+            return Err(UsecaseError::Repository(DomainError::DomainNotAllowed(
+                cmd.domain_name,
+            )));
+        }
+
+        // Idempotent user creation: reuse an existing record if the
+        // user already exists, otherwise create one with the forced
+        // `General`/inactive defaults.
+        let user = match self.user_service.get_by_code(&cmd.user_code).await {
+            Ok(existing) => existing,
+            Err(DomainError::NotFound) => self
+                .user_service
+                .create(&cmd.user_code, &cmd.user_name)
+                .await?,
+            Err(other) => return Err(other.into()),
+        };
+
+        // Idempotent credential creation: only create a credential row
+        // if the user has none. The initial token_version is 0 so
+        // verify/refresh treat the freshly-registered user identically
+        // to the seeded default.
+        if self.credentials.find_by_code(&cmd.user_code).await.is_err() {
+            let password_hash = Self::hash_password(&cmd.password)?;
+            let now = chrono::Utc::now();
+            let creds = UserCredentials::for_repository(
+                cmd.user_code.clone(),
+                password_hash,
+                0,
+                now,
+                now,
+            );
+            self.credentials.create(creds).await?;
+        }
+
+        // Idempotent identity creation: only insert if the exact
+        // (user_code, domain_name, hostname, sid) tuple is missing.
+        if self
+            .identities
+            .find(&cmd.user_code, &cmd.domain_name, &cmd.hostname, &cmd.sid)
+            .await
+            .is_err()
+        {
+            let identity = DomainIdentity::for_repository(
+                cmd.user_code.clone(),
+                cmd.domain_name.clone(),
+                cmd.hostname.clone(),
+                cmd.sid.clone(),
+            );
+            self.identities.create(identity).await?;
+        }
+
+        Ok(RegisteredUserView {
+            user_code: cmd.user_code,
+            user_name: cmd.user_name,
+            role: user.role,
+            active: user.active,
+            domain_name: cmd.domain_name,
+            hostname: cmd.hostname,
+            sid: cmd.sid,
+        })
     }
 
     pub async fn create_user_credential(
