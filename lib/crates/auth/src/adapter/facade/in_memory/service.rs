@@ -55,6 +55,7 @@ fn map_error(err: UsecaseError) -> AuthApiError {
             DomainError::InvalidCredentials => AuthApiError::InvalidCredentials,
             DomainError::DuplicateCode(code) => AuthApiError::DuplicateCode(code),
             DomainError::Repository(msg) => AuthApiError::Repository(msg),
+            DomainError::DomainNotAllowed(msg) => AuthApiError::Validation(msg),
             DomainError::EmptyCode
             | DomainError::EmptyPasswordHash
             | DomainError::InvalidRole(_) => AuthApiError::Repository(d.to_string()),

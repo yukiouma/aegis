@@ -21,6 +21,7 @@ pub use domain::{
 pub use usecase::{
     AccessTokenView, AuthClaimsView, AuthUsecase, AuthUsecaseConfig, CreateUserCredential,
     FindUserCredential, LoginWithDomainUserInfo, LoginWithPassword, Logout, LogoutAck,
-    RefreshAccessToken, RemoveUserCredential, RemoveUserCredentialAck, TokenPairView,
-    UpdateUserCredential, UsecaseError, UserCredentialView, VerifyAccessToken,
+    RefreshAccessToken, RegisterUser, RegisteredUserView, RemoveUserCredential,
+    RemoveUserCredentialAck, TokenPairView, UpdateUserCredential, UsecaseError, UserCredentialView,
+    VerifyAccessToken,
 };

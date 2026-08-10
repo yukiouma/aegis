@@ -149,6 +149,25 @@ impl DomainIdentityRepository for DomainIdentityRepo {
         let row = row.ok_or(DomainError::NotFound)?;
         row.try_into()
     }
+
+    async fn create(&self, identity: DomainIdentity) -> Result<DomainIdentity, DomainError> {
+        let row: DomainIdentityRow = sqlx::QueryBuilder::new(
+            "INSERT INTO auth_user_domain_identities (user_code, domain_name, hostname, sid) VALUES (",
+        )
+        .push_bind(identity.user_code.clone())
+        .push(", ")
+        .push_bind(identity.domain_name.clone())
+        .push(", ")
+        .push_bind(identity.hostname.clone())
+        .push(", ")
+        .push_bind(identity.sid.clone())
+        .push(") RETURNING user_code, domain_name, hostname, sid")
+        .build_query_as::<DomainIdentityRow>()
+        .fetch_one(&self.pool)
+        .await
+        .map_err(map_db_error)?;
+        row.try_into()
+    }
 }
 
 fn map_db_error(err: sqlx::Error) -> DomainError {

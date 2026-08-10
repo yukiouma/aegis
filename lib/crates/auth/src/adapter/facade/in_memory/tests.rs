@@ -32,6 +32,7 @@ fn make_service(
         signing_key: b"0123456789abcdef0123456789abcdef".to_vec(),
         access_ttl: Duration::from_secs(60),
         refresh_ttl: Duration::from_secs(3600),
+        allow_domains: vec!["example.com".into()],
     };
     AuthServiceImpl::new(crate::usecase::AuthUsecase::new(cfg))
 }

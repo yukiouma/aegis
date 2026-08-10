@@ -23,6 +23,9 @@ pub enum DomainError {
     #[error("invalid credentials")]
     InvalidCredentials,
 
+    #[error("domain is not allowed: {0}")]
+    DomainNotAllowed(String),
+
     #[error("repository error: {0}")]
     Repository(String),
 }

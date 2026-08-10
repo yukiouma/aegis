@@ -139,6 +139,11 @@ impl DomainIdentityRepository for MockDomainIdentityRepo {
             .cloned()
             .ok_or(DomainError::NotFound)
     }
+
+    async fn create(&self, identity: DomainIdentity) -> Result<DomainIdentity, DomainError> {
+        self.state.lock().unwrap().rows.push(identity.clone());
+        Ok(identity)
+    }
 }
 
 #[derive(Clone, Default)]
@@ -153,12 +158,28 @@ impl FakeUserService {
             active,
             role,
         };
-        self.by_code.lock().unwrap().insert(code.to_string(), summary);
+        self.by_code
+            .lock()
+            .unwrap()
+            .insert(code.to_string(), summary);
     }
 }
 
 #[async_trait]
 impl UserService for FakeUserService {
+    async fn create(&self, code: &str, _name: &str) -> Result<UserSummary, DomainError> {
+        let summary = UserSummary {
+            code: code.to_owned(),
+            active: false,
+            role: Role::General,
+        };
+        self.by_code
+            .lock()
+            .unwrap()
+            .insert(code.to_owned(), summary.clone());
+        Ok(summary)
+    }
+
     async fn get_by_code(&self, code: &str) -> Result<UserSummary, DomainError> {
         self.by_code
             .lock()
@@ -184,6 +205,7 @@ pub fn make_usecase(
         signing_key: b"0123456789abcdef0123456789abcdef".to_vec(),
         access_ttl: std::time::Duration::from_secs(60),
         refresh_ttl: std::time::Duration::from_secs(3600),
+        allow_domains: vec!["example.com".into()],
     };
     AuthUsecase::new(cfg)
 }

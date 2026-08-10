@@ -32,6 +32,10 @@ pub struct AuthUsecaseConfig<R: UserCredentialsRepository, D: DomainIdentityRepo
     pub signing_key: Vec<u8>,
     pub access_ttl: Duration,
     pub refresh_ttl: Duration,
+    /// Domains permitted for user registration. Compared
+    /// case-insensitively after trimming whitespace. An empty list
+    /// denies every registration.
+    pub allow_domains: Vec<String>,
 }
 
 /// Internal JWT claim payload for access tokens.
@@ -76,10 +80,17 @@ pub struct AuthUsecase<R: UserCredentialsRepository, D: DomainIdentityRepository
     signing_key: Vec<u8>,
     access_ttl: Duration,
     refresh_ttl: Duration,
+    allow_domains: std::collections::HashSet<String>,
 }
 
 impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D> {
     pub fn new(config: AuthUsecaseConfig<R, D>) -> Self {
+        let allow_domains = config
+            .allow_domains
+            .into_iter()
+            .map(|d| d.trim().to_ascii_lowercase())
+            .filter(|d| !d.is_empty())
+            .collect();
         Self {
             credentials: config.credentials,
             identities: config.identities,
@@ -88,6 +99,7 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             signing_key: config.signing_key,
             access_ttl: config.access_ttl,
             refresh_ttl: config.refresh_ttl,
+            allow_domains,
         }
     }
 
@@ -114,10 +126,7 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             return Err(UsecaseError::Repository(DomainError::EmptyPasswordHash));
         }
         let creds = self.credentials.find_by_code(&cmd.code).await?;
-        let summary = self
-            .user_service
-            .get_by_code(&cmd.code)
-            .await?;
+        let summary = self.user_service.get_by_code(&cmd.code).await?;
         if !summary.active {
             return Err(UsecaseError::Repository(DomainError::Inactive));
         }
@@ -161,10 +170,7 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
         self.identities
             .find(&cmd.code, &cmd.domain_name, &cmd.hostname, &cmd.sid)
             .await?;
-        let summary = self
-            .user_service
-            .get_by_code(&cmd.code)
-            .await?;
+        let summary = self.user_service.get_by_code(&cmd.code).await?;
         if !summary.active {
             return Err(UsecaseError::Repository(DomainError::Inactive));
         }
@@ -198,10 +204,7 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             )));
         }
 
-        let summary = self
-            .user_service
-            .get_by_code(&claims.sub)
-            .await?;
+        let summary = self.user_service.get_by_code(&claims.sub).await?;
         if !summary.active {
             return Err(UsecaseError::Repository(DomainError::Inactive));
         }
@@ -232,10 +235,7 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthUsecase<R, D
             )));
         }
 
-        let summary = self
-            .user_service
-            .get_by_code(&claims.sub)
-            .await?;
+        let summary = self.user_service.get_by_code(&claims.sub).await?;
         if !summary.active {
             return Err(UsecaseError::Repository(DomainError::Inactive));
         }
