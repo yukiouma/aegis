@@ -58,7 +58,7 @@ impl<R: UserRepository> UserUsecase<R> {
             code: cmd.code,
             name: cmd.name,
             role: cmd.role,
-            active: true,
+            active: cmd.active,
         };
 
         let user = self.repository.create(input).await?;

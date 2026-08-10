@@ -39,6 +39,7 @@ fn public_types_are_nameable_from_crate_root() {
         code: "u1".into(),
         name: "Alice".into(),
         role: Role::General,
+        active: true,
     });
     assert_update(UpdateUser {
         id: 1,

@@ -201,6 +201,7 @@ async fn create_returns_view() {
         code: "u1".into(),
         name: "Alice".into(),
         role: Role::Admin,
+        active: true,
     };
 
     let view = usecase.create(cmd).await.expect("create succeeds");
@@ -309,6 +310,7 @@ async fn empty_create_inputs_are_rejected_before_hitting_repo() {
         code: "   ".into(),
         name: "Alice".into(),
         role: Role::Admin,
+        active: true,
     };
     let err = usecase.create(cmd).await.expect_err("blank code rejected");
     assert!(
@@ -320,6 +322,7 @@ async fn empty_create_inputs_are_rejected_before_hitting_repo() {
         code: "u1".into(),
         name: "".into(),
         role: Role::Admin,
+        active: true,
     };
     let err = usecase.create(cmd).await.expect_err("blank name rejected");
     assert!(matches!(
@@ -364,6 +367,7 @@ async fn repository_errors_propagate_as_usecase_repository_error() {
         code: "u1".into(),
         name: "Alice".into(),
         role: Role::Admin,
+        active: true,
     };
     // Drive the usecase to create the first user.
     usecase.create(cmd).await.expect("first create works");
@@ -373,6 +377,7 @@ async fn repository_errors_propagate_as_usecase_repository_error() {
         code: "u1".into(),
         name: "Alice".into(),
         role: Role::Admin,
+        active: true,
     };
     let err = usecase.create(cmd).await.expect_err("duplicate rejected");
     assert!(

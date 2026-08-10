@@ -4,9 +4,7 @@
 //! the in-crate type names so a regression in `user.rs` is caught
 //! at `cargo test -p apis` time.
 
-use apis::user::{
-    CreateUserRequest, Role, UpdateUserRequest, UserApiError, UserService, UserView,
-};
+use apis::user::{CreateUserRequest, Role, UpdateUserRequest, UserApiError, UserService, UserView};
 
 /// Every public type in `apis::user` is nameable from the test.
 #[test]
@@ -35,6 +33,7 @@ fn public_types_are_nameable() {
         code: "u1".into(),
         name: "Alice".into(),
         role: Role::General,
+        active: true,
     });
     assert_update(UpdateUserRequest {
         id: 1,
@@ -200,22 +199,13 @@ impl AuthService for FakeAuthService {
     ) -> Result<TokenPair, AuthApiError> {
         todo!()
     }
-    async fn logout(
-        &self,
-        _req: LogoutRequest,
-    ) -> Result<LogoutResponse, AuthApiError> {
+    async fn logout(&self, _req: LogoutRequest) -> Result<LogoutResponse, AuthApiError> {
         todo!()
     }
-    async fn verify(
-        &self,
-        _req: VerifyRequest,
-    ) -> Result<AuthClaims, AuthApiError> {
+    async fn verify(&self, _req: VerifyRequest) -> Result<AuthClaims, AuthApiError> {
         todo!()
     }
-    async fn refresh(
-        &self,
-        _req: RefreshRequest,
-    ) -> Result<RefreshResponse, AuthApiError> {
+    async fn refresh(&self, _req: RefreshRequest) -> Result<RefreshResponse, AuthApiError> {
         todo!()
     }
     async fn find_user_credential_by_code(

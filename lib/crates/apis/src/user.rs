@@ -71,6 +71,7 @@ pub struct CreateUserRequest {
     pub code: String,
     pub name: String,
     pub role: Role,
+    pub active: bool,
 }
 
 /// Input DTO for updating a user.
