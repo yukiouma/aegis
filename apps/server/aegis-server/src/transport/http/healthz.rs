@@ -17,6 +17,7 @@ use crate::state::AppState;
     get,
     path = "",
     tag = "system",
+    operation_id = "system_healthz",
     responses(
         (status = 200, description = "Liveness probe response", content_type = "text/plain", body = String),
     ),

@@ -38,6 +38,7 @@ fn member_data(value: dto::ProjectMemberDataRequest) -> apis::project::ProjectMe
 /// `POST /api/product` — create a product.
 #[utoipa::path(
     post, path = "", tag = "product",
+    operation_id = "product_create",
     request_body = dto::CreateProductRequest,
     responses(
         (status = 201, description = "Product created", body = dto::ProductViewResponse),
@@ -69,6 +70,7 @@ pub async fn create_product(
 /// `GET /api/product` — list products.
 #[utoipa::path(
     get, path = "", tag = "product",
+    operation_id = "product_list",
     responses(
         (status = 200, description = "Products list", body = dto::ProductListResponse),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
@@ -88,6 +90,7 @@ pub async fn list_products(
 /// `GET /api/product/{code}` — fetch a product by its code.
 #[utoipa::path(
     get, path = "/{code}", tag = "product",
+    operation_id = "product_get_by_code",
     params(
         ("code" = String, Path, description = "Product code to fetch"),
     ),
@@ -115,6 +118,7 @@ pub async fn get_product_by_code(
 /// to the apis update request.
 #[utoipa::path(
     patch, path = "/{code}", tag = "product",
+    operation_id = "product_update",
     params(
         ("code" = String, Path, description = "Product code to update"),
     ),
@@ -156,6 +160,7 @@ pub async fn update_product(
 /// `POST /api/project` — create a project.
 #[utoipa::path(
     post, path = "", tag = "project",
+    operation_id = "project_create",
     request_body = dto::CreateProjectRequest,
     responses(
         (status = 201, description = "Project created", body = dto::ProjectViewResponse),
@@ -190,6 +195,7 @@ pub async fn create_project(
 /// `GET /api/project` — list projects.
 #[utoipa::path(
     get, path = "", tag = "project",
+    operation_id = "project_list",
     responses(
         (status = 200, description = "Projects list", body = dto::ProjectListResponse),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
@@ -209,6 +215,7 @@ pub async fn list_projects(
 /// `GET /api/project/{code}` — fetch a project by its code.
 #[utoipa::path(
     get, path = "/{code}", tag = "project",
+    operation_id = "project_get_by_code",
     params(
         ("code" = String, Path, description = "Project code to fetch"),
     ),
@@ -238,6 +245,7 @@ pub async fn get_project_by_code(
 ///   rows.
 #[utoipa::path(
     patch, path = "/{code}", tag = "project",
+    operation_id = "project_update",
     params(
         ("code" = String, Path, description = "Project code to update"),
     ),
