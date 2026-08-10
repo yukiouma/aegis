@@ -167,8 +167,9 @@ mod tests {
     use apis::auth::{
         AuthApiError, AuthClaims, AuthService, CreateUserCredentialRequest,
         LoginWithDomainUserInfoRequest, LoginWithPasswordRequest, LogoutRequest, LogoutResponse,
-        RefreshRequest, RefreshResponse, RemoveUserCredentialResponse, TokenPair,
-        UpdateUserCredentialRequest, UserCredentialView, VerifyRequest,
+        RefreshRequest, RefreshResponse, RegisterUserRequest, RegisterUserResponse,
+        RemoveUserCredentialResponse, TokenPair, UpdateUserCredentialRequest, UserCredentialView,
+        VerifyRequest,
     };
 
     /// Mock `AuthService` whose login / refresh / logout methods
@@ -268,6 +269,12 @@ mod tests {
             }
             assert!(self.logout_ok, "logout_ok must be set");
             Ok(LogoutResponse::default())
+        }
+        async fn register_user(
+            &self,
+            _req: RegisterUserRequest,
+        ) -> Result<RegisterUserResponse, AuthApiError> {
+            unimplemented!("not exercised by this handler")
         }
     }
 

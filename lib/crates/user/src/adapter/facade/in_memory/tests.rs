@@ -3,14 +3,14 @@
 //! Wires the adapter on top of an in-memory `UserRepository` so the
 //! behaviour is exercised without touching PostgreSQL.
 
-use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicI32, Ordering};
 
 use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
 
-use apis::user::UserService;
 use apis::user::Role as ApiRole;
+use apis::user::UserService;
 
 use crate::domain::{DomainError, User, UserNew, UserRepository, UserUpdate};
 use crate::usecase::UserUsecase;
@@ -147,6 +147,7 @@ async fn create_returns_view_with_assigned_id_and_active_true() {
             code: "u1".into(),
             name: "Alice".into(),
             role: ApiRole::Admin,
+            active: true,
         })
         .await
         .unwrap();
@@ -167,6 +168,7 @@ async fn create_rejects_empty_code_with_validation() {
             code: "  ".into(),
             name: "Alice".into(),
             role: ApiRole::General,
+            active: true,
         })
         .await
         .unwrap_err();
@@ -180,6 +182,7 @@ async fn create_rejects_duplicate_code() {
         code: "u1".into(),
         name: "Alice".into(),
         role: ApiRole::General,
+        active: true,
     })
     .await
     .unwrap();
@@ -188,6 +191,7 @@ async fn create_rejects_duplicate_code() {
             code: "u1".into(),
             name: "Bob".into(),
             role: ApiRole::General,
+            active: true,
         })
         .await
         .unwrap_err();
@@ -205,6 +209,7 @@ async fn get_by_id_returns_seeded_user() {
             code: "u1".into(),
             name: "Alice".into(),
             role: ApiRole::Admin,
+            active: true,
         })
         .await
         .unwrap();
@@ -227,6 +232,7 @@ async fn get_by_code_returns_seeded_user() {
             code: "u1".into(),
             name: "Alice".into(),
             role: ApiRole::Admin,
+            active: true,
         })
         .await
         .unwrap();
@@ -256,6 +262,7 @@ async fn list_returns_all_seeded_users_in_insertion_order() {
             code: code.into(),
             name: name.into(),
             role: ApiRole::General,
+            active: true,
         })
         .await
         .unwrap();
@@ -282,6 +289,7 @@ async fn update_applies_supplied_fields_and_returns_view() {
             code: "u1".into(),
             name: "Alice".into(),
             role: ApiRole::General,
+            active: true,
         })
         .await
         .unwrap();
@@ -322,6 +330,7 @@ async fn update_rejects_duplicate_code() {
         code: "u1".into(),
         name: "Alice".into(),
         role: ApiRole::General,
+        active: true,
     })
     .await
     .unwrap();
@@ -330,6 +339,7 @@ async fn update_rejects_duplicate_code() {
             code: "u2".into(),
             name: "Bob".into(),
             role: ApiRole::General,
+            active: true,
         })
         .await
         .unwrap();

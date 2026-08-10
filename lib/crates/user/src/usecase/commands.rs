@@ -4,6 +4,7 @@ pub struct CreateUser {
     pub code: String,
     pub name: String,
     pub role: Role,
+    pub active: bool,
 }
 
 #[derive(Default)]

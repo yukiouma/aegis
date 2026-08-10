@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use apis::auth::{
     AuthApiError, AuthService, LoginWithDomainUserInfoRequest, LoginWithPasswordRequest,
-    LogoutRequest, RefreshRequest, VerifyRequest,
+    LogoutRequest, RefreshRequest, RegisterUserRequest, VerifyRequest,
 };
 use apis::user::Role as ApiRole;
 
@@ -32,6 +32,7 @@ fn make_service(
         signing_key: b"0123456789abcdef0123456789abcdef".to_vec(),
         access_ttl: Duration::from_secs(60),
         refresh_ttl: Duration::from_secs(3600),
+        allow_domains: vec!["example.com".into()],
     };
     AuthServiceImpl::new(crate::usecase::AuthUsecase::new(cfg))
 }
@@ -293,6 +294,46 @@ async fn remove_user_credential_returns_empty_response() {
 
     let err = svc.find_user_credential_by_code("u1").await.unwrap_err();
     assert!(matches!(err, AuthApiError::NotFound));
+}
+
+#[tokio::test]
+async fn register_user_returns_view_and_maps_disallowed_domain_to_validation_error() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let svc = make_service(creds, ids, users);
+
+    let view = svc
+        .register_user(RegisterUserRequest {
+            user_code: "u1".into(),
+            user_name: "Alice".into(),
+            domain_name: "example.com".into(),
+            hostname: "host".into(),
+            sid: "S-1-5".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect("registration succeeds");
+    assert_eq!(view.user_code, "u1");
+    assert_eq!(view.user_name, "Alice");
+    assert_eq!(view.role, ApiRole::General);
+    assert!(!view.active);
+    assert_eq!(view.domain_name, "example.com");
+    assert_eq!(view.hostname, "host");
+    assert_eq!(view.sid, "S-1-5");
+
+    let err = svc
+        .register_user(RegisterUserRequest {
+            user_code: "u2".into(),
+            user_name: "Bob".into(),
+            domain_name: "evil.test".into(),
+            hostname: "host".into(),
+            sid: "S-1-5".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect_err("disallowed domain maps to validation");
+    assert!(matches!(err, AuthApiError::Validation(_)));
 }
 
 #[tokio::test]

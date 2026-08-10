@@ -298,8 +298,9 @@ mod tests {
     use apis::auth::{
         AuthApiError, AuthClaims as ApisAuthClaims, AuthService, CreateUserCredentialRequest,
         LoginWithDomainUserInfoRequest, LoginWithPasswordRequest, LogoutRequest, LogoutResponse,
-        RefreshRequest, RefreshResponse, RemoveUserCredentialResponse, TokenPair,
-        UpdateUserCredentialRequest, UserCredentialView, VerifyRequest,
+        RefreshRequest, RefreshResponse, RegisterUserRequest, RegisterUserResponse,
+        RemoveUserCredentialResponse, TokenPair, UpdateUserCredentialRequest, UserCredentialView,
+        VerifyRequest,
     };
 
     /// Build an `AuthClaims` (the wrapper extractor in
@@ -550,6 +551,12 @@ mod tests {
         }
         async fn logout(&self, _req: LogoutRequest) -> Result<LogoutResponse, AuthApiError> {
             unimplemented!()
+        }
+        async fn register_user(
+            &self,
+            _req: RegisterUserRequest,
+        ) -> Result<RegisterUserResponse, AuthApiError> {
+            unimplemented!("not exercised by this handler")
         }
     }
 

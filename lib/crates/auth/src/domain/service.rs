@@ -22,5 +22,7 @@ pub struct UserSummary {
 
 #[async_trait]
 pub trait UserService: Send + Sync {
+    async fn create(&self, code: &str, name: &str) -> Result<UserSummary, DomainError>;
+
     async fn get_by_code(&self, code: &str) -> Result<UserSummary, DomainError>;
 }

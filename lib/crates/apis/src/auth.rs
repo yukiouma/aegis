@@ -58,6 +58,38 @@ pub struct RefreshRequest {
     pub refresh_token: String,
 }
 
+/// Input DTO for [`AuthService::register_user`].
+///
+/// The implementation hashes `password` before persisting; the raw
+/// value is never returned. The remaining fields populate the
+/// `user` row (`user_code`, `user_name`), the `auth_user_domain_identities`
+/// row (`domain_name`, `hostname`, `sid`), and the credential row.
+/// The user is forced to `Role::General` and `active = false` when
+/// the row is missing.
+#[derive(Debug, Clone)]
+pub struct RegisterUserRequest {
+    pub user_code: String,
+    pub user_name: String,
+    pub domain_name: String,
+    pub hostname: String,
+    pub sid: String,
+    pub password: String,
+}
+
+/// Response DTO for [`AuthService::register_user`]. Carries the
+/// post-registration view of the user and identity binding. Never
+/// exposes a password or password hash.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegisterUserResponse {
+    pub user_code: String,
+    pub user_name: String,
+    pub role: Role,
+    pub active: bool,
+    pub domain_name: String,
+    pub hostname: String,
+    pub sid: String,
+}
+
 /// Input DTO for [`AuthService::create_user_credential`].
 ///
 /// `password` is the raw user-supplied password; the implementation
@@ -244,8 +276,22 @@ pub trait AuthService: Send + Sync {
     /// (idempotent). A malformed or already-revoked refresh token
     /// surfaces as `AuthApiError::Verification`. Storage failures
     /// surface as `AuthApiError::Repository`.
-    async fn logout(
+    async fn logout(&self, req: LogoutRequest) -> Result<LogoutResponse, AuthApiError>;
+
+    // -- user registration --------------------------------------------
+
+    /// Register a user, credential row, and domain identity for
+    /// `req.user_code`.
+    ///
+    /// Existing rows are reused rather than overwritten. The user is
+    /// forced to `Role::General` and `active = false` if the user is
+    /// newly created; pre-existing users keep their current role and
+    /// `active` state. The implementation hashes `req.password`
+    /// before persisting and only persists the resulting PHC string.
+    /// A `req.domain_name` not in the allowlist surfaces as
+    /// `AuthApiError::Validation`.
+    async fn register_user(
         &self,
-        req: LogoutRequest,
-    ) -> Result<LogoutResponse, AuthApiError>;
+        req: RegisterUserRequest,
+    ) -> Result<RegisterUserResponse, AuthApiError>;
 }

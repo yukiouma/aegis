@@ -18,7 +18,7 @@ use crate::domain::{
 };
 use crate::usecase::commands::{
     AuthClaimsView, LoginWithDomainUserInfo, LoginWithPassword, Logout, RefreshAccessToken,
-    TokenPairView, VerifyAccessToken,
+    RegisterUser, TokenPairView, VerifyAccessToken,
 };
 use crate::usecase::{AuthUsecase, AuthUsecaseConfig, UsecaseError};
 
@@ -139,6 +139,11 @@ impl DomainIdentityRepository for MockDomainIdentityRepo {
             .cloned()
             .ok_or(DomainError::NotFound)
     }
+
+    async fn create(&self, identity: DomainIdentity) -> Result<DomainIdentity, DomainError> {
+        self.state.lock().unwrap().rows.push(identity.clone());
+        Ok(identity)
+    }
 }
 
 #[derive(Clone, Default)]
@@ -153,12 +158,28 @@ impl FakeUserService {
             active,
             role,
         };
-        self.by_code.lock().unwrap().insert(code.to_string(), summary);
+        self.by_code
+            .lock()
+            .unwrap()
+            .insert(code.to_string(), summary);
     }
 }
 
 #[async_trait]
 impl UserService for FakeUserService {
+    async fn create(&self, code: &str, _name: &str) -> Result<UserSummary, DomainError> {
+        let summary = UserSummary {
+            code: code.to_owned(),
+            active: false,
+            role: Role::General,
+        };
+        self.by_code
+            .lock()
+            .unwrap()
+            .insert(code.to_owned(), summary.clone());
+        Ok(summary)
+    }
+
     async fn get_by_code(&self, code: &str) -> Result<UserSummary, DomainError> {
         self.by_code
             .lock()
@@ -184,6 +205,7 @@ pub fn make_usecase(
         signing_key: b"0123456789abcdef0123456789abcdef".to_vec(),
         access_ttl: std::time::Duration::from_secs(60),
         refresh_ttl: std::time::Duration::from_secs(3600),
+        allow_domains: vec!["example.com".into()],
     };
     AuthUsecase::new(cfg)
 }
@@ -991,5 +1013,230 @@ async fn remove_user_credential_returns_not_found_for_unknown_code() {
     assert!(matches!(
         err,
         UsecaseError::Repository(DomainError::NotFound)
+    ));
+}
+
+// -- user registration ----------------------------------------------------
+
+fn make_registration_usecase(
+    creds: MockUserCredentialsRepo,
+    ids: MockDomainIdentityRepo,
+    users: FakeUserService,
+    allow_domains: Vec<String>,
+) -> AuthUsecase<MockUserCredentialsRepo, MockDomainIdentityRepo> {
+    let cfg = AuthUsecaseConfig {
+        credentials: creds,
+        identities: ids,
+        user_service: Arc::new(users),
+        cache: Arc::new(crate::InMemoryTokenVersionCache::new()),
+        signing_key: b"0123456789abcdef0123456789abcdef".to_vec(),
+        access_ttl: std::time::Duration::from_secs(60),
+        refresh_ttl: std::time::Duration::from_secs(3600),
+        allow_domains,
+    };
+    AuthUsecase::new(cfg)
+}
+
+#[tokio::test]
+async fn register_user_rejects_when_allowlist_is_empty() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_registration_usecase(creds, ids, users, vec![]);
+
+    let err = usecase
+        .register_user(RegisterUser {
+            user_code: "u1".into(),
+            user_name: "Alice".into(),
+            domain_name: "example.com".into(),
+            hostname: "host".into(),
+            sid: "S-1-5".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect_err("empty allowlist rejects every registration");
+    assert!(matches!(
+        err,
+        UsecaseError::Repository(DomainError::DomainNotAllowed(_))
+    ));
+}
+
+#[tokio::test]
+async fn register_user_rejects_unknown_domain() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_registration_usecase(creds, ids, users, vec!["example.com".into()]);
+
+    let err = usecase
+        .register_user(RegisterUser {
+            user_code: "u1".into(),
+            user_name: "Alice".into(),
+            domain_name: "evil.test".into(),
+            hostname: "host".into(),
+            sid: "S-1-5".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect_err("disallowed domain");
+    assert!(matches!(
+        err,
+        UsecaseError::Repository(DomainError::DomainNotAllowed(ref d)) if d == "evil.test"
+    ));
+}
+
+#[tokio::test]
+async fn register_user_accepts_domain_with_normalized_matching() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_registration_usecase(creds, ids, users, vec!["  EXAMPLE.com ".into()]);
+
+    let view = usecase
+        .register_user(RegisterUser {
+            user_code: "u1".into(),
+            user_name: "Alice".into(),
+            domain_name: " example.COM ".into(),
+            hostname: "host".into(),
+            sid: "S-1-5".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect("registration succeeds");
+    assert_eq!(view.user_code, "u1");
+    assert_eq!(view.domain_name, " example.COM ");
+    assert!(!view.active);
+    assert_eq!(view.role, Role::General);
+}
+
+#[tokio::test]
+async fn register_user_persists_hashed_password_with_initial_token_version() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_registration_usecase(creds.clone(), ids, users, vec!["example.com".into()]);
+
+    usecase
+        .register_user(RegisterUser {
+            user_code: "u1".into(),
+            user_name: "Alice".into(),
+            domain_name: "example.com".into(),
+            hostname: "host".into(),
+            sid: "S-1-5".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect("registration succeeds");
+
+    let stored = creds
+        .find_by_code("u1")
+        .await
+        .expect("credential row exists");
+    assert_eq!(stored.token_version, 0);
+    let parsed = argon2::PasswordHash::new(&stored.password_hash).expect("phc hash parses");
+    assert!(
+        argon2::Argon2::default()
+            .verify_password(b"hunter2", &parsed)
+            .is_ok()
+    );
+}
+
+#[tokio::test]
+async fn register_user_creates_identity_with_supplied_identity_fields() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_registration_usecase(creds, ids.clone(), users, vec!["example.com".into()]);
+
+    usecase
+        .register_user(RegisterUser {
+            user_code: "u1".into(),
+            user_name: "Alice".into(),
+            domain_name: "example.com".into(),
+            hostname: "host".into(),
+            sid: "S-1-5".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect("registration succeeds");
+
+    let row = ids
+        .find("u1", "example.com", "host", "S-1-5")
+        .await
+        .expect("identity row exists");
+    assert_eq!(row.user_code, "u1");
+    assert_eq!(row.domain_name, "example.com");
+    assert_eq!(row.hostname, "host");
+    assert_eq!(row.sid, "S-1-5");
+}
+
+#[tokio::test]
+async fn register_user_reuses_existing_user_credential_and_identity() {
+    let creds = MockUserCredentialsRepo::default();
+    creds.seed_hash("u1", &hash_password("previous"), 7);
+    let ids = MockDomainIdentityRepo::default();
+    ids.seed(DomainIdentity::for_repository(
+        "u1".into(),
+        "example.com".into(),
+        "host".into(),
+        "S-1-5".into(),
+    ));
+    let users = FakeUserService::default();
+    users.seed("u1", Role::Admin, true);
+    let usecase = make_registration_usecase(
+        creds.clone(),
+        ids.clone(),
+        users,
+        vec!["example.com".into()],
+    );
+
+    let view = usecase
+        .register_user(RegisterUser {
+            user_code: "u1".into(),
+            user_name: "Alice".into(),
+            domain_name: "example.com".into(),
+            hostname: "host".into(),
+            sid: "S-1-5".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect("registration succeeds");
+    assert_eq!(view.role, Role::Admin);
+    assert!(view.active);
+
+    // Existing credential must not be overwritten.
+    let stored = creds.find_by_code("u1").await.expect("cred");
+    assert_eq!(stored.token_version, 7);
+    let parsed = argon2::PasswordHash::new(&stored.password_hash).expect("phc");
+    assert!(
+        argon2::Argon2::default()
+            .verify_password(b"previous", &parsed)
+            .is_ok()
+    );
+    // The existing identity is still present.
+    assert_eq!(ids.state.lock().unwrap().rows.len(), 1);
+}
+
+#[tokio::test]
+async fn register_user_propagates_repository_errors() {
+    let creds = MockUserCredentialsRepo::default();
+    let ids = MockDomainIdentityRepo::default();
+    let users = FakeUserService::default();
+    let usecase = make_registration_usecase(creds, ids, users, vec!["example.com".into()]);
+
+    let err = usecase
+        .register_user(RegisterUser {
+            user_code: "   ".into(),
+            user_name: "Alice".into(),
+            domain_name: "example.com".into(),
+            hostname: "host".into(),
+            sid: "S-1-5".into(),
+            password: "hunter2".into(),
+        })
+        .await
+        .expect_err("blank code rejected");
+    assert!(matches!(
+        err,
+        UsecaseError::Repository(DomainError::EmptyCode)
     ));
 }

@@ -3,8 +3,9 @@ use async_trait::async_trait;
 use apis::auth::{
     AuthApiError, AuthClaims, AuthService, CreateUserCredentialRequest,
     LoginWithDomainUserInfoRequest, LoginWithPasswordRequest, LogoutRequest, LogoutResponse,
-    RefreshRequest, RefreshResponse, RemoveUserCredentialResponse, TokenPair,
-    UpdateUserCredentialRequest, UserCredentialView, VerifyRequest,
+    RefreshRequest, RefreshResponse, RegisterUserRequest, RegisterUserResponse,
+    RemoveUserCredentialResponse, TokenPair, UpdateUserCredentialRequest, UserCredentialView,
+    VerifyRequest,
 };
 use apis::user::Role as ApiRole;
 
@@ -12,9 +13,9 @@ use crate::domain::{DomainError, DomainIdentityRepository, UserCredentialsReposi
 use crate::usecase::{
     AccessTokenView, AuthClaimsView, AuthUsecase, CreateUserCredential, FindUserCredential,
     LoginWithDomainUserInfo, LoginWithPassword, Logout as LogoutCmd, RefreshAccessToken,
-    RemoveUserCredential as RemoveUserCredentialCmd, RemoveUserCredentialAck, TokenPairView,
-    UpdateUserCredential, UsecaseError, UserCredentialView as UserCredentialViewUsecase,
-    VerifyAccessToken,
+    RegisterUser, RegisteredUserView, RemoveUserCredential as RemoveUserCredentialCmd,
+    RemoveUserCredentialAck, TokenPairView, UpdateUserCredential, UsecaseError,
+    UserCredentialView as UserCredentialViewUsecase, VerifyAccessToken,
 };
 
 pub struct AuthServiceImpl<R: UserCredentialsRepository, D: DomainIdentityRepository> {
@@ -55,6 +56,7 @@ fn map_error(err: UsecaseError) -> AuthApiError {
             DomainError::InvalidCredentials => AuthApiError::InvalidCredentials,
             DomainError::DuplicateCode(code) => AuthApiError::DuplicateCode(code),
             DomainError::Repository(msg) => AuthApiError::Repository(msg),
+            DomainError::DomainNotAllowed(msg) => AuthApiError::Validation(msg),
             DomainError::EmptyCode
             | DomainError::EmptyPasswordHash
             | DomainError::InvalidRole(_) => AuthApiError::Repository(d.to_string()),
@@ -199,5 +201,32 @@ impl<R: UserCredentialsRepository, D: DomainIdentityRepository> AuthService
             .await
             .map_err(map_error)?;
         Ok(RemoveUserCredentialResponse {})
+    }
+
+    async fn register_user(
+        &self,
+        req: RegisterUserRequest,
+    ) -> Result<RegisterUserResponse, AuthApiError> {
+        let view: RegisteredUserView = self
+            .usecase
+            .register_user(RegisterUser {
+                user_code: req.user_code,
+                user_name: req.user_name,
+                domain_name: req.domain_name,
+                hostname: req.hostname,
+                sid: req.sid,
+                password: req.password,
+            })
+            .await
+            .map_err(map_error)?;
+        Ok(RegisterUserResponse {
+            user_code: view.user_code,
+            user_name: view.user_name,
+            role: to_api_role(view.role),
+            active: view.active,
+            domain_name: view.domain_name,
+            hostname: view.hostname,
+            sid: view.sid,
+        })
     }
 }

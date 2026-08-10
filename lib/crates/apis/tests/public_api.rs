@@ -4,9 +4,7 @@
 //! the in-crate type names so a regression in `user.rs` is caught
 //! at `cargo test -p apis` time.
 
-use apis::user::{
-    CreateUserRequest, Role, UpdateUserRequest, UserApiError, UserService, UserView,
-};
+use apis::user::{CreateUserRequest, Role, UpdateUserRequest, UserApiError, UserService, UserView};
 
 /// Every public type in `apis::user` is nameable from the test.
 #[test]
@@ -35,6 +33,7 @@ fn public_types_are_nameable() {
         code: "u1".into(),
         name: "Alice".into(),
         role: Role::General,
+        active: true,
     });
     assert_update(UpdateUserRequest {
         id: 1,
@@ -92,8 +91,9 @@ fn user_service_is_send_sync() {
 use apis::auth::{
     AuthApiError, AuthClaims, AuthService, CreateUserCredentialRequest,
     LoginWithDomainUserInfoRequest, LoginWithPasswordRequest, LogoutRequest, LogoutResponse,
-    RefreshRequest, RefreshResponse, RemoveUserCredentialResponse, TokenPair,
-    UpdateUserCredentialRequest, UserCredentialView, VerifyRequest,
+    RefreshRequest, RefreshResponse, RegisterUserRequest, RegisterUserResponse,
+    RemoveUserCredentialResponse, TokenPair, UpdateUserCredentialRequest, UserCredentialView,
+    VerifyRequest,
 };
 
 /// Every public type in `apis::auth` is nameable from the test.
@@ -112,6 +112,8 @@ fn auth_public_types_are_nameable() {
     fn assert_update_cred(_: UpdateUserCredentialRequest) {}
     fn assert_cred_view(_: UserCredentialView) {}
     fn assert_remove_cred_res(_: RemoveUserCredentialResponse) {}
+    fn assert_register_req(_: RegisterUserRequest) {}
+    fn assert_register_res(_: RegisterUserResponse) {}
     fn assert_err(_: AuthApiError) {}
 
     // `TokenPair` is constructible field-by-field.
@@ -166,6 +168,23 @@ fn auth_public_types_are_nameable() {
         token_version: 0,
     });
     assert_remove_cred_res(RemoveUserCredentialResponse {});
+    assert_register_req(RegisterUserRequest {
+        user_code: "u1".into(),
+        user_name: "Alice".into(),
+        domain_name: "example.com".into(),
+        hostname: "host".into(),
+        sid: "S-1-5".into(),
+        password: "p".into(),
+    });
+    assert_register_res(RegisterUserResponse {
+        user_code: "u1".into(),
+        user_name: "Alice".into(),
+        role: apis::user::Role::General,
+        active: false,
+        domain_name: "example.com".into(),
+        hostname: "host".into(),
+        sid: "S-1-5".into(),
+    });
 
     // Touch every variant of the error type to keep it from being
     // dead-code-eliminated by the test build's analysis.
@@ -200,22 +219,13 @@ impl AuthService for FakeAuthService {
     ) -> Result<TokenPair, AuthApiError> {
         todo!()
     }
-    async fn logout(
-        &self,
-        _req: LogoutRequest,
-    ) -> Result<LogoutResponse, AuthApiError> {
+    async fn logout(&self, _req: LogoutRequest) -> Result<LogoutResponse, AuthApiError> {
         todo!()
     }
-    async fn verify(
-        &self,
-        _req: VerifyRequest,
-    ) -> Result<AuthClaims, AuthApiError> {
+    async fn verify(&self, _req: VerifyRequest) -> Result<AuthClaims, AuthApiError> {
         todo!()
     }
-    async fn refresh(
-        &self,
-        _req: RefreshRequest,
-    ) -> Result<RefreshResponse, AuthApiError> {
+    async fn refresh(&self, _req: RefreshRequest) -> Result<RefreshResponse, AuthApiError> {
         todo!()
     }
     async fn find_user_credential_by_code(
@@ -240,6 +250,12 @@ impl AuthService for FakeAuthService {
         &self,
         _code: &str,
     ) -> Result<RemoveUserCredentialResponse, AuthApiError> {
+        todo!()
+    }
+    async fn register_user(
+        &self,
+        _req: RegisterUserRequest,
+    ) -> Result<RegisterUserResponse, AuthApiError> {
         todo!()
     }
 }

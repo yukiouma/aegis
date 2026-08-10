@@ -9,7 +9,7 @@ pub use auth_usecase::{AuthUsecase, AuthUsecaseConfig};
 pub use commands::{
     AccessTokenView, AuthClaimsView, CreateUserCredential, FindUserCredential,
     LoginWithDomainUserInfo, LoginWithPassword, Logout, LogoutAck, RefreshAccessToken,
-    RemoveUserCredential, RemoveUserCredentialAck, Role, TokenPairView, UpdateUserCredential,
-    UserCredentialView, VerifyAccessToken,
+    RegisterUser, RegisteredUserView, RemoveUserCredential, RemoveUserCredentialAck, Role,
+    TokenPairView, UpdateUserCredential, UserCredentialView, VerifyAccessToken,
 };
 pub use error::UsecaseError;

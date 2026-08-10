@@ -210,6 +210,51 @@ impl From<apis::auth::UserCredentialView> for UserCredentialViewResponse {
     }
 }
 
+/// Wire-level request body for `POST /api/auth/user-credential`.
+///
+/// Authentication is enforced by the `BearerAuth` middleware; the
+/// handler additionally rejects callers whose role is not
+/// `Root`/`Admin`. The server hashes `password` before persisting and
+/// never returns the value.
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct RegisterUserRequest {
+    pub user_code: String,
+    pub user_name: String,
+    pub domain_name: String,
+    pub hostname: String,
+    pub sid: String,
+    pub password: String,
+}
+
+/// Wire-level response body for `POST /api/auth/user-credential`.
+///
+/// Never includes a password or password hash. Translates from
+/// [`apis::auth::RegisterUserResponse`] via the `From` impl below.
+#[derive(Serialize, Deserialize, ToSchema)]
+pub struct RegisterUserResponse {
+    pub user_code: String,
+    pub user_name: String,
+    pub role: Role,
+    pub active: bool,
+    pub domain_name: String,
+    pub hostname: String,
+    pub sid: String,
+}
+
+impl From<apis::auth::RegisterUserResponse> for RegisterUserResponse {
+    fn from(view: apis::auth::RegisterUserResponse) -> Self {
+        Self {
+            user_code: view.user_code,
+            user_name: view.user_name,
+            role: view.role.into(),
+            active: view.active,
+            domain_name: view.domain_name,
+            hostname: view.hostname,
+            sid: view.sid,
+        }
+    }
+}
+
 // -- product requests / responses ------------------------------------------
 
 /// Wire-level request body for `POST /api/product`.

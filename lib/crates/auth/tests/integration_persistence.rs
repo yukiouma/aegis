@@ -221,6 +221,11 @@ async fn usecase_can_be_constructed_from_real_repos() {
             signing_key: b"0123456789abcdef0123456789abcdef".to_vec(),
             access_ttl: std::time::Duration::from_secs(60),
             refresh_ttl: std::time::Duration::from_secs(3600),
+            // The integration smoke test never calls `register_user`,
+            // so any non-empty allowlist would work; the empty default
+            // matches the "deny all registrations" semantics that the
+            // production binary opts into via AEGIS_AUTH_ALLOW_DOMAINS.
+            allow_domains: Vec::new(),
         };
         let _usecase = AuthUsecase::new(cfg);
     })
@@ -252,5 +257,17 @@ impl FakeUserService {
 impl UserService for FakeUserService {
     async fn get_by_code(&self, _code: &str) -> Result<UserSummary, DomainError> {
         Err(DomainError::NotFound)
+    }
+    async fn create(
+        &self,
+        _code: &str,
+        _name: &str,
+    ) -> Result<UserSummary, DomainError> {
+        // The smoke test never exercises this path — `register_user`
+        // requires `allow_domains` and a live fixture row, neither of
+        // which the integration harness sets up.
+        Err(DomainError::DomainNotAllowed(
+            "register_user is not exercised by the integration smoke test".into(),
+        ))
     }
 }

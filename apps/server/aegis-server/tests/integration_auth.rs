@@ -173,6 +173,7 @@ fn build_app(pool: PgPool) -> Router {
         signing_key: signing_key(),
         access_ttl: Duration::from_secs(900),
         refresh_ttl: Duration::from_secs(3600),
+        allow_domains: vec!["aegis.local".to_string()],
     });
 
     let auth = Arc::new(AuthServiceImpl::new(auth_usecase)) as Arc<dyn AuthService>;
@@ -451,6 +452,223 @@ async fn refresh_without_authorization_returns_401() {
     assert_eq!(body["code"], "token_verification_failed");
 
     cleanup_user(&pool, &code).await;
+}
+
+#[tokio::test]
+#[ignore = "requires a live Postgres; run with `cargo test -- --ignored`"]
+async fn admin_register_user_creates_user_credential_and_identity() {
+    // Drives the full registration flow end-to-end:
+    //   1. Seed an admin user, log in to obtain a bearer access token.
+    //   2. POST /api/auth/user-credential as the admin — handler must
+    //      hash the password, create the user (inactive, general role),
+    //      credential, and domain identity rows.
+    //   3. Assert the response body and the three DB rows.
+    init_tracing_once();
+    let pool = pool_or_skip().await;
+    run_migrations(&pool).await;
+
+    let admin_code = format!("itest-admin-{}", uuid_like_suffix());
+    seed_user(&pool, &admin_code, "admin").await;
+    let app = build_app(pool.clone());
+
+    // 1. login as admin
+    let (status, body) = send(
+        app.clone(),
+        Request::builder()
+            .method("POST")
+            .uri("/api/auth/login")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"code":"{admin_code}","password":"{SEED_PASSWORD}"}}"#
+            )))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, AxStatus::OK, "admin login body: {body}");
+    let access = body["access_token"]
+        .as_str()
+        .expect("access_token present")
+        .to_string();
+
+    // 2. POST registration
+    let new_code = format!("itest-new-{}", uuid_like_suffix());
+    let new_password = "fresh-pass-123";
+    let (status, body) = send(
+        app,
+        Request::builder()
+            .method("POST")
+            .uri("/api/auth/user-credential")
+            .header("authorization", format!("Bearer {access}"))
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"user_code":"{new_code}","user_name":"Fresh","domain_name":"aegis.local","hostname":"ws01","sid":"S-1","password":"{new_password}"}}"#
+            )))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, AxStatus::CREATED, "register body: {body}");
+    assert_eq!(body["user_code"], serde_json::json!(new_code));
+    assert_eq!(body["role"], serde_json::json!("general"));
+    assert_eq!(body["active"], serde_json::json!(false));
+    assert_eq!(body["domain_name"], serde_json::json!("aegis.local"));
+
+    // 3. DB rows exist. The user row is inactive (handler sets
+    // `active=false` on creation); the credential row carries a
+    // non-empty Argon2 hash.
+    let active: bool = sqlx::query_scalar("SELECT active FROM users WHERE code = $1")
+        .bind(&new_code)
+        .fetch_one(&pool)
+        .await
+        .expect("user row present");
+    assert!(!active, "newly registered user must be inactive");
+    let hash: String =
+        sqlx::query_scalar("SELECT password_hash FROM auth_user_credentials WHERE code = $1")
+            .bind(&new_code)
+            .fetch_one(&pool)
+            .await
+            .expect("credential row present");
+    assert!(
+        hash.starts_with("$argon2id$"),
+        "password must be hashed with Argon2id, got {hash:?}"
+    );
+    let sid: String = sqlx::query_scalar(
+        "SELECT sid FROM auth_user_domain_identities \
+         WHERE domain_name = $1 AND hostname = $2 AND sid = $3",
+    )
+    .bind("aegis.local")
+    .bind("ws01")
+    .bind("S-1")
+    .fetch_one(&pool)
+    .await
+    .expect("identity row present");
+    assert_eq!(sid, "S-1");
+
+    cleanup_registered(&pool, &new_code).await;
+    cleanup_user(&pool, &admin_code).await;
+}
+
+#[tokio::test]
+#[ignore = "requires a live Postgres; run with `cargo test -- --ignored`"]
+async fn register_user_with_disallowed_domain_returns_400() {
+    // The handler returns 400 (validation) when the domain is not in
+    // `allow_domains`. The allowlist in `build_app` only accepts
+    // `aegis.local`; everything else is rejected.
+    init_tracing_once();
+    let pool = pool_or_skip().await;
+    run_migrations(&pool).await;
+
+    let admin_code = format!("itest-admin-{}", uuid_like_suffix());
+    seed_user(&pool, &admin_code, "admin").await;
+    let app = build_app(pool.clone());
+
+    let (status, body) = send(
+        app.clone(),
+        Request::builder()
+            .method("POST")
+            .uri("/api/auth/login")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"code":"{admin_code}","password":"{SEED_PASSWORD}"}}"#
+            )))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, AxStatus::OK, "admin login body: {body}");
+    let access = body["access_token"]
+        .as_str()
+        .expect("access_token present")
+        .to_string();
+
+    let new_code = format!("itest-new-{}", uuid_like_suffix());
+    let (status, body) = send(
+        app,
+        Request::builder()
+            .method("POST")
+            .uri("/api/auth/user-credential")
+            .header("authorization", format!("Bearer {access}"))
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"user_code":"{new_code}","user_name":"Fresh","domain_name":"other.local","hostname":"ws01","sid":"S-1","password":"x"}}"#
+            )))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(
+        status,
+        AxStatus::BAD_REQUEST,
+        "disallowed domain body: {body}"
+    );
+
+    cleanup_user(&pool, &new_code).await;
+    cleanup_user(&pool, &admin_code).await;
+}
+
+#[tokio::test]
+#[ignore = "requires a live Postgres; run with `cargo test -- --ignored`"]
+async fn register_user_as_general_returns_403() {
+    // The admin/root gate lives in the handler. A caller with role
+    // `general` must be rejected with 403 even though the bearer is
+    // valid and the domain is allowed.
+    init_tracing_once();
+    let pool = pool_or_skip().await;
+    run_migrations(&pool).await;
+
+    let general_code = format!("itest-gen-{}", uuid_like_suffix());
+    seed_user(&pool, &general_code, "general").await;
+    let app = build_app(pool.clone());
+
+    let (status, body) = send(
+        app.clone(),
+        Request::builder()
+            .method("POST")
+            .uri("/api/auth/login")
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"code":"{general_code}","password":"{SEED_PASSWORD}"}}"#
+            )))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(status, AxStatus::OK, "general login body: {body}");
+    let access = body["access_token"]
+        .as_str()
+        .expect("access_token present")
+        .to_string();
+
+    let new_code = format!("itest-new-{}", uuid_like_suffix());
+    let (status, _body) = send(
+        app,
+        Request::builder()
+            .method("POST")
+            .uri("/api/auth/user-credential")
+            .header("authorization", format!("Bearer {access}"))
+            .header("content-type", "application/json")
+            .body(Body::from(format!(
+                r#"{{"user_code":"{new_code}","user_name":"Fresh","domain_name":"aegis.local","hostname":"ws01","sid":"S-1","password":"x"}}"#
+            )))
+            .unwrap(),
+    )
+    .await;
+    assert_eq!(
+        status,
+        AxStatus::FORBIDDEN,
+        "general caller must not be allowed to register"
+    );
+
+    cleanup_user(&pool, &new_code).await;
+    cleanup_user(&pool, &general_code).await;
+}
+
+/// Tear down the rows created by the registration endpoint. Mirrors
+/// [`cleanup_user`] but also removes the `auth_user_domain_identities`
+/// row. The identities table stores `user_code` directly (no FK),
+/// so the cleanup is a plain delete on that column.
+async fn cleanup_registered(pool: &PgPool, code: &str) {
+    let _ = sqlx::query("DELETE FROM auth_user_domain_identities WHERE user_code = $1")
+        .bind(code)
+        .execute(pool)
+        .await;
+    cleanup_user(pool, code).await;
 }
 
 /// Cheap per-run unique suffix. `uuid` is not a workspace dep and

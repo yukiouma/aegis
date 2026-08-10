@@ -71,8 +71,9 @@ mod tests {
     use apis::auth::{
         AuthApiError, AuthClaims as ApiAuthClaims, AuthService, CreateUserCredentialRequest,
         LoginWithDomainUserInfoRequest, LoginWithPasswordRequest, LogoutRequest, LogoutResponse,
-        RefreshRequest, RefreshResponse, RemoveUserCredentialResponse, TokenPair,
-        UpdateUserCredentialRequest, UserCredentialView, VerifyRequest,
+        RefreshRequest, RefreshResponse, RegisterUserRequest, RegisterUserResponse,
+        RemoveUserCredentialResponse, TokenPair, UpdateUserCredentialRequest, UserCredentialView,
+        VerifyRequest,
     };
 
     #[derive(Clone)]
@@ -140,6 +141,25 @@ mod tests {
         }
         async fn logout(&self, _req: LogoutRequest) -> Result<LogoutResponse, AuthApiError> {
             Ok(LogoutResponse::default())
+        }
+        async fn register_user(
+            &self,
+            req: RegisterUserRequest,
+        ) -> Result<RegisterUserResponse, AuthApiError> {
+            // Router-level integration tests don't exercise the
+            // canonical registration flow — they only assert that the
+            // route is mounted, the body is parsed, and the handler
+            // reaches the `AuthService` port. Echo a synthetic 201
+            // view built from the request body.
+            Ok(RegisterUserResponse {
+                user_code: req.user_code,
+                user_name: req.user_name,
+                role: apis::user::Role::General,
+                active: false,
+                domain_name: req.domain_name,
+                hostname: req.hostname,
+                sid: req.sid,
+            })
         }
     }
 
@@ -599,26 +619,32 @@ mod tests {
             );
         }
 
-        // /api/auth/user-credential namespace advertises its single
-        // self-service verb (PATCH) under the BearerAuth requirement —
-        // `user_code` is derived from the token, so there is no
-        // `/{code}` path. There is intentionally no POST: credential
-        // creation is out of band, so the openapi document must NOT
-        // expose one.
-        let op = &doc["paths"]["/api/auth/user-credential"]["patch"];
+        // /api/auth/user-credential namespace advertises two verbs:
+        // `PATCH` for self-service rotation and `POST` for the
+        // administrator-only registration route. Both sit under
+        // BearerAuth. `user_code` for PATCH is derived from the
+        // token, so there is no `/{code}` path; the POST body
+        // carries `user_code` explicitly.
+        let patch_op = &doc["paths"]["/api/auth/user-credential"]["patch"];
         assert!(
-            op.is_object(),
+            patch_op.is_object(),
             "missing patch /api/auth/user-credential in openapi"
         );
         assert_eq!(
-            op["security"][0]["BearerAuth"],
+            patch_op["security"][0]["BearerAuth"],
             serde_json::json!([]),
             "patch /api/auth/user-credential must require BearerAuth",
         );
+        let post_op = &doc["paths"]["/api/auth/user-credential"]["post"];
         assert!(
-            doc["paths"]["/api/auth/user-credential"]["post"].is_null(),
-            "POST /api/auth/user-credential must NOT be advertised — \
-             credential creation happens out of band"
+            post_op.is_object(),
+            "POST /api/auth/user-credential must be advertised for the \
+             administrator registration route"
+        );
+        assert_eq!(
+            post_op["security"][0]["BearerAuth"],
+            serde_json::json!([]),
+            "POST /api/auth/user-credential must require BearerAuth",
         );
     }
 
@@ -770,16 +796,17 @@ mod tests {
 
     // ---- /api/auth/user-credential integration ----------------------
 
-    /// `POST /api/auth/user-credential` is intentionally NOT a
-    /// supported method — only `PATCH` exists for the user-credential
-    /// namespace (creation happens out of band). The router therefore
-    /// answers with `405 Method Not Allowed` (the path is registered
-    /// for PATCH, just not for POST), not `401` (which would mean the
-    /// request reached a handler gated by `AuthClaims`) and not
-    /// `404` (which would mean the path is not registered at all —
-    /// PATCH is, so 404 is wrong).
+    /// `POST /api/auth/user-credential` IS a supported method — the
+    /// administrator-only registration route. The router must register
+    /// it alongside the existing `PATCH` handler. Because the canonical
+    /// backend would dispatch this to the auth usecase, the router-only
+    /// fixture (which has no `register_user` behaviour) surfaces that
+    /// request as a `500` once it reaches the handler. The negative
+    /// shape (`405`) is the assertion that the path is registered —
+    /// `unimplemented!()` blows up inside the handler rather than the
+    /// router.
     #[tokio::test]
-    async fn user_credential_create_route_is_unregistered() {
+    async fn user_credential_create_route_is_registered() {
         let app = router(test_state());
         let response = app
             .oneshot(
@@ -788,22 +815,34 @@ mod tests {
                     .uri("/api/auth/user-credential")
                     .header("content-type", "application/json")
                     .header("authorization", "Bearer good")
-                    .body(Body::from(r#"{"password":"hunter2"}"#))
+                    .body(Body::from(
+                        r#"{"user_code":"u2","user_name":"Bob","domain_name":"aegis.local","hostname":"h","sid":"s","password":"p"}"#,
+                    ))
                     .unwrap(),
             )
             .await
             .unwrap();
-        assert_eq!(response.status(), AxStatus::METHOD_NOT_ALLOWED);
-        assert!(
-            response.headers().get("allow").is_some(),
-            "405 response must include an Allow header listing PATCH"
+        // The path is registered for POST (alongside PATCH); the
+        // router-only MockAuth's `register_user` returns
+        // `unimplemented!()`, so we expect a 5xx once the request
+        // reaches the handler. The important negative is `405` (the
+        // path is NOT unregistered) and `404` (the path IS mounted).
+        assert_ne!(
+            response.status(),
+            AxStatus::METHOD_NOT_ALLOWED,
+            "POST should be registered alongside PATCH"
+        );
+        assert_ne!(
+            response.status(),
+            AxStatus::NOT_FOUND,
+            "POST path must be mounted on the router"
         );
     }
 
     /// No bearer at all: the top-level router must reject the
-    /// `/api/auth/user-credential` PATCH route with 401. (There is no
-    /// POST route to gate — creation is out of band — so its absence
-    /// is covered by `user_credential_create_route_is_unregistered`.)
+    /// `/api/auth/user-credential` PATCH route with 401. (POST is now
+    /// also mounted for the administrator registration endpoint; its
+    /// 401 path is covered by `user_credential_create_route_without_authorization_returns_401`.)
     #[tokio::test]
     async fn user_credential_route_without_authorization_returns_401() {
         let app = router(test_state());
@@ -825,5 +864,28 @@ mod tests {
             .unwrap();
         let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
         assert_eq!(value["code"], "token_verification_failed");
+    }
+
+    /// POST shares the same bearer-auth gate as PATCH. Without a
+    /// token the router must reject the request with 401 — the
+    /// admin/root gate lives in the handler, but the AuthClaims
+    /// extractor fires first.
+    #[tokio::test]
+    async fn user_credential_create_route_without_authorization_returns_401() {
+        let app = router(test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/api/auth/user-credential")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        r#"{"user_code":"u2","user_name":"Bob","domain_name":"aegis.local","hostname":"h","sid":"s","password":"p"}"#,
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::UNAUTHORIZED);
     }
 }

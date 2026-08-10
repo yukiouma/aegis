@@ -74,6 +74,11 @@ let usecase = AuthUsecase::new(AuthUsecaseConfig {
     signing_key,
     access_ttl: Duration::from_secs(15 * 60),
     refresh_ttl: Duration::from_secs(7 * 24 * 60 * 60),
+    // Comma-separated list of domain names the administrator-only
+    // `register_user` endpoint will accept. Domain matching is
+    // case-insensitive after trimming. An empty allowlist rejects
+    // every registration.
+    allow_domains: vec!["aegis.local".to_string()],
 });
 
 let auth_service: Arc<dyn apis::auth::AuthService> =
@@ -117,3 +122,20 @@ subsequent verifies in the same process reject tokens minted before
 the bump. Cross-process revocation still relies on a shared backend
 (Redis) when one is wired in; in a single-process deployment the
 in-memory cache is the source of truth within that process.
+
+## Administrator-only user registration
+
+`AuthUsecase::register_user` (exposed via
+[`apis::auth::AuthService::register_user`]) creates a new general-role,
+inactive user together with their initial credential and the requested
+`DomainIdentity`. The flow is idempotent: re-running with the same
+`user_code` and `domain_name`+`hostname`+`sid` returns the existing
+view without re-inserting.
+
+The usecase rejects the call when the normalised `domain_name` (lower
+cased, whitespace trimmed) is not in `AuthUsecaseConfig::allow_domains`.
+An empty `allow_domains` therefore rejects every registration —
+production deployments must populate it (the `aegis-server` binary
+reads it from the `AEGIS_AUTH_ALLOW_DOMAINS` env var, comma separated).
+The `aegis-server` HTTP layer additionally gates the route on the
+caller's role: only `Root` and `Admin` callers can reach the handler.

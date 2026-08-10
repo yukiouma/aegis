@@ -1,5 +1,28 @@
 //! Command / view DTOs for the auth usecase.
 
+/// Input for `AuthUsecase::register_user`.
+#[derive(Debug, Clone)]
+pub struct RegisterUser {
+    pub user_code: String,
+    pub user_name: String,
+    pub domain_name: String,
+    pub hostname: String,
+    pub sid: String,
+    pub password: String,
+}
+
+/// Safe result of `AuthUsecase::register_user`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegisteredUserView {
+    pub user_code: String,
+    pub user_name: String,
+    pub role: Role,
+    pub active: bool,
+    pub domain_name: String,
+    pub hostname: String,
+    pub sid: String,
+}
+
 /// Input for `AuthUsecase::login_with_password`.
 #[derive(Debug, Clone)]
 pub struct LoginWithPassword {

@@ -8,10 +8,8 @@
 
 use async_trait::async_trait;
 
-use apis::user::{
-    CreateUserRequest, UpdateUserRequest, UserApiError, UserService, UserView,
-};
 use apis::user::Role as ApiRole;
+use apis::user::{CreateUserRequest, UpdateUserRequest, UserApiError, UserService, UserView};
 
 use crate::domain::{DomainError, Role, UserRepository};
 use crate::usecase::{CreateUser, UpdateUser, UsecaseError, UserUsecase};
@@ -84,11 +82,11 @@ impl From<UsecaseError> for UserApiError {
                 DomainError::NotFound => UserApiError::NotFound,
                 DomainError::DuplicateCode(code) => UserApiError::DuplicateCode(code),
                 DomainError::Repository(msg) => UserApiError::Repository(msg),
-                DomainError::EmptyCode
-                | DomainError::EmptyName
-                | DomainError::InvalidRole(_) => unreachable!(
-                    "domain validation errors are only produced as UsecaseError::Validation"
-                ),
+                DomainError::EmptyCode | DomainError::EmptyName | DomainError::InvalidRole(_) => {
+                    unreachable!(
+                        "domain validation errors are only produced as UsecaseError::Validation"
+                    )
+                }
             },
         }
     }
@@ -101,6 +99,7 @@ impl<R: UserRepository> UserService for UserServiceImpl<R> {
             code: req.code,
             name: req.name,
             role: to_internal_role(req.role),
+            active: req.active,
         };
         let view = self.usecase.create(cmd).await?;
         Ok(user_view_from_internal(view))

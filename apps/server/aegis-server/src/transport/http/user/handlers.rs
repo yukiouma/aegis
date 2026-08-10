@@ -65,6 +65,7 @@ pub async fn create(
             code: req.code,
             name: req.name,
             role: req.role.into(),
+            active: true,
         })
         .await?;
     Ok((StatusCode::CREATED, Json(view.into())))
@@ -192,8 +193,9 @@ mod tests {
     use apis::auth::{
         AuthApiError, AuthClaims, AuthService, CreateUserCredentialRequest,
         LoginWithDomainUserInfoRequest, LoginWithPasswordRequest, LogoutRequest, LogoutResponse,
-        RefreshRequest, RefreshResponse, RemoveUserCredentialResponse, TokenPair,
-        UpdateUserCredentialRequest, UserCredentialView, VerifyRequest,
+        RefreshRequest, RefreshResponse, RegisterUserRequest, RegisterUserResponse,
+        RemoveUserCredentialResponse, TokenPair, UpdateUserCredentialRequest, UserCredentialView,
+        VerifyRequest,
     };
 
     /// Configurable mock for [`apis::user::UserService`]. Each method
@@ -329,6 +331,12 @@ mod tests {
         }
         async fn logout(&self, _req: LogoutRequest) -> Result<LogoutResponse, AuthApiError> {
             unimplemented!()
+        }
+        async fn register_user(
+            &self,
+            _req: RegisterUserRequest,
+        ) -> Result<RegisterUserResponse, AuthApiError> {
+            unimplemented!("not exercised by this handler")
         }
     }
 

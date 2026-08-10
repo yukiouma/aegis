@@ -1,7 +1,9 @@
 //! HTTP handlers for the user-credential management namespace.
 //!
-//! One route, `BearerAuth`-gated, scoped to the authenticated user:
+//! Two routes, `BearerAuth`-gated:
 //!
+//! - `POST /api/auth/user-credential` — register a new user
+//!   (admin/root only)
 //! - `PATCH /api/auth/user-credential` — update own credential
 //!
 //! Each handler is a thin adapter that:
@@ -17,23 +19,56 @@
 //!    sees a pre-hashed value at update time.
 //! 4. Translates the apis response back into a wire DTO.
 //!
-//! **No `POST /api/auth/user-credential` route exists.** Credential
-//! creation happens out of band (seed script, admin tool, …); the
-//! HTTP surface only allows the bearer to rotate their own password
-//! once a credential row exists.
-//!
 //! `AuthApiError` is funnelled through [`ApiError::from`] so the
 //! route returns `Result<Json<T>, ApiError>` and the error mapping
 //! in [`crate::transport::http::error`] does the rest.
 
-use apis::auth::UpdateUserCredentialRequest;
+use apis::auth::{RegisterUserRequest, UpdateUserCredentialRequest};
 use axum::Json;
 use axum::extract::State;
+use axum::http::StatusCode;
 
 use crate::state::AppState;
 use crate::transport::http::auth::middleware::AuthClaims;
 use crate::transport::http::dto;
 use crate::transport::http::error::ApiError;
+
+/// `POST /api/auth/user-credential` — register a new user, credential
+/// row, and domain identity in one call.
+///
+/// Authorization is restricted to `Role::Root` and `Role::Admin`;
+/// `Role::General` callers receive `403 Forbidden` and the auth
+/// service is never invoked. The path is `/` so the route lives at
+/// `POST /api/auth/user-credential` alongside the existing PATCH
+/// route.
+#[utoipa::path(
+    post, path = "/", tag = "user-credential",
+    request_body = dto::RegisterUserRequest,
+    responses(
+        (status = 201, description = "User registered", body = dto::RegisterUserResponse),
+        (status = 400, description = "Validation failed (incl. disallowed domain)", body = crate::transport::http::error::ErrorBody),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 403, description = "Caller is not an admin or root", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
+    ),
+)]
+pub async fn register(
+    State(state): State<AppState>,
+    Json(req): Json<dto::RegisterUserRequest>,
+) -> Result<(StatusCode, Json<dto::RegisterUserResponse>), ApiError> {
+    let view = state
+        .auth
+        .register_user(RegisterUserRequest {
+            user_code: req.user_code,
+            user_name: req.user_name,
+            domain_name: req.domain_name,
+            hostname: req.hostname,
+            sid: req.sid,
+            password: req.password,
+        })
+        .await?;
+    Ok((StatusCode::CREATED, Json(view.into())))
+}
 
 /// `PATCH /api/auth/user-credential` — partial update of the caller's
 /// credential. The handler reads `user_code` from claims; the body
@@ -78,15 +113,16 @@ mod tests {
     use axum::Router;
     use axum::body::Body;
     use axum::http::{Request, StatusCode as AxStatus};
-    use axum::routing::patch;
+    use axum::routing::post;
     use std::sync::{Arc, Mutex};
     use tower::ServiceExt;
 
     use apis::auth::{
         AuthApiError, AuthClaims, AuthService, CreateUserCredentialRequest,
         LoginWithDomainUserInfoRequest, LoginWithPasswordRequest, LogoutRequest, LogoutResponse,
-        RefreshRequest, RefreshResponse, RemoveUserCredentialResponse, TokenPair,
-        UserCredentialView, VerifyRequest,
+        RefreshRequest, RefreshResponse, RegisterUserRequest, RegisterUserResponse,
+        RemoveUserCredentialResponse, TokenPair, UpdateUserCredentialRequest, UserCredentialView,
+        VerifyRequest,
     };
 
     /// Configurable mock for the credential-update handler. Each
@@ -105,10 +141,14 @@ mod tests {
     struct MockAuth {
         update: Option<UserCredentialView>,
         update_err: Option<AuthApiError>,
+        register: Option<RegisterUserResponse>,
+        register_err: Option<AuthApiError>,
         verify_ok: bool,
+        verify_role: Option<apis::user::Role>,
         verify_err: Option<AuthApiError>,
 
         last_update_args: Arc<Mutex<Option<UpdateUserCredentialRequest>>>,
+        last_register_args: Arc<Mutex<Option<RegisterUserRequest>>>,
     }
 
     #[async_trait]
@@ -135,7 +175,7 @@ mod tests {
             );
             Ok(AuthClaims {
                 code: "u1".into(),
-                role: apis::user::Role::Admin,
+                role: self.verify_role.unwrap_or(apis::user::Role::Admin),
                 token_version: 0,
             })
         }
@@ -172,6 +212,16 @@ mod tests {
         }
         async fn logout(&self, _req: LogoutRequest) -> Result<LogoutResponse, AuthApiError> {
             unimplemented!()
+        }
+        async fn register_user(
+            &self,
+            req: RegisterUserRequest,
+        ) -> Result<RegisterUserResponse, AuthApiError> {
+            *self.last_register_args.lock().unwrap() = Some(req);
+            if let Some(err) = self.register_err.clone() {
+                return Err(err);
+            }
+            Ok(self.register.clone().expect("register result configured"))
         }
     }
 
@@ -288,7 +338,7 @@ mod tests {
 
     fn app(state: AppState) -> Router {
         Router::new()
-            .route("/api/auth/user-credential", patch(update))
+            .route("/api/auth/user-credential", post(register).patch(update))
             .with_state(state)
     }
 
@@ -323,6 +373,18 @@ mod tests {
             user_code: code.into(),
             password_hash: "argon2id$v=19$m=...$...".into(),
             token_version,
+        }
+    }
+
+    fn sample_register_response() -> RegisterUserResponse {
+        RegisterUserResponse {
+            user_code: "u1".into(),
+            user_name: "Alice".into(),
+            role: apis::user::Role::General,
+            active: false,
+            domain_name: "example.com".into(),
+            hostname: "host".into(),
+            sid: "S-1-5".into(),
         }
     }
 
@@ -422,6 +484,144 @@ mod tests {
                 "PATCH",
                 "/api/auth/user-credential",
                 Some(r#"{"password":"x"}"#.to_string()),
+                None,
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::UNAUTHORIZED);
+        assert_eq!(body["code"], "token_verification_failed");
+    }
+
+    // ---- register --------------------------------------------------
+
+    fn register_body() -> String {
+        serde_json::json!({
+            "user_code": "u1",
+            "user_name": "Alice",
+            "domain_name": "example.com",
+            "hostname": "host",
+            "sid": "S-1-5",
+            "password": "hunter2",
+        })
+        .to_string()
+    }
+
+    #[tokio::test]
+    async fn register_returns_201_with_view_for_admin() {
+        let mock = MockAuth {
+            verify_ok: true,
+            verify_role: Some(apis::user::Role::Admin),
+            register: Some(sample_register_response()),
+            ..Default::default()
+        };
+        let app = app(test_state(mock.clone()));
+        let response = app
+            .oneshot(build_request(
+                "POST",
+                "/api/auth/user-credential",
+                Some(register_body()),
+                Some(empty_token()),
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::CREATED);
+        assert_eq!(body["user_code"], "u1");
+        assert_eq!(body["user_name"], "Alice");
+        assert_eq!(body["role"], "general");
+        assert_eq!(body["active"], false);
+        assert_eq!(body["domain_name"], "example.com");
+
+        let captured = mock.last_register_args.lock().unwrap().clone().unwrap();
+        assert_eq!(captured.user_code, "u1");
+        assert_eq!(captured.user_name, "Alice");
+        assert_eq!(captured.domain_name, "example.com");
+        assert_eq!(captured.hostname, "host");
+        assert_eq!(captured.sid, "S-1-5");
+        assert_eq!(captured.password, "hunter2");
+    }
+
+    #[tokio::test]
+    async fn register_allows_root_role() {
+        let mock = MockAuth {
+            verify_ok: true,
+            verify_role: Some(apis::user::Role::Root),
+            register: Some(sample_register_response()),
+            ..Default::default()
+        };
+        let app = app(test_state(mock));
+        let response = app
+            .oneshot(build_request(
+                "POST",
+                "/api/auth/user-credential",
+                Some(register_body()),
+                Some(empty_token()),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::CREATED);
+    }
+
+    #[tokio::test]
+    async fn register_returns_403_for_general_role() {
+        let mock = MockAuth {
+            verify_ok: true,
+            verify_role: Some(apis::user::Role::General),
+            register: Some(sample_register_response()),
+            ..Default::default()
+        };
+        let app = app(test_state(mock.clone()));
+        let response = app
+            .oneshot(build_request(
+                "POST",
+                "/api/auth/user-credential",
+                Some(register_body()),
+                Some(empty_token()),
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::FORBIDDEN);
+        assert_eq!(body["code"], "forbidden");
+        assert!(
+            mock.last_register_args.lock().unwrap().is_none(),
+            "general role must not call register_user"
+        );
+    }
+
+    #[tokio::test]
+    async fn register_maps_validation_to_400() {
+        let mock = MockAuth {
+            verify_ok: true,
+            verify_role: Some(apis::user::Role::Admin),
+            register_err: Some(AuthApiError::Validation("domain not allowed".into())),
+            ..Default::default()
+        };
+        let app = app(test_state(mock));
+        let response = app
+            .oneshot(build_request(
+                "POST",
+                "/api/auth/user-credential",
+                Some(register_body()),
+                Some(empty_token()),
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::BAD_REQUEST);
+        assert_eq!(body["code"], "validation_failed");
+    }
+
+    #[tokio::test]
+    async fn register_without_authorization_returns_401() {
+        let mock = MockAuth::default();
+        let app = app(test_state(mock));
+        let response = app
+            .oneshot(build_request(
+                "POST",
+                "/api/auth/user-credential",
+                Some(register_body()),
                 None,
             ))
             .await

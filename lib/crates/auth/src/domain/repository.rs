@@ -48,4 +48,6 @@ pub trait DomainIdentityRepository: Send + Sync {
         hostname: &str,
         sid: &str,
     ) -> Result<DomainIdentity, DomainError>;
+
+    async fn create(&self, identity: DomainIdentity) -> Result<DomainIdentity, DomainError>;
 }
