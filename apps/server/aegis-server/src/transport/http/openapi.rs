@@ -61,6 +61,8 @@ use crate::transport::http::error::ErrorBody;
         dto::UserListResponse,
         dto::UpdateUserCredentialRequest,
         dto::UserCredentialViewResponse,
+        dto::RegisterUserRequest,
+        dto::RegisterUserResponse,
         dto::CreateProductRequest,
         dto::UpdateProductRequest,
         dto::ProductViewResponse,

@@ -65,6 +65,7 @@ pub async fn create(
             code: req.code,
             name: req.name,
             role: req.role.into(),
+            active: true,
         })
         .await?;
     Ok((StatusCode::CREATED, Json(view.into())))

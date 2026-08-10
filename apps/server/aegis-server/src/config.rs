@@ -16,6 +16,12 @@ pub struct Config {
     pub bind_addr: SocketAddr,
     pub access_ttl: Duration,
     pub refresh_ttl: Duration,
+    /// Domains permitted for `POST /api/auth/user-credential`
+    /// registration. Sourced from `AEGIS_AUTH_ALLOW_DOMAINS` as a
+    /// comma-separated list; an unset variable yields an empty
+    /// allowlist, which the usecase treats as "reject every
+    /// registration".
+    pub allow_domains: Vec<String>,
 }
 
 /// Failure modes of [`Config::from_env`].
@@ -25,10 +31,7 @@ pub enum ConfigError {
     MissingEnvVariable(&'static str),
 
     #[error("invalid value for environment variable {var}: {message}")]
-    InvalidValue {
-        var: &'static str,
-        message: String,
-    },
+    InvalidValue { var: &'static str, message: String },
 }
 
 impl Config {
@@ -42,12 +45,11 @@ impl Config {
 
         let signing_key_hex = std::env::var("AEGIS_AUTH_SIGNING_KEY")
             .map_err(|_| ConfigError::MissingEnvVariable("AEGIS_AUTH_SIGNING_KEY"))?;
-        let signing_key = hex_decode(&signing_key_hex).map_err(|message| {
-            ConfigError::InvalidValue {
+        let signing_key =
+            hex_decode(&signing_key_hex).map_err(|message| ConfigError::InvalidValue {
                 var: "AEGIS_AUTH_SIGNING_KEY",
                 message,
-            }
-        })?;
+            })?;
         if signing_key.len() < 32 {
             return Err(ConfigError::InvalidValue {
                 var: "AEGIS_AUTH_SIGNING_KEY",
@@ -55,14 +57,15 @@ impl Config {
             });
         }
 
-        let bind_addr_str = std::env::var("AEGIS_HTTP_BIND")
-            .unwrap_or_else(|_| "0.0.0.0:8080".to_string());
-        let bind_addr: SocketAddr = bind_addr_str.parse().map_err(|e: std::net::AddrParseError| {
-            ConfigError::InvalidValue {
-                var: "AEGIS_HTTP_BIND",
-                message: e.to_string(),
-            }
-        })?;
+        let bind_addr_str =
+            std::env::var("AEGIS_HTTP_BIND").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
+        let bind_addr: SocketAddr =
+            bind_addr_str
+                .parse()
+                .map_err(|e: std::net::AddrParseError| ConfigError::InvalidValue {
+                    var: "AEGIS_HTTP_BIND",
+                    message: e.to_string(),
+                })?;
 
         let access_ttl_secs = match std::env::var("AEGIS_ACCESS_TTL_SECS") {
             Ok(s) => s.parse::<u64>().map_err(|e| ConfigError::InvalidValue {
@@ -78,6 +81,14 @@ impl Config {
             })?,
             Err(_) => 7 * 24 * 60 * 60,
         };
+        let allow_domains = match std::env::var("AEGIS_AUTH_ALLOW_DOMAINS") {
+            Ok(s) => s
+                .split(',')
+                .map(|d| d.trim().to_string())
+                .filter(|d| !d.is_empty())
+                .collect(),
+            Err(_) => Vec::new(),
+        };
 
         Ok(Self {
             database_url,
@@ -85,6 +96,7 @@ impl Config {
             bind_addr,
             access_ttl: Duration::from_secs(access_ttl_secs),
             refresh_ttl: Duration::from_secs(refresh_ttl_secs),
+            allow_domains,
         })
     }
 }
@@ -150,7 +162,9 @@ mod tests {
     fn set_env(key: &'static str, value: &str) -> EnvGuard {
         let prev = std::env::var(key).ok();
         // SAFETY: serialized via ENV_LOCK in tests.
-        unsafe { std::env::set_var(key, value); }
+        unsafe {
+            std::env::set_var(key, value);
+        }
         EnvGuard { key, prev }
     }
 
@@ -167,6 +181,7 @@ mod tests {
         let _b = set_env("AEGIS_HTTP_BIND", "127.0.0.1:9090");
         let _a = set_env("AEGIS_ACCESS_TTL_SECS", "60");
         let _r = set_env("AEGIS_REFRESH_TTL_SECS", "120");
+        let _d = set_env("AEGIS_AUTH_ALLOW_DOMAINS", "example.com, corp.test");
 
         let cfg = Config::from_env().expect("config should parse");
         assert_eq!(cfg.database_url, "postgres://localhost/x");
@@ -174,6 +189,7 @@ mod tests {
         assert_eq!(cfg.bind_addr.to_string(), "127.0.0.1:9090");
         assert_eq!(cfg.access_ttl, std::time::Duration::from_secs(60));
         assert_eq!(cfg.refresh_ttl, std::time::Duration::from_secs(120));
+        assert_eq!(cfg.allow_domains, vec!["example.com", "corp.test"]);
     }
 
     #[test]
@@ -181,23 +197,36 @@ mod tests {
         let _g = lock_env();
         let _db = set_env("AEGIS_DATABASE_URL", "postgres://localhost/x");
         let _sk = set_env("AEGIS_AUTH_SIGNING_KEY", &sample_key_hex());
-        // AEGIS_HTTP_BIND, AEGIS_ACCESS_TTL_SECS, AEGIS_REFRESH_TTL_SECS all unset.
+        // AEGIS_HTTP_BIND, AEGIS_ACCESS_TTL_SECS, AEGIS_REFRESH_TTL_SECS,
+        // AEGIS_AUTH_ALLOW_DOMAINS all unset.
 
         let cfg = Config::from_env().expect("config should parse");
         assert_eq!(cfg.bind_addr.to_string(), "0.0.0.0:8080");
         assert_eq!(cfg.access_ttl, std::time::Duration::from_secs(900));
-        assert_eq!(cfg.refresh_ttl, std::time::Duration::from_secs(7 * 24 * 60 * 60));
+        assert_eq!(
+            cfg.refresh_ttl,
+            std::time::Duration::from_secs(7 * 24 * 60 * 60)
+        );
+        assert!(
+            cfg.allow_domains.is_empty(),
+            "missing allow_domains env var must yield an empty allowlist"
+        );
     }
 
     #[test]
     fn from_env_errors_when_database_url_missing() {
         let _g = lock_env();
         // SAFETY: serialized via ENV_LOCK in tests.
-        unsafe { std::env::remove_var("AEGIS_DATABASE_URL"); }
+        unsafe {
+            std::env::remove_var("AEGIS_DATABASE_URL");
+        }
         let _sk = set_env("AEGIS_AUTH_SIGNING_KEY", &sample_key_hex());
 
         let err = Config::from_env().expect_err("should fail");
-        assert!(matches!(err, ConfigError::MissingEnvVariable("AEGIS_DATABASE_URL")));
+        assert!(matches!(
+            err,
+            ConfigError::MissingEnvVariable("AEGIS_DATABASE_URL")
+        ));
     }
 
     #[test]
@@ -205,10 +234,15 @@ mod tests {
         let _g = lock_env();
         let _db = set_env("AEGIS_DATABASE_URL", "postgres://localhost/x");
         // SAFETY: serialized via ENV_LOCK in tests.
-        unsafe { std::env::remove_var("AEGIS_AUTH_SIGNING_KEY"); }
+        unsafe {
+            std::env::remove_var("AEGIS_AUTH_SIGNING_KEY");
+        }
 
         let err = Config::from_env().expect_err("should fail");
-        assert!(matches!(err, ConfigError::MissingEnvVariable("AEGIS_AUTH_SIGNING_KEY")));
+        assert!(matches!(
+            err,
+            ConfigError::MissingEnvVariable("AEGIS_AUTH_SIGNING_KEY")
+        ));
     }
 
     #[test]
@@ -219,7 +253,13 @@ mod tests {
         let _sk = set_env("AEGIS_AUTH_SIGNING_KEY", &"00".repeat(16));
 
         let err = Config::from_env().expect_err("should fail");
-        assert!(matches!(err, ConfigError::InvalidValue { var: "AEGIS_AUTH_SIGNING_KEY", .. }));
+        assert!(matches!(
+            err,
+            ConfigError::InvalidValue {
+                var: "AEGIS_AUTH_SIGNING_KEY",
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -229,7 +269,13 @@ mod tests {
         let _sk = set_env("AEGIS_AUTH_SIGNING_KEY", "not-hex-bytes");
 
         let err = Config::from_env().expect_err("should fail");
-        assert!(matches!(err, ConfigError::InvalidValue { var: "AEGIS_AUTH_SIGNING_KEY", .. }));
+        assert!(matches!(
+            err,
+            ConfigError::InvalidValue {
+                var: "AEGIS_AUTH_SIGNING_KEY",
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -240,7 +286,13 @@ mod tests {
         let _b = set_env("AEGIS_HTTP_BIND", "not-an-addr");
 
         let err = Config::from_env().expect_err("should fail");
-        assert!(matches!(err, ConfigError::InvalidValue { var: "AEGIS_HTTP_BIND", .. }));
+        assert!(matches!(
+            err,
+            ConfigError::InvalidValue {
+                var: "AEGIS_HTTP_BIND",
+                ..
+            }
+        ));
     }
 
     #[test]
@@ -251,6 +303,12 @@ mod tests {
         let _a = set_env("AEGIS_ACCESS_TTL_SECS", "not-a-number");
 
         let err = Config::from_env().expect_err("should fail");
-        assert!(matches!(err, ConfigError::InvalidValue { var: "AEGIS_ACCESS_TTL_SECS", .. }));
+        assert!(matches!(
+            err,
+            ConfigError::InvalidValue {
+                var: "AEGIS_ACCESS_TTL_SECS",
+                ..
+            }
+        ));
     }
 }

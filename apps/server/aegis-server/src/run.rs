@@ -156,6 +156,7 @@ fn build_auth_service(
         signing_key: config.signing_key.clone(),
         access_ttl: config.access_ttl,
         refresh_ttl: config.refresh_ttl,
+        allow_domains: config.allow_domains.clone(),
     });
     Ok(Arc::new(AuthServiceImpl::new(usecase)))
 }
