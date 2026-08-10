@@ -89,8 +89,14 @@ pub async fn login_domain(
 }
 
 /// `POST /api/auth/refresh` — exchange a still-valid refresh token
-/// for a fresh access token. Requires a valid access token in
-/// `Authorization: Bearer <token>`.
+/// for a fresh access token.
+///
+/// This route does **not** require a valid access token. The whole
+/// point of the endpoint is to mint a new access token when the
+/// current one has expired; rejecting expired access tokens here
+/// would be self-defeating. The refresh token in the body is the
+/// sole credential — `AuthService::refresh` validates it and
+/// surfaces any failure as 401.
 #[utoipa::path(
     post,
     path = "/refresh",
@@ -98,20 +104,14 @@ pub async fn login_domain(
     request_body = dto::RefreshRequest,
     responses(
         (status = 200, description = "Fresh access token", body = dto::AccessTokenResponse),
-        (status = 401, description = "Missing / invalid access token, or refresh token rejected", body = crate::transport::http::error::ErrorBody),
+        (status = 401, description = "Refresh token rejected", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository / signing failure", body = crate::transport::http::error::ErrorBody),
     ),
-    security(("BearerAuth" = [])),
 )]
 pub async fn refresh(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Json(req): Json<dto::RefreshRequest>,
 ) -> Result<Json<dto::AccessTokenResponse>, ApiError> {
-    // `claims` is unused in the handler body — its presence alone
-    // proves the caller presented a valid access token. The actual
-    // session identity is carried by the refresh token in the body.
-    let _ = claims;
     let response = state
         .auth
         .refresh(RefreshRequest {
@@ -519,7 +519,6 @@ mod tests {
     #[tokio::test]
     async fn refresh_returns_access_token() {
         let mock = MockAuth {
-            verify_ok: true,
             refresh: Some(RefreshResponse {
                 access_token: "NEW".into(),
             }),
@@ -544,12 +543,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn refresh_maps_verify_failure_to_401() {
-        // The access token is rejected by `verify` — refresh
-        // returns 401 with `token_verification_failed` before the
-        // handler body ever runs.
+    async fn refresh_with_expired_access_token_still_succeeds() {
+        // The whole point of the refresh endpoint: an expired
+        // access token must not be a barrier. The refresh token in
+        // the body is the real credential. We configure the mock
+        // to fail `verify` (mimicking an expired access token)
+        // but still let `refresh` succeed — the handler must
+        // never consult `verify` on this route.
         let mock = MockAuth {
             verify_err: Some(AuthApiError::Verification("expired".into())),
+            refresh: Some(RefreshResponse {
+                access_token: "NEW".into(),
+            }),
             ..Default::default()
         };
         let app = router(test_state(mock));
@@ -566,16 +571,21 @@ mod tests {
             .await
             .unwrap();
         let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::UNAUTHORIZED);
-        assert_eq!(body["code"], "token_verification_failed");
+        assert_eq!(status, AxStatus::OK);
+        assert_eq!(body["access_token"], "NEW");
     }
 
     #[tokio::test]
-    async fn refresh_without_authorization_returns_401() {
-        // No Authorization header — the AuthClaims extractor
-        // returns 401 `token_verification_failed` before the
-        // handler body runs.
-        let mock = MockAuth::default();
+    async fn refresh_without_authorization_header_succeeds() {
+        // The refresh endpoint does not require an access token
+        // at all. The body carries the refresh token that
+        // authenticates the request.
+        let mock = MockAuth {
+            refresh: Some(RefreshResponse {
+                access_token: "NEW".into(),
+            }),
+            ..Default::default()
+        };
         let app = router(test_state(mock));
         let response = app
             .oneshot(
@@ -589,17 +599,17 @@ mod tests {
             .await
             .unwrap();
         let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::UNAUTHORIZED);
-        assert_eq!(body["code"], "token_verification_failed");
+        assert_eq!(status, AxStatus::OK);
+        assert_eq!(body["access_token"], "NEW");
     }
 
     #[tokio::test]
     async fn refresh_maps_refresh_token_failure_to_401() {
-        // The access token verifies fine, but the refresh token
-        // itself is rejected by the auth usecase — same 401 + same
-        // code, but reached via the handler body.
+        // The refresh token itself is rejected by the auth usecase —
+        // 401 with `token_verification_failed`, reached via the
+        // handler body. The presence or absence of an access token
+        // in the request has no effect on this route.
         let mock = MockAuth {
-            verify_ok: true,
             refresh_err: Some(AuthApiError::Verification("refresh expired".into())),
             ..Default::default()
         };
