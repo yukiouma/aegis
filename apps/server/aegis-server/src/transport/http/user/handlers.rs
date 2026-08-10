@@ -193,7 +193,8 @@ mod tests {
     use apis::auth::{
         AuthApiError, AuthClaims, AuthService, CreateUserCredentialRequest,
         LoginWithDomainUserInfoRequest, LoginWithPasswordRequest, LogoutRequest, LogoutResponse,
-        RefreshRequest, RefreshResponse, RemoveUserCredentialResponse, TokenPair,
+        RefreshRequest,
+    RegisterUserRequest, RegisterUserResponse, RefreshResponse, RemoveUserCredentialResponse, TokenPair,
         UpdateUserCredentialRequest, UserCredentialView, VerifyRequest,
     };
 
@@ -330,6 +331,12 @@ mod tests {
         }
         async fn logout(&self, _req: LogoutRequest) -> Result<LogoutResponse, AuthApiError> {
             unimplemented!()
+        }
+        async fn register_user(
+            &self,
+            _req: RegisterUserRequest,
+        ) -> Result<RegisterUserResponse, AuthApiError> {
+            unimplemented!("not exercised by this handler")
         }
     }
 

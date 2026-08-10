@@ -173,6 +173,7 @@ fn build_app(pool: PgPool) -> Router {
         signing_key: signing_key(),
         access_ttl: Duration::from_secs(900),
         refresh_ttl: Duration::from_secs(3600),
+        allow_domains: vec!["aegis.local".to_string()],
     });
 
     let auth = Arc::new(AuthServiceImpl::new(auth_usecase)) as Arc<dyn AuthService>;
