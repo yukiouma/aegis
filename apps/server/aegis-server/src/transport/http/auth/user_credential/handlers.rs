@@ -51,14 +51,11 @@ use crate::transport::http::error::ApiError;
         (status = 403, description = "Caller is not an admin or root", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
-    security(("BearerAuth" = [])),
 )]
 pub async fn register(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Json(req): Json<dto::RegisterUserRequest>,
 ) -> Result<(StatusCode, Json<dto::RegisterUserResponse>), ApiError> {
-    require_admin_or_root(&claims)?;
     let view = state
         .auth
         .register_user(RegisterUserRequest {
@@ -71,16 +68,6 @@ pub async fn register(
         })
         .await?;
     Ok((StatusCode::CREATED, Json(view.into())))
-}
-
-/// Reject callers whose role is not `Root` or `Admin`. Mirrors the
-/// helper used by the project handlers; duplicated locally to keep
-/// the auth module's authorization rule explicit at the call site.
-fn require_admin_or_root(claims: &AuthClaims) -> Result<(), ApiError> {
-    match claims.0.role {
-        apis::user::Role::Root | apis::user::Role::Admin => Ok(()),
-        apis::user::Role::General => Err(ApiError::Forbidden),
-    }
 }
 
 /// `PATCH /api/auth/user-credential` — partial update of the caller's
