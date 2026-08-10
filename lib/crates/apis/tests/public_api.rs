@@ -91,8 +91,9 @@ fn user_service_is_send_sync() {
 use apis::auth::{
     AuthApiError, AuthClaims, AuthService, CreateUserCredentialRequest,
     LoginWithDomainUserInfoRequest, LoginWithPasswordRequest, LogoutRequest, LogoutResponse,
-    RefreshRequest, RefreshResponse, RemoveUserCredentialResponse, TokenPair,
-    UpdateUserCredentialRequest, UserCredentialView, VerifyRequest,
+    RefreshRequest, RefreshResponse, RegisterUserRequest, RegisterUserResponse,
+    RemoveUserCredentialResponse, TokenPair, UpdateUserCredentialRequest, UserCredentialView,
+    VerifyRequest,
 };
 
 /// Every public type in `apis::auth` is nameable from the test.
@@ -111,6 +112,8 @@ fn auth_public_types_are_nameable() {
     fn assert_update_cred(_: UpdateUserCredentialRequest) {}
     fn assert_cred_view(_: UserCredentialView) {}
     fn assert_remove_cred_res(_: RemoveUserCredentialResponse) {}
+    fn assert_register_req(_: RegisterUserRequest) {}
+    fn assert_register_res(_: RegisterUserResponse) {}
     fn assert_err(_: AuthApiError) {}
 
     // `TokenPair` is constructible field-by-field.
@@ -165,6 +168,23 @@ fn auth_public_types_are_nameable() {
         token_version: 0,
     });
     assert_remove_cred_res(RemoveUserCredentialResponse {});
+    assert_register_req(RegisterUserRequest {
+        user_code: "u1".into(),
+        user_name: "Alice".into(),
+        domain_name: "example.com".into(),
+        hostname: "host".into(),
+        sid: "S-1-5".into(),
+        password: "p".into(),
+    });
+    assert_register_res(RegisterUserResponse {
+        user_code: "u1".into(),
+        user_name: "Alice".into(),
+        role: apis::user::Role::General,
+        active: false,
+        domain_name: "example.com".into(),
+        hostname: "host".into(),
+        sid: "S-1-5".into(),
+    });
 
     // Touch every variant of the error type to keep it from being
     // dead-code-eliminated by the test build's analysis.
@@ -230,6 +250,12 @@ impl AuthService for FakeAuthService {
         &self,
         _code: &str,
     ) -> Result<RemoveUserCredentialResponse, AuthApiError> {
+        todo!()
+    }
+    async fn register_user(
+        &self,
+        _req: RegisterUserRequest,
+    ) -> Result<RegisterUserResponse, AuthApiError> {
         todo!()
     }
 }
