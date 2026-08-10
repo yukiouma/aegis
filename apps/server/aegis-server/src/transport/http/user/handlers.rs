@@ -44,6 +44,7 @@ use crate::transport::http::error::ApiError;
 /// projection of that view.
 #[utoipa::path(
     post, path = "/", tag = "user",
+    operation_id = "user_create",
     request_body = dto::CreateUserRequest,
     responses(
         (status = 201, description = "User created", body = dto::UserViewResponse),
@@ -79,6 +80,7 @@ pub async fn create(
 /// shape.
 #[utoipa::path(
     get, path = "/", tag = "user",
+    operation_id = "user_list",
     responses(
         (status = 200, description = "Users list", body = dto::UserListResponse),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
@@ -102,6 +104,7 @@ pub async fn list(
 /// into `state.user.get_by_code` and returns the projected view.
 #[utoipa::path(
     get, path = "/{code}", tag = "user",
+    operation_id = "user_get_by_code",
     params(
         ("code" = String, Path, description = "User code to fetch"),
     ),
@@ -135,6 +138,7 @@ pub async fn get_by_code(
 /// 3. Calls `state.user.update`, which returns the projected view.
 #[utoipa::path(
     patch, path = "/{code}", tag = "user",
+    operation_id = "user_update",
     params(
         ("code" = String, Path, description = "User code to update"),
     ),

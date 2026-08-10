@@ -43,6 +43,7 @@ use crate::transport::http::error::ApiError;
 /// route.
 #[utoipa::path(
     post, path = "/", tag = "user-credential",
+    operation_id = "auth_register_user",
     request_body = dto::RegisterUserRequest,
     responses(
         (status = 201, description = "User registered", body = dto::RegisterUserResponse),
@@ -81,6 +82,7 @@ pub async fn register(
 /// [`crate::transport::http::auth::router`].
 #[utoipa::path(
     patch, path = "/", tag = "user-credential",
+    operation_id = "auth_update_user_credential",
     request_body = dto::UpdateUserCredentialRequest,
     responses(
         (status = 200, description = "User credential updated", body = dto::UserCredentialViewResponse),

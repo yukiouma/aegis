@@ -27,6 +27,7 @@ use crate::transport::http::error::ApiError;
     post,
     path = "/login",
     tag = "auth",
+    operation_id = "auth_login",
     request_body = dto::LoginRequest,
     responses(
         (status = 200, description = "Token pair minted", body = dto::TokenPairResponse),
@@ -60,6 +61,7 @@ pub async fn login(
     post,
     path = "/login-domain",
     tag = "auth",
+    operation_id = "auth_login_domain",
     request_body = dto::LoginDomainRequest,
     responses(
         (status = 200, description = "Token pair minted", body = dto::TokenPairResponse),
@@ -101,6 +103,7 @@ pub async fn login_domain(
     post,
     path = "/refresh",
     tag = "auth",
+    operation_id = "auth_refresh",
     request_body = dto::RefreshRequest,
     responses(
         (status = 200, description = "Fresh access token", body = dto::AccessTokenResponse),
@@ -130,6 +133,7 @@ pub async fn refresh(
     post,
     path = "/logout",
     tag = "auth",
+    operation_id = "auth_logout",
     request_body = dto::LogoutRequest,
     responses(
         (status = 200, description = "Logged out", body = dto::LogoutResponse),
