@@ -4,7 +4,7 @@ import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
-import { SettingsPage } from "../../routes/settings";
+import { SettingsPage } from "../../pages/settings";
 import { renderInRouter } from "../file-route-utils";
 
 function createMemoryStorage(): Storage {

@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
 import { renderInRouter } from "../file-route-utils";
-import { HomePage } from "../../routes/index";
+import { HomePage } from "../../pages/home";
 import { invoke } from "@tauri-apps/api/core";
 
 vi.mock("@tauri-apps/api/core", () => ({

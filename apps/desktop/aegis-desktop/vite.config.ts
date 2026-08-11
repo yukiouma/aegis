@@ -13,6 +13,9 @@ export default defineConfig(async () => ({
       autoCodeSplitting: true,
       routesDirectory: 'src/routes',
       generatedRouteTree: 'src/routes/routeTree.gen.ts',
+      // The generated routeTree file lives next to route files but isn't a
+      // route itself; tell the plugin to ignore it.
+      routeFileIgnorePattern: '\\.gen\\.ts$',
     }),
     react(),
   ],
