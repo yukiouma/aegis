@@ -9,6 +9,7 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { render, type RenderOptions } from "@testing-library/react";
+import { routeTree } from "../routes/routeTree.gen";
 
 interface RenderInRouterOptions extends Omit<RenderOptions, "wrapper"> {
   initialEntries?: string[];
@@ -67,21 +68,13 @@ interface RenderWithFullRouterOptions extends Omit<RenderOptions, "wrapper"> {
  * Render the full app routeTree (including `__root.tsx` layout) with an
  * in-memory history. Use this for tests that exercise the Sidebar, layout,
  * or navigation between real routes.
- *
- * NOTE: at this stage (before Task 3 creates the route files) `routeTree.gen.ts`
- * does not exist yet, so this helper falls back to a minimal placeholder
- * router. Task 3 Step 5 restores the real `routeTree.gen.ts` import.
  */
 export async function renderWithFullRouter({
   initialEntries = ["/"],
   ...renderOptions
 }: RenderWithFullRouterOptions = {}) {
   const history = createMemoryHistory({ initialEntries });
-  const placeholder = createRootRoute({ component: () => null });
-  const router = createRouter({
-    routeTree: placeholder,
-    history,
-  });
+  const router = createRouter({ routeTree, history });
 
   await act(async () => {
     await router.load();
