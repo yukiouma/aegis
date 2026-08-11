@@ -22,7 +22,7 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
         <DocumentLangSync />
         <RouterProvider router={router} />
         {import.meta.env.DEV && (
-          <TanStackRouterDevtools position="bottom-right" />
+          <TanStackRouterDevtools router={router} position="bottom-right" />
         )}
       </AegisI18nProvider>
     </AegisThemeProvider>
