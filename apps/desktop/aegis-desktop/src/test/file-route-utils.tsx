@@ -60,7 +60,7 @@ export async function renderInRouter(
   };
 }
 
-interface RenderWithFullRouterOptions extends Omit<RenderOptions, "wrapper"> {
+interface RenderWithFullRouterOptions extends RenderOptions {
   initialEntries?: string[];
 }
 

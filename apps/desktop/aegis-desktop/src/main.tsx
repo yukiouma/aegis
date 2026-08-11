@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
+import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { routeTree } from "./routes/routeTree.gen";
 import { DocumentLangSync } from "./DocumentLangSync";
 
@@ -20,6 +21,9 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
       <AegisI18nProvider>
         <DocumentLangSync />
         <RouterProvider router={router} />
+        {import.meta.env.DEV && (
+          <TanStackRouterDevtools position="bottom-right" />
+        )}
       </AegisI18nProvider>
     </AegisThemeProvider>
   </React.StrictMode>,
