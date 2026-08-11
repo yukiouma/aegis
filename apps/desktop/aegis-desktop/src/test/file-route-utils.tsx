@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { act } from "react";
 import {
   createMemoryHistory,
   createRootRoute,
@@ -8,10 +9,6 @@ import {
   RouterProvider,
 } from "@tanstack/react-router";
 import { render, type RenderOptions } from "@testing-library/react";
-// NOTE: this import is temporarily commented out because routeTree.gen.ts
-// does not exist yet. Restore it in Task 3 Step 5 once the route files are
-// created.
-// import { routeTree } from "../routes/routeTree.gen";
 
 interface RenderInRouterOptions extends Omit<RenderOptions, "wrapper"> {
   initialEntries?: string[];
@@ -22,11 +19,13 @@ interface RenderInRouterOptions extends Omit<RenderOptions, "wrapper"> {
  * in isolation (no real layout, no Sidebar). Use `renderWithFullRouter` to
  * exercise the full `__root.tsx` layout and navigation.
  */
-export function renderInRouter(
+export async function renderInRouter(
   ui: ReactNode,
   { initialEntries = ["/"], ...renderOptions }: RenderInRouterOptions = {},
 ) {
   const history = createMemoryHistory({ initialEntries });
+
+  const Page = () => <>{ui}</>;
 
   const rootRoute = createRootRoute({
     component: () => <Outlet />,
@@ -35,7 +34,7 @@ export function renderInRouter(
   const indexRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/",
-    component: () => <>{ui}</>,
+    component: Page,
   });
 
   const router = createRouter({
@@ -43,8 +42,19 @@ export function renderInRouter(
     history,
   });
 
+  // Trigger an initial match and wait for it to settle before rendering.
+  // router.load() is async because it goes through the data-loading pipeline;
+  // awaiting it (inside `act` so React flushes the resulting state update)
+  // ensures the matched route's component has rendered into the DOM by the
+  // time the caller makes assertions.
+  await act(async () => {
+    await router.load();
+  });
+
+  const result = render(<RouterProvider router={router} />, renderOptions);
+
   return {
-    ...render(<RouterProvider router={router} />, renderOptions),
+    ...result,
     router,
   };
 }
@@ -53,30 +63,34 @@ interface RenderWithFullRouterOptions extends Omit<RenderOptions, "wrapper"> {
   initialEntries?: string[];
 }
 
-// Workaround body for Task 1 — restored in Task 3 Step 5 once routeTree.gen.ts exists.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function _placeholder(initialEntries: string[] = ["/"]) {
-  const history = createMemoryHistory({ initialEntries });
-  // const router = createRouter({ routeTree, history });
-  const router = createRouter({
-    routeTree: createRootRoute({ component: () => null }),
-    history,
-  });
-  return router;
-}
-
 /**
  * Render the full app routeTree (including `__root.tsx` layout) with an
  * in-memory history. Use this for tests that exercise the Sidebar, layout,
  * or navigation between real routes.
+ *
+ * NOTE: at this stage (before Task 3 creates the route files) `routeTree.gen.ts`
+ * does not exist yet, so this helper falls back to a minimal placeholder
+ * router. Task 3 Step 5 restores the real `routeTree.gen.ts` import.
  */
-export function renderWithFullRouter({
+export async function renderWithFullRouter({
   initialEntries = ["/"],
   ...renderOptions
 }: RenderWithFullRouterOptions = {}) {
-  const router = _placeholder(initialEntries);
+  const history = createMemoryHistory({ initialEntries });
+  const placeholder = createRootRoute({ component: () => null });
+  const router = createRouter({
+    routeTree: placeholder,
+    history,
+  });
+
+  await act(async () => {
+    await router.load();
+  });
+
+  const result = render(<RouterProvider router={router} />, renderOptions);
+
   return {
-    ...render(<RouterProvider router={router} />, renderOptions),
+    ...result,
     router,
   };
 }
