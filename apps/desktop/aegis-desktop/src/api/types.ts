@@ -1,5 +1,11 @@
 // Wire-DTO mirrors. Hand-maintained — every shape matches the Rust DTO in
 // `apps/desktop/aegis-desktop/src-tauri/src/http/*` 1:1.
+//
+// Field naming: TypeScript interfaces use camelCase identifiers. Note that
+// this is purely a TS-style rename — the actual JSON keys received from
+// the aegis-server are snake_case (per the server's wire format). Future
+// consumers that destructure these shapes need to know they must use the
+// snake_case keys at runtime, OR a transform layer must be added.
 
 export type Role = "root" | "admin" | "general";
 
@@ -8,14 +14,14 @@ export interface ErrorBody {
   message: string;
 }
 
-// Mirrors `http::dto::ApiError`. The Rust enum uses struct variants (serde
-// tagged enums forbid newtype variants), so each variant shape carries a
-// named field next to its `kind` discriminator.
+// Mirrors `http::dto::ApiError`. The Rust enum uses struct variants
+// (serde tagged enums forbid newtype variants) tagged with `kind =
+// "camelCase"`, so multi-word variants serialize as `refreshFailed` etc.
 export type ApiError =
   | { kind: "network"; message: string }
   | { kind: "http"; status: number; code: string; message: string }
-  | { kind: "refresh_failed" }
-  | { kind: "not_implemented"; detail: string }
+  | { kind: "refreshFailed" }
+  | { kind: "notImplemented"; detail: string }
   | { kind: "store"; message: string };
 
 // Auth
@@ -28,18 +34,18 @@ export interface RegisterUserInput {
   password: string;
 }
 export interface RegisterUserResponse {
-  user_code: string;
-  user_name: string;
+  userCode: string;
+  userName: string;
   role: Role;
   active: boolean;
-  domain_name: string;
+  domainName: string;
   hostname: string;
   sid: string;
 }
 export interface UserCredentialView {
-  user_code: string;
-  password_hash: string;
-  token_version: number;
+  userCode: string;
+  passwordHash: string;
+  tokenVersion: number;
 }
 export interface UpdateUserCredentialInput {
   userCode: string;
@@ -53,8 +59,8 @@ export interface UserView {
   name: string;
   role: Role;
   active: boolean;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 export interface CreateUserInput {
   code: string;
@@ -75,8 +81,8 @@ export interface ProductView {
   name: string;
   description: string;
   active: boolean;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 export interface CreateProductInput {
   code: string;
@@ -109,10 +115,10 @@ export interface ProjectView {
   description: string;
   product: ProductView;
   members: ProjectMembersView;
-  unblind_members: ProjectMembersView;
+  unblindMembers: ProjectMembersView;
   active: boolean;
-  created_at: string;
-  updated_at: string;
+  createdAt: string;
+  updatedAt: string;
 }
 export interface CreateProjectInput {
   code: string;

@@ -28,7 +28,7 @@ pub enum Role {
 /// Note: serde tagged enums do not support newtype variants, so the
 /// payload-bearing variants are struct-shaped (`{ message: ... }` etc.).
 #[derive(Debug, Clone, Serialize, Deserialize, thiserror::Error)]
-#[serde(tag = "kind", rename_all = "snake_case")]
+#[serde(tag = "kind", rename_all = "camelCase")]
 pub enum ApiError {
     /// Reqwest returned a transport error (DNS, connect, TLS, timeout).
     #[error("network: {message}")]
@@ -114,6 +114,6 @@ mod tests {
     fn api_error_refresh_failed_serializes() {
         let e = ApiError::RefreshFailed;
         let j = serde_json::to_string(&e).unwrap();
-        assert!(j.contains("\"kind\":\"refresh_failed\""));
+        assert!(j.contains("\"kind\":\"refreshFailed\""));
     }
 }
