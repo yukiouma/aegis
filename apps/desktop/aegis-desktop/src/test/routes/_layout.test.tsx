@@ -51,7 +51,7 @@ function renderRoot(initialEntries: string[] = ["/"]) {
   });
 }
 
-describe("RootLayout", () => {
+describe("AppLayout", () => {
   it("renders the Sidebar and the Home page content at /", async () => {
     const { router } = await renderRoot(["/"]);
 
