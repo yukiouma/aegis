@@ -65,18 +65,30 @@ describe("HomePage", () => {
     ).toBeInTheDocument();
   });
 
-  it("invokes the Tauri greet command and shows the response", async () => {
-    (invoke as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      "Greetings, Aegis!",
-    );
+  it("invokes the login command with code and password, refreshes login state", async () => {
+    const mock = invoke as unknown as ReturnType<typeof vi.fn>;
+    mock.mockResolvedValueOnce(undefined); // api.login
+    mock.mockResolvedValueOnce(true); // api.isLoggedIn
 
     await renderHome();
 
-    await userEvent.click(
-      screen.getByRole("button", { name: /test greet/i }),
-    );
+    await userEvent.type(screen.getByLabelText(/code/i), "alice");
+    await userEvent.type(screen.getByLabelText(/password/i), "secret");
+    await userEvent.click(screen.getByRole("button", { name: /login/i }));
 
-    expect(invoke).toHaveBeenCalledWith("greet", { name: "Aegis" });
-    expect(await screen.findByText("Greetings, Aegis!")).toBeInTheDocument();
+    expect(mock).toHaveBeenCalledWith("login", { code: "alice", password: "secret" });
+    expect(mock).toHaveBeenCalledWith("isLoggedIn");
+  });
+
+  it("calls logout when the logout button is clicked", async () => {
+    const mock = invoke as unknown as ReturnType<typeof vi.fn>;
+    mock.mockResolvedValueOnce(undefined); // api.logout
+    mock.mockResolvedValueOnce(false); // api.isLoggedIn
+
+    await renderHome();
+
+    await userEvent.click(screen.getByRole("button", { name: /logout/i }));
+
+    expect(mock).toHaveBeenCalledWith("logout");
   });
 });

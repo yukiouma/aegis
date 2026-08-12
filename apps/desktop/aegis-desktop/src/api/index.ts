@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
 import type {
-  ApiError,
   CreateProductInput,
   CreateProjectInput,
   CreateUserInput,
@@ -17,53 +16,63 @@ import type {
   UserView,
 } from "./types";
 
+// Thin wrapper that loosens the `args` parameter type from
+// `InvokeArgs` (= `Record<string, unknown>`) to `unknown` so typed input
+// interfaces (CreateUserInput, etc.) flow through without per-call casts.
+function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  if (args === undefined) {
+    return invoke<T>(cmd);
+  }
+  return invoke<T>(cmd, args);
+}
+
 export const api = {
   // auth
   login: (code: string, password: string): Promise<void> =>
-    invoke<void>("login", { code, password }),
+    call<void>("login", { code, password }),
   loginDomain: (code: string): Promise<void> =>
-    invoke<void>("loginDomain", { code }),
-  isLoggedIn: (): Promise<boolean> => invoke<boolean>("isLoggedIn"),
-  refresh: (): Promise<void> => invoke<void>("refresh"),
-  logout: (): Promise<void> => invoke<void>("logout"),
+    call<void>("loginDomain", { code }),
+  isLoggedIn: (): Promise<boolean> => call<boolean>("isLoggedIn"),
+  refresh: (): Promise<void> => call<void>("refresh"),
+  logout: (): Promise<void> => call<void>("logout"),
 
   // user-credential
   registerUser: (input: RegisterUserInput): Promise<RegisterUserResponse> =>
-    invoke<RegisterUserResponse>("registerUser", input),
+    call<RegisterUserResponse>("registerUser", { ...input }),
   updateUserCredential: (
     input: UpdateUserCredentialInput,
   ): Promise<UserCredentialView> =>
-    invoke<UserCredentialView>("updateUserCredential", input),
+    call<UserCredentialView>("updateUserCredential", { ...input }),
 
   // user
   createUser: (input: CreateUserInput): Promise<UserView> =>
-    invoke<UserView>("createUser", input),
-  listUsers: (): Promise<UserView[]> => invoke<UserView[]>("listUsers"),
+    call<UserView>("createUser", { ...input }),
+  listUsers: (): Promise<UserView[]> => call<UserView[]>("listUsers"),
   getUserByCode: (code: string): Promise<UserView> =>
-    invoke<UserView>("getUserByCode", { code }),
+    call<UserView>("getUserByCode", { code }),
   updateUser: (code: string, body: UpdateUserBody): Promise<UserView> =>
-    invoke<UserView>("updateUser", { code, body }),
+    call<UserView>("updateUser", { code, body: { ...body } }),
 
   // product
   createProduct: (input: CreateProductInput): Promise<ProductView> =>
-    invoke<ProductView>("createProduct", input),
-  listProducts: (): Promise<ProductView[]> => invoke<ProductView[]>("listProducts"),
+    call<ProductView>("createProduct", { ...input }),
+  listProducts: (): Promise<ProductView[]> => call<ProductView[]>("listProducts"),
   getProductByCode: (code: string): Promise<ProductView> =>
-    invoke<ProductView>("getProductByCode", { code }),
+    call<ProductView>("getProductByCode", { code }),
   updateProduct: (code: string, body: UpdateProductBody): Promise<ProductView> =>
-    invoke<ProductView>("updateProduct", { code, body }),
+    call<ProductView>("updateProduct", { code, body: { ...body } }),
 
   // project
   createProject: (input: CreateProjectInput): Promise<ProjectView> =>
-    invoke<ProjectView>("createProject", input),
-  listProjects: (): Promise<ProjectView[]> => invoke<ProjectView[]>("listProjects"),
+    call<ProjectView>("createProject", { ...input }),
+  listProjects: (): Promise<ProjectView[]> => call<ProjectView[]>("listProjects"),
   getProjectByCode: (code: string): Promise<ProjectView> =>
-    invoke<ProjectView>("getProjectByCode", { code }),
+    call<ProjectView>("getProjectByCode", { code }),
   updateProject: (code: string, body: UpdateProjectBody): Promise<ProjectView> =>
-    invoke<ProjectView>("updateProject", { code, body }),
+    call<ProjectView>("updateProject", { code, body: { ...body } }),
 
   // health
-  healthz: (): Promise<string> => invoke<string>("healthz"),
+  healthz: (): Promise<string> => call<string>("healthz"),
 } as const;
 
 export type { ApiError } from "./types";
