@@ -44,3 +44,7 @@ serde      = { version = "1", features = ["derive"] }
 # `serde_json` is the JSON codec used by axum's Json extractor. Pinned
 # in the workspace so every consumer resolves the same version.
 serde_json = "1"
+# `reqwest` is the HTTP client used by the desktop app's outbound HTTP
+# layer. Pinned in the workspace so it resolves to one version across
+# crates and stays on rustls (no native-tls).
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "webpki-roots"] }
