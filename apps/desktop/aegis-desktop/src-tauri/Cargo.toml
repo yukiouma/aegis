@@ -23,4 +23,12 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-store = "2"
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "webpki-roots"] }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+windows-utils = { path = "../../../../lib/crates/windows-utils" }
 
+[dev-dependencies]
+wiremock = "0.6"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
