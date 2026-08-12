@@ -136,6 +136,7 @@ pub const NO_AUTH_PATHS: &[(&str, &str)] = &[
     ("POST", "/api/auth/login-domain"),
     ("GET",  "/healthz"),
     ("POST", "/api/auth/user-credential"),
+    ("POST", "/api/auth/refresh"),
 ];
 ```
 
@@ -144,11 +145,13 @@ constructs `HttpClient::new(BASE_URL.into(), store)` once in `lib.rs`.
 
 ### `NO_AUTH_PATHS` policy
 
-Exactly the four routes the user listed. The client does not attach
-`Authorization: Bearer <token>` to those four. Any other path
-(including `/api/auth/refresh`) gets a Bearer header if the access
-token is present; the server's middleware does not enforce auth on
-`refresh`, so a stale Bearer is harmless if attached.
+The four routes the user listed, plus `/api/auth/refresh`. The latter
+is added because the server does not enforce Bearer on `refresh`
+(intentional, so expired access tokens can be refreshed), and the
+desktop's retry-on-401 path needs to send the refresh request
+without a stale Bearer header for both clarity and log hygiene. Any
+path not in this list gets `Authorization: Bearer <token>` attached
+when an access token is present.
 
 ## Dependencies
 
@@ -210,9 +213,6 @@ Three impls exist:
   uses the file `auth.bin` (the default store). Reads / writes via
   `store.get("access_token")` etc.
 - `MemoryStore` (`Mutex<HashMap<String, String>>`) for unit tests.
-- `NullStore` (returns `Ok(None)` / `Ok(())` everywhere) is the
-  optional fallback if `tauri_plugin_store` ever fails to open on
-  boot (see Bootstrap).
 
 ### `request<TReq, TResp>(...)`
 
@@ -259,9 +259,11 @@ Flow (single attempt):
    first_attempt_token`, the concurrent racer has already refreshed —
    skip to step 5 with `t`.
 3. Otherwise, build a `POST /api/auth/refresh` request with body
-   `RefreshRequest { refresh_token }`. **No** Bearer attached (refresh
-   goes through `request` with `needs_auth = false` via the
-   hard-coded method/path; the lock prevents recursion).
+   `RefreshRequest { refresh_token }`. This call is constructed
+   directly (not via `self.request()`); the lock is held, so reentry
+   would deadlock. The refresh call has no Bearer header by virtue of
+   `/api/auth/refresh` being in `NO_AUTH_PATHS` — the same policy
+   the public surface uses.
 4. On success (`200` + parsed `AccessTokenResponse`):
    - `tokens.set_access_token(&new).await?;`
    - Drop the guard.
@@ -470,25 +472,35 @@ listProjects, getProjectByCode, updateProject, healthz]`.
 
 ## Bootstrap (`lib.rs`)
 
-`run()` owns the wiring from compile-time config to a Tauri app:
+`pub fn run()` (changed from synchronous to fallible
+`Result<(), Box<dyn std::error::Error>>`) owns the wiring from
+compile-time config to a Tauri app:
 
-1. `let store = app.store("auth.bin")?;` — wrapped in a `match` so a
-   missing-corrupt store falls back to `NullStore` and logs
-   `tracing::warn!`. (Today the store is persistent on disk; if it
-   can't be opened we want the app to start, just without login
-   persistence, so the user can re-login.)
-2. `let client = HttpClient::new(http::config::BASE_URL.into(), Arc::new(TauriStore { store: Arc::clone(&store) }));`
+1. Build the Tauri app builder; on first `.build()` get a handle so
+   `app.store("auth.bin")?` can be called. If that fails, log via
+   `tracing::error!` and return the error — falling back to a
+   no-store mode would mask a real persistence failure and confuse
+   users who can't stay logged in.
+2. `let client = HttpClient::new(http::config::BASE_URL.into(), Arc::new(TauriStore { store: store.clone() }));`
 3. `.plugin(tauri_plugin_store::Builder::new().build())` (already
    present).
 4. `.plugin(tauri_plugin_opener::init())` (already present).
 5. `.manage(client)`.
 6. `.invoke_handler(tauri::generate_handler![...all 20 commands...])`.
-7. `.run(tauri::generate_context!())`.
+7. `.run(tauri::generate_context!())?`
 
 `reqwest::Client` is constructed inside `HttpClient::new` with a
 `Duration::from_secs(15)` overall timeout and a single
 `User-Agent: aegis-desktop/0.1.0` header; future debugging can swap
 this for a builder that wires tracing spans.
+
+`main.rs` becomes:
+
+```rust
+fn main() {
+    aegis_desktop_lib::run().expect("error while running tauri application");
+}
+```
 
 ## TS wrapper (`apps/desktop/aegis-desktop/src/api/`)
 
