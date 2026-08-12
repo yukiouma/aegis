@@ -21,16 +21,16 @@ describe("api wrappers", () => {
     expect(mockInvoke).toHaveBeenCalledWith("login", { code: "alice", password: "secret" });
   });
 
-  it("loginDomain -> invoke('loginDomain', { code })", async () => {
+  it("loginDomain -> invoke('login_domain', { code })", async () => {
     mockInvoke.mockResolvedValueOnce(undefined);
     await api.loginDomain("alice");
-    expect(mockInvoke).toHaveBeenCalledWith("loginDomain", { code: "alice" });
+    expect(mockInvoke).toHaveBeenCalledWith("login_domain", { code: "alice" });
   });
 
-  it("isLoggedIn -> invoke('isLoggedIn')", async () => {
+  it("isLoggedIn -> invoke('is_logged_in')", async () => {
     mockInvoke.mockResolvedValueOnce(true);
     await api.isLoggedIn();
-    expect(mockInvoke).toHaveBeenCalledWith("isLoggedIn");
+    expect(mockInvoke).toHaveBeenCalledWith("is_logged_in");
   });
 
   it("refresh -> invoke('refresh')", async () => {
@@ -45,7 +45,7 @@ describe("api wrappers", () => {
     expect(mockInvoke).toHaveBeenCalledWith("logout");
   });
 
-  it("registerUser -> invoke('registerUser', input)", async () => {
+  it("registerUser -> invoke('register_user', input)", async () => {
     mockInvoke.mockResolvedValueOnce({});
     await api.registerUser({
       userCode: "u",
@@ -55,7 +55,7 @@ describe("api wrappers", () => {
       sid: "s",
       password: "p",
     });
-    expect(mockInvoke).toHaveBeenCalledWith("registerUser", {
+    expect(mockInvoke).toHaveBeenCalledWith("register_user", {
       userCode: "u",
       userName: "n",
       domainName: "d",
@@ -65,103 +65,103 @@ describe("api wrappers", () => {
     });
   });
 
-  it("updateUserCredential -> invoke('updateUserCredential', { userCode, password? })", async () => {
+  it("updateUserCredential -> invoke('update_user_credential', { userCode, password? })", async () => {
     mockInvoke.mockResolvedValueOnce({});
     await api.updateUserCredential({ userCode: "u", password: "p" });
-    expect(mockInvoke).toHaveBeenCalledWith("updateUserCredential", {
+    expect(mockInvoke).toHaveBeenCalledWith("update_user_credential", {
       userCode: "u",
       password: "p",
     });
   });
 
-  it("createUser -> invoke('createUser', { code, name, role })", async () => {
+  it("createUser -> invoke('create_user', { code, name, role })", async () => {
     mockInvoke.mockResolvedValueOnce({});
     await api.createUser({ code: "u", name: "Alice", role: "admin" });
-    expect(mockInvoke).toHaveBeenCalledWith("createUser", {
+    expect(mockInvoke).toHaveBeenCalledWith("create_user", {
       code: "u",
       name: "Alice",
       role: "admin",
     });
   });
 
-  it("listUsers -> invoke('listUsers')", async () => {
+  it("listUsers -> invoke('list_users')", async () => {
     mockInvoke.mockResolvedValueOnce([]);
     await api.listUsers();
-    expect(mockInvoke).toHaveBeenCalledWith("listUsers");
+    expect(mockInvoke).toHaveBeenCalledWith("list_users");
   });
 
-  it("getUserByCode -> invoke('getUserByCode', { code })", async () => {
+  it("getUserByCode -> invoke('get_user_by_code', { code })", async () => {
     mockInvoke.mockResolvedValueOnce({});
     await api.getUserByCode("alice");
-    expect(mockInvoke).toHaveBeenCalledWith("getUserByCode", { code: "alice" });
+    expect(mockInvoke).toHaveBeenCalledWith("get_user_by_code", { code: "alice" });
   });
 
-  it("updateUser -> invoke('updateUser', { code, body })", async () => {
+  it("updateUser -> invoke('update_user', { code, body })", async () => {
     mockInvoke.mockResolvedValueOnce({});
     await api.updateUser("alice", { name: "Alicia" });
-    expect(mockInvoke).toHaveBeenCalledWith("updateUser", {
+    expect(mockInvoke).toHaveBeenCalledWith("update_user", {
       code: "alice",
       body: { name: "Alicia" },
     });
   });
 
-  it("createProduct -> invoke('createProduct', input)", async () => {
+  it("createProduct -> invoke('create_product', input)", async () => {
     mockInvoke.mockResolvedValueOnce({});
     await api.createProduct({ code: "p", name: "P", description: "" });
-    expect(mockInvoke).toHaveBeenCalledWith("createProduct", {
+    expect(mockInvoke).toHaveBeenCalledWith("create_product", {
       code: "p",
       name: "P",
       description: "",
     });
   });
 
-  it("listProducts -> invoke('listProducts')", async () => {
+  it("listProducts -> invoke('list_products')", async () => {
     mockInvoke.mockResolvedValueOnce([]);
     await api.listProducts();
-    expect(mockInvoke).toHaveBeenCalledWith("listProducts");
+    expect(mockInvoke).toHaveBeenCalledWith("list_products");
   });
 
-  it("getProductByCode -> invoke('getProductByCode', { code })", async () => {
+  it("getProductByCode -> invoke('get_product_by_code', { code })", async () => {
     mockInvoke.mockResolvedValueOnce({});
     await api.getProductByCode("p");
-    expect(mockInvoke).toHaveBeenCalledWith("getProductByCode", { code: "p" });
+    expect(mockInvoke).toHaveBeenCalledWith("get_product_by_code", { code: "p" });
   });
 
-  it("updateProduct -> invoke('updateProduct', { code, body })", async () => {
+  it("updateProduct -> invoke('update_product', { code, body })", async () => {
     mockInvoke.mockResolvedValueOnce({});
     await api.updateProduct("p", { active: false });
-    expect(mockInvoke).toHaveBeenCalledWith("updateProduct", {
+    expect(mockInvoke).toHaveBeenCalledWith("update_product", {
       code: "p",
       body: { active: false },
     });
   });
 
-  it("createProject -> invoke('createProject', input)", async () => {
+  it("createProject -> invoke('create_project', input)", async () => {
     mockInvoke.mockResolvedValueOnce({});
     await api.createProject({ code: "p", description: "", productId: 1 });
-    expect(mockInvoke).toHaveBeenCalledWith("createProject", {
+    expect(mockInvoke).toHaveBeenCalledWith("create_project", {
       code: "p",
       description: "",
       productId: 1,
     });
   });
 
-  it("listProjects -> invoke('listProjects')", async () => {
+  it("listProjects -> invoke('list_projects')", async () => {
     mockInvoke.mockResolvedValueOnce([]);
     await api.listProjects();
-    expect(mockInvoke).toHaveBeenCalledWith("listProjects");
+    expect(mockInvoke).toHaveBeenCalledWith("list_projects");
   });
 
-  it("getProjectByCode -> invoke('getProjectByCode', { code })", async () => {
+  it("getProjectByCode -> invoke('get_project_by_code', { code })", async () => {
     mockInvoke.mockResolvedValueOnce({});
     await api.getProjectByCode("p");
-    expect(mockInvoke).toHaveBeenCalledWith("getProjectByCode", { code: "p" });
+    expect(mockInvoke).toHaveBeenCalledWith("get_project_by_code", { code: "p" });
   });
 
-  it("updateProject -> invoke('updateProject', { code, body })", async () => {
+  it("updateProject -> invoke('update_project', { code, body })", async () => {
     mockInvoke.mockResolvedValueOnce({});
     await api.updateProject("p", { active: false });
-    expect(mockInvoke).toHaveBeenCalledWith("updateProject", {
+    expect(mockInvoke).toHaveBeenCalledWith("update_project", {
       code: "p",
       body: { active: false },
     });

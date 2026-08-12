@@ -77,7 +77,7 @@ describe("HomePage", () => {
     await userEvent.click(screen.getByRole("button", { name: /login/i }));
 
     expect(mock).toHaveBeenCalledWith("login", { code: "alice", password: "secret" });
-    expect(mock).toHaveBeenCalledWith("isLoggedIn");
+    expect(mock).toHaveBeenCalledWith("is_logged_in");
   });
 
   it("calls logout when the logout button is clicked", async () => {

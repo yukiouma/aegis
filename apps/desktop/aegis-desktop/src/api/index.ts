@@ -31,45 +31,45 @@ export const api = {
   login: (code: string, password: string): Promise<void> =>
     call<void>("login", { code, password }),
   loginDomain: (code: string): Promise<void> =>
-    call<void>("loginDomain", { code }),
-  isLoggedIn: (): Promise<boolean> => call<boolean>("isLoggedIn"),
+    call<void>("login_domain", { code }),
+  isLoggedIn: (): Promise<boolean> => call<boolean>("is_logged_in"),
   refresh: (): Promise<void> => call<void>("refresh"),
   logout: (): Promise<void> => call<void>("logout"),
 
   // user-credential
   registerUser: (input: RegisterUserInput): Promise<RegisterUserResponse> =>
-    call<RegisterUserResponse>("registerUser", { ...input }),
+    call<RegisterUserResponse>("register_user", { ...input }),
   updateUserCredential: (
     input: UpdateUserCredentialInput,
   ): Promise<UserCredentialView> =>
-    call<UserCredentialView>("updateUserCredential", { ...input }),
+    call<UserCredentialView>("update_user_credential", { ...input }),
 
   // user
   createUser: (input: CreateUserInput): Promise<UserView> =>
-    call<UserView>("createUser", { ...input }),
-  listUsers: (): Promise<UserView[]> => call<UserView[]>("listUsers"),
+    call<UserView>("create_user", { ...input }),
+  listUsers: (): Promise<UserView[]> => call<UserView[]>("list_users"),
   getUserByCode: (code: string): Promise<UserView> =>
-    call<UserView>("getUserByCode", { code }),
+    call<UserView>("get_user_by_code", { code }),
   updateUser: (code: string, body: UpdateUserBody): Promise<UserView> =>
-    call<UserView>("updateUser", { code, body: { ...body } }),
+    call<UserView>("update_user", { code, body: { ...body } }),
 
   // product
   createProduct: (input: CreateProductInput): Promise<ProductView> =>
-    call<ProductView>("createProduct", { ...input }),
-  listProducts: (): Promise<ProductView[]> => call<ProductView[]>("listProducts"),
+    call<ProductView>("create_product", { ...input }),
+  listProducts: (): Promise<ProductView[]> => call<ProductView[]>("list_products"),
   getProductByCode: (code: string): Promise<ProductView> =>
-    call<ProductView>("getProductByCode", { code }),
+    call<ProductView>("get_product_by_code", { code }),
   updateProduct: (code: string, body: UpdateProductBody): Promise<ProductView> =>
-    call<ProductView>("updateProduct", { code, body: { ...body } }),
+    call<ProductView>("update_product", { code, body: { ...body } }),
 
   // project
   createProject: (input: CreateProjectInput): Promise<ProjectView> =>
-    call<ProjectView>("createProject", { ...input }),
-  listProjects: (): Promise<ProjectView[]> => call<ProjectView[]>("listProjects"),
+    call<ProjectView>("create_project", { ...input }),
+  listProjects: (): Promise<ProjectView[]> => call<ProjectView[]>("list_projects"),
   getProjectByCode: (code: string): Promise<ProjectView> =>
-    call<ProjectView>("getProjectByCode", { code }),
+    call<ProjectView>("get_project_by_code", { code }),
   updateProject: (code: string, body: UpdateProjectBody): Promise<ProjectView> =>
-    call<ProjectView>("updateProject", { code, body: { ...body } }),
+    call<ProjectView>("update_project", { code, body: { ...body } }),
 
   // health
   healthz: (): Promise<string> => call<string>("healthz"),
