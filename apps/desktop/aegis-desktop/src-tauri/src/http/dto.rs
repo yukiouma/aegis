@@ -1,0 +1,119 @@
+//! Cross-resource wire DTOs and the single `ApiError` returned by every command.
+
+use serde::{Deserialize, Serialize};
+
+/// Stable, machine-readable error code returned as part of the server
+/// `ErrorBody`. The desktop client does not dispatch on these codes;
+/// errors are forwarded to the frontend as opaque `ApiError::Http` records.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ErrorBody {
+    pub code: String,
+    pub message: String,
+}
+
+/// Three administrative tiers. Wire form is `snake_case` to match the
+/// server's `Role` serialization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Role {
+    Root,
+    Admin,
+    General,
+}
+
+/// The single error type every `#[tauri::command]` returns to the frontend.
+/// Serialized as a tagged object (`{"kind": "http", ...}` etc.) so the
+/// frontend can discriminate by `kind`.
+///
+/// Note: serde tagged enums do not support newtype variants, so the
+/// payload-bearing variants are struct-shaped (`{ message: ... }` etc.).
+#[derive(Debug, Clone, Serialize, Deserialize, thiserror::Error)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum ApiError {
+    /// Reqwest returned a transport error (DNS, connect, TLS, timeout).
+    #[error("network: {message}")]
+    Network { message: String },
+
+    /// Server returned a non-2xx response; `code` is the body's stable
+    /// machine-readable token (or `status_text` for non-JSON 5xx).
+    #[error("http {status} ({code}): {message}")]
+    Http {
+        status: u16,
+        code: String,
+        message: String,
+    },
+
+    /// Auth refresh failed (or no refresh token left). Frontend should
+    /// route to login.
+    #[error("refresh failed; please log in")]
+    RefreshFailed,
+
+    /// Functionality not available on this platform (e.g. `loginDomain` on
+    /// non-Windows).
+    #[error("not implemented on this platform: {detail}")]
+    NotImplemented { detail: &'static str },
+
+    /// Persistent token-store error.
+    #[error("store error: {message}")]
+    Store { message: String },
+}
+
+impl From<reqwest::Error> for ApiError {
+    fn from(err: reqwest::Error) -> Self {
+        ApiError::Network { message: err.to_string() }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn role_serializes_snake_case() {
+        assert_eq!(serde_json::to_string(&Role::Root).unwrap(), "\"root\"");
+        assert_eq!(serde_json::to_string(&Role::Admin).unwrap(), "\"admin\"");
+        assert_eq!(serde_json::to_string(&Role::General).unwrap(), "\"general\"");
+    }
+
+    #[test]
+    fn role_deserializes_snake_case() {
+        let r: Role = serde_json::from_str("\"root\"").unwrap();
+        assert_eq!(r, Role::Root);
+    }
+
+    #[test]
+    fn error_body_roundtrip() {
+        let body = ErrorBody { code: "validation_failed".into(), message: "bad code".into() };
+        let j = serde_json::to_string(&body).unwrap();
+        let back: ErrorBody = serde_json::from_str(&j).unwrap();
+        assert_eq!(body, back);
+    }
+
+    #[test]
+    fn api_error_http_serializes_with_kind_tag() {
+        let e = ApiError::Http {
+            status: 401,
+            code: "invalid_credentials".into(),
+            message: "nope".into(),
+        };
+        let j = serde_json::to_string(&e).unwrap();
+        assert!(j.contains("\"kind\":\"http\""), "got {j}");
+        assert!(j.contains("\"status\":401"));
+        assert!(j.contains("\"code\":\"invalid_credentials\""));
+    }
+
+    #[test]
+    fn api_error_network_serializes() {
+        let e = ApiError::Network { message: "dns".into() };
+        let j = serde_json::to_string(&e).unwrap();
+        assert!(j.contains("\"kind\":\"network\""));
+        assert!(j.contains("\"message\":\"dns\""));
+    }
+
+    #[test]
+    fn api_error_refresh_failed_serializes() {
+        let e = ApiError::RefreshFailed;
+        let j = serde_json::to_string(&e).unwrap();
+        assert!(j.contains("\"kind\":\"refreshFailed\""));
+    }
+}
