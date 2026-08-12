@@ -119,6 +119,14 @@ impl HttpClient {
         Arc::clone(&self.tokens)
     }
 
+    pub fn http(&self) -> &reqwest::Client {
+        &self.http
+    }
+
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
     /// Returns a clone of the refresh-lock handle so multiple `HttpClient`
     /// instances that share a `TokenStore` can serialize their concurrent
     /// refresh attempts through a single mutex. In production there is only
