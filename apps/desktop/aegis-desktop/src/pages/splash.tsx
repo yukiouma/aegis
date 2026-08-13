@@ -91,13 +91,19 @@ export function SplashPage() {
     [navigate, push],
   );
 
-  function onContinue() {
+  function onMethodSubmit() {
     push("info", "splash.log.method.selected", {
       method: t(
         method === "account" ? "splash.method.account" : "splash.method.domain",
       ),
     });
-    setActiveStep(2);
+    if (method === "domain") {
+      // The user pressed "Login" on the method step — go straight to the
+      // domain login. No credentials step.
+      void runLogin(() => api.loginDomain());
+    } else {
+      setActiveStep(2);
+    }
   }
 
   function onBack() {
@@ -107,12 +113,8 @@ export function SplashPage() {
     setActiveStep(1);
   }
 
-  function onLogin() {
-    if (method === "account") {
-      void runLogin(() => api.login(accountCode, password));
-    } else {
-      void runLogin(() => api.loginDomain());
-    }
+  function onAccountLogin() {
+    void runLogin(() => api.login(accountCode, password));
   }
 
   return (
@@ -149,8 +151,15 @@ export function SplashPage() {
                       label={t("splash.method.domain")}
                     />
                   </RadioGroup>
-                  <Button variant="contained" onClick={onContinue} sx={{ mt: 1 }}>
-                    {t("splash.method.continue")}
+                  <Button
+                    variant="contained"
+                    onClick={onMethodSubmit}
+                    disabled={inFlight}
+                    sx={{ mt: 1 }}
+                  >
+                    {method === "domain"
+                      ? t("splash.action.login")
+                      : t("splash.method.continue")}
                   </Button>
                 </>
               )}
@@ -164,31 +173,27 @@ export function SplashPage() {
             <StepContent slotProps={{ transition: { unmountOnExit: true } }}>
               {activeStep === 2 && (
                 <>
-                  {method === "account" && (
-                    <Stack spacing={2} sx={{ maxWidth: 320 }}>
-                      <TextField
-                        label={t("splash.field.code")}
-                        value={accountCode}
-                        onChange={(event) => setAccountCode(event.target.value)}
-                        size="small"
-                      />
-                      <TextField
-                        label={t("splash.field.password")}
-                        type="password"
-                        value={password}
-                        onChange={(event) => setPassword(event.target.value)}
-                        size="small"
-                      />
-                    </Stack>
-                  )}
+                  <Stack spacing={2} sx={{ maxWidth: 320 }}>
+                    <TextField
+                      label={t("splash.field.code")}
+                      value={accountCode}
+                      onChange={(event) => setAccountCode(event.target.value)}
+                      size="small"
+                    />
+                    <TextField
+                      label={t("splash.field.password")}
+                      type="password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      size="small"
+                    />
+                  </Stack>
 
                   <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
                     <Button
                       variant="contained"
-                      onClick={onLogin}
-                      disabled={
-                        inFlight || (method === "account" && (!accountCode || !password))
-                      }
+                      onClick={onAccountLogin}
+                      disabled={inFlight || !accountCode || !password}
                     >
                       {t("splash.action.login")}
                     </Button>
@@ -196,31 +201,33 @@ export function SplashPage() {
                       {t("splash.action.back")}
                     </Button>
                   </Stack>
-
-                  {outcome === "notFound" && (
-                    <Box sx={{ mt: 2 }}>
-                      <Alert severity="warning" sx={{ mb: 1 }}>
-                        {t("splash.hint.notFound")}
-                      </Alert>
-                      <Button
-                        variant="outlined"
-                        onClick={() => void navigate({ to: "/register" })}
-                      >
-                        {t("splash.action.register")}
-                      </Button>
-                    </Box>
-                  )}
-
-                  {outcome === "inactive" && (
-                    <Alert severity="warning" sx={{ mt: 2 }}>
-                      {t("splash.hint.inactive")}
-                    </Alert>
-                  )}
                 </>
               )}
             </StepContent>
           </Step>
         </Stepper>
+
+        {/* Outcome UI lives outside the stepper so it remains visible
+            after a domain-path failure (which never reaches step 3). */}
+        {outcome === "notFound" && (
+          <Box sx={{ mt: 2 }}>
+            <Alert severity="warning" sx={{ mb: 1 }}>
+              {t("splash.hint.notFound")}
+            </Alert>
+            <Button
+              variant="outlined"
+              onClick={() => void navigate({ to: "/register" })}
+            >
+              {t("splash.action.register")}
+            </Button>
+          </Box>
+        )}
+
+        {outcome === "inactive" && (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            {t("splash.hint.inactive")}
+          </Alert>
+        )}
 
         <SplashLog entries={entries} />
       </Paper>
