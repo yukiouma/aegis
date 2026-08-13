@@ -24,6 +24,17 @@ export type ApiError =
   | { kind: "notImplemented"; detail: string }
   | { kind: "store"; message: string };
 
+// Mirrors `system::identity::Identity` in src-tauri. That struct carries
+// `#[serde(rename_all = "camelCase")]`, so unlike the other response
+// shapes in this file its JSON keys really are camelCase — `hostMachine`,
+// not `host_machine`.
+export interface Identity {
+  domain: string;
+  hostMachine: string;
+  sid: string;
+  userid: string;
+}
+
 // Auth
 export interface RegisterUserInput {
   userCode: string;

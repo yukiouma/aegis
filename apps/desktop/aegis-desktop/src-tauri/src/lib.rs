@@ -25,6 +25,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::auth::is_logged_in,
             commands::auth::refresh,
             commands::auth::logout,
+            // identity
+            commands::identity::get_domain_user_info,
             // user-credential
             commands::user_credential::register_user,
             commands::user_credential::update_user_credential,

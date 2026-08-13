@@ -18,11 +18,8 @@ pub async fn login(
 }
 
 #[tauri::command]
-pub async fn login_domain(
-    client: State<'_, HttpClient>,
-    code: String,
-) -> Result<(), ApiError> {
-    auth::login_domain(&client, &code).await
+pub async fn login_domain(client: State<'_, HttpClient>) -> Result<(), ApiError> {
+    auth::login_domain(&client).await
 }
 
 #[tauri::command]

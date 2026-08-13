@@ -21,10 +21,10 @@ describe("api wrappers", () => {
     expect(mockInvoke).toHaveBeenCalledWith("login", { code: "alice", password: "secret" });
   });
 
-  it("loginDomain -> invoke('login_domain', { code })", async () => {
+  it("loginDomain -> invoke('login_domain') with no args", async () => {
     mockInvoke.mockResolvedValueOnce(undefined);
-    await api.loginDomain("alice");
-    expect(mockInvoke).toHaveBeenCalledWith("login_domain", { code: "alice" });
+    await api.loginDomain();
+    expect(mockInvoke).toHaveBeenCalledWith("login_domain");
   });
 
   it("isLoggedIn -> invoke('is_logged_in')", async () => {

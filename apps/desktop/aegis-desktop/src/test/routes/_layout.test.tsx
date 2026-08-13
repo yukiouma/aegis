@@ -1,10 +1,14 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+
 import { renderWithFullRouter } from "../file-route-utils";
+import { mockCommands, mockInvoke } from "../tauri-mock";
 
 function createMemoryStorage(): Storage {
   const data = new Map<string, string>();
@@ -31,7 +35,7 @@ function createMemoryStorage(): Storage {
 }
 
 beforeEach(() => {
-  vi.restoreAllMocks();
+  mockInvoke.mockReset();
   vi.unstubAllGlobals();
   vi.stubGlobal("localStorage", createMemoryStorage());
 });
@@ -51,7 +55,11 @@ function renderRoot(initialEntries: string[] = ["/"]) {
   });
 }
 
-describe("AppLayout", () => {
+describe("AppLayout (authenticated)", () => {
+  beforeEach(() => {
+    mockCommands({ is_logged_in: () => true });
+  });
+
   it("renders the Sidebar and the Home page content at /", async () => {
     const { router } = await renderRoot(["/"]);
 
@@ -82,5 +90,46 @@ describe("AppLayout", () => {
     expect(
       screen.getByRole("heading", { level: 4, name: /home/i }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("AppLayout (unauthenticated)", () => {
+  it("redirects / to /splash when not logged in", async () => {
+    mockCommands({ is_logged_in: () => false, healthz: () => "ok" });
+
+    const { router } = await renderRoot(["/"]);
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/splash"));
+    expect(screen.queryByTestId("sidebar")).not.toBeInTheDocument();
+  });
+
+  it("redirects /settings to /splash when not logged in", async () => {
+    mockCommands({ is_logged_in: () => false, healthz: () => "ok" });
+
+    const { router } = await renderRoot(["/settings"]);
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/splash"));
+  });
+
+  it("redirects to /splash when the login check itself fails", async () => {
+    mockCommands({
+      is_logged_in: () => {
+        throw { kind: "store", message: "auth.bin is locked" };
+      },
+      healthz: () => "ok",
+    });
+
+    const { router } = await renderRoot(["/"]);
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/splash"));
+  });
+
+  it("does not guard /splash itself", async () => {
+    mockCommands({ is_logged_in: () => false, healthz: () => "ok" });
+
+    const { router } = await renderRoot(["/splash"]);
+
+    expect(router.state.location.pathname).toBe("/splash");
+    expect(await screen.findByText(/Server is healthy: ok/i)).toBeInTheDocument();
   });
 });
