@@ -1040,6 +1040,8 @@ A vertical MUI `Stepper` with three steps. Step 0 runs `healthz` automatically o
 
 `StepContent` renders its children inside a `Collapse`. Even with `unmountOnExit`, the exit transition runs on a timer, so the previous step's content lingers in the DOM for the transition duration after `activeStep` changes — long enough to race a test assertion that the old content is gone. Each `StepContent` therefore also guards its body on `activeStep`, making removal synchronous with the state change. `unmountOnExit` stays as a belt-and-braces measure so nothing inactive is left behind for a screen reader.
 
+> **MUI v9 API note:** `StepContent` has no `TransitionProps` prop — v9 moved to the slots pattern. Use `slotProps={{ transition: { unmountOnExit: true } }}`. (`TransitionProps` typechecks as an error: *Property 'TransitionProps' does not exist on type 'StepContentProps'*.)
+
 **Files:**
 - Create: `apps/desktop/aegis-desktop/src/test/tauri-mock.ts`
 - Create: `apps/desktop/aegis-desktop/src/pages/splash.tsx`
@@ -1462,7 +1464,7 @@ export function SplashPage() {
 
           <Step>
             <StepLabel>{t("splash.step.method")}</StepLabel>
-            <StepContent TransitionProps={{ unmountOnExit: true }}>
+            <StepContent slotProps={{ transition: { unmountOnExit: true } }}>
               {activeStep === 1 && (
                 <>
                   <RadioGroup
@@ -1492,7 +1494,7 @@ export function SplashPage() {
             <StepLabel error={outcome !== "none"}>
               {t("splash.step.credentials")}
             </StepLabel>
-            <StepContent TransitionProps={{ unmountOnExit: true }}>
+            <StepContent slotProps={{ transition: { unmountOnExit: true } }}>
               {activeStep === 2 && (
                 <>
                   {method === "account" ? (
