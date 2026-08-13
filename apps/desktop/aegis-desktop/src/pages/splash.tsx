@@ -20,7 +20,7 @@ import { useI18n } from "@aegis/ui/i18n";
 
 import { api } from "../api";
 import { errorMessage, httpCode } from "../api/error";
-import { SplashLog, useSplashLog } from "../components/SplashLog";
+import { BootstrapLog, useBootstrapLog } from "../components/BootstrapLog";
 
 type LoginMethod = "account" | "domain";
 
@@ -30,7 +30,7 @@ type Outcome = "none" | "notFound" | "inactive" | "failed";
 export function SplashPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const { entries, push } = useSplashLog();
+  const { entries, push } = useBootstrapLog();
 
   const [activeStep, setActiveStep] = useState(0);
   const [healthFailed, setHealthFailed] = useState(false);
@@ -208,7 +208,7 @@ export function SplashPage() {
           </Alert>
         )}
 
-        <SplashLog entries={entries} />
+        <BootstrapLog entries={entries} />
       </Paper>
     </Box>
   );

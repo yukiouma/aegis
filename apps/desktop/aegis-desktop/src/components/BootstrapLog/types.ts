@@ -3,7 +3,7 @@ import type { TranslationKey } from "@aegis/ui/i18n";
 export type LogLevel = "info" | "success" | "error";
 
 /**
- * A single line in the splash log. It stores the translation *key* and its
+ * A single line in the bootstrap log. It stores the translation *key* and its
  * params rather than translated text, so entries logged before a language
  * switch re-render in the new language.
  */

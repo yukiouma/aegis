@@ -239,7 +239,7 @@ describe("SplashPage — account login", () => {
     await userEvent.type(screen.getByLabelText(/^Password$/i), "pw");
     await userEvent.click(screen.getByRole("button", { name: /^Login$/i }));
 
-    expect(await screen.findByTestId("splash-log-error")).toHaveTextContent(
+    expect(await screen.findByTestId("bootstrap-log-error")).toHaveTextContent(
       "No account matches these credentials.",
     );
     expect(screen.getByText(/You can register a new one/i)).toBeInTheDocument();
@@ -325,7 +325,7 @@ describe("SplashPage — account login", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Register/i })).not.toBeInTheDocument();
     // The log entry stays — that is the audit trail.
-    expect(screen.getByTestId("splash-log-error")).toHaveTextContent(
+    expect(screen.getByTestId("bootstrap-log-error")).toHaveTextContent(
       "No account matches these credentials.",
     );
   });
