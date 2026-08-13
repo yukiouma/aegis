@@ -4,6 +4,7 @@ import type {
   CreateProductInput,
   CreateProjectInput,
   CreateUserInput,
+  Identity,
   ProductView,
   ProjectView,
   RegisterUserInput,
@@ -35,6 +36,10 @@ export const api = {
   isLoggedIn: (): Promise<boolean> => call<boolean>("is_logged_in"),
   refresh: (): Promise<void> => call<void>("refresh"),
   logout: (): Promise<void> => call<void>("logout"),
+
+  // identity
+  getDomainUserInfo: (): Promise<Identity> =>
+    call<Identity>("get_domain_user_info"),
 
   // user-credential
   registerUser: (input: RegisterUserInput): Promise<RegisterUserResponse> =>
@@ -80,6 +85,7 @@ export type {
   CreateProductInput,
   CreateProjectInput,
   CreateUserInput,
+  Identity,
   ProductView,
   ProjectMembers,
   ProjectMembersView,
