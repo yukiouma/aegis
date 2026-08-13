@@ -15,7 +15,7 @@ export const en = {
   'settings.theme.light': 'Light',
   'settings.language.label': 'Language',
 
-  'bootstrap.title': 'Welcome to Aegis',
+  'bootstrap.title': 'Aegis Bootstrap',
   'bootstrap.step.health': 'Server health check',
   'bootstrap.step.loginStatus': 'Checking login status',
   'bootstrap.log.healthCheck.start': 'Checking server health...',
@@ -26,7 +26,7 @@ export const en = {
   'bootstrap.log.loginStatus.notLoggedIn': 'Not logged in. Continuing to login...',
   'bootstrap.log.loginStatus.failed': 'Login status check failed: {message}',
 
-  'login.title': 'Welcome to Aegis',
+  'login.title': 'Login to Aegis',
   'login.step.authenticate': 'Authenticate',
   'login.method.account': 'Account and password',
   'login.method.domain': 'Domain information',

@@ -17,7 +17,7 @@ export const zhCN = {
   'settings.theme.light': '浅色',
   'settings.language.label': '语言',
 
-  'bootstrap.title': '欢迎使用 Aegis',
+  'bootstrap.title': 'Aegis 引导',
   'bootstrap.step.health': '服务器健康检查',
   'bootstrap.step.loginStatus': '正在检查登录状态',
   'bootstrap.log.healthCheck.start': '正在检查服务器健康状态……',
@@ -28,7 +28,7 @@ export const zhCN = {
   'bootstrap.log.loginStatus.notLoggedIn': '未登录，正在进入登录页……',
   'bootstrap.log.loginStatus.failed': '登录状态检查失败：{message}',
 
-  'login.title': '欢迎使用 Aegis',
+  'login.title': '登录 Aegis',
   'login.step.authenticate': '身份验证',
   'login.method.account': '账号与密码',
   'login.method.domain': '域信息',
