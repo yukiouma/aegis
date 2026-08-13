@@ -91,31 +91,28 @@ export function SplashPage() {
     [navigate, push],
   );
 
-  function onMethodSubmit() {
+  function onLogin() {
     push("info", "splash.log.method.selected", {
       method: t(
         method === "account" ? "splash.method.account" : "splash.method.domain",
       ),
     });
     if (method === "domain") {
-      // The user pressed "Login" on the method step — go straight to the
-      // domain login. No credentials step.
       void runLogin(() => api.loginDomain());
     } else {
-      setActiveStep(2);
+      void runLogin(() => api.login(accountCode, password));
     }
   }
 
-  function onBack() {
-    // Returning to the method step discards any failure outcome from the
-    // previous attempt so a stale alert does not linger across retries.
+  function onMethodChange(next: LoginMethod) {
+    // Switching the method clears any failure outcome so a stale alert
+    // does not linger when the user retries with a different flow.
     setOutcome("none");
-    setActiveStep(1);
+    setMethod(next);
   }
 
-  function onAccountLogin() {
-    void runLogin(() => api.login(accountCode, password));
-  }
+  const loginDisabled =
+    inFlight || (method === "account" && (!accountCode || !password));
 
   return (
     <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
@@ -137,78 +134,56 @@ export function SplashPage() {
                   <RadioGroup
                     value={method}
                     onChange={(event) =>
-                      setMethod(event.target.value as LoginMethod)
+                      onMethodChange(event.target.value as LoginMethod)
                     }
                   >
-                    <FormControlLabel
-                      value="account"
-                      control={<Radio />}
-                      label={t("splash.method.account")}
-                    />
                     <FormControlLabel
                       value="domain"
                       control={<Radio />}
                       label={t("splash.method.domain")}
                     />
+                    <FormControlLabel
+                      value="account"
+                      control={<Radio />}
+                      label={t("splash.method.account")}
+                    />
                   </RadioGroup>
+
+                  {method === "account" && (
+                    <Stack spacing={2} sx={{ maxWidth: 320, mt: 1 }}>
+                      <TextField
+                        label={t("splash.field.code")}
+                        value={accountCode}
+                        onChange={(event) => setAccountCode(event.target.value)}
+                        size="small"
+                      />
+                      <TextField
+                        label={t("splash.field.password")}
+                        type="password"
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        size="small"
+                      />
+                    </Stack>
+                  )}
+
                   <Button
                     variant="contained"
-                    onClick={onMethodSubmit}
-                    disabled={inFlight}
-                    sx={{ mt: 1 }}
+                    onClick={onLogin}
+                    disabled={loginDisabled}
+                    sx={{ mt: 2 }}
                   >
-                    {method === "domain"
-                      ? t("splash.action.login")
-                      : t("splash.method.continue")}
+                    {t("splash.action.login")}
                   </Button>
-                </>
-              )}
-            </StepContent>
-          </Step>
-
-          <Step>
-            <StepLabel error={outcome !== "none"}>
-              {t("splash.step.credentials")}
-            </StepLabel>
-            <StepContent slotProps={{ transition: { unmountOnExit: true } }}>
-              {activeStep === 2 && (
-                <>
-                  <Stack spacing={2} sx={{ maxWidth: 320 }}>
-                    <TextField
-                      label={t("splash.field.code")}
-                      value={accountCode}
-                      onChange={(event) => setAccountCode(event.target.value)}
-                      size="small"
-                    />
-                    <TextField
-                      label={t("splash.field.password")}
-                      type="password"
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      size="small"
-                    />
-                  </Stack>
-
-                  <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-                    <Button
-                      variant="contained"
-                      onClick={onAccountLogin}
-                      disabled={inFlight || !accountCode || !password}
-                    >
-                      {t("splash.action.login")}
-                    </Button>
-                    <Button variant="outlined" onClick={onBack} disabled={inFlight}>
-                      {t("splash.action.back")}
-                    </Button>
-                  </Stack>
                 </>
               )}
             </StepContent>
           </Step>
         </Stepper>
 
-        {/* Outcome UI lives outside the stepper so it remains visible
-            after a domain-path failure (which never reaches step 3). */}
+        {/* Outcome UI lives outside the stepper so a failure keeps the
+            Register / admin-hint affordance visible regardless of which
+            step the user is on. */}
         {outcome === "notFound" && (
           <Box sx={{ mt: 2 }}>
             <Alert severity="warning" sx={{ mb: 1 }}>

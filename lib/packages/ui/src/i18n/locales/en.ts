@@ -18,16 +18,12 @@ export const en = {
   'splash.title': 'Welcome to Aegis',
   'splash.step.health': 'Server health check',
   'splash.step.method': 'Choose a login method',
-  'splash.step.credentials': 'Sign in',
   'splash.method.account': 'Account and password',
   'splash.method.domain': 'Domain information',
-  'splash.method.continue': 'Continue',
   'splash.field.code': 'Account',
   'splash.field.password': 'Password',
   'splash.action.login': 'Login',
-  'splash.action.loginDomain': 'Login with domain',
   'splash.action.register': 'Register',
-  'splash.action.back': 'Back',
   'splash.hint.notFound':
     'No account matches these credentials. You can register a new one.',
   'splash.hint.inactive':
