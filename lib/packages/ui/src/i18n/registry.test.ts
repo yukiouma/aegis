@@ -49,28 +49,34 @@ describe('i18n registry', () => {
   });
 });
 
-describe('splash and register catalogs', () => {
-  const splashAndRegisterKeys = [
-    'splash.title',
-    'splash.step.health',
-    'splash.step.method',
-    'splash.method.account',
-    'splash.method.domain',
-    'splash.field.code',
-    'splash.field.password',
-    'splash.action.login',
-    'splash.action.register',
-    'splash.hint.notFound',
-    'splash.hint.inactive',
-    'splash.log.healthCheck.start',
-    'splash.log.healthCheck.ok',
-    'splash.log.healthCheck.failed',
-    'splash.log.method.selected',
-    'splash.log.login.start',
-    'splash.log.login.ok',
-    'splash.log.login.failed',
-    'splash.log.login.notFound',
-    'splash.log.login.inactive',
+describe('bootstrap, login, and register catalogs', () => {
+  const keys = [
+    'bootstrap.title',
+    'bootstrap.step.health',
+    'bootstrap.step.loginStatus',
+    'bootstrap.log.healthCheck.start',
+    'bootstrap.log.healthCheck.ok',
+    'bootstrap.log.healthCheck.failed',
+    'bootstrap.log.loginStatus.start',
+    'bootstrap.log.loginStatus.ok',
+    'bootstrap.log.loginStatus.notLoggedIn',
+    'bootstrap.log.loginStatus.failed',
+    'login.title',
+    'login.step.authenticate',
+    'login.method.account',
+    'login.method.domain',
+    'login.field.code',
+    'login.field.password',
+    'login.action.login',
+    'login.action.register',
+    'login.hint.notFound',
+    'login.hint.inactive',
+    'login.log.method.selected',
+    'login.log.login.start',
+    'login.log.login.ok',
+    'login.log.login.failed',
+    'login.log.login.notFound',
+    'login.log.login.inactive',
     'register.title',
     'register.field.userCode',
     'register.field.domainName',
@@ -88,7 +94,7 @@ describe('splash and register catalogs', () => {
     'register.log.register.failed',
   ] as const;
 
-  it.each(splashAndRegisterKeys)(
+  it.each(keys)(
     'has a non-empty en and zh-CN message for %s',
     (key) => {
       expect(translate('en', key)).not.toBe(key);
@@ -100,10 +106,10 @@ describe('splash and register catalogs', () => {
 
   it('interpolates the message variable in a failure log line', () => {
     expect(
-      translate('en', 'splash.log.login.failed', { message: 'boom' }),
+      translate('en', 'login.log.login.failed', { message: 'boom' }),
     ).toContain('boom');
     expect(
-      translate('zh-CN', 'splash.log.login.failed', { message: 'boom' }),
+      translate('zh-CN', 'login.log.login.failed', { message: 'boom' }),
     ).toContain('boom');
   });
 });

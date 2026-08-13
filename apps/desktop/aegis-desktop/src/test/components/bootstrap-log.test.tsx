@@ -17,14 +17,14 @@ function Harness() {
   const { setLocale } = useI18n();
   return (
     <>
-      <button onClick={() => push("info", "splash.log.healthCheck.start")}>
+      <button onClick={() => push("info", "bootstrap.log.healthCheck.start")}>
         add-info
       </button>
-      <button onClick={() => push("success", "splash.log.login.ok")}>
+      <button onClick={() => push("success", "login.log.login.ok")}>
         add-success
       </button>
       <button
-        onClick={() => push("error", "splash.log.login.failed", { message: "boom" })}
+        onClick={() => push("error", "login.log.login.failed", { message: "boom" })}
       >
         add-error
       </button>
