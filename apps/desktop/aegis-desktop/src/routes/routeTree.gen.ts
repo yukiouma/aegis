@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './__root'
 import { Route as LayoutRouteRouteImport } from './_layout/route'
+import { Route as LoginRouteImport } from './login'
 import { Route as RegisterRouteImport } from './register'
 import { Route as SplashRouteImport } from './splash'
 import { Route as LayoutIndexRouteImport } from './_layout/index'
@@ -17,6 +18,11 @@ import { Route as LayoutSettingsRouteImport } from './_layout/settings'
 
 const LayoutRouteRoute = LayoutRouteRouteImport.update({
   id: '/_layout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegisterRoute = RegisterRouteImport.update({
@@ -42,11 +48,13 @@ const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
+  '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/splash': typeof SplashRoute
   '/settings': typeof LayoutSettingsRoute
 }
 export interface FileRoutesByTo {
+  '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/splash': typeof SplashRoute
   '/settings': typeof LayoutSettingsRoute
@@ -55,6 +63,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_layout': typeof LayoutRouteRouteWithChildren
+  '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/splash': typeof SplashRoute
   '/_layout/settings': typeof LayoutSettingsRoute
@@ -62,12 +71,13 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/register' | '/splash' | '/settings'
+  fullPaths: '/' | '/login' | '/register' | '/splash' | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/register' | '/splash' | '/settings' | '/'
+  to: '/login' | '/register' | '/splash' | '/settings' | '/'
   id:
     | '__root__'
     | '/_layout'
+    | '/login'
     | '/register'
     | '/splash'
     | '/_layout/settings'
@@ -76,6 +86,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   LayoutRouteRoute: typeof LayoutRouteRouteWithChildren
+  LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
   SplashRoute: typeof SplashRoute
 }
@@ -87,6 +98,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof LayoutRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/register': {
@@ -136,6 +154,7 @@ const LayoutRouteRouteWithChildren = LayoutRouteRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   LayoutRouteRoute: LayoutRouteRouteWithChildren,
+  LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
   SplashRoute: SplashRoute,
 }
