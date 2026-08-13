@@ -1,7 +1,9 @@
 //! Cross-platform wrapper for the OS-level identity tuple the
 //! `loginDomain` command reads at request time. On Windows this calls
-//! `windows_utils::get_user_info`; on non-Windows it returns a static
-//! "not implemented" error so the rest of the crate still compiles.
+//! `windows_utils::get_user_info`; on non-Windows it returns a
+//! `NotImplemented` error so the rest of the crate still compiles.
+
+use crate::http::dto::ApiError;
 
 /// Identity tuple that becomes `LoginDomainRequest { code, domain_name,
 /// hostname, sid }` after the user fills in `code`.
@@ -13,13 +15,15 @@ pub struct Identity {
     pub userid: String,
 }
 
-/// Read the current OS identity. Returns `Err` on non-Windows targets so
-/// callers (e.g. `http::auth::login_domain`) can translate to
-/// `ApiError::NotImplemented`.
-pub fn current() -> Result<Identity, String> {
+/// Read the current OS identity. Returns `Err(ApiError::NotImplemented)`
+/// on non-Windows targets; on Windows, OS-level lookup failures are
+/// surfaced as `ApiError::Store` (the closest generic infrastructure
+/// variant — there's no `Os` variant in `ApiError`).
+pub fn current() -> Result<Identity, ApiError> {
     #[cfg(target_os = "windows")]
     {
-        let info = windows_utils::get_user_info().map_err(|e| e.to_string())?;
+        let info = windows_utils::get_user_info()
+            .map_err(|e| ApiError::Store { message: e.to_string() })?;
         Ok(Identity {
             domain: info.domain,
             host_machine: info.host_machine,
@@ -30,7 +34,9 @@ pub fn current() -> Result<Identity, String> {
 
     #[cfg(not(target_os = "windows"))]
     {
-        Err("OS identity lookup requires Windows".into())
+        Err(ApiError::NotImplemented {
+            detail: "OS identity lookup requires Windows",
+        })
     }
 }
 
@@ -52,10 +58,12 @@ mod tests {
 
     #[cfg(not(target_os = "windows"))]
     #[test]
-    fn non_windows_returns_err() {
+    fn non_windows_returns_not_implemented() {
         let r = current();
-        assert!(r.is_err());
-        assert!(r.unwrap_err().contains("Windows"));
+        assert!(matches!(
+            r,
+            Err(ApiError::NotImplemented { detail }) if detail.contains("Windows")
+        ));
     }
 
     #[test]
