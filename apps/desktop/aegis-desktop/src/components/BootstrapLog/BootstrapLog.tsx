@@ -17,7 +17,7 @@ export interface BootstrapLogProps {
 export function BootstrapLog({ entries }: BootstrapLogProps) {
   const { t } = useI18n();
 
-  return (
+  return entries.length === 0 ? null : (
     <Paper
       variant="outlined"
       data-testid="bootstrap-log"
