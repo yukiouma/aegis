@@ -62,4 +62,14 @@ export const en = {
   'register.log.register.start': 'Submitting registration...',
   'register.log.register.ok': 'Registration succeeded for {userCode}.',
   'register.log.register.failed': 'Registration failed: {message}',
+
+  'app.user.unknownUser': 'Unknown user',
+  'app.user.role.root': 'Root',
+  'app.user.role.admin': 'Admin',
+  'app.user.logout': 'Log out',
+  'app.user.logout.confirmTitle': 'Confirm logout',
+  'app.user.logout.confirmMessage': 'Are you sure you want to log out?',
+  'app.user.logout.confirm': 'Confirm',
+  'app.user.logout.cancel': 'Cancel',
+  'app.user.loadFailed': 'Failed to load user info',
 } as const;

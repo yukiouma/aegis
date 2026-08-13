@@ -60,4 +60,14 @@ export const zhCN = {
   'register.log.register.start': '正在提交注册信息……',
   'register.log.register.ok': '{userCode} 注册成功。',
   'register.log.register.failed': '注册失败：{message}',
+
+  'app.user.unknownUser': '未知用户',
+  'app.user.role.root': '超级管理员',
+  'app.user.role.admin': '管理员',
+  'app.user.logout': '退出登录',
+  'app.user.logout.confirmTitle': '确认退出登录',
+  'app.user.logout.confirmMessage': '您确定要退出登录吗？',
+  'app.user.logout.confirm': '确认',
+  'app.user.logout.cancel': '取消',
+  'app.user.loadFailed': '加载用户信息失败',
 } satisfies Record<keyof typeof en, string>;
