@@ -19,7 +19,7 @@ export const zhCN = {
 
   'splash.title': '欢迎使用 Aegis',
   'splash.step.health': '服务器健康检查',
-  'splash.step.method': '选择登录方式',
+  'splash.step.authenticate': '身份验证',
   'splash.method.account': '账号与密码',
   'splash.method.domain': '域信息',
   'splash.field.code': '账号',

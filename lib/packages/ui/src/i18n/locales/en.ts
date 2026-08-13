@@ -17,7 +17,7 @@ export const en = {
 
   'splash.title': 'Welcome to Aegis',
   'splash.step.health': 'Server health check',
-  'splash.step.method': 'Choose a login method',
+  'splash.step.authenticate': 'Authenticate',
   'splash.method.account': 'Account and password',
   'splash.method.domain': 'Domain information',
   'splash.field.code': 'Account',
