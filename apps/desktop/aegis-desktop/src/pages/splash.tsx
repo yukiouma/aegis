@@ -34,7 +34,7 @@ export function SplashPage() {
 
   const [activeStep, setActiveStep] = useState(0);
   const [healthFailed, setHealthFailed] = useState(false);
-  const [method, setMethod] = useState<LoginMethod>("account");
+  const [method, setMethod] = useState<LoginMethod>("domain");
   const [accountCode, setAccountCode] = useState("");
   const [password, setPassword] = useState("");
   const [inFlight, setInFlight] = useState(false);
@@ -100,6 +100,21 @@ export function SplashPage() {
     setActiveStep(2);
   }
 
+  function onBack() {
+    // Returning to the method step discards any failure outcome from the
+    // previous attempt so a stale alert does not linger across retries.
+    setOutcome("none");
+    setActiveStep(1);
+  }
+
+  function onLogin() {
+    if (method === "account") {
+      void runLogin(() => api.login(accountCode, password));
+    } else {
+      void runLogin(() => api.loginDomain());
+    }
+  }
+
   return (
     <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
       <Paper sx={{ p: 4, width: 560, maxWidth: "100%" }}>
@@ -149,7 +164,7 @@ export function SplashPage() {
             <StepContent slotProps={{ transition: { unmountOnExit: true } }}>
               {activeStep === 2 && (
                 <>
-                  {method === "account" ? (
+                  {method === "account" && (
                     <Stack spacing={2} sx={{ maxWidth: 320 }}>
                       <TextField
                         label={t("splash.field.code")}
@@ -164,25 +179,23 @@ export function SplashPage() {
                         onChange={(event) => setPassword(event.target.value)}
                         size="small"
                       />
-                      <Button
-                        variant="contained"
-                        disabled={inFlight || !accountCode || !password}
-                        onClick={() =>
-                          void runLogin(() => api.login(accountCode, password))
-                        }
-                      >
-                        {t("splash.action.login")}
-                      </Button>
                     </Stack>
-                  ) : (
+                  )}
+
+                  <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
                     <Button
                       variant="contained"
-                      disabled={inFlight}
-                      onClick={() => void runLogin(() => api.loginDomain())}
+                      onClick={onLogin}
+                      disabled={
+                        inFlight || (method === "account" && (!accountCode || !password))
+                      }
                     >
-                      {t("splash.action.loginDomain")}
+                      {t("splash.action.login")}
                     </Button>
-                  )}
+                    <Button variant="outlined" onClick={onBack} disabled={inFlight}>
+                      {t("splash.action.back")}
+                    </Button>
+                  </Stack>
 
                   {outcome === "notFound" && (
                     <Box sx={{ mt: 2 }}>

@@ -63,6 +63,7 @@ describe('splash and register catalogs', () => {
     'splash.action.login',
     'splash.action.loginDomain',
     'splash.action.register',
+    'splash.action.back',
     'splash.hint.notFound',
     'splash.hint.inactive',
     'splash.log.healthCheck.start',

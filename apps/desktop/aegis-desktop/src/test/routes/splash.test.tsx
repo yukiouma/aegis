@@ -58,8 +58,10 @@ function renderSplash() {
 /** Health check passes, then advance to the credentials step. */
 async function advanceToCredentials(method: "account" | "domain") {
   await screen.findByText(/Server is healthy/i);
-  if (method === "domain") {
-    await userEvent.click(screen.getByRole("radio", { name: /Domain information/i }));
+  // The default selection is Domain, so the Account path has to switch
+  // the radio explicitly. The Domain path can just continue.
+  if (method === "account") {
+    await userEvent.click(screen.getByRole("radio", { name: /Account and password/i }));
   }
   await userEvent.click(screen.getByRole("button", { name: /Continue/i }));
 }
@@ -190,6 +192,18 @@ describe("SplashPage — account login", () => {
 });
 
 describe("SplashPage — domain login", () => {
+  it("selects Domain by default", async () => {
+    mockCommands({ healthz: () => "ok", is_logged_in: () => true });
+
+    await renderSplash();
+    await screen.findByText(/Server is healthy/i);
+
+    const domainRadio = screen.getByRole("radio", { name: /Domain information/i });
+    const accountRadio = screen.getByRole("radio", { name: /Account and password/i });
+    expect(domainRadio).toBeChecked();
+    expect(accountRadio).not.toBeChecked();
+  });
+
   it("calls login_domain with no arguments and navigates home", async () => {
     mockCommands({
       healthz: () => "ok",
@@ -201,7 +215,7 @@ describe("SplashPage — domain login", () => {
     await advanceToCredentials("domain");
 
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /Login with domain/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^Login$/i }));
 
     expect(mockInvoke).toHaveBeenCalledWith("login_domain");
     await waitFor(() => expect(router.state.location.pathname).toBe("/"));
@@ -219,10 +233,69 @@ describe("SplashPage — domain login", () => {
     await renderSplash();
     await advanceToCredentials("domain");
 
-    await userEvent.click(screen.getByRole("button", { name: /Login with domain/i }));
+    await userEvent.click(screen.getByRole("button", { name: /^Login$/i }));
 
     expect(
       await screen.findByText(/Login failed: loginDomain requires Windows/i),
     ).toBeInTheDocument();
+  });
+});
+
+describe("SplashPage — Back button", () => {
+  it("returns from the credentials step to the method step", async () => {
+    mockCommands({ healthz: () => "ok", is_logged_in: () => true });
+
+    await renderSplash();
+    await advanceToCredentials("domain");
+
+    // We're on the credentials step.
+    await userEvent.click(screen.getByRole("button", { name: /^Back$/i }));
+
+    // The method radio is back; the Login button is gone.
+    expect(
+      screen.getByRole("radio", { name: /Domain information/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Login$/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Continue/i })).toBeInTheDocument();
+  });
+
+  it("clears a failed login outcome when Back is pressed", async () => {
+    mockCommands({
+      healthz: () => "ok",
+      login: () => {
+        throw httpError(404, "not_found", "no such user");
+      },
+      is_logged_in: () => true,
+    });
+
+    const { router } = await renderSplash();
+    await advanceToCredentials("account");
+
+    await userEvent.type(screen.getByLabelText(/Account/i), "alice");
+    await userEvent.type(screen.getByLabelText(/Password/i), "wrong");
+    await userEvent.click(screen.getByRole("button", { name: /^Login$/i }));
+
+    // A `not_found` failure shows both the Alert and the Register button.
+    expect(
+      await screen.findByText(/You can register a new one/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Register/i })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^Back$/i }));
+
+    // Returning to the method step must clear the inline outcome — the
+    // log entry stays because that is the audit trail.
+    expect(
+      screen.queryByText(/You can register a new one/i),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Register/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId("splash-log-error")).toHaveTextContent(
+      "No account matches these credentials.",
+    );
+
+    // Continue forward again and the credentials step is reachable.
+    await userEvent.click(screen.getByRole("button", { name: /Continue/i }));
+    expect(screen.getByLabelText(/Account/i)).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/splash");
   });
 });

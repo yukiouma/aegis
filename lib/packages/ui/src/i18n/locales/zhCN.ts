@@ -29,6 +29,7 @@ export const zhCN = {
   'splash.action.login': '登录',
   'splash.action.loginDomain': '使用域信息登录',
   'splash.action.register': '注册',
+  'splash.action.back': '返回',
   'splash.hint.notFound': '没有与此凭据匹配的账号，您可以注册一个新账号。',
   'splash.hint.inactive': '您的账号尚未启用，请联系管理员。',
   'splash.log.healthCheck.start': '正在检查服务器健康状态……',

@@ -27,6 +27,7 @@ export const en = {
   'splash.action.login': 'Login',
   'splash.action.loginDomain': 'Login with domain',
   'splash.action.register': 'Register',
+  'splash.action.back': 'Back',
   'splash.hint.notFound':
     'No account matches these credentials. You can register a new one.',
   'splash.hint.inactive':
