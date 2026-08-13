@@ -54,6 +54,8 @@ export const api = {
   listUsers: (): Promise<UserView[]> => call<UserView[]>("list_users"),
   getUserByCode: (code: string): Promise<UserView> =>
     call<UserView>("get_user_by_code", { code }),
+  getCurrentUser: (): Promise<UserView> =>
+    call<UserView>("current_user"),
   updateUser: (code: string, body: UpdateUserBody): Promise<UserView> =>
     call<UserView>("update_user", { code, body: { ...body } }),
 
