@@ -58,12 +58,12 @@ pub async fn login(c: &HttpClient, body: LoginRequest) -> Result<(), ApiError> {
     Ok(())
 }
 
-pub async fn login_domain(c: &HttpClient, code: &str) -> Result<(), ApiError> {
-    let id = identity::current().map_err(|_| ApiError::NotImplemented {
-        detail: "loginDomain requires Windows",
-    })?;
+/// Log in using the OS-level domain identity. The user code is taken from
+/// `identity::current().userid` — the caller supplies nothing.
+pub async fn login_domain(c: &HttpClient) -> Result<(), ApiError> {
+    let id = identity::current()?;
     let body = LoginDomainRequest {
-        code: code.into(),
+        code: id.userid,
         domain_name: id.domain,
         hostname: id.host_machine,
         sid: id.sid,
@@ -219,5 +219,36 @@ mod tests {
         let _ = logout(&c).await;
         assert_eq!(store.access_token().await.unwrap(), None);
         assert_eq!(store.refresh_token().await.unwrap(), None);
+    }
+
+    /// Compile-time proof that `login_domain` takes only the client — the
+    /// user code comes from the OS identity, not the caller. Unlike
+    /// `login_domain_propagates_the_identity_error` below, this is not
+    /// gated on the target OS, so it catches an arity regression on
+    /// Windows too (where a real identity lookup makes a behavioural test
+    /// non-deterministic).
+    #[allow(dead_code)]
+    fn assert_login_domain_takes_only_the_client(c: &HttpClient) {
+        let _future = login_domain(c);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[tokio::test]
+    async fn login_domain_propagates_the_identity_error() {        let server = MockServer::start().await;
+        let store = Arc::new(MemoryStore::default());
+        let c = HttpClient::new(server.uri(), store.clone());
+
+        // No `code` argument: the user code now comes from the OS identity.
+        let err = login_domain(&c).await.unwrap_err();
+
+        // The error is whatever `identity::current()` returned, not a
+        // rewritten one. On non-Windows that is `NotImplemented`.
+        match err {
+            ApiError::NotImplemented { detail } => {
+                assert!(detail.contains("Windows"), "got {detail}");
+            }
+            other => panic!("expected NotImplemented, got {other:?}"),
+        }
+        assert!(store.access_token().await.unwrap().is_none());
     }
 }
