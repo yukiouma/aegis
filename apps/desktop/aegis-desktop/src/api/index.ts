@@ -31,8 +31,7 @@ export const api = {
   // auth
   login: (code: string, password: string): Promise<void> =>
     call<void>("login", { code, password }),
-  loginDomain: (code: string): Promise<void> =>
-    call<void>("login_domain", { code }),
+  loginDomain: (): Promise<void> => call<void>("login_domain"),
   isLoggedIn: (): Promise<boolean> => call<boolean>("is_logged_in"),
   refresh: (): Promise<void> => call<void>("refresh"),
   logout: (): Promise<void> => call<void>("logout"),
