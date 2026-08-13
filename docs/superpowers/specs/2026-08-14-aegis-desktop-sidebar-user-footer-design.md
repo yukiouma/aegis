@@ -34,14 +34,11 @@ This change adds a small "user footer" pinned to the bottom of the sidebar with 
 **`apps/desktop/aegis-desktop/src-tauri/src/system.rs`:**
 - `pub mod jwt_claims;`
 
-**`apps/desktop/aegis-desktop/src-tauri/src/http/user.rs`:**
-- New `pub async fn get_current(c: &HttpClient) -> Result<UserViewResponse, ApiError>`:
-  1. `let token = c.tokens().access_token().await?.ok_or_else(|| ApiError::Store { message: "no access token".into() })?;`
-  2. `let code = crate::system::jwt_claims::decode_sub(&token)?;`
-  3. Forward to the existing `get_by_code(&client, &code).await`.
-
 **`apps/desktop/aegis-desktop/src-tauri/src/commands/user.rs`:**
-- New `#[tauri::command] pub async fn current_user(client: State<'_, HttpClient>) -> Result<UserViewResponse, ApiError>` delegating to `user::get_current`. Named `current_user` to match the JS-side `getCurrentUser` convention.
+- New `#[tauri::command] pub async fn current_user(client: State<'_, HttpClient>) -> Result<UserViewResponse, ApiError>` that, inline:
+  1. `let token = client.tokens().access_token().await?.ok_or_else(|| ApiError::Store { message: "no access token".into() })?;`
+  2. `let code = crate::system::jwt_claims::decode_sub(&token)?;`
+  3. `user::get_by_code(&client, &code).await` — calling the existing helper directly. No new `http/user.rs` function.
 
 **`apps/desktop/aegis-desktop/src/api/index.ts`:**
 - Add `getCurrentUser: (): Promise<UserView> => call<UserView>("current_user")` inside the existing `api` object.
@@ -137,7 +134,6 @@ Add to both `lib/packages/ui/src/i18n/locales/en.ts` and `zhCN.ts` (plus update 
 - `apps/desktop/aegis-desktop/src-tauri/Cargo.toml`
 - `apps/desktop/aegis-desktop/src-tauri/src/system.rs`
 - `apps/desktop/aegis-desktop/src-tauri/src/system/jwt_claims.rs` *(new)*
-- `apps/desktop/aegis-desktop/src-tauri/src/http/user.rs`
 - `apps/desktop/aegis-desktop/src-tauri/src/commands/user.rs`
 - `apps/desktop/aegis-desktop/src/api/index.ts`
 - `apps/desktop/aegis-desktop/src/pages/home.tsx`
