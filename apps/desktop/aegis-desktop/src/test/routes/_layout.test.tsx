@@ -94,42 +94,43 @@ describe("AppLayout (authenticated)", () => {
 });
 
 describe("AppLayout (unauthenticated)", () => {
-  it("redirects / to /splash when not logged in", async () => {
-    mockCommands({ is_logged_in: () => false, healthz: () => "ok" });
+  it("redirects / to /login when not logged in", async () => {
+    mockCommands({ is_logged_in: () => false });
 
     const { router } = await renderRoot(["/"]);
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/splash"));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
     expect(screen.queryByTestId("sidebar")).not.toBeInTheDocument();
   });
 
-  it("redirects /settings to /splash when not logged in", async () => {
-    mockCommands({ is_logged_in: () => false, healthz: () => "ok" });
+  it("redirects /settings to /login when not logged in", async () => {
+    mockCommands({ is_logged_in: () => false });
 
     const { router } = await renderRoot(["/settings"]);
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/splash"));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
   });
 
-  it("redirects to /splash when the login check itself fails", async () => {
+  it("redirects to /login when the login check itself fails", async () => {
     mockCommands({
       is_logged_in: () => {
         throw { kind: "store", message: "auth.bin is locked" };
       },
-      healthz: () => "ok",
     });
 
     const { router } = await renderRoot(["/"]);
 
-    await waitFor(() => expect(router.state.location.pathname).toBe("/splash"));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/login"));
   });
 
-  it("does not guard /splash itself", async () => {
-    mockCommands({ is_logged_in: () => false, healthz: () => "ok" });
+  it("does not guard /login itself", async () => {
+    mockCommands({ is_logged_in: () => false });
 
-    const { router } = await renderRoot(["/splash"]);
+    const { router } = await renderRoot(["/login"]);
 
-    expect(router.state.location.pathname).toBe("/splash");
-    expect(await screen.findByText(/Server is healthy: ok/i)).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/login");
+    expect(
+      await screen.findByRole("radio", { name: /Domain information/i }),
+    ).toBeInTheDocument();
   });
 });

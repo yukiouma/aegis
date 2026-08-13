@@ -2,20 +2,20 @@ import { useCallback, useRef, useState } from "react";
 
 import type { LogEntry, PushLog } from "./types";
 
-export interface SplashLogState {
+export interface BootstrapLogState {
   entries: LogEntry[];
   push: PushLog;
 }
 
 /**
- * Append-only log state for the splash and register pages.
+ * Append-only log state for the bootstrap, login, and register pages.
  *
  * `push` is referentially stable, so callers can safely list it in a
  * `useEffect` dependency array without re-running the effect. Ids come
  * from a counter ref rather than the array index or a timestamp, so React
  * keys stay stable and unique.
  */
-export function useSplashLog(): SplashLogState {
+export function useBootstrapLog(): BootstrapLogState {
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const nextId = useRef(0);
 

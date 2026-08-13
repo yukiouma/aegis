@@ -12,11 +12,11 @@ import { useI18n } from "@aegis/ui/i18n";
 
 import { api, type Identity } from "../api";
 import { errorMessage } from "../api/error";
-import { SplashLog, useSplashLog } from "../components/SplashLog";
+import { BootstrapLog, useBootstrapLog } from "../components/BootstrapLog";
 
 export function RegisterPage() {
   const { t } = useI18n();
-  const { entries, push } = useSplashLog();
+  const { entries, push } = useBootstrapLog();
 
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [userName, setUserName] = useState("");
@@ -128,7 +128,7 @@ export function RegisterPage() {
           </Stack>
         )}
 
-        <SplashLog entries={entries} />
+        <BootstrapLog entries={entries} />
       </Paper>
     </Box>
   );

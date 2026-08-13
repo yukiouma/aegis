@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { AegisI18nProvider, useI18n } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
 
-import { SplashLog, useSplashLog } from "../../components/SplashLog";
+import { BootstrapLog, useBootstrapLog } from "../../components/BootstrapLog";
 
 afterEach(() => {
   cleanup();
@@ -13,23 +13,23 @@ afterEach(() => {
 
 /** Drives the hook from a button so the test exercises the real API. */
 function Harness() {
-  const { entries, push } = useSplashLog();
+  const { entries, push } = useBootstrapLog();
   const { setLocale } = useI18n();
   return (
     <>
-      <button onClick={() => push("info", "splash.log.healthCheck.start")}>
+      <button onClick={() => push("info", "bootstrap.log.healthCheck.start")}>
         add-info
       </button>
-      <button onClick={() => push("success", "splash.log.login.ok")}>
+      <button onClick={() => push("success", "login.log.login.ok")}>
         add-success
       </button>
       <button
-        onClick={() => push("error", "splash.log.login.failed", { message: "boom" })}
+        onClick={() => push("error", "login.log.login.failed", { message: "boom" })}
       >
         add-error
       </button>
       <button onClick={() => setLocale("zh-CN")}>to-zh</button>
-      <SplashLog entries={entries} />
+      <BootstrapLog entries={entries} />
     </>
   );
 }
@@ -44,10 +44,10 @@ function renderHarness() {
   );
 }
 
-describe("SplashLog", () => {
-  it("renders an empty container when there are no entries", () => {
+describe("BootstrapLog", () => {
+  it("renders nothing when there are no entries", () => {
     renderHarness();
-    expect(screen.getByTestId("splash-log")).toBeEmptyDOMElement();
+    expect(screen.queryByTestId("bootstrap-log")).not.toBeInTheDocument();
   });
 
   it("appends entries in order and keeps them", async () => {
@@ -56,7 +56,7 @@ describe("SplashLog", () => {
     await userEvent.click(screen.getByText("add-info"));
     await userEvent.click(screen.getByText("add-success"));
 
-    const rows = screen.getByTestId("splash-log").children;
+    const rows = screen.getByTestId("bootstrap-log").children;
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent("Checking server health...");
     expect(rows[1]).toHaveTextContent("Login succeeded. Entering the app...");
@@ -69,9 +69,9 @@ describe("SplashLog", () => {
     await userEvent.click(screen.getByText("add-success"));
     await userEvent.click(screen.getByText("add-error"));
 
-    expect(screen.getByTestId("splash-log-info")).toBeInTheDocument();
-    expect(screen.getByTestId("splash-log-success")).toBeInTheDocument();
-    expect(screen.getByTestId("splash-log-error")).toBeInTheDocument();
+    expect(screen.getByTestId("bootstrap-log-info")).toBeInTheDocument();
+    expect(screen.getByTestId("bootstrap-log-success")).toBeInTheDocument();
+    expect(screen.getByTestId("bootstrap-log-error")).toBeInTheDocument();
   });
 
   it("interpolates params into the message", async () => {
@@ -79,7 +79,7 @@ describe("SplashLog", () => {
 
     await userEvent.click(screen.getByText("add-error"));
 
-    expect(screen.getByTestId("splash-log-error")).toHaveTextContent(
+    expect(screen.getByTestId("bootstrap-log-error")).toHaveTextContent(
       "Login failed: boom",
     );
   });
@@ -88,7 +88,7 @@ describe("SplashLog", () => {
     renderHarness();
 
     await userEvent.click(screen.getByText("add-info"));
-    expect(screen.getByTestId("splash-log")).toHaveTextContent(
+    expect(screen.getByTestId("bootstrap-log")).toHaveTextContent(
       "Checking server health...",
     );
 
@@ -96,7 +96,7 @@ describe("SplashLog", () => {
       await userEvent.click(screen.getByText("to-zh"));
     });
 
-    expect(screen.getByTestId("splash-log")).toHaveTextContent(
+    expect(screen.getByTestId("bootstrap-log")).toHaveTextContent(
       "正在检查服务器健康状态……",
     );
   });

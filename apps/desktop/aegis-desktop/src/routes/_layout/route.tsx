@@ -15,7 +15,7 @@ export const Route = createFileRoute("/_layout")({
       loggedIn = false;
     }
     if (!loggedIn) {
-      throw redirect({ to: "/splash" });
+      throw redirect({ to: "/login" });
     }
   },
   component: AppLayout,

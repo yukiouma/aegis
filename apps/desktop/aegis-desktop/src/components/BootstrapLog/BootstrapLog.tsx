@@ -9,24 +9,24 @@ const LEVEL_COLOR: Record<LogLevel, string> = {
   error: "error.main",
 };
 
-export interface SplashLogProps {
+export interface BootstrapLogProps {
   entries: LogEntry[];
 }
 
 /** Scrollable, append-only transcript of what the page has done so far. */
-export function SplashLog({ entries }: SplashLogProps) {
+export function BootstrapLog({ entries }: BootstrapLogProps) {
   const { t } = useI18n();
 
-  return (
+  return entries.length === 0 ? null : (
     <Paper
       variant="outlined"
-      data-testid="splash-log"
+      data-testid="bootstrap-log"
       sx={{ mt: 2, p: 1.5, maxHeight: 200, overflowY: "auto" }}
     >
       {entries.map((entry) => (
         <Typography
           key={entry.id}
-          data-testid={`splash-log-${entry.level}`}
+          data-testid={`bootstrap-log-${entry.level}`}
           variant="body2"
           sx={{ fontFamily: "monospace", color: LEVEL_COLOR[entry.level] }}
         >

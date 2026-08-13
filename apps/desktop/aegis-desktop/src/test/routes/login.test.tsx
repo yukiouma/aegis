@@ -44,9 +44,9 @@ afterEach(() => {
   cleanup();
 });
 
-function renderSplash() {
+function renderLogin() {
   return renderWithFullRouter({
-    initialEntries: ["/splash"],
+    initialEntries: ["/login"],
     wrapper: ({ children }) => (
       <AegisThemeProvider>
         <AegisI18nProvider>{children}</AegisI18nProvider>
@@ -55,58 +55,14 @@ function renderSplash() {
   });
 }
 
-/** Health check passes, then land on the method step. */
-async function onMethodStep() {
-  await screen.findByText(/Server is healthy/i);
-}
-
-/** Switch to the Account radio and return when the form fields are ready. */
 async function chooseAccount() {
   await userEvent.click(screen.getByRole("radio", { name: /Account and password/i }));
-  // The textfield label is exactly "Account"; the radio label is
-  // "Account and password", which also matches `/Account/i`. Anchor
-  // the regex to the textfield label only.
   await screen.findByLabelText(/^Account$/i);
 }
 
-describe("SplashPage — health check", () => {
-  it("logs success and advances to the method step", async () => {
-    mockCommands({ healthz: () => "ok", is_logged_in: () => true });
-
-    await renderSplash();
-
-    expect(await screen.findByText(/Server is healthy: ok/i)).toBeInTheDocument();
-    expect(
-      await screen.findByRole("radio", { name: /Account and password/i }),
-    ).toBeInTheDocument();
-  });
-
-  it("stops on the health step when healthz fails", async () => {
-    mockCommands({
-      healthz: () => {
-        throw { kind: "network", message: "connection refused" };
-      },
-    });
-
-    await renderSplash();
-
-    expect(
-      await screen.findByText(/Server health check failed: connection refused/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("radio", { name: /Account and password/i }),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Login/i })).not.toBeInTheDocument();
-  });
-});
-
-describe("SplashPage — method step layout", () => {
+describe("LoginPage — method step layout", () => {
   it("selects Domain by default", async () => {
-    mockCommands({ healthz: () => "ok", is_logged_in: () => true });
-
-    await renderSplash();
-    await onMethodStep();
-
+    await renderLogin();
     const domainRadio = screen.getByRole("radio", { name: /Domain information/i });
     const accountRadio = screen.getByRole("radio", { name: /Account and password/i });
     expect(domainRadio).toBeChecked();
@@ -114,69 +70,44 @@ describe("SplashPage — method step layout", () => {
   });
 
   it("hides the account fields when Domain is selected", async () => {
-    mockCommands({ healthz: () => "ok", is_logged_in: () => true });
-
-    await renderSplash();
-    await onMethodStep();
-
+    await renderLogin();
     expect(screen.queryByLabelText(/^Account$/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^Password$/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Login$/i })).toBeInTheDocument();
   });
 
   it("shows the account fields when Account is selected", async () => {
-    mockCommands({ healthz: () => "ok", is_logged_in: () => true });
-
-    await renderSplash();
-    await onMethodStep();
+    await renderLogin();
     await chooseAccount();
-
     expect(screen.getByLabelText(/^Account$/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/^Password$/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Login$/i })).toBeInTheDocument();
   });
 
   it("disables Login until both account fields are filled", async () => {
-    mockCommands({ healthz: () => "ok", is_logged_in: () => true });
-
-    await renderSplash();
-    await onMethodStep();
+    await renderLogin();
     await chooseAccount();
-
     expect(screen.getByRole("button", { name: /^Login$/i })).toBeDisabled();
-
     await userEvent.type(screen.getByLabelText(/^Account$/i), "alice");
     expect(screen.getByRole("button", { name: /^Login$/i })).toBeDisabled();
-
     await userEvent.type(screen.getByLabelText(/^Password$/i), "secret");
     expect(screen.getByRole("button", { name: /^Login$/i })).toBeEnabled();
   });
 
   it("swaps the fields back off when Domain is re-selected", async () => {
-    mockCommands({ healthz: () => "ok", is_logged_in: () => true });
-
-    await renderSplash();
-    await onMethodStep();
+    await renderLogin();
     await chooseAccount();
-
     await userEvent.click(screen.getByRole("radio", { name: /Domain information/i }));
-
     expect(screen.queryByLabelText(/^Account$/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/^Password$/i)).not.toBeInTheDocument();
   });
 });
 
-describe("SplashPage — domain login", () => {
+describe("LoginPage — domain login", () => {
   it("calls login_domain and navigates home on success", async () => {
-    mockCommands({
-      healthz: () => "ok",
-      login_domain: () => undefined,
-      is_logged_in: () => true,
-    });
+    mockCommands({ login_domain: () => undefined, is_logged_in: () => true });
 
-    const { router } = await renderSplash();
-    await onMethodStep();
-
+    const { router } = await renderLogin();
     await userEvent.click(screen.getByRole("button", { name: /^Login$/i }));
 
     expect(mockInvoke).toHaveBeenCalledWith("login_domain");
@@ -185,16 +116,12 @@ describe("SplashPage — domain login", () => {
 
   it("logs a notImplemented failure and stops", async () => {
     mockCommands({
-      healthz: () => "ok",
       login_domain: () => {
         throw { kind: "notImplemented", detail: "loginDomain requires Windows" };
       },
-      is_logged_in: () => true,
     });
 
-    await renderSplash();
-    await onMethodStep();
-
+    await renderLogin();
     await userEvent.click(screen.getByRole("button", { name: /^Login$/i }));
 
     expect(
@@ -203,43 +130,32 @@ describe("SplashPage — domain login", () => {
   });
 });
 
-describe("SplashPage — account login", () => {
+describe("LoginPage — account login", () => {
   it("calls login and navigates home on success", async () => {
-    mockCommands({ healthz: () => "ok", login: () => undefined, is_logged_in: () => true });
+    mockCommands({ login: () => undefined, is_logged_in: () => true });
 
-    const { router } = await renderSplash();
-    await onMethodStep();
+    const { router } = await renderLogin();
     await chooseAccount();
-
     await userEvent.type(screen.getByLabelText(/^Account$/i), "alice");
     await userEvent.type(screen.getByLabelText(/^Password$/i), "secret");
     await userEvent.click(screen.getByRole("button", { name: /^Login$/i }));
 
-    expect(mockInvoke).toHaveBeenCalledWith("login", {
-      code: "alice",
-      password: "secret",
-    });
+    expect(mockInvoke).toHaveBeenCalledWith("login", { code: "alice", password: "secret" });
     await waitFor(() => expect(router.state.location.pathname).toBe("/"));
   });
 
   it("offers a Register button when the account is not found", async () => {
     mockCommands({
-      healthz: () => "ok",
-      login: () => {
-        throw httpError(404, "not_found", "no such user");
-      },
-      is_logged_in: () => true,
+      login: () => { throw httpError(404, "not_found", "no such user"); },
     });
 
-    const { router } = await renderSplash();
-    await onMethodStep();
+    const { router } = await renderLogin();
     await chooseAccount();
-
     await userEvent.type(screen.getByLabelText(/^Account$/i), "ghost");
     await userEvent.type(screen.getByLabelText(/^Password$/i), "pw");
     await userEvent.click(screen.getByRole("button", { name: /^Login$/i }));
 
-    expect(await screen.findByTestId("splash-log-error")).toHaveTextContent(
+    expect(await screen.findByTestId("bootstrap-log-error")).toHaveTextContent(
       "No account matches these credentials.",
     );
     expect(screen.getByText(/You can register a new one/i)).toBeInTheDocument();
@@ -250,17 +166,11 @@ describe("SplashPage — account login", () => {
 
   it("shows the contact-administrator hint for an inactive account", async () => {
     mockCommands({
-      healthz: () => "ok",
-      login: () => {
-        throw httpError(403, "user_inactive", "inactive");
-      },
-      is_logged_in: () => true,
+      login: () => { throw httpError(403, "user_inactive", "inactive"); },
     });
 
-    await renderSplash();
-    await onMethodStep();
+    await renderLogin();
     await chooseAccount();
-
     await userEvent.type(screen.getByLabelText(/^Account$/i), "bob");
     await userEvent.type(screen.getByLabelText(/^Password$/i), "pw");
     await userEvent.click(screen.getByRole("button", { name: /^Login$/i }));
@@ -273,17 +183,11 @@ describe("SplashPage — account login", () => {
 
   it("logs the message and stops for any other failure", async () => {
     mockCommands({
-      healthz: () => "ok",
-      login: () => {
-        throw httpError(401, "invalid_credentials", "bad password");
-      },
-      is_logged_in: () => true,
+      login: () => { throw httpError(401, "invalid_credentials", "bad password"); },
     });
 
-    const { router } = await renderSplash();
-    await onMethodStep();
+    const { router } = await renderLogin();
     await chooseAccount();
-
     await userEvent.type(screen.getByLabelText(/^Account$/i), "alice");
     await userEvent.type(screen.getByLabelText(/^Password$/i), "wrong");
     await userEvent.click(screen.getByRole("button", { name: /^Login$/i }));
@@ -292,40 +196,27 @@ describe("SplashPage — account login", () => {
       await screen.findByText(/Login failed: invalid_credentials: bad password/i),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Register/i })).not.toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/splash");
+    expect(router.state.location.pathname).toBe("/login");
   });
 
   it("clears the failure outcome when the user switches back to Domain", async () => {
     mockCommands({
-      healthz: () => "ok",
-      login: () => {
-        throw httpError(404, "not_found", "no such user");
-      },
-      is_logged_in: () => true,
+      login: () => { throw httpError(404, "not_found", "no such user"); },
     });
 
-    await renderSplash();
-    await onMethodStep();
+    await renderLogin();
     await chooseAccount();
-
     await userEvent.type(screen.getByLabelText(/^Account$/i), "alice");
     await userEvent.type(screen.getByLabelText(/^Password$/i), "wrong");
     await userEvent.click(screen.getByRole("button", { name: /^Login$/i }));
 
-    expect(
-      await screen.findByText(/You can register a new one/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/You can register a new one/i)).toBeInTheDocument();
 
-    // Switching the method is the only way out of the failure state
-    // without a Back button — the same handlers reset `outcome`.
     await userEvent.click(screen.getByRole("radio", { name: /Domain information/i }));
 
-    expect(
-      screen.queryByText(/You can register a new one/i),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/You can register a new one/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Register/i })).not.toBeInTheDocument();
-    // The log entry stays — that is the audit trail.
-    expect(screen.getByTestId("splash-log-error")).toHaveTextContent(
+    expect(screen.getByTestId("bootstrap-log-error")).toHaveTextContent(
       "No account matches these credentials.",
     );
   });

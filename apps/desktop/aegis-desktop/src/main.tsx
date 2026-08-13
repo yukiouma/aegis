@@ -8,7 +8,20 @@ import { routeTree } from "./routes/routeTree.gen";
 import { DocumentLangSync } from "./DocumentLangSync";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
+// Set the app entry to /bootstrap so the health check and login
+// status probe always run before the user reaches the login page
+// or the authenticated home. The fallback below handles the case
+// where `history.replaceState` is a no-op under the tauri://
+// protocol — detected by reading the pathname after the call.
+const initialPath = window.location.pathname;
+if (initialPath === "/" || initialPath === "/index.html") {
+  window.history.replaceState(null, "", "/bootstrap");
+}
 const router = createRouter({ routeTree });
+if (window.location.pathname !== "/bootstrap") {
+  // replaceState did not move us — fall back to a router navigate.
+  void router.navigate({ to: "/bootstrap", replace: true });
+}
 
 declare module "@tanstack/react-router" {
   interface Register {
