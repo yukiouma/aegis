@@ -5,7 +5,7 @@
 
 /// Identity tuple that becomes `LoginDomainRequest { code, domain_name,
 /// hostname, sid }` after the user fills in `code`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Identity {
     pub domain: String,
     pub host_machine: String,
@@ -56,5 +56,20 @@ mod tests {
         let r = current();
         assert!(r.is_err());
         assert!(r.unwrap_err().contains("Windows"));
+    }
+
+    #[test]
+    fn identity_serializes_with_snake_case_keys() {
+        let id = Identity {
+            domain: "corp.example".into(),
+            host_machine: "ws-001".into(),
+            sid: "S-1-5-21-1234".into(),
+            userid: "alice".into(),
+        };
+        let json = serde_json::to_string(&id).expect("serialize");
+        assert_eq!(
+            json,
+            r#"{"domain":"corp.example","host_machine":"ws-001","sid":"S-1-5-21-1234","userid":"alice"}"#
+        );
     }
 }
