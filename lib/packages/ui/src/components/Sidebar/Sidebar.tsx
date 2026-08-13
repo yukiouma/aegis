@@ -22,6 +22,7 @@ export function Sidebar({
   open,
   onToggle,
   onNavigate,
+  footer,
   width = 240,
   collapsedWidth = 56,
 }: SidebarProps) {
@@ -75,6 +76,12 @@ export function Sidebar({
           />
         ))}
       </List>
+      {footer && (
+        <Box sx={{ mt: 'auto' }}>
+          <Divider />
+          <Box sx={{ p: 1.5 }}>{footer}</Box>
+        </Box>
+      )}
     </Drawer>
   );
 }

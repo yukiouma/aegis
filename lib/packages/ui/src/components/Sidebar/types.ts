@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 
 export interface SubMenuItem {
   link: string;
@@ -16,6 +16,7 @@ export interface SidebarProps {
   open: boolean;
   onToggle: () => void;
   onNavigate?: (link: string) => void;
+  footer?: ReactNode;
   width?: number;
   collapsedWidth?: number;
 }

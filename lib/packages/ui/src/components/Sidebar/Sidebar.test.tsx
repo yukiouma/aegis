@@ -92,4 +92,20 @@ describe('Sidebar', () => {
       ),
     ).not.toThrow();
   });
+
+  it('renders footer content when provided', () => {
+    renderWithTheme(
+      <Sidebar
+        {...defaultProps}
+        footer={<div data-testid="custom-footer">Signed in as Alice</div>}
+      />,
+    );
+    expect(screen.getByTestId('custom-footer')).toBeInTheDocument();
+    expect(screen.getByText('Signed in as Alice')).toBeInTheDocument();
+  });
+
+  it('omits footer area when footer prop is not provided', () => {
+    renderWithTheme(<Sidebar {...defaultProps} />);
+    expect(screen.queryByTestId('custom-footer')).not.toBeInTheDocument();
+  });
 });
