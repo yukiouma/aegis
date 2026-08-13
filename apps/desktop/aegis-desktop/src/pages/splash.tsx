@@ -81,7 +81,9 @@ export function SplashPage() {
           push("error", "splash.log.login.inactive");
           setOutcome("inactive");
         } else {
-          push("error", "splash.log.login.failed", { message: errorMessage(e) });
+          push("error", "splash.log.login.failed", {
+            message: errorMessage(e),
+          });
           setOutcome("failed");
         }
       } finally {
@@ -123,11 +125,13 @@ export function SplashPage() {
 
         <Stepper activeStep={activeStep} orientation="vertical">
           <Step>
-            <StepLabel error={healthFailed}>{t("splash.step.health")}</StepLabel>
+            <StepLabel error={healthFailed}>
+              {t("splash.step.health")}
+            </StepLabel>
           </Step>
 
           <Step>
-            <StepLabel>{t("splash.step.method")}</StepLabel>
+            <StepLabel>{t("splash.step.authenticate")}</StepLabel>
             <StepContent slotProps={{ transition: { unmountOnExit: true } }}>
               {activeStep === 1 && (
                 <>

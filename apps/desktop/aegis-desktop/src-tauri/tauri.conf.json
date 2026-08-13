@@ -15,7 +15,8 @@
         "title": "aegis-desktop",
         "width": 800,
         "height": 600,
-        "maximized": true
+        "maximized": true,
+        "visible": false
       }
     ],
     "security": {
