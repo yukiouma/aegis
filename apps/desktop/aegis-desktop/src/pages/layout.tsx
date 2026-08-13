@@ -4,6 +4,7 @@ import { Box } from "@aegis/ui/mui";
 import { Sidebar, type MenuItem, type SidebarProps } from "@aegis/ui";
 import { Home as HomeIcon, Settings as SettingsIcon } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
+import { UserFooter } from "./UserFooter";
 
 const HomeMenuIcon = () => <HomeIcon />;
 const SettingsMenuIcon = () => <SettingsIcon />;
@@ -30,6 +31,7 @@ export function AppLayout() {
     open: sidebarOpen,
     onToggle: () => setSidebarOpen((o) => !o),
     onNavigate: (link) => navigate({ to: link }),
+    footer: <UserFooter sidebarOpen={sidebarOpen} />,
   };
 
   return (
