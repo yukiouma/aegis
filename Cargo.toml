@@ -48,3 +48,8 @@ serde_json = "1"
 # layer. Pinned in the workspace so it resolves to one version across
 # crates and stays on rustls (no native-tls).
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls", "webpki-roots"] }
+# `base64` decodes the JWT payload (URL-safe, no-pad) on the desktop
+# side so the tauri `current_user` command can read the `sub` claim
+# without depending on the server's signing key. Centralized so the
+# desktop `Cargo.toml` stays a one-liner.
+base64 = "0.22"

@@ -29,6 +29,7 @@ thiserror = { workspace = true }
 async-trait = { workspace = true }
 windows-utils = { path = "../../../../lib/crates/windows-utils" }
 chrono = { workspace = true }
+base64 = { workspace = true }
 
 [dev-dependencies]
 wiremock = "0.6"
