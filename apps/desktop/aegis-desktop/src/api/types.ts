@@ -24,6 +24,16 @@ export type ApiError =
   | { kind: "notImplemented"; detail: string }
   | { kind: "store"; message: string };
 
+// Mirrors `system::identity::Identity` in src-tauri. JSON keys are
+// snake_case at runtime (per the file-top wire-DTO comment), so
+// destructuring must use `host_machine`, not `hostMachine`.
+export interface Identity {
+  domain: string;
+  hostMachine: string;
+  sid: string;
+  userid: string;
+}
+
 // Auth
 export interface RegisterUserInput {
   userCode: string;
