@@ -107,8 +107,7 @@ export function ProjectTable({
                     <Stack
                       direction="row"
                       spacing={0.5}
-                      flexWrap="wrap"
-                      useFlexGap
+                      sx={{ flexWrap: "wrap", gap: 0.5 }}
                     >
                       {memberLeaders.map((u) => (
                         <Chip
@@ -146,7 +145,7 @@ export function ProjectTable({
                     <Stack
                       direction="row"
                       spacing={0.5}
-                      justifyContent="flex-end"
+                      sx={{ justifyContent: "flex-end" }}
                     >
                       {canEdit && (
                         <IconButton
