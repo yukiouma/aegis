@@ -5,6 +5,7 @@ import { AegisThemeProvider } from "@aegis/ui/theme";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { routeTree } from "./routes/routeTree.gen";
+import { QueryProvider } from "./data/client";
 import { DocumentLangSync } from "./DocumentLangSync";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
@@ -46,13 +47,15 @@ function App() {
   return (
     <React.StrictMode>
       <AegisThemeProvider>
-        <AegisI18nProvider>
-          <DocumentLangSync />
-          <RouterProvider router={router} />
-          {import.meta.env.DEV && (
-            <TanStackRouterDevtools router={router} position="bottom-right" />
-          )}
-        </AegisI18nProvider>
+        <QueryProvider>
+          <AegisI18nProvider>
+            <DocumentLangSync />
+            <RouterProvider router={router} />
+            {import.meta.env.DEV && (
+              <TanStackRouterDevtools router={router} position="bottom-right" />
+            )}
+          </AegisI18nProvider>
+        </QueryProvider>
       </AegisThemeProvider>
     </React.StrictMode>
   );
