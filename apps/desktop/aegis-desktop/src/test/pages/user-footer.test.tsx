@@ -6,6 +6,7 @@ import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
 import { renderInRouter } from "../file-route-utils";
 import { mockCommands } from "../tauri-mock";
+import { TestQueryProvider } from "../test-query-provider";
 import { UserFooter } from "../../pages/UserFooter";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
@@ -22,9 +23,11 @@ afterEach(() => {
 function renderFooter(props: { sidebarOpen?: boolean } = {}) {
   return renderInRouter(
     <AegisThemeProvider>
-      <AegisI18nProvider>
-        <UserFooter sidebarOpen={props.sidebarOpen ?? true} />
-      </AegisI18nProvider>
+      <TestQueryProvider>
+        <AegisI18nProvider>
+          <UserFooter sidebarOpen={props.sidebarOpen ?? true} />
+        </AegisI18nProvider>
+      </TestQueryProvider>
     </AegisThemeProvider>,
   );
 }

@@ -7,9 +7,9 @@ import { AegisThemeProvider } from "@aegis/ui/theme";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
-import { QueryProvider } from "../../data/client";
 import { renderWithFullRouter } from "../file-route-utils";
 import { httpError, mockCommands, mockInvoke } from "../tauri-mock";
+import { TestQueryProvider } from "../test-query-provider";
 
 function createMemoryStorage(): Storage {
   const data = new Map<string, string>();
@@ -50,9 +50,9 @@ function renderLogin() {
     initialEntries: ["/login"],
     wrapper: ({ children }) => (
       <AegisThemeProvider>
-        <QueryProvider>
+        <TestQueryProvider>
           <AegisI18nProvider>{children}</AegisI18nProvider>
-        </QueryProvider>
+        </TestQueryProvider>
       </AegisThemeProvider>
     ),
   });
