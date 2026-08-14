@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Box,
@@ -14,8 +14,8 @@ import {
 } from "@aegis/ui/mui";
 import { Logout } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
-import { api } from "../api";
-import type { Role, UserView } from "../api";
+import { useCurrentUser, useLogout } from "../data/user";
+import type { Role } from "../api";
 
 interface UserFooterProps {
   /** Whether the surrounding sidebar drawer is open. When false, hide
@@ -26,36 +26,25 @@ interface UserFooterProps {
 /**
  * Pinned to the bottom of the Sidebar. Shows the signed-in user's name
  * (with an optional role chip for root / admin) and a logout button
- * gated by a confirm dialog. On confirm: calls `api.logout` and
- * navigates to `/login`. The `_layout` `beforeLoad` guard already
- * redirects an authenticated user away from `/login`, so once the
- * tokens are cleared the navigation lands cleanly.
+ * gated by a confirm dialog. On confirm: calls `useLogout` (which
+ * clears the query cache) and navigates to `/login`. The `_layout`
+ * `beforeLoad` guard already redirects an authenticated user away
+ * from `/login`, so once the tokens are cleared the navigation lands
+ * cleanly.
  */
 export function UserFooter({ sidebarOpen }: UserFooterProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [user, setUser] = useState<UserView | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const currentUser = useCurrentUser();
+  const logout = useLogout();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      try {
-        const view = await api.getCurrentUser();
-        if (!cancelled) setUser(view);
-      } catch (e) {
-        if (!cancelled) setError(String(e));
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const user = currentUser.data;
+  const error = currentUser.error;
 
   async function onConfirmLogout() {
     setConfirmOpen(false);
-    await api.logout();
+    await logout.mutateAsync();
     await navigate({ to: "/login" });
   }
 
@@ -82,7 +71,9 @@ export function UserFooter({ sidebarOpen }: UserFooterProps) {
             sx={{ flexGrow: 1, minWidth: 0 }}
             color={error ? "error" : "textPrimary"}
           >
-            {error ? t("app.user.loadFailed") : (user?.name ?? t("app.user.unknownUser"))}
+            {error
+              ? t("app.user.loadFailed")
+              : (user?.name ?? t("app.user.unknownUser"))}
           </Typography>
         )}
         <IconButton
