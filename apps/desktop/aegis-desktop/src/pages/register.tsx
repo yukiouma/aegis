@@ -10,7 +10,7 @@ import {
 } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
 
-import { api, type Identity } from "../api";
+import { useDomainUserInfo, useRegisterUser } from "../data/user";
 import { errorMessage } from "../api/error";
 import { BootstrapLog, useBootstrapLog } from "../components/BootstrapLog";
 
@@ -18,53 +18,53 @@ export function RegisterPage() {
   const { t } = useI18n();
   const { entries, push } = useBootstrapLog();
 
-  const [identity, setIdentity] = useState<Identity | null>(null);
+  const identity = useDomainUserInfo();
+  const register = useRegisterUser();
+
   const [userName, setUserName] = useState("");
   const [password, setPassword] = useState("");
-  const [inFlight, setInFlight] = useState(false);
   const [registered, setRegistered] = useState(false);
 
-  // React StrictMode invokes effects twice in development. The ref keeps
-  // the identity lookup to a single request.
-  const lookupStarted = useRef(false);
+  // React StrictMode invokes effects twice in development. The ref
+  // keeps the identity lookup to a single request.
+  const lookedUp = useRef(false);
 
   useEffect(() => {
-    if (lookupStarted.current) return;
-    lookupStarted.current = true;
+    if (lookedUp.current) return;
+    lookedUp.current = true;
 
+    push("info", "register.log.identity.start");
     void (async () => {
-      push("info", "register.log.identity.start");
-      try {
-        const info = await api.getDomainUserInfo();
-        push("success", "register.log.identity.ok", { userid: info.userid });
-        setIdentity(info);
-      } catch (e) {
+      const r = await identity.refetch();
+      if (r.isError || r.data === undefined) {
         push("error", "register.log.identity.failed", {
-          message: errorMessage(e),
+          message: errorMessage(r.error ?? "no data"),
         });
+        return;
       }
+      push("success", "register.log.identity.ok", { userid: r.data.userid });
     })();
-  }, [push]);
+  }, [push, identity]);
 
   async function onRegister() {
-    if (!identity) return;
-    setInFlight(true);
+    const info = identity.data;
+    if (!info) return;
     push("info", "register.log.register.start");
     try {
-      await api.registerUser({
-        userCode: identity.userid,
+      await register.mutateAsync({
+        userCode: info.userid,
         userName,
-        domainName: identity.domain,
-        hostname: identity.hostMachine,
-        sid: identity.sid,
+        domainName: info.domain,
+        hostname: info.hostMachine,
+        sid: info.sid,
         password,
       });
-      push("success", "register.log.register.ok", { userCode: identity.userid });
+      push("success", "register.log.register.ok", { userCode: info.userid });
       setRegistered(true);
     } catch (e) {
-      push("error", "register.log.register.failed", { message: errorMessage(e) });
-    } finally {
-      setInFlight(false);
+      push("error", "register.log.register.failed", {
+        message: errorMessage(e),
+      });
     }
   }
 
@@ -79,29 +79,29 @@ export function RegisterPage() {
           <Alert severity="info">{t("register.hint.contactAdmin")}</Alert>
         )}
 
-        {identity && !registered && (
+        {identity.data && !registered && (
           <Stack spacing={2} sx={{ maxWidth: 360 }}>
             <TextField
               label={t("register.field.userCode")}
-              value={identity.userid}
+              value={identity.data.userid}
               disabled
               size="small"
             />
             <TextField
               label={t("register.field.domainName")}
-              value={identity.domain}
+              value={identity.data.domain}
               disabled
               size="small"
             />
             <TextField
               label={t("register.field.hostname")}
-              value={identity.hostMachine}
+              value={identity.data.hostMachine}
               disabled
               size="small"
             />
             <TextField
               label={t("register.field.sid")}
-              value={identity.sid}
+              value={identity.data.sid}
               disabled
               size="small"
             />
@@ -120,7 +120,7 @@ export function RegisterPage() {
             />
             <Button
               variant="contained"
-              disabled={inFlight || !userName || !password}
+              disabled={register.isPending || !userName || !password}
               onClick={() => void onRegister()}
             >
               {t("register.action.register")}

@@ -14,6 +14,8 @@
   },
   "dependencies": {
     "@aegis/ui": "workspace:*",
+    "@tanstack/react-query": "^5.101.4",
+    "@tanstack/react-query-devtools": "^5.101.4",
     "@tanstack/react-router": "^1.170.25",
     "@tanstack/react-router-devtools": "^1.167.1",
     "@tauri-apps/api": "^2",
@@ -23,6 +25,7 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@tanstack/eslint-plugin-query": "^5.101.4",
     "@tanstack/router-plugin": "^1.168.29",
     "@tauri-apps/cli": "^2",
     "@testing-library/jest-dom": "^6.5.0",

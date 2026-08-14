@@ -10,7 +10,7 @@ import {
 } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
 
-import { api } from "../api";
+import { useHealthz, useIsLoggedIn } from "../data/bootstrap";
 import { errorMessage } from "../api/error";
 import { BootstrapLog, useBootstrapLog } from "../components/BootstrapLog";
 
@@ -23,8 +23,13 @@ export function BootstrapPage() {
   const [healthFailed, setHealthFailed] = useState(false);
   const [loginStatusFailed, setLoginStatusFailed] = useState(false);
 
-  // React StrictMode invokes effects twice in development. The ref keeps
-  // the health check and login-status probe to a single request each.
+  // Bootstrap probes are disabled by default; the page drives them
+  // manually via `refetch()` so they fire exactly once on mount.
+  const health = useHealthz();
+  const status = useIsLoggedIn();
+
+  // React StrictMode invokes effects twice in development. The ref
+  // keeps the orchestrator to a single run.
   const started = useRef(false);
 
   useEffect(() => {
@@ -33,26 +38,27 @@ export function BootstrapPage() {
 
     void (async () => {
       push("info", "bootstrap.log.healthCheck.start");
-      try {
-        const status = await api.healthz();
-        push("success", "bootstrap.log.healthCheck.ok", { status });
-        setActiveStep(1);
-      } catch (e) {
-        push("error", "bootstrap.log.healthCheck.failed", { message: errorMessage(e) });
+      const h = await health.refetch();
+      if (h.isError || h.data === undefined) {
+        push("error", "bootstrap.log.healthCheck.failed", {
+          message: errorMessage(h.error ?? "no data"),
+        });
         setHealthFailed(true);
         return;
       }
+      push("success", "bootstrap.log.healthCheck.ok", { status: h.data });
+      setActiveStep(1);
 
       push("info", "bootstrap.log.loginStatus.start");
-      let loggedIn = false;
-      try {
-        loggedIn = await api.isLoggedIn();
-      } catch (e) {
-        push("error", "bootstrap.log.loginStatus.failed", { message: errorMessage(e) });
+      const s = await status.refetch();
+      if (s.isError || s.data === undefined) {
+        push("error", "bootstrap.log.loginStatus.failed", {
+          message: errorMessage(s.error ?? "no data"),
+        });
         setLoginStatusFailed(true);
         return;
       }
-      if (loggedIn) {
+      if (s.data) {
         push("success", "bootstrap.log.loginStatus.ok");
         await navigate({ to: "/" });
       } else {
@@ -60,7 +66,7 @@ export function BootstrapPage() {
         await navigate({ to: "/login" });
       }
     })();
-  }, [navigate, push]);
+  }, [navigate, push, health, status]);
 
   return (
     <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>

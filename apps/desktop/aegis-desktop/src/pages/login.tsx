@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Alert,
@@ -14,7 +14,7 @@ import {
 } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
 
-import { api } from "../api";
+import { useLogin, useLoginDomain } from "../data/auth";
 import { errorMessage, httpCode } from "../api/error";
 import { BootstrapLog, useBootstrapLog } from "../components/BootstrapLog";
 
@@ -28,41 +28,36 @@ export function LoginPage() {
   const navigate = useNavigate();
   const { entries, push } = useBootstrapLog();
 
+  const login = useLogin();
+  const loginDomain = useLoginDomain();
+
   const [method, setMethod] = useState<LoginMethod>("domain");
   const [accountCode, setAccountCode] = useState("");
   const [password, setPassword] = useState("");
-  const [inFlight, setInFlight] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>("none");
 
-  const runLogin = useCallback(
-    async (attempt: () => Promise<void>) => {
-      setInFlight(true);
-      setOutcome("none");
-      push("info", "login.log.login.start");
-      try {
-        await attempt();
-        push("success", "login.log.login.ok");
-        await navigate({ to: "/" });
-      } catch (e) {
-        const failureCode = httpCode(e);
-        if (failureCode === "not_found") {
-          push("error", "login.log.login.notFound");
-          setOutcome("notFound");
-        } else if (failureCode === "user_inactive") {
-          push("error", "login.log.login.inactive");
-          setOutcome("inactive");
-        } else {
-          push("error", "login.log.login.failed", {
-            message: errorMessage(e),
-          });
-          setOutcome("failed");
-        }
-      } finally {
-        setInFlight(false);
+  async function runLogin(attempt: () => Promise<void>) {
+    push("info", "login.log.login.start");
+    try {
+      await attempt();
+      push("success", "login.log.login.ok");
+      await navigate({ to: "/" });
+    } catch (e) {
+      const failureCode = httpCode(e);
+      if (failureCode === "not_found") {
+        push("error", "login.log.login.notFound");
+        setOutcome("notFound");
+      } else if (failureCode === "user_inactive") {
+        push("error", "login.log.login.inactive");
+        setOutcome("inactive");
+      } else {
+        push("error", "login.log.login.failed", {
+          message: errorMessage(e),
+        });
+        setOutcome("failed");
       }
-    },
-    [navigate, push],
-  );
+    }
+  }
 
   function onLogin() {
     push("info", "login.log.method.selected", {
@@ -71,9 +66,9 @@ export function LoginPage() {
       ),
     });
     if (method === "domain") {
-      void runLogin(() => api.loginDomain());
+      void runLogin(() => loginDomain.mutateAsync());
     } else {
-      void runLogin(() => api.login(accountCode, password));
+      void runLogin(() => login.mutateAsync({ code: accountCode, password }));
     }
   }
 
@@ -85,7 +80,9 @@ export function LoginPage() {
   }
 
   const loginDisabled =
-    inFlight || (method === "account" && (!accountCode || !password));
+    login.isPending ||
+    loginDomain.isPending ||
+    (method === "account" && (!accountCode || !password));
 
   return (
     <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>

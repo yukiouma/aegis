@@ -9,6 +9,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 import { renderWithFullRouter } from "../file-route-utils";
 import { httpError, mockCommands, mockInvoke } from "../tauri-mock";
+import { TestQueryProvider } from "../test-query-provider";
 
 const IDENTITY = {
   domain: "corp.example",
@@ -56,7 +57,9 @@ function renderRegister() {
     initialEntries: ["/register"],
     wrapper: ({ children }) => (
       <AegisThemeProvider>
-        <AegisI18nProvider>{children}</AegisI18nProvider>
+        <TestQueryProvider>
+          <AegisI18nProvider>{children}</AegisI18nProvider>
+        </TestQueryProvider>
       </AegisThemeProvider>
     ),
   });
