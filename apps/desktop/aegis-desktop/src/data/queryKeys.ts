@@ -13,5 +13,13 @@ export const queryKeys = {
   user: {
     current: () => ["user", "current"] as const,
     domainIdentity: () => ["user", "domainIdentity"] as const,
+    list: () => ["user", "list"] as const,
+  },
+  project: {
+    all: () => ["project", "list"] as const,
+    byCode: (code: string) => ["project", "byCode", code] as const,
+  },
+  product: {
+    all: () => ["product", "list"] as const,
   },
 } as const;
