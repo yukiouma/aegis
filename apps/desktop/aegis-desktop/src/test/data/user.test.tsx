@@ -8,6 +8,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 import {
   useCurrentUser,
   useDomainUserInfo,
+  useListUsers,
   useLogout,
   useRegisterUser,
 } from "../../data/user";
@@ -31,6 +32,19 @@ const identity = {
   sid: "S-1-...",
   userid: "alice",
 };
+
+const usersList = [
+  userView,
+  {
+    id: 2,
+    code: "bob",
+    name: "Bob",
+    role: "general" as const,
+    active: true,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+  },
+];
 
 beforeEach(() => {
   (invoke as unknown as ReturnType<typeof vi.fn>).mockReset();
@@ -172,5 +186,30 @@ describe("useLogout", () => {
       expect(clearSpy).toHaveBeenCalled();
       expect(client.getQueryData(queryKeys.user.current())).toBeUndefined();
     });
+  });
+});
+
+function ListUsersProbe({ enabled }: { enabled?: boolean }) {
+  const q = useListUsers({ enabled });
+  return (
+    <span data-testid="count">{q.data?.length ?? "none"}</span>
+  );
+}
+
+describe("useListUsers", () => {
+  it("invokes api.listUsers on mount when enabled defaults to true", async () => {
+    mockCommands({ list_users: () => usersList });
+    renderWithQueryClient(<ListUsersProbe />);
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("list_users");
+      expect(screen.getByTestId("count").textContent).toBe("2");
+    });
+  });
+
+  it("does not fetch on mount when enabled is false", async () => {
+    mockCommands({ list_users: () => usersList });
+    renderWithQueryClient(<ListUsersProbe enabled={false} />);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(invoke).not.toHaveBeenCalled();
   });
 });

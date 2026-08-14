@@ -54,3 +54,16 @@ export function useLogout() {
     onSuccess: () => qc.clear(),
   });
 }
+
+/**
+ * All users. Consumed by the drawer's member pickers. Default
+ * `enabled: true` because the drawer is the only consumer and only
+ * opens for root/admin, where the call always succeeds in practice.
+ */
+export function useListUsers(options?: { enabled?: boolean }) {
+  return useQuery<UserView[], ApiError>({
+    queryKey: queryKeys.user.list(),
+    queryFn: () => api.listUsers(),
+    enabled: options?.enabled ?? true,
+  });
+}
