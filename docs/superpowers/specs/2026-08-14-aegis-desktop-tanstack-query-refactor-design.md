@@ -245,7 +245,8 @@ export function useRegisterUser() {
 }
 
 /** Logout mutation. Clears the entire cache so no stale user data
- *  leaks across the auth boundary. */
+ *  leaks across the auth boundary — including the login-status probe
+ *  cache entry that `useLogin` / `useLoginDomain` invalidate. */
 export function useLogout() {
   const qc = useQueryClient();
   return useMutation({
@@ -351,10 +352,11 @@ useEffect(() => {
   if (lookedUp.current) return;
   lookedUp.current = true;
   push("info", "register.log.identity.start");
-  identity.refetch().then((r) => {
+  void (async () => {
+    const r = await identity.refetch();
     if (r.isError) push("error", ..., { message: errorMessage(r.error) });
     else push("success", ..., { userid: r.data!.userid });
-  });
+  })();
 }, []);
 
 async function onRegister() {
