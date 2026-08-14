@@ -6,6 +6,7 @@ import { AegisThemeProvider } from "@aegis/ui/theme";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
+import { QueryProvider } from "../../data/client";
 import { renderWithFullRouter } from "../file-route-utils";
 import { mockCommands, mockInvoke } from "../tauri-mock";
 
@@ -36,7 +37,9 @@ function renderBootstrap() {
     initialEntries: ["/bootstrap"],
     wrapper: ({ children }) => (
       <AegisThemeProvider>
-        <AegisI18nProvider>{children}</AegisI18nProvider>
+        <QueryProvider>
+          <AegisI18nProvider>{children}</AegisI18nProvider>
+        </QueryProvider>
       </AegisThemeProvider>
     ),
   });
