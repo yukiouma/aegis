@@ -7,6 +7,7 @@ import { AegisThemeProvider } from "@aegis/ui/theme";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
+import { QueryProvider } from "../../data/client";
 import { renderWithFullRouter } from "../file-route-utils";
 import { httpError, mockCommands, mockInvoke } from "../tauri-mock";
 
@@ -49,7 +50,9 @@ function renderLogin() {
     initialEntries: ["/login"],
     wrapper: ({ children }) => (
       <AegisThemeProvider>
-        <AegisI18nProvider>{children}</AegisI18nProvider>
+        <QueryProvider>
+          <AegisI18nProvider>{children}</AegisI18nProvider>
+        </QueryProvider>
       </AegisThemeProvider>
     ),
   });
