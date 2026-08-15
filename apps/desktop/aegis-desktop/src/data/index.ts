@@ -14,6 +14,7 @@ export {
   useListUsers,
   useRegisterUser,
   useLogout,
+  useUpdateUser,
 } from "./user";
 export {
   useCreateProject,

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, type ApiError, type Identity, type RegisterUserInput, type RegisterUserResponse, type UserView } from "../api";
+import { api, type ApiError, type Identity, type RegisterUserInput, type RegisterUserResponse, type UpdateUserBody, type UserView } from "../api";
 import { queryKeys } from "./queryKeys";
 
 /**
@@ -65,5 +65,27 @@ export function useListUsers(options?: { enabled?: boolean }) {
     queryKey: queryKeys.user.list(),
     queryFn: () => api.listUsers(),
     enabled: options?.enabled ?? true,
+  });
+}
+
+/**
+ * Update an existing user. On success: invalidates the user list cache
+ * so the management page reflects the new active state on the next
+ * render. Also invalidates `user.current()` since the current user's
+ * own row could be the one being updated by a sibling admin and the
+ * `UserFooter` reads the same cache entry.
+ */
+export function useUpdateUser() {
+  const qc = useQueryClient();
+  return useMutation<
+    UserView,
+    ApiError,
+    { code: string; body: UpdateUserBody }
+  >({
+    mutationFn: ({ code, body }) => api.updateUser(code, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.user.list() });
+      qc.invalidateQueries({ queryKey: queryKeys.user.current() });
+    },
   });
 }
