@@ -14,7 +14,10 @@ import {
 import { queryKeys } from "../../data/queryKeys";
 import type { ProjectView } from "../../api";
 import { mockCommands } from "../tauri-mock";
-import { renderWithQueryClient } from "../render-with-query-client";
+import {
+  makeTestQueryClient,
+  renderWithQueryClient,
+} from "../render-with-query-client";
 
 const projectFixture: ProjectView = {
   id: 1,
@@ -102,6 +105,19 @@ describe("useListProjects", () => {
       expect(invoke).toHaveBeenCalledWith("list_projects");
       expect(screen.getByTestId("count").textContent).toBe("1");
     });
+  });
+
+  it("refetches when remounted against the same client (reopen /projects)", async () => {
+    // The page navigates away (unmount) and back (remount) with the
+    // shared QueryClient. With `staleTime: 0` the cached data is
+    // immediately stale, so re-mounting triggers a fresh fetch.
+    mockCommands({ list_projects: () => [projectFixture] });
+    const client = makeTestQueryClient();
+    const first = renderWithQueryClient(<ListProbe />, { client });
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    first.unmount();
+    renderWithQueryClient(<ListProbe />, { client });
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2));
   });
 
   it("propagates ApiError into query.error", async () => {

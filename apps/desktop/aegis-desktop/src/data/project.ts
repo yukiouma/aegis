@@ -10,14 +10,17 @@ import {
 import { queryKeys } from "./queryKeys";
 
 /**
- * All projects. Fetches on mount. Inherits the global
- * `staleTime: Infinity` — the list is re-read when the page mounts,
- * not via refetch.
+ * All projects. `staleTime: 0` overrides the global `Infinity` so the
+ * list is treated as immediately stale — when the user navigates
+ * away from `/projects` and comes back, the re-mount refetches via
+ * the default `refetchOnMount: true`. Cached data is still rendered
+ * first (no loading flicker); the refresh runs in the background.
  */
 export function useListProjects() {
   return useQuery<ProjectView[], ApiError>({
     queryKey: queryKeys.project.all(),
     queryFn: () => api.listProjects(),
+    staleTime: 0,
   });
 }
 
