@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
-import { Box, Typography } from "@aegis/ui/mui";
-import { useI18n } from "@aegis/ui/i18n";
+import { Box } from "@aegis/ui/mui";
 
 import { useCurrentUser, useListProjects } from "../data";
 import type { ProjectView } from "../api";
@@ -19,8 +18,6 @@ interface DrawerState {
  * applied client-side as a single useMemo over the project list.
  */
 export function ProjectListPage() {
-  const { t } = useI18n();
-
   const projects = useListProjects();
   const currentUser = useCurrentUser();
   const currentCode = currentUser.data?.code ?? null;
@@ -63,8 +60,6 @@ export function ProjectListPage() {
 
   return (
     <Box sx={{ p: 4, display: "flex", flexDirection: "column", gap: 2 }}>
-      <Typography variant="h4">{t("project.heading")}</Typography>
-
       <ProjectFilterBar
         query={query}
         onQueryChange={setQuery}
@@ -95,7 +90,6 @@ function leaderMatches(
   q: string,
 ): boolean {
   return leaders.some(
-    (u) =>
-      u.code.toLowerCase().includes(q) || u.name.toLowerCase().includes(q),
+    (u) => u.code.toLowerCase().includes(q) || u.name.toLowerCase().includes(q),
   );
 }
