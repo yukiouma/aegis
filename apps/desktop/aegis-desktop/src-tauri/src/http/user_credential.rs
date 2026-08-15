@@ -6,6 +6,7 @@ use super::client::HttpClient;
 use super::dto::{ApiError, Role};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RegisterUserRequest {
     pub user_code: String,
     pub user_name: String,
@@ -16,6 +17,7 @@ pub struct RegisterUserRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RegisterUserResponse {
     pub user_code: String,
     pub user_name: String,
@@ -27,6 +29,7 @@ pub struct RegisterUserResponse {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateUserCredentialRequest {
     pub user_code: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -34,6 +37,7 @@ pub struct UpdateUserCredentialRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserCredentialViewResponse {
     pub user_code: String,
     pub password_hash: String,
@@ -80,13 +84,13 @@ mod tests {
         let m = Mock::given(method("POST"))
             .and(path("/api/auth/user-credential"))
             .and(body_json(serde_json::json!({
-                "user_code": "u", "user_name": "n",
-                "domain_name": "d", "hostname": "h", "sid": "s",
+                "userCode": "u", "userName": "n",
+                "domainName": "d", "hostname": "h", "sid": "s",
                 "password": "p"
             })))
             .respond_with(ResponseTemplate::new(201).set_body_json(serde_json::json!({
-                "user_code": "u", "user_name": "n", "role": "general", "active": true,
-                "domain_name": "d", "hostname": "h", "sid": "s"
+                "userCode": "u", "userName": "n", "role": "general", "active": true,
+                "domainName": "d", "hostname": "h", "sid": "s"
             })));
         server.register(m).await;
         let c = HttpClient::new(server.uri(), store);
@@ -114,6 +118,6 @@ mod tests {
             password: None,
         };
         let j = serde_json::to_string(&body).unwrap();
-        assert_eq!(j, r#"{"user_code":"u"}"#);
+        assert_eq!(j, r#"{"userCode":"u"}"#);
     }
 }

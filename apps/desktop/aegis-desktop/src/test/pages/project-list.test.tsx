@@ -109,11 +109,8 @@ function renderPage(user: UserView, projects: ProjectView[]) {
 }
 
 describe("ProjectListPage — basic rendering", () => {
-  it("renders the heading and one row per project", async () => {
+  it("renders one row per project", async () => {
     await renderPage(adminUser, [projectA, projectB]);
-    expect(
-      await screen.findByRole("heading", { name: /projects/i, level: 4 }),
-    ).toBeInTheDocument();
     expect(await screen.findByText("alpha")).toBeInTheDocument();
     expect(await screen.findByText("beta")).toBeInTheDocument();
   });

@@ -11,10 +11,10 @@ pub struct ErrorBody {
     pub message: String,
 }
 
-/// Three administrative tiers. Wire form is `snake_case` to match the
+/// Three administrative tiers. Wire form is camelCase to match the
 /// server's `Role` serialization.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[serde(rename_all = "camelCase")]
 pub enum Role {
     Root,
     Admin,
@@ -69,14 +69,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn role_serializes_snake_case() {
+    fn role_serializes_camel_case() {
         assert_eq!(serde_json::to_string(&Role::Root).unwrap(), "\"root\"");
         assert_eq!(serde_json::to_string(&Role::Admin).unwrap(), "\"admin\"");
         assert_eq!(serde_json::to_string(&Role::General).unwrap(), "\"general\"");
     }
 
     #[test]
-    fn role_deserializes_snake_case() {
+    fn role_deserializes_camel_case() {
         let r: Role = serde_json::from_str("\"root\"").unwrap();
         assert_eq!(r, Role::Root);
     }

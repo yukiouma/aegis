@@ -227,10 +227,12 @@ impl HttpClient {
             .await?
             .ok_or(ApiError::RefreshFailed)?;
         #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
         struct Req<'a> {
             refresh_token: &'a str,
         }
         #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
         struct Resp {
             access_token: String,
         }
@@ -473,7 +475,7 @@ mod tests {
                 Mock::given(method("POST"))
                     .and(path("/api/auth/refresh"))
                     .respond_with(ResponseTemplate::new(200).set_body_json(
-                        serde_json::json!({"access_token": "AT_NEW"})
+                        serde_json::json!({"accessToken": "AT_NEW"})
                     )),
             )
             .await;
@@ -552,7 +554,7 @@ mod tests {
         let refresh_mock = Mock::given(method("POST"))
             .and(path("/api/auth/refresh"))
             .respond_with(ResponseTemplate::new(200).set_body_json(
-                serde_json::json!({"access_token": "AT_NEW"})
+                serde_json::json!({"accessToken": "AT_NEW"})
             ))
             .expect(1);
         server.register(refresh_mock).await;

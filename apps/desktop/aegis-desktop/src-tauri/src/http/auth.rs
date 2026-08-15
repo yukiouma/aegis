@@ -7,12 +7,14 @@ use super::dto::ApiError;
 use crate::system::identity;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LoginRequest {
     pub code: String,
     pub password: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LoginDomainRequest {
     pub code: String,
     pub domain_name: String,
@@ -21,27 +23,32 @@ pub struct LoginDomainRequest {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RefreshRequest {
     pub refresh_token: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LogoutRequest {
     pub refresh_token: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TokenPairResponse {
     pub access_token: String,
     pub refresh_token: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AccessTokenResponse {
     pub access_token: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LogoutResponse {}
 
 pub async fn login(c: &HttpClient, body: LoginRequest) -> Result<(), ApiError> {
@@ -88,10 +95,12 @@ pub async fn refresh(c: &HttpClient) -> Result<(), ApiError> {
         .await?
         .ok_or(ApiError::RefreshFailed)?;
     #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
     struct Req<'a> {
         refresh_token: &'a str,
     }
     #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
     struct Resp {
         access_token: String,
     }
@@ -124,6 +133,7 @@ pub async fn logout(c: &HttpClient) -> Result<(), ApiError> {
     let rt = c.tokens().refresh_token().await?;
     if let Some(refresh_token) = rt {
         #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
         struct Req<'a> {
             refresh_token: &'a str,
         }
@@ -156,7 +166,7 @@ mod tests {
                     .and(path("/api/auth/login"))
                     .and(body_json(serde_json::json!({"code": "u", "password": "p"})))
                     .respond_with(ResponseTemplate::new(200).set_body_json(
-                        serde_json::json!({"access_token": "AT", "refresh_token": "RT"})
+                        serde_json::json!({"accessToken": "AT", "refreshToken": "RT"})
                     )),
             )
             .await;

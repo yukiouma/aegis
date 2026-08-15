@@ -90,8 +90,8 @@ mod current_user_tests {
                 "name": "Alice",
                 "role": "admin",
                 "active": true,
-                "created_at": "2026-01-01T00:00:00Z",
-                "updated_at": "2026-01-01T00:00:00Z",
+                "createdAt": "2026-01-01T00:00:00Z",
+                "updatedAt": "2026-01-01T00:00:00Z",
             })))
             .mount(&server)
             .await;
