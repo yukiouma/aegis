@@ -173,3 +173,58 @@ describe("UserListPage — error surfaces", () => {
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
   });
 });
+
+describe("UserListPage — search", () => {
+  it("renders a TextField with a Search icon in place of the heading", async () => {
+    await renderPage(adminUser, [adminUser, generalUser]);
+    await screen.findByText("alice");
+    const input = screen.getByPlaceholderText(/search by name or code/i);
+    expect(input).toBeInTheDocument();
+    // The Search icon is wired via InputAdornment with position="start".
+    // MUI renders an svg inside the adornment — assert presence loosely
+    // (no role="img" on MUI icons in v9).
+    expect(input.parentElement?.querySelector("svg")).not.toBeNull();
+  });
+
+  it("filters rows by code substring (case-insensitive)", async () => {
+    await renderPage(adminUser, [adminUser, generalUser]);
+    await screen.findByText("alice");
+    const input = screen.getByPlaceholderText(/search by name or code/i);
+    await userEvent.type(input, "BO");
+    // Only bob (code "bob") remains — alice (code "alice") does not
+    // contain "bo".
+    expect(screen.queryByText("alice")).not.toBeInTheDocument();
+    expect(screen.getByText("bob")).toBeInTheDocument();
+  });
+
+  it("filters rows by name substring", async () => {
+    await renderPage(adminUser, [adminUser, generalUser]);
+    await screen.findByText("alice");
+    const input = screen.getByPlaceholderText(/search by name or code/i);
+    await userEvent.type(input, "bob");
+    // "bob" matches generalUser's code AND name.
+    expect(screen.queryByText("alice")).not.toBeInTheDocument();
+    expect(screen.getByText("bob")).toBeInTheDocument();
+  });
+
+  it("shows 'no matches' empty state when query yields zero rows", async () => {
+    await renderPage(adminUser, [adminUser, generalUser]);
+    await screen.findByText("alice");
+    const input = screen.getByPlaceholderText(/search by name or code/i);
+    await userEvent.type(input, "xyz");
+    expect(screen.queryByText("alice")).not.toBeInTheDocument();
+    expect(screen.queryByText("bob")).not.toBeInTheDocument();
+    expect(screen.getByText(/no matching users/i)).toBeInTheDocument();
+  });
+
+  it("clearing the query restores the full list", async () => {
+    await renderPage(adminUser, [adminUser, generalUser]);
+    await screen.findByText("alice");
+    const input = screen.getByPlaceholderText(/search by name or code/i);
+    await userEvent.type(input, "bob");
+    expect(screen.queryByText("alice")).not.toBeInTheDocument();
+    await userEvent.clear(input);
+    expect(screen.getByText("alice")).toBeInTheDocument();
+    expect(screen.getByText("bob")).toBeInTheDocument();
+  });
+});
