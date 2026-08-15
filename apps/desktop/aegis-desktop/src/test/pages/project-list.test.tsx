@@ -9,7 +9,7 @@ import { TestQueryProvider } from "../test-query-provider";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 import { invoke } from "@tauri-apps/api/core";
-import { ProjectListPage } from "../../pages/project-list";
+import { ProjectListPage } from "../../pages/ProjectList";
 import type { ProjectView, UserView } from "../../api";
 import { mockCommands } from "../tauri-mock";
 import { renderInRouter } from "../file-route-utils";
