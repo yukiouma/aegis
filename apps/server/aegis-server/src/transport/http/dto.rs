@@ -12,12 +12,14 @@ use utoipa::ToSchema;
 // -- requests -------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct LoginRequest {
     pub code: String,
     pub password: String,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct LoginDomainRequest {
     pub code: String,
     pub domain_name: String,
@@ -26,11 +28,13 @@ pub struct LoginDomainRequest {
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct RefreshRequest {
     pub refresh_token: String,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct LogoutRequest {
     pub refresh_token: String,
 }
@@ -38,20 +42,24 @@ pub struct LogoutRequest {
 // -- responses ------------------------------------------------------------
 
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct TokenPairResponse {
     pub access_token: String,
     pub refresh_token: String,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct AccessTokenResponse {
     pub access_token: String,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct LogoutResponse {}
 
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct AuthClaimsResponse {
     pub code: String,
     pub role: Role,
@@ -98,6 +106,7 @@ impl From<Role> for apis::user::Role {
 /// `apis::user::CreateUserRequest`; the handler translates at the
 /// boundary so the apis crate stays free of serde / utoipa.
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateUserRequest {
     pub code: String,
     pub name: String,
@@ -114,6 +123,7 @@ pub struct CreateUserRequest {
 /// so a partial update round-trips losslessly: deserializing
 /// `{"name":"Alice"}` and re-serializing it produces the same JSON.
 #[derive(Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateUserRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code: Option<String>,
@@ -127,6 +137,7 @@ pub struct UpdateUserRequest {
 
 /// Wire-level extractor for the `{code}` URL parameter.
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct PathCode {
     pub code: String,
 }
@@ -136,6 +147,7 @@ pub struct PathCode {
 /// so utoipa can document the response shape and the handler can
 /// return it directly via `Json<UserViewResponse>`.
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct UserViewResponse {
     pub id: i32,
     pub code: String,
@@ -150,6 +162,7 @@ pub struct UserViewResponse {
 /// vector in a struct leaves room for future pagination metadata
 /// (`total`, `next_cursor`, …) without breaking the response shape.
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct UserListResponse {
     pub users: Vec<UserViewResponse>,
 }
@@ -182,6 +195,7 @@ impl From<apis::user::UserView> for UserViewResponse {
 /// happens out of band (seed script / admin tool), so this route
 /// only handles rotation of an existing password.
 #[derive(Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateUserCredentialRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
@@ -194,6 +208,7 @@ pub struct UpdateUserCredentialRequest {
 /// password. The handler translates from the apis view via the
 /// `From` impl below.
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct UserCredentialViewResponse {
     pub user_code: String,
     pub password_hash: String,
@@ -217,6 +232,7 @@ impl From<apis::auth::UserCredentialView> for UserCredentialViewResponse {
 /// `Root`/`Admin`. The server hashes `password` before persisting and
 /// never returns the value.
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct RegisterUserRequest {
     pub user_code: String,
     pub user_name: String,
@@ -231,6 +247,7 @@ pub struct RegisterUserRequest {
 /// Never includes a password or password hash. Translates from
 /// [`apis::auth::RegisterUserResponse`] via the `From` impl below.
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct RegisterUserResponse {
     pub user_code: String,
     pub user_name: String,
@@ -259,6 +276,7 @@ impl From<apis::auth::RegisterUserResponse> for RegisterUserResponse {
 
 /// Wire-level request body for `POST /api/product`.
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateProductRequest {
     pub code: String,
     pub name: String,
@@ -269,6 +287,7 @@ pub struct CreateProductRequest {
 /// field is optional; `skip_serializing_if` keeps a partial update
 /// round-trip lossless.
 #[derive(Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateProductRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code: Option<String>,
@@ -282,6 +301,7 @@ pub struct UpdateProductRequest {
 
 /// Wire-level projection of a product.
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ProductViewResponse {
     pub id: i32,
     pub code: String,
@@ -307,6 +327,7 @@ impl From<apis::project::ProductView> for ProductViewResponse {
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ProductListResponse {
     pub products: Vec<ProductViewResponse>,
 }
@@ -320,6 +341,7 @@ pub struct ProductListResponse {
 /// each vector keeps empty membership objects round-tripping as `{}`
 /// rather than `{"leaders":[],"workers":[]}`.
 #[derive(Serialize, Deserialize, ToSchema, Default, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectMemberDataRequest {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub leaders: Vec<String>,
@@ -328,6 +350,7 @@ pub struct ProjectMemberDataRequest {
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct UserSummaryViewResponse {
     pub code: String,
     pub name: String,
@@ -343,6 +366,7 @@ impl From<apis::project::UserSummaryView> for UserSummaryViewResponse {
 }
 
 #[derive(Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectMemberViewResponse {
     pub leaders: Vec<UserSummaryViewResponse>,
     pub workers: Vec<UserSummaryViewResponse>,
@@ -361,6 +385,7 @@ impl From<apis::project::ProjectMemberView> for ProjectMemberViewResponse {
 
 /// Wire-level request body for `POST /api/project`.
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateProjectRequest {
     pub code: String,
     pub description: String,
@@ -380,6 +405,7 @@ pub struct CreateProjectRequest {
 /// `Some(ProjectMemberDataRequest { leaders: vec![], workers: vec![] })`
 /// rather than failing on missing keys.
 #[derive(Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateProjectRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code: Option<String>,
@@ -396,6 +422,7 @@ pub struct UpdateProjectRequest {
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectViewResponse {
     pub id: i32,
     pub code: String,
@@ -425,6 +452,7 @@ impl From<apis::project::ProjectView> for ProjectViewResponse {
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectListResponse {
     pub projects: Vec<ProjectViewResponse>,
 }
