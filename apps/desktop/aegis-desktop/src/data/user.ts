@@ -61,12 +61,21 @@ export function useLogout() {
       // own query client — closing them first means the cached data
       // is never read again, and there is no ordering window during
       // which a workspace page could issue a stale fetch.
-      const all = await getAllWebviewWindows();
-      await Promise.all(
-        all
-          .filter((w) => w.label.startsWith("project:"))
-          .map((w) => w.close()),
-      );
+      //
+      // The window enumeration is wrapped in try/catch so logout
+      // still succeeds in environments where Tauri isn't available
+      // (jsdom tests, future non-Tauri hosts): cache clearing is the
+      // critical side effect, window cleanup is best-effort.
+      try {
+        const all = await getAllWebviewWindows();
+        await Promise.all(
+          all
+            .filter((w) => w.label.startsWith("project:"))
+            .map((w) => w.close()),
+        );
+      } catch {
+        // Swallow — see comment above.
+      }
       qc.clear();
     },
   });
