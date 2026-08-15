@@ -107,6 +107,7 @@ export const zhCN = {
   'user.active': '已启用',
   'user.inactive': '未启用',
   'user.cannotDeactivateSelf': '无法停用自己的账号',
+  'user.cannotChangeOwnRole': '无法修改自己的角色',
   'user.field.code': '账号',
   'user.field.name': '姓名',
   'user.field.role': '角色',

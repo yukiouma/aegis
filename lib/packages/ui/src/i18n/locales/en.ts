@@ -109,6 +109,7 @@ export const en = {
   'user.active': 'Active',
   'user.inactive': 'Inactive',
   'user.cannotDeactivateSelf': 'You cannot deactivate yourself',
+  'user.cannotChangeOwnRole': 'You cannot change your own role',
   'user.field.code': 'Code',
   'user.field.name': 'Name',
   'user.field.role': 'Role',
