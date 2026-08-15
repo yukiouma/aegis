@@ -34,6 +34,7 @@ export interface ProjectTableProps {
   canEdit: boolean;
   onOpenCreate: () => void;
   onOpenEdit: (code: string) => void;
+  onOpenWorkspace: (code: string) => void;
 }
 
 /**
@@ -50,6 +51,7 @@ export function ProjectTable({
   canEdit,
   onOpenCreate,
   onOpenEdit,
+  onOpenWorkspace,
 }: ProjectTableProps) {
   const { t } = useI18n();
 
@@ -155,7 +157,10 @@ export function ProjectTable({
                           <Edit />
                         </IconButton>
                       )}
-                      <IconButton aria-label={t("project.open")} disabled>
+                      <IconButton
+                        aria-label={t("project.open")}
+                        onClick={() => onOpenWorkspace(row.code)}
+                      >
                         <OpenInNew />
                       </IconButton>
                     </Stack>

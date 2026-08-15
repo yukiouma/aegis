@@ -43,12 +43,15 @@ function renderTable(props: {
   canEdit?: boolean;
   onOpenCreate?: () => void;
   onOpenEdit?: (code: string) => void;
+  onOpenWorkspace?: (code: string) => void;
 } = {}) {
   const onOpenCreate = props.onOpenCreate ?? vi.fn();
   const onOpenEdit = props.onOpenEdit ?? vi.fn();
+  const onOpenWorkspace = props.onOpenWorkspace ?? vi.fn();
   return {
     onOpenCreate,
     onOpenEdit,
+    onOpenWorkspace,
     ...render(
       <AegisThemeProvider>
         <AegisI18nProvider>
@@ -59,6 +62,7 @@ function renderTable(props: {
             canEdit={props.canEdit ?? true}
             onOpenCreate={onOpenCreate}
             onOpenEdit={onOpenEdit}
+            onOpenWorkspace={onOpenWorkspace}
           />
         </AegisI18nProvider>
       </AegisThemeProvider>,
@@ -121,13 +125,13 @@ describe("ProjectTable — operation column role gating", () => {
     expect(screen.getByRole("button", { name: /open project/i })).toBeInTheDocument();
   });
 
-  it("hides Add and Edit when canEdit=false but still renders OpenInNew as disabled", () => {
+  it("hides Add and Edit when canEdit=false but still renders OpenInNew enabled", () => {
     renderTable({ canEdit: false });
     expect(screen.queryByRole("button", { name: /add project/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /edit project/i })).not.toBeInTheDocument();
     const openBtn = screen.getByRole("button", { name: /open project/i });
     expect(openBtn).toBeInTheDocument();
-    expect(openBtn).toBeDisabled();
+    expect(openBtn).not.toBeDisabled();
   });
 
   it("calls onOpenCreate when Add is clicked", async () => {
@@ -140,6 +144,21 @@ describe("ProjectTable — operation column role gating", () => {
     const { onOpenEdit } = renderTable({ canEdit: true });
     await userEvent.click(screen.getByRole("button", { name: /edit project/i }));
     expect(onOpenEdit).toHaveBeenCalledWith("alpha");
+  });
+});
+
+describe("ProjectTable — OpenInNew workspace action", () => {
+  it("calls onOpenWorkspace(row.code) when OpenInNew is clicked", async () => {
+    const { onOpenWorkspace } = renderTable();
+    await userEvent.click(screen.getByRole("button", { name: /open project/i }));
+    expect(onOpenWorkspace).toHaveBeenCalledTimes(1);
+    expect(onOpenWorkspace).toHaveBeenCalledWith("alpha");
+  });
+
+  it("OpenInNew is enabled regardless of canEdit", () => {
+    renderTable({ canEdit: false });
+    const openBtn = screen.getByRole("button", { name: /open project/i });
+    expect(openBtn).not.toBeDisabled();
   });
 });
 

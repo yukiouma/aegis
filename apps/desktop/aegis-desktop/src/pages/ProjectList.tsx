@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Box } from "@aegis/ui/mui";
 
 import { useCurrentUser, useListProjects } from "../data";
-import type { ProjectView } from "../api";
+import { api, type ProjectView } from "../api";
 import { ProjectDrawer } from "./ProjectDrawer";
 import { ProjectFilterBar } from "./ProjectFilterBar";
 import { ProjectTable } from "./ProjectTable";
@@ -58,6 +58,10 @@ export function ProjectListPage() {
     });
   }, [projects.data, query, involve, currentCode]);
 
+  const handleOpenWorkspace = useCallback((code: string) => {
+    void api.openProjectWorkspace(code);
+  }, []);
+
   return (
     <Box sx={{ p: 4, display: "flex", flexDirection: "column", gap: 2 }}>
       <ProjectFilterBar
@@ -74,6 +78,7 @@ export function ProjectListPage() {
         canEdit={canEdit}
         onOpenCreate={() => setDrawer({ mode: "create", code: null })}
         onOpenEdit={(code) => setDrawer({ mode: "edit", code })}
+        onOpenWorkspace={handleOpenWorkspace}
       />
 
       <ProjectDrawer
