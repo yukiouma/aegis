@@ -101,8 +101,8 @@ export const zhCN = {
   'nav.management': '管理',
   'nav.management.users': '用户',
   'common.retry': '重试',
-  'user.heading': '用户',
   'user.empty': '暂无用户',
+  'user.noMatches': '无匹配用户',
   'user.loadFailed': '加载用户失败：{message}',
   'user.active': '已启用',
   'user.inactive': '未启用',
@@ -115,4 +115,5 @@ export const zhCN = {
   'user.role.root': 'Root',
   'user.role.admin': '管理员',
   'user.role.general': '普通用户',
+  'user.search.placeholder': '按姓名或账号搜索',
 } satisfies Record<keyof typeof en, string>;

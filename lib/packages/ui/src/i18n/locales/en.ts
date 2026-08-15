@@ -103,8 +103,8 @@ export const en = {
   'nav.management': 'Management',
   'nav.management.users': 'Users',
   'common.retry': 'Retry',
-  'user.heading': 'Users',
   'user.empty': 'No users yet',
+  'user.noMatches': 'No matching users',
   'user.loadFailed': 'Failed to load users: {message}',
   'user.active': 'Active',
   'user.inactive': 'Inactive',
@@ -117,4 +117,5 @@ export const en = {
   'user.role.root': 'Root',
   'user.role.admin': 'Admin',
   'user.role.general': 'General',
+  'user.search.placeholder': 'Search by name or code',
 } as const;
