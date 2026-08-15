@@ -11,6 +11,7 @@ import {
   useListUsers,
   useLogout,
   useRegisterUser,
+  useUpdateUser,
 } from "../../data/user";
 import { queryKeys } from "../../data/queryKeys";
 import { mockCommands } from "../tauri-mock";
@@ -211,5 +212,96 @@ describe("useListUsers", () => {
     renderWithQueryClient(<ListUsersProbe enabled={false} />);
     await new Promise((r) => setTimeout(r, 0));
     expect(invoke).not.toHaveBeenCalled();
+  });
+});
+
+function UpdateUserHarness() {
+  const m = useUpdateUser();
+  return (
+    <>
+      <button
+        onClick={() => {
+          m.mutate({ code: "bob", body: { active: false } });
+        }}
+      >
+        toggle
+      </button>
+      <span data-testid="pending">{m.isPending ? "yes" : "no"}</span>
+    </>
+  );
+}
+
+describe("useUpdateUser", () => {
+  it("invokes api.update_user with { code, body }", async () => {
+    mockCommands({ update_user: () => userView });
+    renderWithQueryClient(<UpdateUserHarness />);
+    await userEvent.click(screen.getByRole("button", { name: "toggle" }));
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("update_user", {
+        code: "bob",
+        body: { active: false },
+      });
+    });
+  });
+
+  it("invalidates user.list and user.current on success", async () => {
+    mockCommands({ update_user: () => userView });
+    const { client } = renderWithQueryClient(<UpdateUserHarness />);
+    client.setQueryData(queryKeys.user.list(), usersList);
+    client.setQueryData(queryKeys.user.current(), userView);
+
+    const spy = vi.spyOn(client, "invalidateQueries");
+    await userEvent.click(screen.getByRole("button", { name: "toggle" }));
+    await waitFor(() => {
+      expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.user.list() });
+      expect(spy).toHaveBeenCalledWith({ queryKey: queryKeys.user.current() });
+    });
+  });
+
+  it("does not invalidate any query on error", async () => {
+    mockCommands({
+      update_user: () =>
+        Promise.reject({
+          kind: "http",
+          status: 403,
+          code: "forbidden",
+          message: "nope",
+        }),
+    });
+    const { client } = renderWithQueryClient(<UpdateUserHarness />);
+    client.setQueryData(queryKeys.user.list(), usersList);
+    const spy = vi.spyOn(client, "invalidateQueries");
+    await userEvent.click(screen.getByRole("button", { name: "toggle" }));
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("update_user", expect.anything());
+    });
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+function UpdateUserRoleHarness() {
+  const m = useUpdateUser();
+  return (
+    <button
+      onClick={() => {
+        m.mutate({ code: "bob", body: { role: "admin" } });
+      }}
+    >
+      promote
+    </button>
+  );
+}
+
+describe("useUpdateUser — role body", () => {
+  it("invokes api.update_user with body: { role }", async () => {
+    mockCommands({ update_user: () => userView });
+    renderWithQueryClient(<UpdateUserRoleHarness />);
+    await userEvent.click(screen.getByRole("button", { name: "promote" }));
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("update_user", {
+        code: "bob",
+        body: { role: "admin" },
+      });
+    });
   });
 });
