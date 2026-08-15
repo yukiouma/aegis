@@ -11,7 +11,8 @@ points at the user page. The page shows a read-only table of users
 (code, name, role, active) and lets root or admin users flip the
 `active` flag of any non-root user via a `Switch`. Root users are
 never displayed in the table; the current user cannot deactivate
-themselves.
+themselves. Both the `Management` sidebar entry and the page itself
+are hidden from users whose role is not `root` or `admin`.
 
 Back the page with two existing TanStack Query hooks (`useListUsers`,
 `useCurrentUser`) plus one new hook (`useUpdateUser`) added to the
@@ -124,8 +125,9 @@ edits to the generated file.
 
 ### Sidebar entry
 
-In `src/pages/layout.tsx`, add a `Management` menu item after
-Settings:
+In `src/pages/layout.tsx`, append a `Management` menu item after
+Settings. The entry is hidden entirely from users whose role is
+neither `root` nor `admin`, mirroring the page-visibility rule:
 
 ```tsx
 import {
@@ -135,6 +137,7 @@ import {
   Settings as SettingsIcon,
   Workspaces as WorkspacesIcon,
 } from "@aegis/ui/icons";
+import { useCurrentUser } from "../data";
 
 const HomeMenuIcon = () => <HomeIcon />;
 const ProjectsMenuIcon = () => <WorkspacesIcon />;
@@ -142,11 +145,22 @@ const SettingsMenuIcon = () => <SettingsIcon />;
 const ManagementMenuIcon = () => <AdminPanelSettingsIcon />;
 const UsersMenuIcon = () => <PeopleIcon />;
 
-const menu: MenuItem[] = [
-  { link: "/", title: t("nav.home"), icon: HomeMenuIcon },
-  { link: "/projects", title: t("nav.projects"), icon: ProjectsMenuIcon },
-  { link: "/settings", title: t("nav.settings"), icon: SettingsMenuIcon },
-  {
+export function AppLayout() {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const currentUser = useCurrentUser();
+
+  const role = currentUser.data?.role;
+  const canManage = role === "root" || role === "admin";
+
+  const baseMenu: MenuItem[] = [
+    { link: "/", title: t("nav.home"), icon: HomeMenuIcon },
+    { link: "/projects", title: t("nav.projects"), icon: ProjectsMenuIcon },
+    { link: "/settings", title: t("nav.settings"), icon: SettingsMenuIcon },
+  ];
+
+  const managementEntry: MenuItem = {
     link: "#",
     title: t("nav.management"),
     icon: ManagementMenuIcon,
@@ -157,8 +171,23 @@ const menu: MenuItem[] = [
         icon: UsersMenuIcon,
       },
     ],
-  },
-];
+  };
+
+  const menu: MenuItem[] = canManage
+    ? [...baseMenu, managementEntry]
+    : baseMenu;
+
+  const sidebarProps: SidebarProps = {
+    title: t("app.title"),
+    menu,
+    open: sidebarOpen,
+    onToggle: () => setSidebarOpen((o) => !o),
+    onNavigate: (link) => navigate({ to: link }),
+    footer: <UserFooter sidebarOpen={sidebarOpen} />,
+  };
+
+  // ...render unchanged
+}
 ```
 
 `AdminPanelSettings` and `People` are both part of
@@ -167,6 +196,12 @@ const menu: MenuItem[] = [
 expands the submenu (the existing Sidebar `handleClick` in
 `lib/packages/ui/src/components/Sidebar/Sidebar.tsx:107-110` does
 not call `onNavigate` for items with a `subMenu`).
+
+While `useCurrentUser` is still loading, `role` is `undefined`,
+`canManage` is `false`, and the Management entry is hidden. Once
+the role resolves, the entry appears. The brief flicker on first
+mount for a root/admin user is acceptable and matches how the
+footer already behaves.
 
 The `UserFooter` already renders below the menu via the
 existing `footer` prop on `Sidebar`; no change there.
@@ -644,8 +679,14 @@ Coverage:
 - **Authenticated + general** — `role: "general"` → page renders
   nothing inside `<Outlet>` (the orchestrator returns `null`).
 - **Sidebar shows the Management entry with Users submenu** —
-  `screen.getByText("Management")` present; clicking it expands the
-  submenu; `screen.getByText("Users")` then appears.
+  with an admin current user, `screen.getByText("Management")`
+  present; clicking it expands the submenu; `screen.getByText("Users")`
+  then appears.
+- **Sidebar hides the Management entry for general users** — with
+  `role: "general"`, `screen.queryByText("Management")` returns
+  `null`; the sidebar still shows Home, Projects, and Settings.
+- **Sidebar shows the Management entry for root users** — with
+  `role: "root"`, `screen.getByText("Management")` present.
 - **Navigation** — starting at `/settings`, click `Users` in the
   sidebar submenu; `router.state.location.pathname` becomes
   `/users`.
@@ -672,8 +713,9 @@ Coverage:
 - `apps/desktop/aegis-desktop/src/data/user.test.tsx` — add
   `useUpdateUser` cases (per the "New hook" section)
 - `apps/desktop/aegis-desktop/src/pages/layout.tsx` — add
-  `AdminPanelSettings` / `People` icon imports; add Management
-  menu entry with Users submenu
+  `AdminPanelSettings` / `People` icon imports; add `useCurrentUser`
+  import; build the menu array dynamically so the Management entry
+  is only included for root/admin users
 - `lib/packages/ui/src/i18n/locales/en.ts` — add `user.*`,
   `nav.management*`, `common.retry`
 - `lib/packages/ui/src/i18n/locales/zhCN.ts` — mirror the same keys
