@@ -116,4 +116,11 @@ export const zhCN = {
   'user.role.admin': '管理员',
   'user.role.general': '普通用户',
   'user.search.placeholder': '按姓名或账号搜索',
+
+  'workspace.menu.dashboard': '仪表板',
+  'workspace.menu.configuration': '配置',
+  'workspace.dashboard.heading': '仪表板 — {projectCode}',
+  'workspace.configuration.heading': '配置 — {projectCode}',
+  'workspace.placeholder': '敬请期待',
+  'workspace.focusMain': '返回主窗口',
 } satisfies Record<keyof typeof en, string>;
