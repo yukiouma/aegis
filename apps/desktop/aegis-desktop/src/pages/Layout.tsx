@@ -3,16 +3,21 @@ import { Outlet, useNavigate } from "@tanstack/react-router";
 import { Box } from "@aegis/ui/mui";
 import { Sidebar, type MenuItem, type SidebarProps } from "@aegis/ui";
 import {
+  AdminPanelSettings as AdminPanelSettingsIcon,
   Home as HomeIcon,
+  People as PeopleIcon,
   Settings as SettingsIcon,
   Workspaces as WorkspacesIcon,
 } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
+import { useCurrentUser } from "../data";
 import { UserFooter } from "./UserFooter";
 
 const HomeMenuIcon = () => <HomeIcon />;
 const ProjectsMenuIcon = () => <WorkspacesIcon />;
 const SettingsMenuIcon = () => <SettingsIcon />;
+const ManagementMenuIcon = () => <AdminPanelSettingsIcon />;
+const UsersMenuIcon = () => <PeopleIcon />;
 
 /**
  * Authenticated app shell: the `Sidebar` plus the active child route.
@@ -24,12 +29,33 @@ export function AppLayout() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = React.useState(true);
+  const currentUser = useCurrentUser();
 
-  const menu: MenuItem[] = [
+  const role = currentUser.data?.role;
+  const canManage = role === "root" || role === "admin";
+
+  const baseMenu: MenuItem[] = [
     { link: "/", title: t("nav.home"), icon: HomeMenuIcon },
     { link: "/projects", title: t("nav.projects"), icon: ProjectsMenuIcon },
     { link: "/settings", title: t("nav.settings"), icon: SettingsMenuIcon },
   ];
+
+  const managementEntry: MenuItem = {
+    link: "#",
+    title: t("nav.management"),
+    icon: ManagementMenuIcon,
+    subMenu: [
+      {
+        link: "/users",
+        title: t("nav.management.users"),
+        icon: UsersMenuIcon,
+      },
+    ],
+  };
+
+  const menu: MenuItem[] = canManage
+    ? [...baseMenu, managementEntry]
+    : baseMenu;
 
   const sidebarProps: SidebarProps = {
     title: t("app.title"),
