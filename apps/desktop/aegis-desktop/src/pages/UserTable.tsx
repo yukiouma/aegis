@@ -31,6 +31,7 @@ export interface UserTableProps {
   onToggle: (code: string, nextActive: boolean) => void;
   onRoleChange: (code: string, nextRole: Role) => void;
   onRetry: () => void;
+  emptyMessage?: string;
 }
 
 /**
@@ -48,6 +49,7 @@ export function UserTable({
   onToggle,
   onRoleChange,
   onRetry,
+  emptyMessage,
 }: UserTableProps) {
   const { t } = useI18n();
 
@@ -143,7 +145,9 @@ export function UserTable({
         </Table>
         {!showSpinner && rows.length === 0 && (
           <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-            <Typography color="textSecondary">{t("user.empty")}</Typography>
+            <Typography color="textSecondary">
+              {emptyMessage ?? t("user.empty")}
+            </Typography>
           </Box>
         )}
       </TableContainer>

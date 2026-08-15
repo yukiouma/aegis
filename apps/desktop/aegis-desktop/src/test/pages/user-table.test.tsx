@@ -29,6 +29,7 @@ function renderTable(
     error: null,
     selfCode: null,
     onToggle: vi.fn(),
+    onRoleChange: vi.fn(),
     onRetry: vi.fn(),
   };
   return render(
@@ -79,6 +80,12 @@ describe("UserTable — rendering states", () => {
   it("renders the empty-state copy when no rows and not loading", () => {
     renderTable({ rows: [], loading: false });
     expect(screen.getByText(/no users yet/i)).toBeInTheDocument();
+  });
+
+  it("renders emptyMessage when provided and rows is empty", () => {
+    renderTable({ rows: [], emptyMessage: "Nothing matched" });
+    expect(screen.getByText("Nothing matched")).toBeInTheDocument();
+    expect(screen.queryByText(/no users yet/i)).not.toBeInTheDocument();
   });
 
   it("renders the error Alert when error is set", () => {
