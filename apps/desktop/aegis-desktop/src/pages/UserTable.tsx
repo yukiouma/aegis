@@ -2,10 +2,11 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   CircularProgress,
   FormControlLabel,
+  MenuItem,
   Paper,
+  Select,
   Switch,
   Table,
   TableBody,
@@ -18,7 +19,7 @@ import {
 } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
 
-import type { ApiError, UserView } from "../api";
+import type { ApiError, Role, UserView } from "../api";
 import { errorMessage } from "../api/error";
 
 export interface UserTableProps {
@@ -28,6 +29,7 @@ export interface UserTableProps {
   error: ApiError | null;
   selfCode: string | null;
   onToggle: (code: string, nextActive: boolean) => void;
+  onRoleChange: (code: string, nextRole: Role) => void;
   onRetry: () => void;
 }
 
@@ -44,6 +46,7 @@ export function UserTable({
   error,
   selfCode,
   onToggle,
+  onRoleChange,
   onRetry,
 }: UserTableProps) {
   const { t } = useI18n();
@@ -90,11 +93,22 @@ export function UserTable({
                   <TableCell>{row.code}</TableCell>
                   <TableCell>{row.name}</TableCell>
                   <TableCell>
-                    <Chip
-                      variant="outlined"
-                      size="small"
-                      label={t(`user.role.${row.role}`)}
-                    />
+                    <Tooltip title={isSelf ? t("user.cannotChangeOwnRole") : ""}>
+                      <span>
+                        <Select
+                          size="small"
+                          value={row.role}
+                          disabled={disabled}
+                          onChange={(e) =>
+                            onRoleChange(row.code, e.target.value as Role)
+                          }
+                          sx={{ minWidth: 120 }}
+                        >
+                          <MenuItem value="admin">{t("user.role.admin")}</MenuItem>
+                          <MenuItem value="general">{t("user.role.general")}</MenuItem>
+                        </Select>
+                      </span>
+                    </Tooltip>
                   </TableCell>
                   <TableCell>
                     <Tooltip

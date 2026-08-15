@@ -101,13 +101,18 @@ describe("UserTable — rendering states", () => {
 });
 
 describe("UserTable — rows", () => {
-  it("renders one row per user with code, name, role chip, and switch", () => {
+  it("renders one row per user with code, name, role select, and switch", () => {
     renderTable({ rows: [adminUser, generalUser, adminUser2] });
     expect(screen.getByText("alice")).toBeInTheDocument();
     expect(screen.getByText("Alice")).toBeInTheDocument();
-    expect(screen.getAllByText("Admin").length).toBeGreaterThan(0);
+    // Each non-root user renders a Select with their current role as
+    // the visible label. Two admins + one general.
+    const selects = screen.getAllByRole("combobox");
+    expect(selects).toHaveLength(3);
+    expect(selects[0]).toHaveTextContent("Admin");   // alice
+    expect(selects[1]).toHaveTextContent("General"); // bob
+    expect(selects[2]).toHaveTextContent("Admin");   // carol
     expect(screen.getByText("bob")).toBeInTheDocument();
-    expect(screen.getByText("General")).toBeInTheDocument();
     expect(screen.getByText("carol")).toBeInTheDocument();
   });
 
@@ -121,6 +126,52 @@ describe("UserTable — rows", () => {
     renderTable({ rows: [generalUser] });
     const sw = getSwitches()[0];
     expect(sw.checked).toBe(false);
+  });
+});
+
+describe("UserTable — role Select", () => {
+  /** Find the combobox whose visible text equals `label`. */
+  function selectWithLabel(label: string): HTMLElement {
+    const selects = screen.getAllByRole("combobox");
+    const match = selects.find((s) => s.textContent === label);
+    if (!match) throw new Error(`Select with label "${label}" not found`);
+    return match;
+  }
+
+  it("Select on the self row is disabled", () => {
+    renderTable({ rows: [adminUser], selfCode: "alice" });
+    expect(selectWithLabel("Admin")).toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("Select on non-self rows is enabled", () => {
+    renderTable({ rows: [adminUser, generalUser], selfCode: "alice" });
+    expect(selectWithLabel("Admin")).toHaveAttribute("aria-disabled", "true");
+    // MUI omits `aria-disabled` entirely when the control is enabled
+    // (rather than setting it to "false"). Assert "not disabled" via
+    // the absence of the explicit true marker.
+    expect(selectWithLabel("General").getAttribute("aria-disabled")).not.toBe("true");
+  });
+
+  it("dropdown options are admin and general only (no root)", async () => {
+    renderTable({ rows: [adminUser] });
+    await userEvent.click(selectWithLabel("Admin"));
+    expect(screen.getByRole("option", { name: "Admin" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "General" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Root" })).not.toBeInTheDocument();
+  });
+
+  it("calls onRoleChange when a different role is picked", async () => {
+    const onRoleChange = vi.fn();
+    renderTable({ rows: [generalUser], onRoleChange });
+    await userEvent.click(selectWithLabel("General"));
+    await userEvent.click(screen.getByRole("option", { name: "Admin" }));
+    expect(onRoleChange).toHaveBeenCalledWith("bob", "admin");
+  });
+
+  it("disables every Select while mutationLoading is true", () => {
+    renderTable({ rows: [adminUser, generalUser], mutationLoading: true });
+    const selects = screen.getAllByRole("combobox");
+    expect(selects.every((s) => s.getAttribute("aria-disabled") === "true")).toBe(true);
   });
 });
 
