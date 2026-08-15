@@ -1,13 +1,16 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { AegisI18nProvider } from "@aegis/ui/i18n";
-import { AegisThemeProvider } from "@aegis/ui/theme";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { routeTree } from "./routes/routeTree.gen";
 import { QueryProvider } from "./data/client";
 import { DocumentLangSync } from "./DocumentLangSync";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import {
+  PersistentThemeProvider,
+  PersistentI18nProvider,
+  SettingsSyncBridge,
+} from "./SettingsSyncBridge";
 
 // Set the app entry to /bootstrap so the health check and login
 // status probe always run before the user reaches the login page
@@ -46,17 +49,19 @@ function App() {
   });
   return (
     <React.StrictMode>
-      <AegisThemeProvider>
+      <PersistentThemeProvider>
         <QueryProvider>
-          <AegisI18nProvider>
-            <DocumentLangSync />
-            <RouterProvider router={router} />
-            {import.meta.env.DEV && (
-              <TanStackRouterDevtools router={router} position="bottom-right" />
-            )}
-          </AegisI18nProvider>
+          <PersistentI18nProvider>
+            <SettingsSyncBridge>
+              <DocumentLangSync />
+              <RouterProvider router={router} />
+              {import.meta.env.DEV && (
+                <TanStackRouterDevtools router={router} position="bottom-right" />
+              )}
+            </SettingsSyncBridge>
+          </PersistentI18nProvider>
         </QueryProvider>
-      </AegisThemeProvider>
+      </PersistentThemeProvider>
     </React.StrictMode>
   );
 }
