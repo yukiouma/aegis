@@ -24,6 +24,12 @@ export {
 } from "./project";
 export { useListProducts } from "./product";
 
+export {
+  useHydrateSettingsFromStore,
+  useListenForSettingsChanges,
+  persistSettings,
+} from "./settings";
+
 // Re-export the React Query primitive that pages may need for ad-hoc
 // cache interactions (e.g. `queryClient.setQueryData`).
 export { useQueryClient } from "@tanstack/react-query";
