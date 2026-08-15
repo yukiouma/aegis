@@ -11,18 +11,22 @@ import {
   PersistentI18nProvider,
   SettingsSyncBridge,
 } from "./SettingsSyncBridge";
+import { shouldRedirectToBootstrap } from "./bootstrap-redirect";
 
 // Set the app entry to /bootstrap so the health check and login
 // status probe always run before the user reaches the login page
 // or the authenticated home. The fallback below handles the case
 // where `history.replaceState` is a no-op under the tauri://
 // protocol — detected by reading the pathname after the call.
+//
+// Workspace windows open at /project/<code> and must skip the
+// bootstrap probes entirely (see bootstrap-redirect.ts).
 const initialPath = window.location.pathname;
-if (initialPath === "/" || initialPath === "/index.html") {
+if (shouldRedirectToBootstrap(initialPath)) {
   window.history.replaceState(null, "", "/bootstrap");
 }
 const router = createRouter({ routeTree });
-if (window.location.pathname !== "/bootstrap") {
+if (shouldRedirectToBootstrap(window.location.pathname)) {
   // replaceState did not move us — fall back to a router navigate.
   void router.navigate({ to: "/bootstrap", replace: true });
 }
