@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 import type {
   CreateProductInput,
@@ -79,6 +80,26 @@ export const api = {
 
   // health
   healthz: (): Promise<string> => call<string>("healthz"),
+
+  // workspace window
+  openProjectWorkspace: async (code: string): Promise<void> => {
+    const label = `project:${code}`;
+    const existing = await WebviewWindow.getByLabel(label);
+    if (existing) {
+      await existing.show();
+      await existing.setFocus();
+      return;
+    }
+    new WebviewWindow(label, {
+      url: `/project/${code}`,
+      title: code,
+      width: 1100,
+      height: 720,
+      minWidth: 720,
+      minHeight: 480,
+      maximized: true,
+    });
+  },
 } as const;
 
 export type { ApiError } from "./types";

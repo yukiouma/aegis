@@ -1,0 +1,89 @@
+import React from "react";
+import { Outlet, useNavigate, useParams } from "@tanstack/react-router";
+import { Box, Button, IconButton } from "@aegis/ui/mui";
+import { Sidebar, type MenuItem, type SidebarProps } from "@aegis/ui";
+import {
+  Dashboard as DashboardIcon,
+  Launch as LaunchIcon,
+  Settings as SettingsIcon,
+} from "@aegis/ui/icons";
+import { useI18n } from "@aegis/ui/i18n";
+import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
+
+const DashboardMenuIcon = () => <DashboardIcon />;
+const ConfigMenuIcon = () => <SettingsIcon />;
+
+/**
+ * Workspace window shell. Sidebar header is the project code; menu
+ * has Dashboard + Configuration entries only; footer is a "Back to
+ * main" button that focuses the main window. Mounted by the
+ * `_project/route.tsx` layout.
+ */
+export function ProjectWorkspaceLayout() {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const { projectCode } = useParams({ strict: false }) as {
+    projectCode: string;
+  };
+  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+
+  const menu: MenuItem[] = [
+    {
+      link: `/project/${projectCode}/dashboard`,
+      title: t("workspace.menu.dashboard"),
+      icon: DashboardMenuIcon,
+    },
+    {
+      link: `/project/${projectCode}/configuration`,
+      title: t("workspace.menu.configuration"),
+      icon: ConfigMenuIcon,
+    },
+  ];
+
+  async function focusMainWindow() {
+    const all = await getAllWebviewWindows();
+    const mainWin = all.find((w) => w.label === "main");
+    if (mainWin) {
+      await mainWin.setFocus();
+      await mainWin.show();
+    }
+  }
+
+  const sidebarProps: SidebarProps = {
+    title: projectCode,
+    menu,
+    open: sidebarOpen,
+    onToggle: () => setSidebarOpen((o) => !o),
+    onNavigate: (link) => navigate({ to: link }),
+    footer: sidebarOpen ? (
+      <Button
+        size="small"
+        variant="outlined"
+        fullWidth
+        onClick={() => void focusMainWindow()}
+      >
+        {t("workspace.focusMain")}
+      </Button>
+    ) : (
+      <IconButton
+        aria-label={t("workspace.focusMain")}
+        onClick={() => void focusMainWindow()}
+        size="small"
+      >
+        <LaunchIcon />
+      </IconButton>
+    ),
+  };
+
+  return (
+    <Box sx={{ display: "flex", minHeight: "100vh" }}>
+      <Sidebar {...sidebarProps} />
+      <Box
+        component="main"
+        sx={{ flexGrow: 1, transition: "margin 0.3s" }}
+      >
+        <Outlet />
+      </Box>
+    </Box>
+  );
+}

@@ -17,6 +17,10 @@ import { Route as LayoutIndexRouteImport } from './_layout/index'
 import { Route as LayoutProjectsRouteImport } from './_layout/projects'
 import { Route as LayoutSettingsRouteImport } from './_layout/settings'
 import { Route as LayoutUsersRouteImport } from './_layout/users'
+import { Route as ProjectProjectCodeRouteRouteImport } from './project/$projectCode/route'
+import { Route as ProjectProjectCodeIndexRouteImport } from './project/$projectCode/index'
+import { Route as ProjectProjectCodeConfigurationRouteImport } from './project/$projectCode/configuration'
+import { Route as ProjectProjectCodeDashboardRouteImport } from './project/$projectCode/dashboard'
 
 const LayoutRouteRoute = LayoutRouteRouteImport.update({
   id: '/_layout',
@@ -57,15 +61,41 @@ const LayoutUsersRoute = LayoutUsersRouteImport.update({
   path: '/users',
   getParentRoute: () => LayoutRouteRoute,
 } as any)
+const ProjectProjectCodeRouteRoute = ProjectProjectCodeRouteRouteImport.update({
+  id: '/project/$projectCode',
+  path: '/project/$projectCode',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectProjectCodeIndexRoute = ProjectProjectCodeIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProjectProjectCodeRouteRoute,
+} as any)
+const ProjectProjectCodeConfigurationRoute =
+  ProjectProjectCodeConfigurationRouteImport.update({
+    id: '/configuration',
+    path: '/configuration',
+    getParentRoute: () => ProjectProjectCodeRouteRoute,
+  } as any)
+const ProjectProjectCodeDashboardRoute =
+  ProjectProjectCodeDashboardRouteImport.update({
+    id: '/dashboard',
+    path: '/dashboard',
+    getParentRoute: () => ProjectProjectCodeRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
   '/bootstrap': typeof BootstrapRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/project/$projectCode': typeof ProjectProjectCodeRouteRouteWithChildren
   '/projects': typeof LayoutProjectsRoute
   '/settings': typeof LayoutSettingsRoute
   '/users': typeof LayoutUsersRoute
+  '/project/$projectCode/configuration': typeof ProjectProjectCodeConfigurationRoute
+  '/project/$projectCode/dashboard': typeof ProjectProjectCodeDashboardRoute
+  '/project/$projectCode/': typeof ProjectProjectCodeIndexRoute
 }
 export interface FileRoutesByTo {
   '/bootstrap': typeof BootstrapRoute
@@ -75,6 +105,9 @@ export interface FileRoutesByTo {
   '/settings': typeof LayoutSettingsRoute
   '/users': typeof LayoutUsersRoute
   '/': typeof LayoutIndexRoute
+  '/project/$projectCode/configuration': typeof ProjectProjectCodeConfigurationRoute
+  '/project/$projectCode/dashboard': typeof ProjectProjectCodeDashboardRoute
+  '/project/$projectCode': typeof ProjectProjectCodeIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -82,10 +115,14 @@ export interface FileRoutesById {
   '/bootstrap': typeof BootstrapRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/project/$projectCode': typeof ProjectProjectCodeRouteRouteWithChildren
   '/_layout/projects': typeof LayoutProjectsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/users': typeof LayoutUsersRoute
   '/_layout/': typeof LayoutIndexRoute
+  '/project/$projectCode/configuration': typeof ProjectProjectCodeConfigurationRoute
+  '/project/$projectCode/dashboard': typeof ProjectProjectCodeDashboardRoute
+  '/project/$projectCode/': typeof ProjectProjectCodeIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -94,9 +131,13 @@ export interface FileRouteTypes {
     | '/bootstrap'
     | '/login'
     | '/register'
+    | '/project/$projectCode'
     | '/projects'
     | '/settings'
     | '/users'
+    | '/project/$projectCode/configuration'
+    | '/project/$projectCode/dashboard'
+    | '/project/$projectCode/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/bootstrap'
@@ -106,16 +147,23 @@ export interface FileRouteTypes {
     | '/settings'
     | '/users'
     | '/'
+    | '/project/$projectCode/configuration'
+    | '/project/$projectCode/dashboard'
+    | '/project/$projectCode'
   id:
     | '__root__'
     | '/_layout'
     | '/bootstrap'
     | '/login'
     | '/register'
+    | '/project/$projectCode'
     | '/_layout/projects'
     | '/_layout/settings'
     | '/_layout/users'
     | '/_layout/'
+    | '/project/$projectCode/configuration'
+    | '/project/$projectCode/dashboard'
+    | '/project/$projectCode/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -123,6 +171,7 @@ export interface RootRouteChildren {
   BootstrapRoute: typeof BootstrapRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
+  ProjectProjectCodeRouteRoute: typeof ProjectProjectCodeRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -183,6 +232,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutUsersRouteImport
       parentRoute: typeof LayoutRouteRoute
     }
+    '/project/$projectCode': {
+      id: '/project/$projectCode'
+      path: '/project/$projectCode'
+      fullPath: '/project/$projectCode'
+      preLoaderRoute: typeof ProjectProjectCodeRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/project/$projectCode/': {
+      id: '/project/$projectCode/'
+      path: '/'
+      fullPath: '/project/$projectCode/'
+      preLoaderRoute: typeof ProjectProjectCodeIndexRouteImport
+      parentRoute: typeof ProjectProjectCodeRouteRoute
+    }
+    '/project/$projectCode/configuration': {
+      id: '/project/$projectCode/configuration'
+      path: '/configuration'
+      fullPath: '/project/$projectCode/configuration'
+      preLoaderRoute: typeof ProjectProjectCodeConfigurationRouteImport
+      parentRoute: typeof ProjectProjectCodeRouteRoute
+    }
+    '/project/$projectCode/dashboard': {
+      id: '/project/$projectCode/dashboard'
+      path: '/dashboard'
+      fullPath: '/project/$projectCode/dashboard'
+      preLoaderRoute: typeof ProjectProjectCodeDashboardRouteImport
+      parentRoute: typeof ProjectProjectCodeRouteRoute
+    }
   }
 }
 
@@ -204,11 +281,30 @@ const LayoutRouteRouteWithChildren = LayoutRouteRoute._addFileChildren(
   LayoutRouteRouteChildren,
 )
 
+interface ProjectProjectCodeRouteRouteChildren {
+  ProjectProjectCodeConfigurationRoute: typeof ProjectProjectCodeConfigurationRoute
+  ProjectProjectCodeDashboardRoute: typeof ProjectProjectCodeDashboardRoute
+  ProjectProjectCodeIndexRoute: typeof ProjectProjectCodeIndexRoute
+}
+
+const ProjectProjectCodeRouteRouteChildren: ProjectProjectCodeRouteRouteChildren =
+  {
+    ProjectProjectCodeConfigurationRoute: ProjectProjectCodeConfigurationRoute,
+    ProjectProjectCodeDashboardRoute: ProjectProjectCodeDashboardRoute,
+    ProjectProjectCodeIndexRoute: ProjectProjectCodeIndexRoute,
+  }
+
+const ProjectProjectCodeRouteRouteWithChildren =
+  ProjectProjectCodeRouteRoute._addFileChildren(
+    ProjectProjectCodeRouteRouteChildren,
+  )
+
 const rootRouteChildren: RootRouteChildren = {
   LayoutRouteRoute: LayoutRouteRouteWithChildren,
   BootstrapRoute: BootstrapRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
+  ProjectProjectCodeRouteRoute: ProjectProjectCodeRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -118,4 +118,11 @@ export const en = {
   'user.role.admin': 'Admin',
   'user.role.general': 'General',
   'user.search.placeholder': 'Search by name or code',
+
+  'workspace.menu.dashboard': 'Dashboard',
+  'workspace.menu.configuration': 'Configuration',
+  'workspace.dashboard.heading': 'Dashboard — {projectCode}',
+  'workspace.configuration.heading': 'Configuration — {projectCode}',
+  'workspace.placeholder': 'Coming soon',
+  'workspace.focusMain': 'Back to main',
 } as const;

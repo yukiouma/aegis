@@ -1,25 +1,32 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { AegisI18nProvider } from "@aegis/ui/i18n";
-import { AegisThemeProvider } from "@aegis/ui/theme";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { routeTree } from "./routes/routeTree.gen";
 import { QueryProvider } from "./data/client";
 import { DocumentLangSync } from "./DocumentLangSync";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import {
+  PersistentThemeProvider,
+  PersistentI18nProvider,
+  SettingsSyncBridge,
+} from "./SettingsSyncBridge";
+import { shouldRedirectToBootstrap } from "./bootstrap-redirect";
 
 // Set the app entry to /bootstrap so the health check and login
 // status probe always run before the user reaches the login page
 // or the authenticated home. The fallback below handles the case
 // where `history.replaceState` is a no-op under the tauri://
 // protocol — detected by reading the pathname after the call.
+//
+// Workspace windows open at /project/<code> and must skip the
+// bootstrap probes entirely (see bootstrap-redirect.ts).
 const initialPath = window.location.pathname;
-if (initialPath === "/" || initialPath === "/index.html") {
+if (shouldRedirectToBootstrap(initialPath)) {
   window.history.replaceState(null, "", "/bootstrap");
 }
 const router = createRouter({ routeTree });
-if (window.location.pathname !== "/bootstrap") {
+if (shouldRedirectToBootstrap(window.location.pathname)) {
   // replaceState did not move us — fall back to a router navigate.
   void router.navigate({ to: "/bootstrap", replace: true });
 }
@@ -46,17 +53,19 @@ function App() {
   });
   return (
     <React.StrictMode>
-      <AegisThemeProvider>
+      <PersistentThemeProvider>
         <QueryProvider>
-          <AegisI18nProvider>
-            <DocumentLangSync />
-            <RouterProvider router={router} />
-            {import.meta.env.DEV && (
-              <TanStackRouterDevtools router={router} position="bottom-right" />
-            )}
-          </AegisI18nProvider>
+          <PersistentI18nProvider>
+            <SettingsSyncBridge>
+              <DocumentLangSync />
+              <RouterProvider router={router} />
+              {import.meta.env.DEV && (
+                <TanStackRouterDevtools router={router} position="bottom-right" />
+              )}
+            </SettingsSyncBridge>
+          </PersistentI18nProvider>
         </QueryProvider>
-      </AegisThemeProvider>
+      </PersistentThemeProvider>
     </React.StrictMode>
   );
 }
