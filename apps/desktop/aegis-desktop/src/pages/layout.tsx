@@ -47,7 +47,6 @@ export function AppLayout() {
         component="main"
         sx={{
           flexGrow: 1,
-          ml: `${sidebarOpen ? 240 : 56}px`,
           transition: "margin 0.3s",
         }}
       >
