@@ -54,7 +54,11 @@ export function AppLayout() {
   };
 
   const menu: MenuItem[] = canManage
-    ? [...baseMenu, managementEntry]
+    ? [
+        ...baseMenu.slice(0, 2),     // Home, Projects
+        managementEntry,             // Management (submenu: Users)
+        ...baseMenu.slice(2),        // Settings
+      ]
     : baseMenu;
 
   const sidebarProps: SidebarProps = {
