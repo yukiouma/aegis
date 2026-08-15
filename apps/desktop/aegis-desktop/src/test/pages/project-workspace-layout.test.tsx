@@ -137,4 +137,38 @@ describe("ProjectWorkspaceLayout", () => {
     expect(mockFocus).not.toHaveBeenCalled();
     expect(mockShow).not.toHaveBeenCalled();
   });
+
+  it("renders an icon-only footer button when the sidebar is collapsed", async () => {
+    mockGetAll.mockResolvedValue([
+      { label: "main", setFocus: mockFocus, show: mockShow },
+    ]);
+    await renderLayout("/project/DEMO-001/dashboard");
+
+    // Sanity: expanded state shows the labelled Button.
+    expect(
+      screen.getByRole("button", { name: /back to main/i }),
+    ).toBeInTheDocument();
+
+    // Collapse the sidebar via the built-in toggle.
+    await userEvent.click(
+      screen.getByRole("button", { name: /toggle sidebar/i }),
+    );
+
+    // After collapse: still findable by the same accessible name (the
+    // IconButton carries it), but the element is now an SVG-based
+    // IconButton — verify by absence of the "Back to main" text.
+    expect(screen.queryByText(/back to main/i)).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /back to main/i }),
+    ).toBeInTheDocument();
+
+    // Clicking it still focuses the main window.
+    await userEvent.click(
+      screen.getByRole("button", { name: /back to main/i }),
+    );
+    await waitFor(() => {
+      expect(mockFocus).toHaveBeenCalledTimes(1);
+      expect(mockShow).toHaveBeenCalledTimes(1);
+    });
+  });
 });

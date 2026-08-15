@@ -1,9 +1,10 @@
 import React from "react";
 import { Outlet, useNavigate, useParams } from "@tanstack/react-router";
-import { Box, Button } from "@aegis/ui/mui";
+import { Box, Button, IconButton } from "@aegis/ui/mui";
 import { Sidebar, type MenuItem, type SidebarProps } from "@aegis/ui";
 import {
   Dashboard as DashboardIcon,
+  Launch as LaunchIcon,
   Settings as SettingsIcon,
 } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
@@ -54,7 +55,7 @@ export function ProjectWorkspaceLayout() {
     open: sidebarOpen,
     onToggle: () => setSidebarOpen((o) => !o),
     onNavigate: (link) => navigate({ to: link }),
-    footer: (
+    footer: sidebarOpen ? (
       <Button
         size="small"
         variant="outlined"
@@ -63,6 +64,14 @@ export function ProjectWorkspaceLayout() {
       >
         {t("workspace.focusMain")}
       </Button>
+    ) : (
+      <IconButton
+        aria-label={t("workspace.focusMain")}
+        onClick={() => void focusMainWindow()}
+        size="small"
+      >
+        <LaunchIcon />
+      </IconButton>
     ),
   };
 
