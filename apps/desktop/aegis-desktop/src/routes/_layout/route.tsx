@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { api } from "../../api";
-import { AppLayout } from "../../pages/layout";
+import { AppLayout } from "../../pages/Layout";
 
 export const Route = createFileRoute("/_layout")({
   // Every page under this layout requires a session. A failing

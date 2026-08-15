@@ -4,7 +4,7 @@ import { cleanup, screen } from "@testing-library/react";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
 import { renderInRouter } from "../file-route-utils";
-import { HomePage } from "../../pages/home";
+import { HomePage } from "../../pages/Home";
 
 vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
