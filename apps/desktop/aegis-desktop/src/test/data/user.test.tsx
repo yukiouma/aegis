@@ -278,3 +278,30 @@ describe("useUpdateUser", () => {
     expect(spy).not.toHaveBeenCalled();
   });
 });
+
+function UpdateUserRoleHarness() {
+  const m = useUpdateUser();
+  return (
+    <button
+      onClick={() => {
+        m.mutate({ code: "bob", body: { role: "admin" } });
+      }}
+    >
+      promote
+    </button>
+  );
+}
+
+describe("useUpdateUser — role body", () => {
+  it("invokes api.update_user with body: { role }", async () => {
+    mockCommands({ update_user: () => userView });
+    renderWithQueryClient(<UpdateUserRoleHarness />);
+    await userEvent.click(screen.getByRole("button", { name: "promote" }));
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("update_user", {
+        code: "bob",
+        body: { role: "admin" },
+      });
+    });
+  });
+});

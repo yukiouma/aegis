@@ -118,12 +118,39 @@ describe("UserListPage — toggle calls update_user", () => {
 });
 
 describe("UserListPage — self-disable", () => {
-  it("disables the Switch on the current user's own row", async () => {
+  it("disables both the Switch and the Select on the current user's row", async () => {
     await renderPage(adminUser, [adminUser, generalUser]);
     await screen.findByText("alice");
     const switches = getSwitches();
-    expect(switches[0].disabled).toBe(true); // alice = self
-    expect(switches[1].disabled).toBe(false); // bob
+    expect(switches[0].disabled).toBe(true); // alice Switch
+
+    const selects = screen.getAllByRole("combobox");
+    const aliceSelect = selects.find((s) => s.textContent === "Admin");
+    expect(aliceSelect).toBeDefined();
+    expect(aliceSelect).toHaveAttribute("aria-disabled", "true");
+  });
+});
+
+describe("UserListPage — role change", () => {
+  /** Find the Select on a row whose visible text equals `label`. */
+  function selectWithLabel(label: string): HTMLElement {
+    const selects = screen.getAllByRole("combobox");
+    const match = selects.find((s) => s.textContent === label);
+    if (!match) throw new Error(`Select with label "${label}" not found`);
+    return match;
+  }
+
+  it("calls update_user with { code, body: { role } } when a role is picked", async () => {
+    await renderPage(adminUser, [adminUser, generalUser]);
+    await screen.findByText("bob");
+    await userEvent.click(selectWithLabel("General"));
+    await userEvent.click(screen.getByRole("option", { name: "Admin" }));
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("update_user", {
+        code: "bob",
+        body: { role: "admin" },
+      });
+    });
   });
 });
 

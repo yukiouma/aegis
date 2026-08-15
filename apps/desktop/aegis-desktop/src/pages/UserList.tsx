@@ -3,7 +3,7 @@ import { Box, Typography } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
 
 import { useCurrentUser, useListUsers, useUpdateUser } from "../data";
-import type { UserView } from "../api";
+import type { Role, UserView } from "../api";
 import { UserTable } from "./UserTable";
 
 /**
@@ -34,6 +34,13 @@ export function UserListPage() {
     [updateUser],
   );
 
+  const handleRoleChange = useCallback(
+    (code: string, nextRole: Role) => {
+      updateUser.mutate({ code, body: { role: nextRole } });
+    },
+    [updateUser],
+  );
+
   if (!canManage) return null;
 
   return (
@@ -46,6 +53,7 @@ export function UserListPage() {
         error={users.error ?? updateUser.error}
         selfCode={selfCode}
         onToggle={handleToggle}
+        onRoleChange={handleRoleChange}
         onRetry={users.refetch}
       />
     </Box>
