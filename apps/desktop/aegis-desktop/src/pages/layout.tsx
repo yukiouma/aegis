@@ -2,11 +2,16 @@ import React from "react";
 import { Outlet, useNavigate } from "@tanstack/react-router";
 import { Box } from "@aegis/ui/mui";
 import { Sidebar, type MenuItem, type SidebarProps } from "@aegis/ui";
-import { Home as HomeIcon, Settings as SettingsIcon } from "@aegis/ui/icons";
+import {
+  Home as HomeIcon,
+  Settings as SettingsIcon,
+  Workspaces as WorkspacesIcon,
+} from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
 import { UserFooter } from "./UserFooter";
 
 const HomeMenuIcon = () => <HomeIcon />;
+const ProjectsMenuIcon = () => <WorkspacesIcon />;
 const SettingsMenuIcon = () => <SettingsIcon />;
 
 /**
@@ -22,6 +27,7 @@ export function AppLayout() {
 
   const menu: MenuItem[] = [
     { link: "/", title: t("nav.home"), icon: HomeMenuIcon },
+    { link: "/projects", title: t("nav.projects"), icon: ProjectsMenuIcon },
     { link: "/settings", title: t("nav.settings"), icon: SettingsMenuIcon },
   ];
 
@@ -41,7 +47,6 @@ export function AppLayout() {
         component="main"
         sx={{
           flexGrow: 1,
-          ml: `${sidebarOpen ? 240 : 56}px`,
           transition: "margin 0.3s",
         }}
       >

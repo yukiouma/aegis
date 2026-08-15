@@ -7,6 +7,7 @@ use super::client::HttpClient;
 use super::dto::{ApiError, Role};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserViewResponse {
     pub id: i32,
     pub code: String,
@@ -18,11 +19,13 @@ pub struct UserViewResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserListResponse {
     pub users: Vec<UserViewResponse>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateUserRequest {
     pub code: String,
     pub name: String,
@@ -30,6 +33,7 @@ pub struct CreateUserRequest {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateUserRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code: Option<String>,
@@ -95,8 +99,8 @@ mod tests {
                             "users": [{
                                 "id": 1, "code": "a", "name": "Alice",
                                 "role": "admin", "active": true,
-                                "created_at": "2026-01-01T00:00:00Z",
-                                "updated_at": "2026-01-02T00:00:00Z"
+                                "createdAt": "2026-01-01T00:00:00Z",
+                                "updatedAt": "2026-01-02T00:00:00Z"
                             }]
                         }),
                     )),

@@ -7,6 +7,7 @@ use super::client::HttpClient;
 use super::dto::ApiError;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProductViewResponse {
     pub id: i32,
     pub code: String,
@@ -18,11 +19,13 @@ pub struct ProductViewResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProductListResponse {
     pub products: Vec<ProductViewResponse>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateProductRequest {
     pub code: String,
     pub name: String,
@@ -30,6 +33,7 @@ pub struct CreateProductRequest {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateProductRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code: Option<String>,
@@ -105,8 +109,8 @@ mod tests {
                             "products": [{
                                 "id": 1, "code": "x", "name": "X",
                                 "description": "", "active": true,
-                                "created_at": "2026-01-01T00:00:00Z",
-                                "updated_at": "2026-01-02T00:00:00Z"
+                                "createdAt": "2026-01-01T00:00:00Z",
+                                "updatedAt": "2026-01-02T00:00:00Z"
                             }]
                         }),
                     )),

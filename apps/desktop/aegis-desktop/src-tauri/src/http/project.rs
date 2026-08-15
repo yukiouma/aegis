@@ -8,6 +8,7 @@ use super::dto::ApiError;
 use super::product::ProductViewResponse;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectMemberDataRequest {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub leaders: Vec<String>,
@@ -16,18 +17,21 @@ pub struct ProjectMemberDataRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UserSummaryViewResponse {
     pub code: String,
     pub name: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectMemberViewResponse {
     pub leaders: Vec<UserSummaryViewResponse>,
     pub workers: Vec<UserSummaryViewResponse>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectViewResponse {
     pub id: i32,
     pub code: String,
@@ -41,11 +45,13 @@ pub struct ProjectViewResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectListResponse {
     pub projects: Vec<ProjectViewResponse>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateProjectRequest {
     pub code: String,
     pub description: String,
@@ -57,6 +63,7 @@ pub struct CreateProjectRequest {
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UpdateProjectRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code: Option<String>,
@@ -138,14 +145,14 @@ mod tests {
                                 "product": {
                                     "id": 1, "code": "x", "name": "X",
                                     "description": "", "active": true,
-                                    "created_at": "2026-01-01T00:00:00Z",
-                                    "updated_at": "2026-01-02T00:00:00Z"
+                                    "createdAt": "2026-01-01T00:00:00Z",
+                                    "updatedAt": "2026-01-02T00:00:00Z"
                                 },
                                 "members": { "leaders": [], "workers": [] },
-                                "unblind_members": { "leaders": [], "workers": [] },
+                                "unblindMembers": { "leaders": [], "workers": [] },
                                 "active": true,
-                                "created_at": "2026-01-01T00:00:00Z",
-                                "updated_at": "2026-01-02T00:00:00Z"
+                                "createdAt": "2026-01-01T00:00:00Z",
+                                "updatedAt": "2026-01-02T00:00:00Z"
                             }]
                         }),
                     )),

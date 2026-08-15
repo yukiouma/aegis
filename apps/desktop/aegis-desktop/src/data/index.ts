@@ -11,9 +11,17 @@ export { useHealthz, useIsLoggedIn } from "./bootstrap";
 export {
   useCurrentUser,
   useDomainUserInfo,
+  useListUsers,
   useRegisterUser,
   useLogout,
 } from "./user";
+export {
+  useCreateProject,
+  useListProjects,
+  useProject,
+  useUpdateProject,
+} from "./project";
+export { useListProducts } from "./product";
 
 // Re-export the React Query primitive that pages may need for ad-hoc
 // cache interactions (e.g. `queryClient.setQueryData`).

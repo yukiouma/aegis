@@ -14,6 +14,7 @@ import { Route as BootstrapRouteImport } from './bootstrap'
 import { Route as LoginRouteImport } from './login'
 import { Route as RegisterRouteImport } from './register'
 import { Route as LayoutIndexRouteImport } from './_layout/index'
+import { Route as LayoutProjectsRouteImport } from './_layout/projects'
 import { Route as LayoutSettingsRouteImport } from './_layout/settings'
 
 const LayoutRouteRoute = LayoutRouteRouteImport.update({
@@ -40,6 +41,11 @@ const LayoutIndexRoute = LayoutIndexRouteImport.update({
   path: '/',
   getParentRoute: () => LayoutRouteRoute,
 } as any)
+const LayoutProjectsRoute = LayoutProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => LayoutRouteRoute,
+} as any)
 const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -51,12 +57,14 @@ export interface FileRoutesByFullPath {
   '/bootstrap': typeof BootstrapRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/projects': typeof LayoutProjectsRoute
   '/settings': typeof LayoutSettingsRoute
 }
 export interface FileRoutesByTo {
   '/bootstrap': typeof BootstrapRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/projects': typeof LayoutProjectsRoute
   '/settings': typeof LayoutSettingsRoute
   '/': typeof LayoutIndexRoute
 }
@@ -66,20 +74,23 @@ export interface FileRoutesById {
   '/bootstrap': typeof BootstrapRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
+  '/_layout/projects': typeof LayoutProjectsRoute
   '/_layout/settings': typeof LayoutSettingsRoute
   '/_layout/': typeof LayoutIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/bootstrap' | '/login' | '/register' | '/settings'
+  fullPaths:
+    '/' | '/bootstrap' | '/login' | '/register' | '/projects' | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/bootstrap' | '/login' | '/register' | '/settings' | '/'
+  to: '/bootstrap' | '/login' | '/register' | '/projects' | '/settings' | '/'
   id:
     | '__root__'
     | '/_layout'
     | '/bootstrap'
     | '/login'
     | '/register'
+    | '/_layout/projects'
     | '/_layout/settings'
     | '/_layout/'
   fileRoutesById: FileRoutesById
@@ -128,6 +139,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutIndexRouteImport
       parentRoute: typeof LayoutRouteRoute
     }
+    '/_layout/projects': {
+      id: '/_layout/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof LayoutProjectsRouteImport
+      parentRoute: typeof LayoutRouteRoute
+    }
     '/_layout/settings': {
       id: '/_layout/settings'
       path: '/settings'
@@ -139,11 +157,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface LayoutRouteRouteChildren {
+  LayoutProjectsRoute: typeof LayoutProjectsRoute
   LayoutSettingsRoute: typeof LayoutSettingsRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
 }
 
 const LayoutRouteRouteChildren: LayoutRouteRouteChildren = {
+  LayoutProjectsRoute: LayoutProjectsRoute,
   LayoutSettingsRoute: LayoutSettingsRoute,
   LayoutIndexRoute: LayoutIndexRoute,
 }
