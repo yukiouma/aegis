@@ -1,9 +1,14 @@
 import { invoke } from "@tauri-apps/api/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, screen, waitFor } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+
+const mockGetAll = vi.fn();
+vi.mock("@tauri-apps/api/webviewWindow", () => ({
+  getAllWebviewWindows: (...args: unknown[]) => mockGetAll(...args),
+}));
 
 import {
   useCurrentUser,
@@ -49,6 +54,10 @@ const usersList = [
 
 beforeEach(() => {
   (invoke as unknown as ReturnType<typeof vi.fn>).mockReset();
+  mockGetAll.mockReset();
+  // Default to no other windows so existing tests don't break.
+  // Individual tests override this when they need a populated list.
+  mockGetAll.mockResolvedValue([]);
 });
 afterEach(() => {
   cleanup();
@@ -187,6 +196,76 @@ describe("useLogout", () => {
       expect(clearSpy).toHaveBeenCalled();
       expect(client.getQueryData(queryKeys.user.current())).toBeUndefined();
     });
+  });
+
+  it("closes every project:* window on success and skips the main window", async () => {
+    const mainClose = vi.fn();
+    const project1Close = vi.fn();
+    const project2Close = vi.fn();
+    mockGetAll.mockResolvedValue([
+      { label: "main", close: mainClose },
+      { label: "project:DEMO-001", close: project1Close },
+      { label: "project:DEMO-002", close: project2Close },
+    ]);
+    mockCommands({ logout: () => undefined });
+    const { client } = renderWithQueryClient(<LogoutHarness />);
+    const clearSpy = vi.spyOn(client, "clear");
+
+    await userEvent.click(screen.getByRole("button", { name: "logout" }));
+
+    await waitFor(() => {
+      expect(project1Close).toHaveBeenCalledTimes(1);
+      expect(project2Close).toHaveBeenCalledTimes(1);
+      expect(mainClose).not.toHaveBeenCalled();
+      expect(clearSpy).toHaveBeenCalled();
+    });
+  });
+
+  it("does not call any window.close when only the main window exists", async () => {
+    const mainClose = vi.fn();
+    mockGetAll.mockResolvedValue([{ label: "main", close: mainClose }]);
+    mockCommands({ logout: () => undefined });
+    const { client } = renderWithQueryClient(<LogoutHarness />);
+    const clearSpy = vi.spyOn(client, "clear");
+
+    await userEvent.click(screen.getByRole("button", { name: "logout" }));
+
+    await waitFor(() => expect(clearSpy).toHaveBeenCalled());
+    expect(mainClose).not.toHaveBeenCalled();
+  });
+
+  it("closes project windows BEFORE clearing the cache", async () => {
+    // Deferred close promise — lets the test observe the ordering.
+    let closeProject!: () => void;
+    const project1Close = vi.fn(
+      () => new Promise<void>((resolve) => { closeProject = resolve; }),
+    );
+    mockGetAll.mockResolvedValue([
+      { label: "main", close: vi.fn() },
+      { label: "project:DEMO-001", close: project1Close },
+    ]);
+    mockCommands({ logout: () => undefined });
+    const { client } = renderWithQueryClient(<LogoutHarness />);
+    const clearSpy = vi.spyOn(client, "clear");
+
+    // Fire the click inside act() so React Query's internal scheduling
+    // fully flushes through the synchronous handler entry point.
+    // The close() promise stays pending, so we can observe the
+    // intermediate state before resolving it.
+    let clickPromise!: Promise<void>;
+    await act(async () => {
+      clickPromise = userEvent.click(
+        screen.getByRole("button", { name: "logout" }),
+      );
+    });
+
+    await waitFor(() => expect(project1Close).toHaveBeenCalledTimes(1));
+    expect(clearSpy).not.toHaveBeenCalled();
+
+    closeProject();
+    await clickPromise;
+
+    await waitFor(() => expect(clearSpy).toHaveBeenCalled());
   });
 });
 
