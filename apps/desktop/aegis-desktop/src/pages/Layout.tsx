@@ -46,7 +46,7 @@ export function AppLayout() {
     icon: ManagementMenuIcon,
     subMenu: [
       {
-        link: "/users",
+        link: "/management/users",
         title: t("nav.management.users"),
         icon: UsersMenuIcon,
       },

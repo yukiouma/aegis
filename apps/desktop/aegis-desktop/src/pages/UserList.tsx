@@ -10,8 +10,10 @@ import { UserTable } from "./UserTable";
 /**
  * User management page. Lists non-root users with code, name, role,
  * and an active-state Switch. Filtering (root users hidden, search
- * by name/code) and the role gate live here; the table is a pure
- * presentational component.
+ * by name/code) lives here; the table is a pure presentational
+ * component. Role authorization is enforced by the route guard at
+ * `/_authed/_layout/management`, not here — by the time this
+ * component mounts, the caller is already `root` or `admin`.
  */
 export function UserListPage() {
   const { t } = useI18n();
@@ -20,8 +22,6 @@ export function UserListPage() {
   const updateUser = useUpdateUser();
   const [search, setSearch] = useState("");
 
-  const role = currentUser.data?.role;
-  const canManage = role === "root" || role === "admin";
   const selfCode = currentUser.data?.code ?? null;
 
   // Trim + lowercase once so the memo dependency is a stable string
@@ -53,8 +53,6 @@ export function UserListPage() {
     },
     [updateUser],
   );
-
-  if (!canManage) return null;
 
   return (
     <Box sx={{ p: 4, display: "flex", flexDirection: "column", gap: 2 }}>
