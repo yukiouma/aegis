@@ -357,3 +357,396 @@ the rest is UI plumbing. Two cleanups:
 6. Test ergonomics (#10) — 45 minutes.
 
 The other items are smaller fixes you can pick up opportunistically.
+
+## Codebase organization
+
+The current organization is mostly sound — this section audits the file layout
+itself, separate from the code-quality points above.
+
+### What's already working
+
+- **`api/` is a clean seam.** `index.ts` = transport, `error.ts` = error
+  narrowing, `types.ts` = wire DTOs. Pages never reach past `data/`; data hooks
+  never reach past `api/`. That's the right kind of layering.
+- **Data hooks are co-located by resource** (`user.ts`, `project.ts`,
+  `product.ts`) with a **single barrel** (`data/index.ts`). Good "one way in"
+  pattern.
+- **`pages/` vs `routes/` split** is justified and documented (see comment in
+  [`Layout.tsx`](../../apps/desktop/aegis-desktop/src/pages/Layout.tsx)).
+  Components are testable in isolation; route files are thin glue.
+- **`@aegis/ui` is the design-system boundary.** Pages don't import MUI
+  primitives directly — they import `@aegis/ui/mui` and `@aegis/ui/icons`. The
+  shell can be swapped without touching business code.
+- **Test infrastructure is centralized in `test/`** (mock dispatch, render
+  helpers, query provider). Tests for pages/components live next to where
+  production code lives.
+
+### Things worth tightening
+
+#### 1. The "everything in `src/data/`" bag
+
+`data/` currently mixes three different concerns and it's worth naming them:
+
+| Current name | Concern | Better location |
+|---|---|---|
+| `auth.ts`, `bootstrap.ts`, `user.ts`, `project.ts`, `product.ts` | Server cache hooks | `src/data/` (keep) |
+| `queryKeys.ts`, `client.tsx` | React Query infra | `src/data/query/` |
+| `settings.ts` | Persistent cross-window prefs (store + events) | `src/prefs/` or `src/data/prefs/` |
+| `index.ts` | Public barrel | stays |
+
+`s/settings.ts/prefs/` is the most useful split because `settings.ts` isn't
+really a "server cache" hook — it's a Tauri-store + event-bus adapter with two
+React-facing hooks bolted on. Mixing it with `useListProjects` confuses the
+layering.
+
+#### 2. `components/` has only one folder
+
+[`components/BootstrapLog/`](../../apps/desktop/aegis-desktop/src/components/BootstrapLog/)
+is the only thing in `components/`. Two reasonable interpretations:
+
+- **It's a placeholder**: more shared components will land here (e.g. a
+  `<RoleChip>`, a `<EmptyState>`) — in which case the folder name is fine,
+  just keep it as the "shared, non-page" bucket and don't let `pages/` grow
+  subcomponents.
+- **It's mis-named**: the BootstrapLog is really a **feature** used by
+  Bootstrap/Login/Register pages, not a generic shared component. Consider
+  moving it under `src/features/auth/` (or `src/features/splash/`) and rename
+  `components/` to whatever the next shared widget actually is.
+
+Either is defensible, but right now `components/` looks like a "scrap drawer"
+because it has one tenant.
+
+#### 3. Root-level `.tsx` files are a mixed bag
+
+[`main.tsx`](../../apps/desktop/aegis-desktop/src/main.tsx),
+[`bootstrap-redirect.ts`](../../apps/desktop/aegis-desktop/src/bootstrap-redirect.ts),
+[`DocumentLangSync.tsx`](../../apps/desktop/aegis-desktop/src/DocumentLangSync.tsx),
+[`SettingsSyncBridge.tsx`](../../apps/desktop/aegis-desktop/src/SettingsSyncBridge.tsx)
+all live in `src/` directly. None of them are pages, none are data hooks, none
+are components. They're **app shell glue**.
+
+Two clean options:
+
+- **Collect into a single `src/app/` folder**: `app/main.tsx`,
+  `app/Providers.tsx` (the chain in `App()`), `app/DocumentLangSync.tsx`,
+  `app/SettingsSyncBridge.tsx`, `app/bootstrap-redirect.ts`. Once the four
+  files exist in `app/`, the next shell concern has an obvious home.
+- **Keep them flat but co-locate the providers**: move the four providers from
+  `main.tsx` into a single `Providers.tsx` so `main.tsx` is just routing +
+  render. The current `App()` function with its nested provider wrappers is
+  doing too much.
+
+Pick the first — a dedicated `app/` folder signals "this is the entry point
+and its plumbing, don't grow here casually."
+
+#### 4. `vite-env.d.ts` belongs at the project root
+
+`src/vite-env.d.ts` should be at the repo root (or in `src/types/`). Vite
+specifically looks for `vite-env.d.ts` next to `vite.config.ts`. It's working
+where it is, but it's unusual.
+
+#### 5. Barrel files are a tradeoff you're already paying for
+
+[`data/index.ts`](../../apps/desktop/aegis-desktop/src/data/index.ts) is a
+re-export hub, and [`api/index.ts`](../../apps/desktop/aegis-desktop/src/api/index.ts)
+re-exports 18 types from `types.ts`. Two specific hazards worth knowing:
+
+- **Re-exported types lose their origin in error stacks** — when something
+  blows up in a page, the stack points at the barrel, not the file with the
+  actual type. Not a bug, just an annoyance.
+- **The barrel becomes a "god file"** the moment you start re-exporting more
+  than 30 things. Yours is at the edge. If `data/` grows another resource
+  (e.g. `permission.ts`, `audit.ts`, etc., on top of the existing
+  `product.ts`), consider **per-resource sub-barrels** (`data/auth/index.ts`)
+  so each resource is self-contained.
+
+You can also drop the `export type { ... } from "./types"` block in
+`api/index.ts` if pages import directly from `api/types.ts` — the re-export is
+convenience, not necessity.
+
+#### 6. Tests live in `src/test/` — keep the centralized root, enforce the mirror
+
+This is a deliberate choice (see `src/test/data/` mirroring `src/data/`). Pros:
+one place to find all tests and test utilities. Cons: when you move a source
+file you have to remember to move its test too, and the parallelism is implicit
+not enforced.
+
+Since the project is adopting a feature-sliced layout, **the mirror gets
+deeper, not flatter**. The end state is `src/test/features/<x>/...` mirroring
+`src/features/<x>/...`, plus top-level utilities under `src/test/`. Two
+practices that keep the mirror honest as the codebase grows:
+
+- **An eslint rule** requiring `src/test/<mirror-path>.test.{ts,tsx}` to exist
+  for every non-trivial source file under `src/`. Cheap to write, catches
+  orphans immediately.
+- **A naming convention** for test files: snake-case (e.g.
+  `project-list.test.tsx`) rather than camelCase (`ProjectList.test.tsx`).
+  Keeps directory listings tidy and aligns with what most of the existing
+  tests in this project already do.
+
+Co-location is rejected on purpose for this project — the centralized test
+root is the team's chosen convention, and the reorganization respects it
+rather than fighting it.
+
+### Reorganization: Option B (feature-sliced, adopted)
+
+End-state layout (rendered via `tree -a -I 'node_modules'`):
+
+```
+src/
+├── main.tsx                               # Vite entry; referenced by index.html
+├── app/
+│   ├── Providers.tsx
+│   ├── SettingsSyncBridge.tsx
+│   ├── DocumentLangSync.tsx
+│   └── bootstrap-redirect.ts
+├── features/
+│   ├── auth/
+│   │   ├── pages/
+│   │   │   ├── Login.tsx
+│   │   │   ├── Register.tsx
+│   │   │   ├── Bootstrap.tsx
+│   │   │   └── Home.tsx                  # post-login landing
+│   │   ├── components/
+│   │   │   └── BootstrapLog/
+│   │   │       ├── BootstrapLog.tsx
+│   │   │       ├── useBootstrapLog.ts
+│   │   │       ├── types.ts
+│   │   │       └── index.ts
+│   │   └── data/
+│   │       ├── auth.ts
+│   │       ├── bootstrap.ts
+│   │       ├── user.ts                   # identity lookup + register + logout
+│   │       └── index.ts                  # barrel
+│   ├── projects/
+│   │   ├── pages/
+│   │   │   ├── ProjectList.tsx
+│   │   │   ├── ProjectTable.tsx
+│   │   │   ├── ProjectDrawer.tsx
+│   │   │   └── ProjectFilterBar.tsx
+│   │   └── data/
+│   │       ├── project.ts
+│   │       ├── product.ts
+│   │       └── index.ts
+│   ├── users/
+│   │   ├── pages/
+│   │   │   ├── UserList.tsx
+│   │   │   ├── UserTable.tsx
+│   │   │   ├── UserFilterBar.tsx
+│   │   │   └── UserFooter.tsx
+│   │   └── data/
+│   │       ├── user.ts                   # list + update (split from auth)
+│   │       └── index.ts
+│   ├── settings/
+│   │   └── pages/
+│   │       └── Settings.tsx
+│   └── workspace/
+│       ├── pages/
+│       │   ├── ProjectWorkspaceLayout.tsx
+│       │   ├── ProjectDashboard.tsx
+│       │   └── ProjectConfiguration.tsx
+│       └── data/                          # reserved for workspace-only hooks
+├── routes/                                # TanStack Router file-based routes
+│   ├── __root.tsx
+│   ├── routeTree.gen.ts                   # generated by @tanstack/router-plugin
+│   ├── bootstrap.tsx                      # → features/auth/pages/Bootstrap
+│   ├── login.tsx                          # → features/auth/pages/Login
+│   ├── register.tsx                       # → features/auth/pages/Register
+│   ├── _layout/
+│   │   ├── route.tsx                      # authenticated shell + AppLayout
+│   │   ├── index.tsx                      # → features/auth/pages/Home
+│   │   ├── projects.tsx                   # → features/projects/pages/ProjectList
+│   │   ├── settings.tsx                   # → features/settings/pages/Settings
+│   │   └── users.tsx                      # → features/users/pages/UserList
+│   └── project/
+│       └── $projectCode/
+│           ├── route.tsx                  # workspace shell
+│           ├── index.tsx                  # redirect → /dashboard
+│           ├── dashboard.tsx              # → features/workspace/pages/ProjectDashboard
+│           └── configuration.tsx          # → features/workspace/pages/ProjectConfiguration
+└── shared/
+    ├── api/
+    │   ├── index.ts
+    │   ├── error.ts
+    │   └── types.ts
+    ├── prefs/
+    │   ├── settings.ts
+    │   └── windows.ts                    # new home for getAllWebviewWindows helpers
+```
+
+`vite-env.d.ts` lives at the project root (next to `vite.config.ts`), not under
+`src/`.
+
+Test directory (kept under `src/test/` per the centralized-tests constraint):
+
+```
+src/test/
+├── setup.ts                                # vitest setup, jsdom polyfills
+├── tauri-mock.ts                           # mockCommands / mockInvoke
+├── render-with-query-client.tsx            # render helper (with client)
+├── file-route-utils.tsx                    # renderInRouter / renderWithFullRouter
+├── test-query-provider.tsx                 # TestQueryProvider
+├── api/                                    # mirrors src/shared/api/
+│   ├── api.test.ts
+│   ├── error.test.ts
+│   └── open-project-workspace.test.ts
+├── app/                                    # mirrors src/app/
+│   ├── bootstrap-redirect.test.ts
+│   └── document-lang-sync.test.tsx
+├── shared/
+│   └── prefs/
+│       ├── settings.test.tsx
+│       └── windows.test.ts
+├── features/                               # mirrors src/features/
+│   ├── auth/
+│   │   ├── data/
+│   │   │   ├── auth.test.tsx
+│   │   │   ├── bootstrap.test.tsx
+│   │   │   └── user.test.tsx
+│   │   ├── pages/
+│   │   │   ├── Login.test.tsx
+│   │   │   ├── Register.test.tsx
+│   │   │   └── Bootstrap.test.tsx
+│   │   └── components/
+│   │       └── bootstrap-log.test.tsx
+│   ├── projects/
+│   │   ├── data/
+│   │   │   ├── project.test.tsx
+│   │   │   └── product.test.tsx
+│   │   └── pages/
+│   │       ├── project-list.test.tsx
+│   │       ├── project-table.test.tsx
+│   │       ├── project-drawer.test.tsx
+│   │       └── project-filter-bar.test.tsx
+│   ├── users/
+│   │   ├── data/
+│   │   │   └── user.test.tsx
+│   │   └── pages/
+│   │       ├── user-list.test.tsx
+│   │       ├── user-table.test.tsx
+│   │       ├── user-filter-bar.test.tsx
+│   │       └── user-footer.test.tsx
+│   ├── settings/
+│   │   └── pages/
+│   │       └── Settings.test.tsx
+│   └── workspace/
+│       ├── pages/
+│       │   ├── project-workspace-layout.test.tsx
+│       │   ├── ProjectDashboard.test.tsx
+│       │   └── ProjectConfiguration.test.tsx
+│       └── routes/
+│           └── project-workspace.test.tsx
+└── routes/                                 # mirrors src/routes/
+    ├── _layout.test.tsx
+    ├── bootstrap.test.tsx
+    ├── index.test.tsx
+    ├── login.test.tsx
+    ├── register.test.tsx
+    ├── projects.test.tsx
+    └── settings.test.tsx
+```
+
+Three constraints shape this layout:
+
+- **`src/main.tsx` stays at the root** of `src/` because it's the Vite entry
+  point referenced from `index.html`. Moving it into `src/app/` would break
+  the dev server / production build references.
+- **`src/routes/` stays as the single TanStack Router source** because the
+  router plugin scans one directory (`routesDirectory: 'src/routes'` in
+  `vite.config.ts`). Route files remain thin — each one imports its page
+  component from the corresponding `features/<x>/pages/` and re-exports it as
+  the route's `component`. Features own the UI and data; `routes/` owns the
+  URL shape.
+- **`src/test/` stays as the single test root** for both feature tests and
+  shared utilities. The folder mirrors `src/` 1:1 (`src/test/features/auth/`
+  tests `src/features/auth/`, `src/test/shared/prefs/` tests
+  `src/shared/prefs/`, etc.), and the top-level utilities (`tauri-mock.ts`,
+  `setup.ts`, etc.) stay flat under `src/test/`. Co-location is rejected in
+  favor of the centralized, discoverable test root.
+
+### Why this layout
+
+- **Vertical slices mean a feature can be deleted without touching the rest of
+  the tree.** When `features/users/` gets retired, nothing else in the tree
+  references it.
+- **`routes/` owns the URL shape, features own the UI and data.** Route files
+  become three-line shims (`import { ProjectListPage } from
+  "@/features/projects/pages/ProjectList"; export const Route =
+  createFileRoute("/_layout/projects")({ component: ProjectListPage });`).
+  This is the only seam where URL structure meets feature code.
+- **`src/main.tsx` stays at the root of `src/`** as the Vite entry point; the
+  provider chain moves into `app/Providers.tsx` and is rendered from
+  `main.tsx`. The wiring is one component, the orchestration is one file —
+  each easy to find.
+- **Tests live under `src/test/`, mirroring `src/` 1:1.** Feature tests land in
+  `src/test/features/<x>/`, glue tests in `src/test/app/`, shared-utility tests
+  in `src/test/shared/`. The mirror is a convention enforced by code review
+  (or, ideally, an eslint rule that requires
+  `src/test/<mirror-path>.test.{ts,tsx}` for every non-trivial source file).
+  Tradeoff: when you move a source file, you have to move its test too. The
+  payoff: one place to find every test, and the test directory stays out of
+  the feature folders.
+- **`shared/prefs/` becomes the obvious home** for the cross-window settings
+  pattern AND the window-management helpers — both are app-glue concerns, not
+  server cache.
+- **Path aliases (`@/features/...`, `@/shared/...`)** replace the
+  `../../data/...` chain. One-time `tsconfig` + `vite.config.ts` setup,
+  removes a class of bugs from refactors.
+
+### Trade-offs to acknowledge
+
+- **Per-feature sub-barrels grow.** Each `features/<x>/data/index.ts` is
+  small but multiplies by the number of features. Worth it because the
+  alternative (one giant `data/index.ts`) is the problem you have today.
+- **Cross-feature imports need an explicit boundary.** If `features/projects`
+  needs `features/users/data`, that's a code-review moment — usually a sign
+  the dependency should move to `shared/`.
+- **`shared/prefs/windows.ts` is new** and should land alongside the
+  reorganization rather than as a separate PR, so the move commits read
+  cleanly in history.
+
+### Migration order
+
+1. **Add `tsconfig` path alias `@/` → `src/`** and the matching Vite resolve
+   alias. No source moves yet — just make the new addresses work.
+2. **Create `app/` and `shared/prefs/`**; move `bootstrap-redirect.ts`,
+   `DocumentLangSync.tsx`, `SettingsSyncBridge.tsx` into `app/`. Move
+   `data/settings.ts` to `shared/prefs/settings.ts`. Update imports.
+3. **Extract `Providers.tsx`** in `app/` from `main.tsx`'s `App()` component,
+   so `main.tsx` shrinks to: import router, import `Providers`, render.
+   `main.tsx` itself stays at `src/` root.
+4. **Split `data/user.ts`** into `features/auth/data/user.ts` (identity +
+   register + logout) and `features/users/data/user.ts` (list + update). The
+   `useCurrentUser` hook goes into `features/auth/data/` since the sidebar
+   footer lives in `features/users/pages/`.
+5. **Create feature folders** one feature at a time, in this order:
+   `auth → users → projects → workspace → settings`. For each feature:
+   - Move the page components into `features/<x>/pages/`.
+   - Move the data hooks into `features/<x>/data/`.
+   - **Update the route file in `src/routes/`** to import the page from its
+     new home. The route file itself does NOT move — it stays in
+     `src/routes/` per the TanStack Router constraint. After the rewrite, a
+     route file looks like:
+
+     ```ts
+     import { createFileRoute } from "@tanstack/react-router";
+     import { ProjectListPage } from "@/features/projects/pages/ProjectList";
+
+     export const Route = createFileRoute("/_layout/projects")({
+       component: ProjectListPage,
+     });
+     ```
+
+   - **Move the feature's tests into `src/test/features/<x>/`** — keep the
+     existing mirror convention. For example, `src/test/pages/ProjectList.test.tsx`
+     becomes `src/test/features/projects/pages/project-list.test.tsx`, and
+     `src/test/data/project.test.tsx` becomes
+     `src/test/features/projects/data/project.test.tsx`.
+6. **Move `BootstrapLog/`** into `features/auth/components/`. Move its test
+   from `src/test/components/` to `src/test/features/auth/components/`.
+7. **Move `vite-env.d.ts`** to the project root (next to `vite.config.ts`).
+8. **Run `pnpm tsc --noEmit` + `pnpm test`** after each step. Expect a few
+   import-path corrections and at least one stale test mock.
+
+The total is ~half a day for a careful pass with the build green at every
+commit. Each step is independently revertable.
