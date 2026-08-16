@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
-import { api } from "../../api";
+import { api } from "../../shared/api";
 
 // Pathless layout that owns the auth guard for every page below it. Adding
 // any new authenticated route is now a matter of placing it under
