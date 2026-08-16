@@ -3,15 +3,15 @@ import ReactDOM from "react-dom/client";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { routeTree } from "./routes/routeTree.gen";
-import { QueryProvider } from "./data/client";
-import { DocumentLangSync } from "./DocumentLangSync";
+import { QueryProvider } from "./shared/query";
+import { DocumentLangSync } from "./features/app/components/DocumentLangSync";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   PersistentThemeProvider,
   PersistentI18nProvider,
   SettingsSyncBridge,
-} from "./SettingsSyncBridge";
-import { shouldRedirectToBootstrap } from "./bootstrap-redirect";
+} from "./features/app/components/SettingsSyncBridge";
+import { shouldRedirectToBootstrap } from "./features/bootstrap/redirect";
 
 // Set the app entry to /bootstrap so the health check and login
 // status probe always run before the user reaches the login page

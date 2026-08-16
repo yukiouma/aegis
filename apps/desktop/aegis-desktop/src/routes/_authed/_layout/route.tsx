@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { AppLayout } from "../../../pages/Layout";
+import { AppLayout } from "../../../features/app/components/AppLayout";
 
 // UI shell for the top-level authenticated area (sidebar + content).
 // Auth is enforced by the parent `/_authed` layout, not here.

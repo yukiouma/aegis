@@ -1,6 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 
-import { api } from "../../../../api";
+import { api } from "../../../../shared/api";
 
 // Pathful layout that gates every `/management/*` route on the current
 // user's role. Only `root` and `admin` may enter; everyone else is
