@@ -35,7 +35,7 @@ function createMemoryStorage(): Storage {
   } as unknown as Storage;
 }
 
-function renderRoot(initialEntries: string[] = ["/users"]) {
+function renderRoot(initialEntries: string[] = ["/management/users"]) {
   return renderWithFullRouter({
     initialEntries,
     wrapper: ({ children }) => (
@@ -79,14 +79,14 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
-describe("/users — sidebar gating", () => {
+describe("/management/users — sidebar gating", () => {
   it("shows the Management entry for an admin user", async () => {
     mockCommands({
       is_logged_in: () => true,
       current_user: () => adminUser,
       list_users: () => [],
     });
-    await renderRoot(["/users"]);
+    await renderRoot(["/management/users"]);
     expect(await screen.findByText("Management")).toBeInTheDocument();
   });
 
@@ -96,7 +96,7 @@ describe("/users — sidebar gating", () => {
       current_user: () => rootUser,
       list_users: () => [],
     });
-    await renderRoot(["/users"]);
+    await renderRoot(["/management/users"]);
     expect(await screen.findByText("Management")).toBeInTheDocument();
   });
 
@@ -105,7 +105,7 @@ describe("/users — sidebar gating", () => {
       is_logged_in: () => true,
       current_user: () => generalUser,
     });
-    await renderRoot(["/users"]);
+    await renderRoot(["/"]);
     await screen.findByTestId("sidebar");
     expect(screen.queryByText("Management")).not.toBeInTheDocument();
   });
@@ -123,7 +123,65 @@ describe("/users — sidebar gating", () => {
   });
 });
 
-describe("/users — routing", () => {
+describe("/management/users — role guard", () => {
+  it("renders the Users page for an admin user", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => adminUser,
+      list_users: () => [],
+    });
+    const { router } = await renderRoot(["/management/users"]);
+    expect(screen.getByTestId("sidebar")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/management/users");
+  });
+
+  it("renders the Users page for a root user", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => rootUser,
+      list_users: () => [],
+    });
+    const { router } = await renderRoot(["/management/users"]);
+    expect(screen.getByTestId("sidebar")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/management/users");
+  });
+
+  it("redirects to / when a general user navigates directly", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => generalUser,
+    });
+    const { router } = await renderRoot(["/management/users"]);
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/"),
+    );
+    expect(screen.queryByTestId("sidebar")).toBeInTheDocument();
+  });
+
+  it("redirects to / when the current_user probe itself fails", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => {
+        throw { kind: "store", message: "auth.bin is locked" };
+      },
+    });
+    const { router } = await renderRoot(["/management/users"]);
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/"),
+    );
+  });
+
+  it("redirects to /login when not logged in", async () => {
+    mockCommands({ is_logged_in: () => false });
+    const { router } = await renderRoot(["/management/users"]);
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/login"),
+    );
+    expect(screen.queryByTestId("sidebar")).not.toBeInTheDocument();
+  });
+});
+
+describe("/management/users — sidebar navigation", () => {
   beforeEach(() => {
     mockCommands({
       is_logged_in: () => true,
@@ -132,27 +190,12 @@ describe("/users — routing", () => {
     });
   });
 
-  it("renders the Sidebar and the Users page at /users", async () => {
-    const { router } = await renderRoot(["/users"]);
-    expect(screen.getByTestId("sidebar")).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe("/users");
-  });
-
-  it("navigates from /settings to /users when Users submenu is clicked", async () => {
+  it("navigates from /settings to /management/users when Users submenu is clicked", async () => {
     const { router } = await renderRoot(["/settings"]);
     await userEvent.click(await screen.findByText("Management"));
     await userEvent.click(await screen.findByText("Users"));
     await waitFor(() =>
-      expect(router.state.location.pathname).toBe("/users"),
+      expect(router.state.location.pathname).toBe("/management/users"),
     );
-  });
-
-  it("redirects to /login when not logged in", async () => {
-    mockCommands({ is_logged_in: () => false });
-    const { router } = await renderRoot(["/users"]);
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe("/login"),
-    );
-    expect(screen.queryByTestId("sidebar")).not.toBeInTheDocument();
   });
 });

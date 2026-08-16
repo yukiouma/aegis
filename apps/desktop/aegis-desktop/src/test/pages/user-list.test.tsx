@@ -79,15 +79,7 @@ describe("UserListPage — root filter", () => {
   });
 });
 
-describe("UserListPage — role gate", () => {
-  it("renders nothing for a general user", async () => {
-    const { container } = await renderPage(generalUser, [adminUser]);
-    await waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith("current_user");
-    });
-    expect(container.textContent).not.toContain("alice");
-  });
-
+describe("UserListPage — renders for authorized roles", () => {
   it("renders the table for an admin user", async () => {
     await renderPage(adminUser, [adminUser, generalUser]);
     await screen.findByText("alice");

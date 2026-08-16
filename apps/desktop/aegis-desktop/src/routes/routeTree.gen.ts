@@ -9,21 +9,23 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './__root'
-import { Route as LayoutRouteRouteImport } from './_layout/route'
+import { Route as AuthedRouteRouteImport } from './_authed/route'
 import { Route as BootstrapRouteImport } from './bootstrap'
 import { Route as LoginRouteImport } from './login'
 import { Route as RegisterRouteImport } from './register'
-import { Route as LayoutIndexRouteImport } from './_layout/index'
-import { Route as LayoutProjectsRouteImport } from './_layout/projects'
-import { Route as LayoutSettingsRouteImport } from './_layout/settings'
-import { Route as LayoutUsersRouteImport } from './_layout/users'
-import { Route as ProjectProjectCodeRouteRouteImport } from './project/$projectCode/route'
-import { Route as ProjectProjectCodeIndexRouteImport } from './project/$projectCode/index'
-import { Route as ProjectProjectCodeConfigurationRouteImport } from './project/$projectCode/configuration'
-import { Route as ProjectProjectCodeDashboardRouteImport } from './project/$projectCode/dashboard'
+import { Route as AuthedLayoutRouteRouteImport } from './_authed/_layout/route'
+import { Route as AuthedLayoutIndexRouteImport } from './_authed/_layout/index'
+import { Route as AuthedLayoutManagementRouteRouteImport } from './_authed/_layout/management/route'
+import { Route as AuthedLayoutProjectsRouteImport } from './_authed/_layout/projects'
+import { Route as AuthedLayoutSettingsRouteImport } from './_authed/_layout/settings'
+import { Route as AuthedProjectProjectCodeRouteRouteImport } from './_authed/project/$projectCode/route'
+import { Route as AuthedLayoutManagementUsersRouteImport } from './_authed/_layout/management/users'
+import { Route as AuthedProjectProjectCodeIndexRouteImport } from './_authed/project/$projectCode/index'
+import { Route as AuthedProjectProjectCodeConfigurationRouteImport } from './_authed/project/$projectCode/configuration'
+import { Route as AuthedProjectProjectCodeDashboardRouteImport } from './_authed/project/$projectCode/dashboard'
 
-const LayoutRouteRoute = LayoutRouteRouteImport.update({
-  id: '/_layout',
+const AuthedRouteRoute = AuthedRouteRouteImport.update({
+  id: '/_authed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BootstrapRoute = BootstrapRouteImport.update({
@@ -41,88 +43,105 @@ const RegisterRoute = RegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LayoutIndexRoute = LayoutIndexRouteImport.update({
+const AuthedLayoutRouteRoute = AuthedLayoutRouteRouteImport.update({
+  id: '/_layout',
+  getParentRoute: () => AuthedRouteRoute,
+} as any)
+const AuthedLayoutIndexRoute = AuthedLayoutIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => LayoutRouteRoute,
+  getParentRoute: () => AuthedLayoutRouteRoute,
 } as any)
-const LayoutProjectsRoute = LayoutProjectsRouteImport.update({
+const AuthedLayoutManagementRouteRoute =
+  AuthedLayoutManagementRouteRouteImport.update({
+    id: '/management',
+    path: '/management',
+    getParentRoute: () => AuthedLayoutRouteRoute,
+  } as any)
+const AuthedLayoutProjectsRoute = AuthedLayoutProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
-  getParentRoute: () => LayoutRouteRoute,
+  getParentRoute: () => AuthedLayoutRouteRoute,
 } as any)
-const LayoutSettingsRoute = LayoutSettingsRouteImport.update({
+const AuthedLayoutSettingsRoute = AuthedLayoutSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
-  getParentRoute: () => LayoutRouteRoute,
+  getParentRoute: () => AuthedLayoutRouteRoute,
 } as any)
-const LayoutUsersRoute = LayoutUsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => LayoutRouteRoute,
-} as any)
-const ProjectProjectCodeRouteRoute = ProjectProjectCodeRouteRouteImport.update({
-  id: '/project/$projectCode',
-  path: '/project/$projectCode',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProjectProjectCodeIndexRoute = ProjectProjectCodeIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => ProjectProjectCodeRouteRoute,
-} as any)
-const ProjectProjectCodeConfigurationRoute =
-  ProjectProjectCodeConfigurationRouteImport.update({
+const AuthedProjectProjectCodeRouteRoute =
+  AuthedProjectProjectCodeRouteRouteImport.update({
+    id: '/project/$projectCode',
+    path: '/project/$projectCode',
+    getParentRoute: () => AuthedRouteRoute,
+  } as any)
+const AuthedLayoutManagementUsersRoute =
+  AuthedLayoutManagementUsersRouteImport.update({
+    id: '/users',
+    path: '/users',
+    getParentRoute: () => AuthedLayoutManagementRouteRoute,
+  } as any)
+const AuthedProjectProjectCodeIndexRoute =
+  AuthedProjectProjectCodeIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthedProjectProjectCodeRouteRoute,
+  } as any)
+const AuthedProjectProjectCodeConfigurationRoute =
+  AuthedProjectProjectCodeConfigurationRouteImport.update({
     id: '/configuration',
     path: '/configuration',
-    getParentRoute: () => ProjectProjectCodeRouteRoute,
+    getParentRoute: () => AuthedProjectProjectCodeRouteRoute,
   } as any)
-const ProjectProjectCodeDashboardRoute =
-  ProjectProjectCodeDashboardRouteImport.update({
+const AuthedProjectProjectCodeDashboardRoute =
+  AuthedProjectProjectCodeDashboardRouteImport.update({
     id: '/dashboard',
     path: '/dashboard',
-    getParentRoute: () => ProjectProjectCodeRouteRoute,
+    getParentRoute: () => AuthedProjectProjectCodeRouteRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof LayoutIndexRoute
+  '/': typeof AuthedLayoutIndexRoute
   '/bootstrap': typeof BootstrapRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
-  '/project/$projectCode': typeof ProjectProjectCodeRouteRouteWithChildren
-  '/projects': typeof LayoutProjectsRoute
-  '/settings': typeof LayoutSettingsRoute
-  '/users': typeof LayoutUsersRoute
-  '/project/$projectCode/configuration': typeof ProjectProjectCodeConfigurationRoute
-  '/project/$projectCode/dashboard': typeof ProjectProjectCodeDashboardRoute
-  '/project/$projectCode/': typeof ProjectProjectCodeIndexRoute
+  '/management': typeof AuthedLayoutManagementRouteRouteWithChildren
+  '/project/$projectCode': typeof AuthedProjectProjectCodeRouteRouteWithChildren
+  '/projects': typeof AuthedLayoutProjectsRoute
+  '/settings': typeof AuthedLayoutSettingsRoute
+  '/management/users': typeof AuthedLayoutManagementUsersRoute
+  '/project/$projectCode/configuration': typeof AuthedProjectProjectCodeConfigurationRoute
+  '/project/$projectCode/dashboard': typeof AuthedProjectProjectCodeDashboardRoute
+  '/project/$projectCode/': typeof AuthedProjectProjectCodeIndexRoute
 }
 export interface FileRoutesByTo {
+  '/': typeof AuthedLayoutIndexRoute
   '/bootstrap': typeof BootstrapRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
-  '/projects': typeof LayoutProjectsRoute
-  '/settings': typeof LayoutSettingsRoute
-  '/users': typeof LayoutUsersRoute
-  '/': typeof LayoutIndexRoute
-  '/project/$projectCode/configuration': typeof ProjectProjectCodeConfigurationRoute
-  '/project/$projectCode/dashboard': typeof ProjectProjectCodeDashboardRoute
-  '/project/$projectCode': typeof ProjectProjectCodeIndexRoute
+  '/management': typeof AuthedLayoutManagementRouteRouteWithChildren
+  '/projects': typeof AuthedLayoutProjectsRoute
+  '/settings': typeof AuthedLayoutSettingsRoute
+  '/management/users': typeof AuthedLayoutManagementUsersRoute
+  '/project/$projectCode/configuration': typeof AuthedProjectProjectCodeConfigurationRoute
+  '/project/$projectCode/dashboard': typeof AuthedProjectProjectCodeDashboardRoute
+  '/project/$projectCode': typeof AuthedProjectProjectCodeIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/_layout': typeof LayoutRouteRouteWithChildren
+  '/_authed': typeof AuthedRouteRouteWithChildren
   '/bootstrap': typeof BootstrapRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
-  '/project/$projectCode': typeof ProjectProjectCodeRouteRouteWithChildren
-  '/_layout/projects': typeof LayoutProjectsRoute
-  '/_layout/settings': typeof LayoutSettingsRoute
-  '/_layout/users': typeof LayoutUsersRoute
-  '/_layout/': typeof LayoutIndexRoute
-  '/project/$projectCode/configuration': typeof ProjectProjectCodeConfigurationRoute
-  '/project/$projectCode/dashboard': typeof ProjectProjectCodeDashboardRoute
-  '/project/$projectCode/': typeof ProjectProjectCodeIndexRoute
+  '/_authed/_layout': typeof AuthedLayoutRouteRouteWithChildren
+  '/_authed/_layout/management': typeof AuthedLayoutManagementRouteRouteWithChildren
+  '/_authed/project/$projectCode': typeof AuthedProjectProjectCodeRouteRouteWithChildren
+  '/_authed/_layout/projects': typeof AuthedLayoutProjectsRoute
+  '/_authed/_layout/settings': typeof AuthedLayoutSettingsRoute
+  '/_authed/_layout/': typeof AuthedLayoutIndexRoute
+  '/_authed/_layout/management/users': typeof AuthedLayoutManagementUsersRoute
+  '/_authed/project/$projectCode/configuration': typeof AuthedProjectProjectCodeConfigurationRoute
+  '/_authed/project/$projectCode/dashboard': typeof AuthedProjectProjectCodeDashboardRoute
+  '/_authed/project/$projectCode/': typeof AuthedProjectProjectCodeIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -131,56 +150,59 @@ export interface FileRouteTypes {
     | '/bootstrap'
     | '/login'
     | '/register'
+    | '/management'
     | '/project/$projectCode'
     | '/projects'
     | '/settings'
-    | '/users'
+    | '/management/users'
     | '/project/$projectCode/configuration'
     | '/project/$projectCode/dashboard'
     | '/project/$projectCode/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/'
     | '/bootstrap'
     | '/login'
     | '/register'
+    | '/management'
     | '/projects'
     | '/settings'
-    | '/users'
-    | '/'
+    | '/management/users'
     | '/project/$projectCode/configuration'
     | '/project/$projectCode/dashboard'
     | '/project/$projectCode'
   id:
     | '__root__'
-    | '/_layout'
+    | '/_authed'
     | '/bootstrap'
     | '/login'
     | '/register'
-    | '/project/$projectCode'
-    | '/_layout/projects'
-    | '/_layout/settings'
-    | '/_layout/users'
-    | '/_layout/'
-    | '/project/$projectCode/configuration'
-    | '/project/$projectCode/dashboard'
-    | '/project/$projectCode/'
+    | '/_authed/_layout'
+    | '/_authed/_layout/management'
+    | '/_authed/project/$projectCode'
+    | '/_authed/_layout/projects'
+    | '/_authed/_layout/settings'
+    | '/_authed/_layout/'
+    | '/_authed/_layout/management/users'
+    | '/_authed/project/$projectCode/configuration'
+    | '/_authed/project/$projectCode/dashboard'
+    | '/_authed/project/$projectCode/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  LayoutRouteRoute: typeof LayoutRouteRouteWithChildren
+  AuthedRouteRoute: typeof AuthedRouteRouteWithChildren
   BootstrapRoute: typeof BootstrapRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
-  ProjectProjectCodeRouteRoute: typeof ProjectProjectCodeRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_layout': {
-      id: '/_layout'
+    '/_authed': {
+      id: '/_authed'
       path: ''
       fullPath: '/'
-      preLoaderRoute: typeof LayoutRouteRouteImport
+      preLoaderRoute: typeof AuthedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/bootstrap': {
@@ -204,107 +226,151 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_layout/': {
-      id: '/_layout/'
+    '/_authed/_layout': {
+      id: '/_authed/_layout'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthedLayoutRouteRouteImport
+      parentRoute: typeof AuthedRouteRoute
+    }
+    '/_authed/_layout/': {
+      id: '/_authed/_layout/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof LayoutIndexRouteImport
-      parentRoute: typeof LayoutRouteRoute
+      preLoaderRoute: typeof AuthedLayoutIndexRouteImport
+      parentRoute: typeof AuthedLayoutRouteRoute
     }
-    '/_layout/projects': {
-      id: '/_layout/projects'
+    '/_authed/_layout/management': {
+      id: '/_authed/_layout/management'
+      path: '/management'
+      fullPath: '/management'
+      preLoaderRoute: typeof AuthedLayoutManagementRouteRouteImport
+      parentRoute: typeof AuthedLayoutRouteRoute
+    }
+    '/_authed/_layout/projects': {
+      id: '/_authed/_layout/projects'
       path: '/projects'
       fullPath: '/projects'
-      preLoaderRoute: typeof LayoutProjectsRouteImport
-      parentRoute: typeof LayoutRouteRoute
+      preLoaderRoute: typeof AuthedLayoutProjectsRouteImport
+      parentRoute: typeof AuthedLayoutRouteRoute
     }
-    '/_layout/settings': {
-      id: '/_layout/settings'
+    '/_authed/_layout/settings': {
+      id: '/_authed/_layout/settings'
       path: '/settings'
       fullPath: '/settings'
-      preLoaderRoute: typeof LayoutSettingsRouteImport
-      parentRoute: typeof LayoutRouteRoute
+      preLoaderRoute: typeof AuthedLayoutSettingsRouteImport
+      parentRoute: typeof AuthedLayoutRouteRoute
     }
-    '/_layout/users': {
-      id: '/_layout/users'
-      path: '/users'
-      fullPath: '/users'
-      preLoaderRoute: typeof LayoutUsersRouteImport
-      parentRoute: typeof LayoutRouteRoute
-    }
-    '/project/$projectCode': {
-      id: '/project/$projectCode'
+    '/_authed/project/$projectCode': {
+      id: '/_authed/project/$projectCode'
       path: '/project/$projectCode'
       fullPath: '/project/$projectCode'
-      preLoaderRoute: typeof ProjectProjectCodeRouteRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedProjectProjectCodeRouteRouteImport
+      parentRoute: typeof AuthedRouteRoute
     }
-    '/project/$projectCode/': {
-      id: '/project/$projectCode/'
+    '/_authed/_layout/management/users': {
+      id: '/_authed/_layout/management/users'
+      path: '/users'
+      fullPath: '/management/users'
+      preLoaderRoute: typeof AuthedLayoutManagementUsersRouteImport
+      parentRoute: typeof AuthedLayoutManagementRouteRoute
+    }
+    '/_authed/project/$projectCode/': {
+      id: '/_authed/project/$projectCode/'
       path: '/'
       fullPath: '/project/$projectCode/'
-      preLoaderRoute: typeof ProjectProjectCodeIndexRouteImport
-      parentRoute: typeof ProjectProjectCodeRouteRoute
+      preLoaderRoute: typeof AuthedProjectProjectCodeIndexRouteImport
+      parentRoute: typeof AuthedProjectProjectCodeRouteRoute
     }
-    '/project/$projectCode/configuration': {
-      id: '/project/$projectCode/configuration'
+    '/_authed/project/$projectCode/configuration': {
+      id: '/_authed/project/$projectCode/configuration'
       path: '/configuration'
       fullPath: '/project/$projectCode/configuration'
-      preLoaderRoute: typeof ProjectProjectCodeConfigurationRouteImport
-      parentRoute: typeof ProjectProjectCodeRouteRoute
+      preLoaderRoute: typeof AuthedProjectProjectCodeConfigurationRouteImport
+      parentRoute: typeof AuthedProjectProjectCodeRouteRoute
     }
-    '/project/$projectCode/dashboard': {
-      id: '/project/$projectCode/dashboard'
+    '/_authed/project/$projectCode/dashboard': {
+      id: '/_authed/project/$projectCode/dashboard'
       path: '/dashboard'
       fullPath: '/project/$projectCode/dashboard'
-      preLoaderRoute: typeof ProjectProjectCodeDashboardRouteImport
-      parentRoute: typeof ProjectProjectCodeRouteRoute
+      preLoaderRoute: typeof AuthedProjectProjectCodeDashboardRouteImport
+      parentRoute: typeof AuthedProjectProjectCodeRouteRoute
     }
   }
 }
 
-interface LayoutRouteRouteChildren {
-  LayoutProjectsRoute: typeof LayoutProjectsRoute
-  LayoutSettingsRoute: typeof LayoutSettingsRoute
-  LayoutUsersRoute: typeof LayoutUsersRoute
-  LayoutIndexRoute: typeof LayoutIndexRoute
+interface AuthedLayoutManagementRouteRouteChildren {
+  AuthedLayoutManagementUsersRoute: typeof AuthedLayoutManagementUsersRoute
 }
 
-const LayoutRouteRouteChildren: LayoutRouteRouteChildren = {
-  LayoutProjectsRoute: LayoutProjectsRoute,
-  LayoutSettingsRoute: LayoutSettingsRoute,
-  LayoutUsersRoute: LayoutUsersRoute,
-  LayoutIndexRoute: LayoutIndexRoute,
-}
-
-const LayoutRouteRouteWithChildren = LayoutRouteRoute._addFileChildren(
-  LayoutRouteRouteChildren,
-)
-
-interface ProjectProjectCodeRouteRouteChildren {
-  ProjectProjectCodeConfigurationRoute: typeof ProjectProjectCodeConfigurationRoute
-  ProjectProjectCodeDashboardRoute: typeof ProjectProjectCodeDashboardRoute
-  ProjectProjectCodeIndexRoute: typeof ProjectProjectCodeIndexRoute
-}
-
-const ProjectProjectCodeRouteRouteChildren: ProjectProjectCodeRouteRouteChildren =
+const AuthedLayoutManagementRouteRouteChildren: AuthedLayoutManagementRouteRouteChildren =
   {
-    ProjectProjectCodeConfigurationRoute: ProjectProjectCodeConfigurationRoute,
-    ProjectProjectCodeDashboardRoute: ProjectProjectCodeDashboardRoute,
-    ProjectProjectCodeIndexRoute: ProjectProjectCodeIndexRoute,
+    AuthedLayoutManagementUsersRoute: AuthedLayoutManagementUsersRoute,
   }
 
-const ProjectProjectCodeRouteRouteWithChildren =
-  ProjectProjectCodeRouteRoute._addFileChildren(
-    ProjectProjectCodeRouteRouteChildren,
+const AuthedLayoutManagementRouteRouteWithChildren =
+  AuthedLayoutManagementRouteRoute._addFileChildren(
+    AuthedLayoutManagementRouteRouteChildren,
   )
 
+interface AuthedLayoutRouteRouteChildren {
+  AuthedLayoutManagementRouteRoute: typeof AuthedLayoutManagementRouteRouteWithChildren
+  AuthedLayoutProjectsRoute: typeof AuthedLayoutProjectsRoute
+  AuthedLayoutSettingsRoute: typeof AuthedLayoutSettingsRoute
+  AuthedLayoutIndexRoute: typeof AuthedLayoutIndexRoute
+}
+
+const AuthedLayoutRouteRouteChildren: AuthedLayoutRouteRouteChildren = {
+  AuthedLayoutManagementRouteRoute:
+    AuthedLayoutManagementRouteRouteWithChildren,
+  AuthedLayoutProjectsRoute: AuthedLayoutProjectsRoute,
+  AuthedLayoutSettingsRoute: AuthedLayoutSettingsRoute,
+  AuthedLayoutIndexRoute: AuthedLayoutIndexRoute,
+}
+
+const AuthedLayoutRouteRouteWithChildren =
+  AuthedLayoutRouteRoute._addFileChildren(AuthedLayoutRouteRouteChildren)
+
+interface AuthedProjectProjectCodeRouteRouteChildren {
+  AuthedProjectProjectCodeConfigurationRoute: typeof AuthedProjectProjectCodeConfigurationRoute
+  AuthedProjectProjectCodeDashboardRoute: typeof AuthedProjectProjectCodeDashboardRoute
+  AuthedProjectProjectCodeIndexRoute: typeof AuthedProjectProjectCodeIndexRoute
+}
+
+const AuthedProjectProjectCodeRouteRouteChildren: AuthedProjectProjectCodeRouteRouteChildren =
+  {
+    AuthedProjectProjectCodeConfigurationRoute:
+      AuthedProjectProjectCodeConfigurationRoute,
+    AuthedProjectProjectCodeDashboardRoute:
+      AuthedProjectProjectCodeDashboardRoute,
+    AuthedProjectProjectCodeIndexRoute: AuthedProjectProjectCodeIndexRoute,
+  }
+
+const AuthedProjectProjectCodeRouteRouteWithChildren =
+  AuthedProjectProjectCodeRouteRoute._addFileChildren(
+    AuthedProjectProjectCodeRouteRouteChildren,
+  )
+
+interface AuthedRouteRouteChildren {
+  AuthedLayoutRouteRoute: typeof AuthedLayoutRouteRouteWithChildren
+  AuthedProjectProjectCodeRouteRoute: typeof AuthedProjectProjectCodeRouteRouteWithChildren
+}
+
+const AuthedRouteRouteChildren: AuthedRouteRouteChildren = {
+  AuthedLayoutRouteRoute: AuthedLayoutRouteRouteWithChildren,
+  AuthedProjectProjectCodeRouteRoute:
+    AuthedProjectProjectCodeRouteRouteWithChildren,
+}
+
+const AuthedRouteRouteWithChildren = AuthedRouteRoute._addFileChildren(
+  AuthedRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
-  LayoutRouteRoute: LayoutRouteRouteWithChildren,
+  AuthedRouteRoute: AuthedRouteRouteWithChildren,
   BootstrapRoute: BootstrapRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,
-  ProjectProjectCodeRouteRoute: ProjectProjectCodeRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
