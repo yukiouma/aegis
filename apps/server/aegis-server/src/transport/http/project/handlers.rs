@@ -33,126 +33,14 @@ fn member_data(value: dto::ProjectMemberDataRequest) -> apis::project::ProjectMe
     }
 }
 
-// -- products --------------------------------------------------------------
-
-/// `POST /api/product` — create a product.
-#[utoipa::path(
-    post, path = "", tag = "product",
-    operation_id = "product_create",
-    request_body = dto::CreateProductRequest,
-    responses(
-        (status = 201, description = "Product created", body = dto::ProductViewResponse),
-        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 403, description = "Admin or root required", body = crate::transport::http::error::ErrorBody),
-        (status = 409, description = "Product code already exists", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn create_product(
-    State(state): State<AppState>,
-    claims: AuthClaims,
-    Json(req): Json<dto::CreateProductRequest>,
-) -> Result<(StatusCode, Json<dto::ProductViewResponse>), ApiError> {
-    require_admin_or_root(&claims)?;
-    let view = state
-        .project
-        .create_product(apis::project::CreateProductRequest {
-            code: req.code,
-            name: req.name,
-            description: req.description,
-        })
-        .await?;
-    Ok((StatusCode::CREATED, Json(view.into())))
-}
-
-/// `GET /api/product` — list products.
-#[utoipa::path(
-    get, path = "", tag = "product",
-    operation_id = "product_list",
-    responses(
-        (status = 200, description = "Products list", body = dto::ProductListResponse),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn list_products(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-) -> Result<Json<dto::ProductListResponse>, ApiError> {
-    let views = state.project.list_products().await?;
-    let products = views.into_iter().map(Into::into).collect();
-    Ok(Json(dto::ProductListResponse { products }))
-}
-
-/// `GET /api/product/{code}` — fetch a product by its code.
-#[utoipa::path(
-    get, path = "/{code}", tag = "product",
-    operation_id = "product_get_by_code",
-    params(
-        ("code" = String, Path, description = "Product code to fetch"),
-    ),
-    responses(
-        (status = 200, description = "Product found", body = dto::ProductViewResponse),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "Product not found", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn get_product_by_code(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-    Path(PathCode { code }): Path<PathCode>,
-) -> Result<Json<dto::ProductViewResponse>, ApiError> {
-    let view = state.project.get_product_by_code(&code).await?;
-    Ok(Json(view.into()))
-}
-
-/// `PATCH /api/product/{code}` — partial update of a product.
-///
-/// The handler resolves the URL `{code}` to an internal `id` via
-/// `get_product_by_code` and threads optional body fields through
-/// to the apis update request.
-#[utoipa::path(
-    patch, path = "/{code}", tag = "product",
-    operation_id = "product_update",
-    params(
-        ("code" = String, Path, description = "Product code to update"),
-    ),
-    request_body = dto::UpdateProductRequest,
-    responses(
-        (status = 200, description = "Product updated", body = dto::ProductViewResponse),
-        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 403, description = "Admin or root required", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "Product not found", body = crate::transport::http::error::ErrorBody),
-        (status = 409, description = "Product code already exists", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn update_product(
-    State(state): State<AppState>,
-    claims: AuthClaims,
-    Path(PathCode { code }): Path<PathCode>,
-    Json(req): Json<dto::UpdateProductRequest>,
-) -> Result<Json<dto::ProductViewResponse>, ApiError> {
-    require_admin_or_root(&claims)?;
-    let id = state.project.get_product_by_code(&code).await?.id;
-    let view = state
-        .project
-        .update_product(apis::project::UpdateProductRequest {
-            id,
-            code: req.code,
-            name: req.name,
-            description: req.description,
-            active: req.active,
-        })
-        .await?;
-    Ok(Json(view.into()))
+/// Translate a wire tag DTO into the apis DTO. Validation (non-empty
+/// key/value) is delegated to the domain layer — the handler just
+/// passes through whatever the client supplied.
+fn tag_data(value: dto::TagDataRequest) -> apis::project::TagData {
+    apis::project::TagData {
+        key: value.key,
+        value: value.value,
+    }
 }
 
 // -- projects --------------------------------------------------------------
@@ -167,7 +55,7 @@ pub async fn update_product(
         (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
         (status = 403, description = "Admin or root required", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "Referenced product or user not found", body = crate::transport::http::error::ErrorBody),
+        (status = 404, description = "Referenced user not found", body = crate::transport::http::error::ErrorBody),
         (status = 409, description = "Project code already exists", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
@@ -184,9 +72,9 @@ pub async fn create_project(
         .create_project(apis::project::CreateProjectRequest {
             code: req.code,
             description: req.description,
-            product_id: req.product_id,
             members: req.members.map(member_data),
             unblind_members: req.unblind_members.map(member_data),
+            tags: req.tags.map(|ts| ts.into_iter().map(tag_data).collect()),
         })
         .await?;
     Ok((StatusCode::CREATED, Json(view.into())))
@@ -243,6 +131,10 @@ pub async fn get_project_by_code(
 ///   unchanged.
 /// - `Some(empty)` (a present `{}`) wipes the corresponding team's
 ///   rows.
+///
+/// `tags` follows the same missing-vs-empty distinction. Missing
+/// leaves the tag list alone; a present (possibly empty) list
+/// replaces the whole tag array.
 #[utoipa::path(
     patch, path = "/{code}", tag = "project",
     operation_id = "project_update",
@@ -255,7 +147,7 @@ pub async fn get_project_by_code(
         (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
         (status = 403, description = "Admin or root required", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "Project, product, or member not found", body = crate::transport::http::error::ErrorBody),
+        (status = 404, description = "Project or member not found", body = crate::transport::http::error::ErrorBody),
         (status = 409, description = "Project code already exists", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
@@ -275,10 +167,10 @@ pub async fn update_project(
             id,
             code: req.code,
             description: req.description,
-            product_id: req.product_id,
             active: req.active,
             members: req.members.map(member_data),
             unblind_members: req.unblind_members.map(member_data),
+            tags: req.tags.map(|ts| ts.into_iter().map(tag_data).collect()),
         })
         .await?;
     Ok(Json(view.into()))
@@ -324,30 +216,14 @@ mod tests {
         })
     }
 
-    fn sample_product_view(id: i32, code: &str) -> apis::project::ProductView {
-        apis::project::ProductView {
-            id,
-            code: code.to_string(),
-            name: format!("Product {code}"),
-            description: "sample".to_string(),
-            active: true,
-            created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
-                .unwrap()
-                .with_timezone(&chrono::Utc),
-            updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
-                .unwrap()
-                .with_timezone(&chrono::Utc),
-        }
-    }
-
     fn sample_project_view(id: i32, code: &str) -> apis::project::ProjectView {
         apis::project::ProjectView {
             id,
             code: code.to_string(),
             description: "sample".to_string(),
-            product: sample_product_view(1, "p1"),
             members: apis::project::ProjectMemberView::default(),
             unblind_members: apis::project::ProjectMemberView::default(),
+            tags: vec![],
             active: true,
             created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
                 .unwrap()
@@ -360,14 +236,6 @@ mod tests {
 
     #[derive(Clone, Default)]
     pub struct MockProjectService {
-        pub create_product: Option<apis::project::ProductView>,
-        pub create_product_err: Option<apis::project::ProjectApiError>,
-        pub get_product_by_code: Option<apis::project::ProductView>,
-        pub get_product_by_code_err: Option<apis::project::ProjectApiError>,
-        pub list_products: Option<Vec<apis::project::ProductView>>,
-        pub list_products_err: Option<apis::project::ProjectApiError>,
-        pub update_product: Option<apis::project::ProductView>,
-        pub update_product_err: Option<apis::project::ProjectApiError>,
         pub create_project: Option<apis::project::ProjectView>,
         pub create_project_err: Option<apis::project::ProjectApiError>,
         pub get_project_by_code: Option<apis::project::ProjectView>,
@@ -376,69 +244,12 @@ mod tests {
         pub list_projects_err: Option<apis::project::ProjectApiError>,
         pub update_project: Option<apis::project::ProjectView>,
         pub update_project_err: Option<apis::project::ProjectApiError>,
-        pub last_create_product_args: Arc<Mutex<Option<apis::project::CreateProductRequest>>>,
-        pub last_update_product_args: Arc<Mutex<Option<apis::project::UpdateProductRequest>>>,
         pub last_create_project_args: Arc<Mutex<Option<apis::project::CreateProjectRequest>>>,
         pub last_update_project_args: Arc<Mutex<Option<apis::project::UpdateProjectRequest>>>,
     }
 
     #[async_trait]
     impl apis::project::ProjectService for MockProjectService {
-        async fn create_product(
-            &self,
-            req: apis::project::CreateProductRequest,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            *self.last_create_product_args.lock().unwrap() = Some(req);
-            if let Some(err) = self.create_product_err.clone() {
-                return Err(err);
-            }
-            Ok(self
-                .create_product
-                .clone()
-                .expect("create_product result configured"))
-        }
-        async fn get_product_by_id(
-            &self,
-            _id: i32,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            unimplemented!("not exposed at HTTP")
-        }
-        async fn get_product_by_code(
-            &self,
-            _code: &str,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            if let Some(err) = self.get_product_by_code_err.clone() {
-                return Err(err);
-            }
-            Ok(self
-                .get_product_by_code
-                .clone()
-                .expect("get_product_by_code result configured"))
-        }
-        async fn list_products(
-            &self,
-        ) -> Result<Vec<apis::project::ProductView>, apis::project::ProjectApiError> {
-            if let Some(err) = self.list_products_err.clone() {
-                return Err(err);
-            }
-            Ok(self
-                .list_products
-                .clone()
-                .expect("list_products result configured"))
-        }
-        async fn update_product(
-            &self,
-            req: apis::project::UpdateProductRequest,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            *self.last_update_product_args.lock().unwrap() = Some(req);
-            if let Some(err) = self.update_product_err.clone() {
-                return Err(err);
-            }
-            Ok(self
-                .update_product
-                .clone()
-                .expect("update_product result configured"))
-        }
         async fn create_project(
             &self,
             req: apis::project::CreateProjectRequest,
@@ -612,11 +423,6 @@ mod tests {
 
     pub fn app(state: AppState) -> Router {
         Router::new()
-            .route("/api/product", post(create_product).get(list_products))
-            .route(
-                "/api/product/{code}",
-                get(get_product_by_code).patch(update_product),
-            )
             .route("/api/project", post(create_project).get(list_projects))
             .route(
                 "/api/project/{code}",
@@ -666,420 +472,6 @@ mod tests {
         assert_eq!(err.code(), "forbidden");
     }
 
-    // ---- product handlers -------------------------------------------
-
-    #[tokio::test]
-    async fn create_product_root_returns_201() {
-        let project = MockProjectService {
-            create_product: Some(sample_product_view(7, "p1")),
-            ..Default::default()
-        };
-        let auth = MockAuth {
-            role: apis::user::Role::Root,
-        };
-        let app = app(test_state(project.clone(), auth));
-        let response = app
-            .oneshot(build_request(
-                "POST",
-                "/api/product",
-                Some(r#"{"code":"p1","name":"Atlas","description":"core"}"#.to_string()),
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::CREATED);
-        assert_eq!(body["id"], 7);
-        assert_eq!(body["code"], "p1");
-        let captured = project
-            .last_create_product_args
-            .lock()
-            .unwrap()
-            .clone()
-            .unwrap();
-        assert_eq!(captured.code, "p1");
-        assert_eq!(captured.name, "Atlas");
-        assert_eq!(captured.description, "core");
-    }
-
-    #[tokio::test]
-    async fn create_product_admin_returns_201() {
-        let project = MockProjectService {
-            create_product: Some(sample_product_view(7, "p1")),
-            ..Default::default()
-        };
-        let app = app(test_state(project, MockAuth::default()));
-        let response = app
-            .oneshot(build_request(
-                "POST",
-                "/api/product",
-                Some(r#"{"code":"p1","name":"Atlas","description":"core"}"#.to_string()),
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        assert_eq!(read_json(response).await.0, AxStatus::CREATED);
-    }
-
-    #[tokio::test]
-    async fn create_product_general_returns_403() {
-        let project = MockProjectService::default();
-        let auth = MockAuth {
-            role: apis::user::Role::General,
-        };
-        let app = app(test_state(project, auth));
-        let response = app
-            .oneshot(build_request(
-                "POST",
-                "/api/product",
-                Some(r#"{"code":"p1","name":"Atlas","description":"core"}"#.to_string()),
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::FORBIDDEN);
-        assert_eq!(body["code"], "forbidden");
-    }
-
-    #[tokio::test]
-    async fn create_product_without_authorization_returns_401() {
-        let project = MockProjectService::default();
-        let app = app(test_state(project, MockAuth::default()));
-        let response = app
-            .oneshot(build_request(
-                "POST",
-                "/api/product",
-                Some(r#"{"code":"p1","name":"Atlas","description":"core"}"#.to_string()),
-                None,
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::UNAUTHORIZED);
-        assert_eq!(body["code"], "token_verification_failed");
-    }
-
-    #[tokio::test]
-    async fn create_product_validation_maps_to_400() {
-        let project = MockProjectService {
-            create_product_err: Some(apis::project::ProjectApiError::Validation("bad".into())),
-            ..Default::default()
-        };
-        let app = app(test_state(project, MockAuth::default()));
-        let response = app
-            .oneshot(build_request(
-                "POST",
-                "/api/product",
-                Some(r#"{"code":"p1","name":"Atlas","description":"core"}"#.to_string()),
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::BAD_REQUEST);
-        assert_eq!(body["code"], "validation_failed");
-    }
-
-    #[tokio::test]
-    async fn create_product_duplicate_code_maps_to_409() {
-        let project = MockProjectService {
-            create_product_err: Some(apis::project::ProjectApiError::DuplicateCode("p1".into())),
-            ..Default::default()
-        };
-        let app = app(test_state(project, MockAuth::default()));
-        let response = app
-            .oneshot(build_request(
-                "POST",
-                "/api/product",
-                Some(r#"{"code":"p1","name":"Atlas","description":"core"}"#.to_string()),
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::CONFLICT);
-        assert_eq!(body["code"], "duplicate_code");
-    }
-
-    #[tokio::test]
-    async fn create_product_repository_maps_to_500() {
-        let project = MockProjectService {
-            create_product_err: Some(apis::project::ProjectApiError::Repository("db".into())),
-            ..Default::default()
-        };
-        let app = app(test_state(project, MockAuth::default()));
-        let response = app
-            .oneshot(build_request(
-                "POST",
-                "/api/product",
-                Some(r#"{"code":"p1","name":"Atlas","description":"core"}"#.to_string()),
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::INTERNAL_SERVER_ERROR);
-        assert_eq!(body["code"], "repository_error");
-    }
-
-    #[tokio::test]
-    async fn list_products_returns_200_with_array() {
-        let project = MockProjectService {
-            list_products: Some(vec![sample_product_view(7, "p1")]),
-            ..Default::default()
-        };
-        let app = app(test_state(project, MockAuth::default()));
-        let response = app
-            .oneshot(build_request(
-                "GET",
-                "/api/product",
-                None,
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::OK);
-        let products = body["products"].as_array().unwrap();
-        assert_eq!(products.len(), 1);
-        assert_eq!(products[0]["code"], "p1");
-    }
-
-    #[tokio::test]
-    async fn list_products_without_authorization_returns_401() {
-        let app = app(test_state(
-            MockProjectService::default(),
-            MockAuth::default(),
-        ));
-        let response = app
-            .oneshot(build_request("GET", "/api/product", None, None))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::UNAUTHORIZED);
-        assert_eq!(body["code"], "token_verification_failed");
-    }
-
-    #[tokio::test]
-    async fn list_products_general_reads_succeed() {
-        let project = MockProjectService {
-            list_products: Some(Vec::new()),
-            ..Default::default()
-        };
-        let auth = MockAuth {
-            role: apis::user::Role::General,
-        };
-        let app = app(test_state(project, auth));
-        let response = app
-            .oneshot(build_request(
-                "GET",
-                "/api/product",
-                None,
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        assert_eq!(read_json(response).await.0, AxStatus::OK);
-    }
-
-    #[tokio::test]
-    async fn list_products_repository_maps_to_500() {
-        let project = MockProjectService {
-            list_products_err: Some(apis::project::ProjectApiError::Repository("db".into())),
-            ..Default::default()
-        };
-        let app = app(test_state(project, MockAuth::default()));
-        let response = app
-            .oneshot(build_request(
-                "GET",
-                "/api/product",
-                None,
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::INTERNAL_SERVER_ERROR);
-        assert_eq!(body["code"], "repository_error");
-    }
-
-    #[tokio::test]
-    async fn get_product_by_code_returns_200() {
-        let project = MockProjectService {
-            get_product_by_code: Some(sample_product_view(7, "p1")),
-            ..Default::default()
-        };
-        let app = app(test_state(project, MockAuth::default()));
-        let response = app
-            .oneshot(build_request(
-                "GET",
-                "/api/product/p1",
-                None,
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::OK);
-        assert_eq!(body["code"], "p1");
-    }
-
-    #[tokio::test]
-    async fn get_product_by_code_not_found_maps_to_404() {
-        let project = MockProjectService {
-            get_product_by_code_err: Some(apis::project::ProjectApiError::NotFound),
-            ..Default::default()
-        };
-        let app = app(test_state(project, MockAuth::default()));
-        let response = app
-            .oneshot(build_request(
-                "GET",
-                "/api/product/p1",
-                None,
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::NOT_FOUND);
-        assert_eq!(body["code"], "not_found");
-    }
-
-    #[tokio::test]
-    async fn get_product_by_code_without_authorization_returns_401() {
-        let app = app(test_state(
-            MockProjectService::default(),
-            MockAuth::default(),
-        ));
-        let response = app
-            .oneshot(build_request("GET", "/api/product/p1", None, None))
-            .await
-            .unwrap();
-        assert_eq!(read_json(response).await.0, AxStatus::UNAUTHORIZED);
-    }
-
-    #[tokio::test]
-    async fn update_product_resolves_code_to_id() {
-        let project = MockProjectService {
-            get_product_by_code: Some(sample_product_view(42, "p1")),
-            update_product: Some(sample_product_view(42, "p1")),
-            ..Default::default()
-        };
-        let app = app(test_state(project.clone(), MockAuth::default()));
-        let response = app
-            .oneshot(build_request(
-                "PATCH",
-                "/api/product/p1",
-                Some(r#"{"name":"Renamed"}"#.to_string()),
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, _body) = read_json(response).await;
-        assert_eq!(status, AxStatus::OK);
-        let captured = project
-            .last_update_product_args
-            .lock()
-            .unwrap()
-            .clone()
-            .unwrap();
-        assert_eq!(captured.id, 42);
-        assert_eq!(captured.name.as_deref(), Some("Renamed"));
-        assert!(captured.code.is_none());
-        assert!(captured.description.is_none());
-        assert!(captured.active.is_none());
-    }
-
-    #[tokio::test]
-    async fn update_product_general_returns_403() {
-        let project = MockProjectService {
-            get_product_by_code: Some(sample_product_view(42, "p1")),
-            ..Default::default()
-        };
-        let auth = MockAuth {
-            role: apis::user::Role::General,
-        };
-        let app = app(test_state(project, auth));
-        let response = app
-            .oneshot(build_request(
-                "PATCH",
-                "/api/product/p1",
-                Some(r#"{"name":"Renamed"}"#.to_string()),
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::FORBIDDEN);
-        assert_eq!(body["code"], "forbidden");
-    }
-
-    #[tokio::test]
-    async fn update_product_lookup_not_found_maps_to_404() {
-        let project = MockProjectService {
-            get_product_by_code_err: Some(apis::project::ProjectApiError::NotFound),
-            ..Default::default()
-        };
-        let app = app(test_state(project, MockAuth::default()));
-        let response = app
-            .oneshot(build_request(
-                "PATCH",
-                "/api/product/p1",
-                Some(r#"{"name":"Renamed"}"#.to_string()),
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::NOT_FOUND);
-        assert_eq!(body["code"], "not_found");
-    }
-
-    #[tokio::test]
-    async fn update_product_update_duplicate_maps_to_409() {
-        let project = MockProjectService {
-            get_product_by_code: Some(sample_product_view(42, "p1")),
-            update_product_err: Some(apis::project::ProjectApiError::DuplicateCode("p1".into())),
-            ..Default::default()
-        };
-        let app = app(test_state(project, MockAuth::default()));
-        let response = app
-            .oneshot(build_request(
-                "PATCH",
-                "/api/product/p1",
-                Some(r#"{"code":"p2"}"#.to_string()),
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::CONFLICT);
-        assert_eq!(body["code"], "duplicate_code");
-    }
-
-    #[tokio::test]
-    async fn update_product_validation_maps_to_400() {
-        let project = MockProjectService {
-            get_product_by_code: Some(sample_product_view(42, "p1")),
-            update_product_err: Some(apis::project::ProjectApiError::Validation("bad".into())),
-            ..Default::default()
-        };
-        let app = app(test_state(project, MockAuth::default()));
-        let response = app
-            .oneshot(build_request(
-                "PATCH",
-                "/api/product/p1",
-                Some(r#"{"name":""}"#.to_string()),
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::BAD_REQUEST);
-        assert_eq!(body["code"], "validation_failed");
-    }
-
     // ---- project handlers -------------------------------------------
 
     #[tokio::test]
@@ -1097,7 +489,7 @@ mod tests {
                 "POST",
                 "/api/project",
                 Some(
-                    r#"{"code":"pr1","description":"x","product_id":1,"members":{"leaders":["l1"]}}"#
+                    r#"{"code":"pr1","description":"x","members":{"leaders":["l1"]},"tags":[{"key":"Product","value":"DEMO-001"}]}"#
                         .to_string(),
                 ),
                 Some("Bearer good"),
@@ -1114,10 +506,13 @@ mod tests {
             .clone()
             .unwrap();
         assert_eq!(captured.code, "pr1");
-        assert_eq!(captured.product_id, 1);
         let members = captured.members.expect("members present");
         assert_eq!(members.leaders, vec!["l1".to_string()]);
         assert!(members.workers.is_empty());
+        let tags = captured.tags.expect("tags present");
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].key, "Product");
+        assert_eq!(tags[0].value, "DEMO-001");
     }
 
     #[tokio::test]
@@ -1131,7 +526,7 @@ mod tests {
             .oneshot(build_request(
                 "POST",
                 "/api/project",
-                Some(r#"{"code":"pr1","description":"x","product_id":1}"#.to_string()),
+                Some(r#"{"code":"pr1","description":"x"}"#.to_string()),
                 Some("Bearer good"),
             ))
             .await
@@ -1151,7 +546,7 @@ mod tests {
             .oneshot(build_request(
                 "POST",
                 "/api/project",
-                Some(r#"{"code":"pr1","description":"x","product_id":1}"#.to_string()),
+                Some(r#"{"code":"pr1","description":"x"}"#.to_string()),
                 None,
             ))
             .await
@@ -1159,27 +554,6 @@ mod tests {
         let (status, body) = read_json(response).await;
         assert_eq!(status, AxStatus::UNAUTHORIZED);
         assert_eq!(body["code"], "token_verification_failed");
-    }
-
-    #[tokio::test]
-    async fn create_project_product_not_found_maps_to_404() {
-        let project = MockProjectService {
-            create_project_err: Some(apis::project::ProjectApiError::ProductNotFound("1".into())),
-            ..Default::default()
-        };
-        let app = app(test_state(project, MockAuth::default()));
-        let response = app
-            .oneshot(build_request(
-                "POST",
-                "/api/project",
-                Some(r#"{"code":"pr1","description":"x","product_id":1}"#.to_string()),
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::NOT_FOUND);
-        assert_eq!(body["code"], "product_not_found");
     }
 
     #[tokio::test]
@@ -1193,7 +567,7 @@ mod tests {
             .oneshot(build_request(
                 "POST",
                 "/api/project",
-                Some(r#"{"code":"pr1","description":"x","product_id":1}"#.to_string()),
+                Some(r#"{"code":"pr1","description":"x"}"#.to_string()),
                 Some("Bearer good"),
             ))
             .await
@@ -1214,7 +588,7 @@ mod tests {
             .oneshot(build_request(
                 "POST",
                 "/api/project",
-                Some(r#"{"code":"pr1","description":"x","product_id":1}"#.to_string()),
+                Some(r#"{"code":"pr1","description":"x"}"#.to_string()),
                 Some("Bearer good"),
             ))
             .await
@@ -1235,7 +609,7 @@ mod tests {
             .oneshot(build_request(
                 "POST",
                 "/api/project",
-                Some(r#"{"code":"pr1","description":"x","product_id":1}"#.to_string()),
+                Some(r#"{"code":"pr1","description":"x"}"#.to_string()),
                 Some("Bearer good"),
             ))
             .await
@@ -1256,7 +630,7 @@ mod tests {
             .oneshot(build_request(
                 "POST",
                 "/api/project",
-                Some(r#"{"code":"pr1","description":"x","product_id":1}"#.to_string()),
+                Some(r#"{"code":"pr1","description":"x"}"#.to_string()),
                 Some("Bearer good"),
             ))
             .await
@@ -1422,7 +796,7 @@ mod tests {
             .oneshot(build_request(
                 "PATCH",
                 "/api/project/pr1",
-                Some(r#"{"members":{},"unblind_members":{}}"#.to_string()),
+                Some(r#"{"members":{},"unblindMembers":{}}"#.to_string()),
                 Some("Bearer good"),
             ))
             .await
@@ -1455,7 +829,7 @@ mod tests {
             .oneshot(build_request(
                 "PATCH",
                 "/api/project/pr1",
-                Some(r#"{"unblind_members":{"leaders":["l1"],"workers":["w1","w2"]}}"#.to_string()),
+                Some(r#"{"unblindMembers":{"leaders":["l1"],"workers":["w1","w2"]}}"#.to_string()),
                 Some("Bearer good"),
             ))
             .await

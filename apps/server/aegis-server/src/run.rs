@@ -178,11 +178,9 @@ fn build_project_service(
     pool: PgPool,
     user: Arc<dyn apis::user::UserService>,
 ) -> Arc<dyn apis::project::ProjectService> {
-    let product_repo = project::ProductRepo::new(pool.clone());
     let project_repo = project::ProjectRepo::new(pool);
     let users = project::UserServiceImpl::new(user);
     let usecase = project::ProjectUsecase::new(project::ProjectUsecaseConfig {
-        product_repo,
         project_repo,
         users,
     });

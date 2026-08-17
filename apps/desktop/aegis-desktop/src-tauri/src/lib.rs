@@ -36,11 +36,6 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::user::get_user_by_code,
             commands::user::current_user,
             commands::user::update_user,
-            // product
-            commands::product::create_product,
-            commands::product::list_products,
-            commands::product::get_product_by_code,
-            commands::product::update_product,
             // project
             commands::project::create_project,
             commands::project::list_projects,

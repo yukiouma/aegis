@@ -36,11 +36,10 @@ use crate::transport::http::user;
 /// merged on top, and the resulting `Router` is wrapped in a
 /// `TraceLayer` for tracing.
 pub fn router(state: AppState) -> axum::Router {
-    let (product_routes, project_routes) = project_router::routers();
+    let project_routes = project_router::router();
     let api_routers = OpenApiRouter::new()
         .nest("/auth", auth::router())
         .nest("/user", user::router())
-        .nest("/product", product_routes)
         .nest("/project", project_routes);
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
@@ -168,35 +167,6 @@ mod tests {
 
     #[async_trait]
     impl apis::project::ProjectService for NullProjectService {
-        async fn create_product(
-            &self,
-            _req: apis::project::CreateProductRequest,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            unimplemented!()
-        }
-        async fn get_product_by_id(
-            &self,
-            _id: i32,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            unimplemented!()
-        }
-        async fn get_product_by_code(
-            &self,
-            _code: &str,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            unimplemented!()
-        }
-        async fn list_products(
-            &self,
-        ) -> Result<Vec<apis::project::ProductView>, apis::project::ProjectApiError> {
-            unimplemented!()
-        }
-        async fn update_product(
-            &self,
-            _req: apis::project::UpdateProductRequest,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            unimplemented!()
-        }
         async fn create_project(
             &self,
             _req: apis::project::CreateProjectRequest,
@@ -317,30 +287,14 @@ mod tests {
         }
     }
 
-    fn sample_product_view(id: i32, code: &str) -> apis::project::ProductView {
-        apis::project::ProductView {
-            id,
-            code: code.to_string(),
-            name: format!("Product {code}"),
-            description: "sample".to_string(),
-            active: true,
-            created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
-                .unwrap()
-                .with_timezone(&chrono::Utc),
-            updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
-                .unwrap()
-                .with_timezone(&chrono::Utc),
-        }
-    }
-
     fn sample_project_view(id: i32, code: &str) -> apis::project::ProjectView {
         apis::project::ProjectView {
             id,
             code: code.to_string(),
             description: "sample".to_string(),
-            product: sample_product_view(1, "p1"),
             members: apis::project::ProjectMemberView::default(),
             unblind_members: apis::project::ProjectMemberView::default(),
+            tags: vec![],
             active: true,
             created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
                 .unwrap()
@@ -385,35 +339,6 @@ mod tests {
 
     #[async_trait]
     impl apis::project::ProjectService for StubProjectService {
-        async fn create_product(
-            &self,
-            _req: apis::project::CreateProductRequest,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            Ok(sample_product_view(1, "p1"))
-        }
-        async fn get_product_by_id(
-            &self,
-            _id: i32,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            unimplemented!()
-        }
-        async fn get_product_by_code(
-            &self,
-            _code: &str,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            Ok(sample_product_view(1, "p1"))
-        }
-        async fn list_products(
-            &self,
-        ) -> Result<Vec<apis::project::ProductView>, apis::project::ProjectApiError> {
-            Ok(vec![sample_product_view(1, "p1")])
-        }
-        async fn update_product(
-            &self,
-            _req: apis::project::UpdateProductRequest,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            Ok(sample_product_view(1, "p1"))
-        }
         async fn create_project(
             &self,
             _req: apis::project::CreateProjectRequest,
@@ -577,16 +502,11 @@ mod tests {
             );
         }
 
-        // /api/product and /api/project namespaces must advertise
-        // every verb with the BearerAuth requirement. Write
-        // operations (POST/PATCH) must additionally advertise a 403
-        // response, because non-admin callers are rejected at the
-        // role guard.
+        // /api/project namespace must advertise every verb with the
+        // BearerAuth requirement. Write operations (POST/PATCH) must
+        // additionally advertise a 403 response, because non-admin
+        // callers are rejected at the role guard.
         for (method, path) in [
-            ("post", "/api/product"),
-            ("get", "/api/product"),
-            ("get", "/api/product/{code}"),
-            ("patch", "/api/product/{code}"),
             ("post", "/api/project"),
             ("get", "/api/project"),
             ("get", "/api/project/{code}"),
@@ -600,12 +520,7 @@ mod tests {
                 "{method} {path} must require BearerAuth",
             );
         }
-        for (method, path) in [
-            ("post", "/api/product"),
-            ("patch", "/api/product/{code}"),
-            ("post", "/api/project"),
-            ("patch", "/api/project/{code}"),
-        ] {
+        for (method, path) in [("post", "/api/project"), ("patch", "/api/project/{code}")] {
             let op = &doc["paths"][path][method];
             let response_keys: Vec<&str> = op["responses"]
                 .as_object()
@@ -728,31 +643,7 @@ mod tests {
         assert_eq!(value["code"], "token_verification_failed");
     }
 
-    // ---- /api/product and /api/project integration -------------------
-
-    #[tokio::test]
-    async fn product_list_route_is_wired() {
-        let app = router(test_state_with_project());
-        let response = app
-            .oneshot(
-                Request::builder()
-                    .method("GET")
-                    .uri("/api/product")
-                    .header("authorization", "Bearer good")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(response.status(), AxStatus::OK);
-        let body = axum::body::to_bytes(response.into_body(), 4096)
-            .await
-            .unwrap();
-        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
-        let products = value["products"].as_array().expect("products array");
-        assert_eq!(products.len(), 1);
-        assert_eq!(products[0]["code"], "p1");
-    }
+    // ---- /api/project integration ------------------------------------
 
     #[tokio::test]
     async fn project_list_route_is_wired() {

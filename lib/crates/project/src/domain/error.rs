@@ -5,11 +5,11 @@ pub enum DomainError {
     #[error("code must not be empty")]
     EmptyCode,
 
-    #[error("name must not be empty")]
-    EmptyName,
+    #[error("tag key must not be empty")]
+    EmptyTagKey,
 
-    #[error("product id must be non-zero")]
-    ZeroProductId,
+    #[error("tag value must not be empty")]
+    EmptyTagValue,
 
     #[error("duplicate code in leaders: {0}")]
     DuplicateLeader(String),
@@ -25,9 +25,6 @@ pub enum DomainError {
 
     #[error("not found")]
     NotFound,
-
-    #[error("product not found: {0}")]
-    ProductNotFound(String),
 
     #[error("user not found: {0}")]
     UserNotFound(String),

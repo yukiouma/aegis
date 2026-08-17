@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-use crate::domain::{Product, Project, UserSummary};
+use crate::domain::{Project, ProjectTag, UserSummary};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserSummaryView {
@@ -24,26 +24,16 @@ pub struct ProjectMemberView {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProductView {
-    pub id: i32,
-    pub code: String,
-    pub name: String,
-    pub description: String,
-    pub active: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+pub struct TagView {
+    pub key: String,
+    pub value: String,
 }
 
-impl From<Product> for ProductView {
-    fn from(p: Product) -> Self {
+impl From<ProjectTag> for TagView {
+    fn from(t: ProjectTag) -> Self {
         Self {
-            id: p.id,
-            code: p.code,
-            name: p.name,
-            description: p.description,
-            active: p.active,
-            created_at: p.created_at,
-            updated_at: p.updated_at,
+            key: t.key,
+            value: t.value,
         }
     }
 }
@@ -53,22 +43,20 @@ pub struct ProjectView {
     pub id: i32,
     pub code: String,
     pub description: String,
-    pub product: ProductView,
     pub members: ProjectMemberView,
     pub unblind_members: ProjectMemberView,
+    pub tags: Vec<TagView>,
     pub active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
 impl ProjectView {
-    /// Build the parent Product + membership hydration around a domain
-    /// `Project`. The product and user summaries are looked up via the
-    /// supplied closures so the constructor stays testable without
-    /// reaching for `ProductRepository` / `UserService` directly here.
+    /// Build the view around a domain `Project`. Membership lists
+    /// must already be hydrated to `ProjectMemberView` (look up user
+    /// summaries before calling). Tags pass straight through.
     pub fn from_project(
         project: Project,
-        product: Product,
         members: ProjectMemberView,
         unblind_members: ProjectMemberView,
     ) -> Self {
@@ -76,19 +64,12 @@ impl ProjectView {
             id: project.id,
             code: project.code,
             description: project.description,
-            product: product.into(),
             members,
             unblind_members,
+            tags: project.tags.into_iter().map(Into::into).collect(),
             active: project.active,
             created_at: project.created_at,
             updated_at: project.updated_at,
         }
     }
-}
-
-// Bring `ProjectMember` back into scope for any future use of the
-// `Default` constructor in tests / mirrors.
-#[allow(dead_code)]
-fn _force_project_member_use(m: crate::domain::ProjectMember) -> crate::domain::ProjectMember {
-    m
 }

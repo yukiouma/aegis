@@ -28,22 +28,19 @@ impl ProjectRepository for ProjectRepo {
     async fn create(&self, input: ProjectNew) -> Result<Project, DomainError> {
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
 
-        // `QueryBuilder::push_bind` emits `$1`, `$2`, … placeholders
-        // — Postgres' `INSERT ... VALUES` requires those to be wrapped
-        // in `(...)`, so we open the parenthesis before the first
-        // bind and close it after the last. Comma separators stay
-        // inside the parens (between binds, not after).
+        let tags_json = sqlx::types::Json(&input.tags.unwrap_or_default());
+
         let row: ProjectRow = sqlx::QueryBuilder::new(
-            "INSERT INTO projects (code, description, product_id, active) VALUES (",
+            "INSERT INTO projects (code, description, active, tags) VALUES (",
         )
         .push_bind(&input.code)
         .push(", ")
         .push_bind(&input.description)
         .push(", ")
-        .push_bind(input.product_id)
-        .push(", ")
         .push_bind(true)
-        .push(") RETURNING id, code, description, product_id, active, created_at, updated_at")
+        .push(", ")
+        .push_bind(tags_json)
+        .push(") RETURNING id, code, description, active, tags, created_at, updated_at")
         .build_query_as::<ProjectRow>()
         .fetch_one(&mut *tx)
         .await
@@ -67,7 +64,7 @@ impl ProjectRepository for ProjectRepo {
 
     async fn find_by_id(&self, id: i32) -> Result<Project, DomainError> {
         let row: ProjectRow = sqlx::QueryBuilder::new(
-            "SELECT id, code, description, product_id, active, created_at, updated_at \
+            "SELECT id, code, description, active, tags, created_at, updated_at \
              FROM projects WHERE id = ",
         )
         .push_bind(id)
@@ -85,7 +82,7 @@ impl ProjectRepository for ProjectRepo {
 
     async fn find_by_code(&self, code: &str) -> Result<Project, DomainError> {
         let row: ProjectRow = sqlx::QueryBuilder::new(
-            "SELECT id, code, description, product_id, active, created_at, updated_at \
+            "SELECT id, code, description, active, tags, created_at, updated_at \
              FROM projects WHERE code = ",
         )
         .push_bind(code)
@@ -104,7 +101,7 @@ impl ProjectRepository for ProjectRepo {
 
     async fn list(&self) -> Result<Vec<Project>, DomainError> {
         let rows: Vec<ProjectRow> = sqlx::QueryBuilder::new(
-            "SELECT id, code, description, product_id, active, created_at, updated_at \
+            "SELECT id, code, description, active, tags, created_at, updated_at \
              FROM projects ORDER BY id",
         )
         .build_query_as::<ProjectRow>()
@@ -126,7 +123,7 @@ impl ProjectRepository for ProjectRepo {
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
 
         // Apply metadata first. If the metadata update fails we never
-        // touch membership.
+        // touch membership or tags.
         let mut qb = sqlx::QueryBuilder::new("UPDATE projects SET ");
         let mut first = true;
         let mut sep = |qb: &mut sqlx::QueryBuilder<sqlx::Postgres>| {
@@ -144,17 +141,15 @@ impl ProjectRepository for ProjectRepo {
             sep(&mut qb);
             qb.push("description = ").push_bind(d);
         }
-        if let Some(pid) = input.product_id {
-            sep(&mut qb);
-            qb.push("product_id = ").push_bind(pid);
-        }
         if let Some(a) = input.active {
             sep(&mut qb);
             qb.push("active = ").push_bind(a);
         }
         if !first {
             qb.push(" WHERE id = ").push_bind(input.id);
-            qb.push(" RETURNING id, code, description, product_id, active, created_at, updated_at");
+            qb.push(
+                " RETURNING id, code, description, active, tags, created_at, updated_at",
+            );
             let row: ProjectRow = qb
                 .build_query_as::<ProjectRow>()
                 .fetch_optional(&mut *tx)
@@ -164,9 +159,9 @@ impl ProjectRepository for ProjectRepo {
             let _: Project = row.try_into()?;
         }
 
-        // Replace membership per supplied team. We always delete-then-
-        // reinsert so the operation is atomic; `None` leaves that team
-        // alone.
+        // Replace membership per supplied team. We always
+        // delete-then-reinsert so the operation is atomic; `None`
+        // leaves that team alone.
         if input.members.is_some() || input.unblind_members.is_some() {
             // Ensure the project exists before we touch membership,
             // otherwise `DELETE` on an unknown id silently succeeds.
@@ -186,6 +181,28 @@ impl ProjectRepository for ProjectRepo {
         }
         if let Some(ref members) = input.unblind_members {
             replace_team(&mut tx, input.id, TeamType::UnblindMembers, members).await?;
+        }
+
+        // Whole-list replace for tags, in the same transaction.
+        if let Some(ref tags) = input.tags {
+            let exists: Option<(i32,)> =
+                sqlx::QueryBuilder::new("SELECT id FROM projects WHERE id = ")
+                    .push_bind(input.id)
+                    .build_query_as::<(i32,)>()
+                    .fetch_optional(&mut *tx)
+                    .await
+                    .map_err(map_db_error)?;
+            if exists.is_none() {
+                return Err(DomainError::NotFound);
+            }
+            sqlx::QueryBuilder::new("UPDATE projects SET tags = ")
+                .push_bind(sqlx::types::Json(tags))
+                .push(" WHERE id = ")
+                .push_bind(input.id)
+                .build()
+                .execute(&mut *tx)
+                .await
+                .map_err(map_db_error)?;
         }
 
         tx.commit().await.map_err(map_db_error)?;

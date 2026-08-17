@@ -1,7 +1,7 @@
 //! Schema + row-conversion tests for the PostgreSQL adapter.
 //!
 //! These tests do NOT require a live database. They read the migration
-//! files and the row-bridge impls directly. Live-database round-trips
+//! file and the row-bridge impls directly. Live-database round-trips
 //! live in `tests/integration_persistence.rs` and are `#[ignore]`-gated.
 
 use std::fs;
@@ -26,80 +26,70 @@ fn create_table_block(sql: &str) -> String {
 }
 
 #[test]
-fn products_migration_creates_products_table() {
-    let sql = load_migration("0001_create_products.sql");
-    let block = create_table_block(&sql);
-    assert!(block.contains("CREATE TABLE") && block.contains("products"));
-}
-
-#[test]
-fn products_migration_has_required_columns() {
-    let block = create_table_block(&load_migration("0001_create_products.sql"));
-    let upper = block.to_uppercase();
-    for required in [
-        "ID INTEGER",
-        "CODE TEXT",
-        "NAME TEXT",
-        "DESCRIPTION TEXT",
-        "ACTIVE BOOLEAN",
-        "CREATED_AT TIMESTAMPTZ NOT NULL DEFAULT NOW()",
-        "UPDATED_AT TIMESTAMPTZ NOT NULL DEFAULT NOW()",
-    ] {
-        assert!(
-            upper.contains(&required.to_uppercase()),
-            "products table must include `{required}`; got:\n{block}"
-        );
-    }
-}
-
-#[test]
-fn products_migration_makes_code_unique_and_not_null() {
-    let block = create_table_block(&load_migration("0001_create_products.sql"));
-    assert!(
-        block.contains("UNIQUE (code)") || block.contains("UNIQUE(\"code\")"),
-        "expected UNIQUE on code; got:\n{block}"
-    );
-    assert!(block.to_uppercase().contains("NOT NULL"));
-}
-
-#[test]
-fn products_migration_has_updated_at_trigger() {
-    let sql = load_migration("0001_create_products.sql");
-    assert!(sql.contains("CREATE TRIGGER products_set_updated_at"));
-    assert!(sql.contains("BEFORE UPDATE ON products"));
-}
-
-#[test]
 fn projects_migration_creates_projects_table() {
-    let sql = load_migration("0002_create_projects.sql");
+    let sql = load_migration("0001_create_projects.sql");
     let block = create_table_block(&sql);
     assert!(block.contains("CREATE TABLE") && block.contains("projects"));
 }
 
 #[test]
-fn projects_migration_references_products() {
-    let block = create_table_block(&load_migration("0002_create_projects.sql"));
+fn projects_migration_has_required_columns() {
+    let block = create_table_block(&load_migration("0001_create_projects.sql"));
     let upper = block.to_uppercase();
-    assert!(
-        upper.contains("PRODUCT_ID INTEGER"),
-        "projects.product_id must be INTEGER; got:\n{block}"
-    );
-    assert!(
-        upper.contains("REFERENCES PRODUCTS(ID)"),
-        "projects.product_id must FK to products(id); got:\n{block}"
-    );
+    for required in [
+        "ID INTEGER",
+        "CODE TEXT",
+        "DESCRIPTION TEXT",
+        "ACTIVE BOOLEAN",
+        "TAGS JSONB NOT NULL DEFAULT '[]'::JSONB",
+        "CREATED_AT TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+        "UPDATED_AT TIMESTAMPTZ NOT NULL DEFAULT NOW()",
+    ] {
+        assert!(
+            upper.contains(&required.to_uppercase()),
+            "projects table must include `{required}`; got:\n{block}"
+        );
+    }
 }
 
 #[test]
 fn projects_migration_has_updated_at_trigger() {
-    let sql = load_migration("0002_create_projects.sql");
+    let sql = load_migration("0001_create_projects.sql");
     assert!(sql.contains("CREATE TRIGGER projects_set_updated_at"));
     assert!(sql.contains("BEFORE UPDATE ON projects"));
 }
 
 #[test]
+fn projects_migration_makes_code_unique() {
+    let block = create_table_block(&load_migration("0001_create_projects.sql"));
+    assert!(
+        block.contains("UNIQUE (code)") || block.contains("UNIQUE(\"code\")"),
+        "expected UNIQUE on code; got:\n{block}"
+    );
+}
+
+#[test]
+fn projects_migration_no_longer_has_product_id() {
+    let sql = load_migration("0001_create_projects.sql");
+    assert!(
+        !sql.contains("product_id"),
+        "projects table must not reference product_id; got:\n{sql}"
+    );
+}
+
+#[test]
+fn projects_migration_has_tags_array_check() {
+    let sql = load_migration("0001_create_projects.sql");
+    let upper = sql.to_uppercase();
+    assert!(
+        upper.contains("JSONB_TYPEOF(TAGS) = 'ARRAY'"),
+        "projects table must enforce jsonb_typeof(tags) = 'array'; got:\n{sql}"
+    );
+}
+
+#[test]
 fn project_members_migration_has_composite_pk_and_checks() {
-    let sql = load_migration("0002_create_projects.sql");
+    let sql = load_migration("0001_create_projects.sql");
     let upper = sql.to_uppercase();
     let start = upper
         .find("CREATE TABLE PROJECT_MEMBERS")
@@ -118,7 +108,7 @@ fn project_members_migration_has_composite_pk_and_checks() {
 
 #[test]
 fn project_members_migration_cascades_on_delete() {
-    let sql = load_migration("0002_create_projects.sql");
+    let sql = load_migration("0001_create_projects.sql");
     assert!(
         sql.contains("REFERENCES projects(id) ON DELETE CASCADE"),
         "project_members FK must cascade on delete"
@@ -129,44 +119,49 @@ fn project_members_migration_cascades_on_delete() {
 mod row_tests {
     use chrono::{TimeZone, Utc};
 
-    use super::super::row::{ProductRow, ProjectMemberRow, ProjectRow};
-    use crate::domain::{ProjectMember, RoleType, TeamType};
+    use super::super::row::{ProjectMemberRow, ProjectRow};
+    use crate::domain::{ProjectMember, ProjectTag, RoleType, TeamType};
 
     fn ts() -> chrono::DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 8, 9, 0, 0, 0).unwrap()
     }
 
     #[test]
-    fn product_row_converts_to_product() {
-        let row = ProductRow {
-            id: 1,
-            code: "p1".into(),
-            name: "Widget".into(),
-            description: "desc".into(),
-            active: true,
-            created_at: ts(),
-            updated_at: ts(),
-        };
-        let p: crate::domain::Product = row.try_into().expect("convert");
-        assert_eq!(p.id, 1);
-        assert_eq!(p.code, "p1");
-    }
-
-    #[test]
-    fn project_row_converts_to_project_with_empty_members() {
+    fn project_row_converts_to_project_with_empty_members_and_tags() {
         let row = ProjectRow {
             id: 1,
             code: "proj1".into(),
             description: "".into(),
-            product_id: 7,
             active: true,
+            tags: sqlx::types::Json(vec![]),
             created_at: ts(),
             updated_at: ts(),
         };
         let p: crate::domain::Project = row.try_into().expect("convert");
-        assert_eq!(p.product_id, 7);
+        assert_eq!(p.id, 1);
         assert_eq!(p.members, ProjectMember::default());
         assert_eq!(p.unblind_members, ProjectMember::default());
+        assert!(p.tags.is_empty());
+    }
+
+    #[test]
+    fn project_row_converts_to_project_with_tags() {
+        let row = ProjectRow {
+            id: 1,
+            code: "proj1".into(),
+            description: "".into(),
+            active: true,
+            tags: sqlx::types::Json(vec![
+                ProjectTag::for_repository("Product".into(), "DEMO-001".into()),
+                ProjectTag::for_repository("Region".into(), "EU".into()),
+            ]),
+            created_at: ts(),
+            updated_at: ts(),
+        };
+        let p: crate::domain::Project = row.try_into().expect("convert");
+        assert_eq!(p.tags.len(), 2);
+        assert_eq!(p.tags[0].key, "Product");
+        assert_eq!(p.tags[1].value, "EU");
     }
 
     #[test]

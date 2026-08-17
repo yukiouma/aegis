@@ -1,50 +1,22 @@
-//! Row -> domain conversion for the SQLx repositories.
+//! Row -> domain conversion for the SQLx repository.
 //!
-//! `ProductRow` and `ProjectRow` are the shapes returned by
-//! `sqlx::query_as`. They are NOT re-exported at the crate root; only
-//! the repositories use them.
+//! `ProjectRow` is the shape returned by `sqlx::query_as`. It is NOT
+//! re-exported at the crate root; only the repository uses it.
 
 use std::convert::TryFrom;
 
 use chrono::{DateTime, Utc};
 use sqlx::FromRow;
 
-use crate::domain::{DomainError, Product, Project, ProjectMember};
-
-#[derive(Clone, FromRow)]
-pub struct ProductRow {
-    pub id: i32,
-    pub code: String,
-    pub name: String,
-    pub description: String,
-    pub active: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-impl TryFrom<ProductRow> for Product {
-    type Error = DomainError;
-
-    fn try_from(row: ProductRow) -> Result<Self, Self::Error> {
-        Ok(Product::for_repository(
-            row.id,
-            row.code,
-            row.name,
-            row.description,
-            row.active,
-            row.created_at,
-            row.updated_at,
-        ))
-    }
-}
+use crate::domain::{DomainError, Project, ProjectMember, ProjectTag};
 
 #[derive(Clone, FromRow)]
 pub struct ProjectRow {
     pub id: i32,
     pub code: String,
     pub description: String,
-    pub product_id: i32,
     pub active: bool,
+    pub tags: sqlx::types::Json<Vec<ProjectTag>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -57,9 +29,9 @@ impl TryFrom<ProjectRow> for Project {
             row.id,
             row.code,
             row.description,
-            row.product_id,
             ProjectMember::default(),
             ProjectMember::default(),
+            row.tags.0,
             row.active,
             row.created_at,
             row.updated_at,

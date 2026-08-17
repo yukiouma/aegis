@@ -6,7 +6,7 @@ mod views;
 #[cfg(test)]
 mod tests;
 
-pub use commands::{CreateProduct, CreateProject, UpdateProduct, UpdateProject};
+pub use commands::{CreateProject, UpdateProject};
 pub use error::UsecaseError;
 pub use project_usecase::{ProjectUsecase, ProjectUsecaseConfig};
-pub use views::{ProductView, ProjectMemberView, ProjectView, UserSummaryView};
+pub use views::{ProjectMemberView, ProjectView, TagView, UserSummaryView};

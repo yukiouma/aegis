@@ -12,8 +12,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use sqlx::PgPool;
 
-use project::domain::{ProductNew, ProductUpdate, ProjectMember, ProjectNew, ProjectUpdate};
-use project::{ProductRepo, ProductRepository, ProjectRepo, ProjectRepository};
+use project::domain::{ProjectMember, ProjectNew, ProjectTag, ProjectUpdate};
+use project::{ProjectRepo, ProjectRepository};
 
 async fn with_pool<F, Fut, T>(f: F) -> T
 where
@@ -41,10 +41,6 @@ where
         .execute(&pool)
         .await
         .expect("drop projects");
-    sqlx::query("DROP TABLE IF EXISTS products CASCADE")
-        .execute(&pool)
-        .await
-        .expect("drop products");
     sqlx::query("DROP TABLE IF EXISTS _sqlx_migrations CASCADE")
         .execute(&pool)
         .await
@@ -70,91 +66,24 @@ fn unique_code(prefix: &str) -> String {
 
 #[tokio::test]
 #[ignore = "requires AEGIS_DATABASE_URL pointing at a live PostgreSQL"]
-async fn product_create_find_list_round_trip() {
+async fn project_create_with_no_membership_or_tags_round_trip() {
     with_pool(|pool| async move {
-        let repo = ProductRepo::new(pool);
-        let code = unique_code("prod");
-        let created = repo
-            .create(ProductNew {
-                code: code.clone(),
-                name: "Widget".into(),
-                description: "".into(),
-            })
-            .await
-            .expect("create");
-        assert_eq!(created.code, code);
-
-        let by_id = repo.find_by_id(created.id).await.expect("find_by_id");
-        assert_eq!(by_id.code, code);
-        let by_code = repo.find_by_code(&code).await.expect("find_by_code");
-        assert_eq!(by_code.id, created.id);
-        let list = repo.list().await.expect("list");
-        assert!(list.iter().any(|p| p.id == created.id));
-    })
-    .await;
-}
-
-#[tokio::test]
-#[ignore = "requires AEGIS_DATABASE_URL pointing at a live PostgreSQL"]
-async fn product_update_flips_active_and_keeps_created_at() {
-    with_pool(|pool| async move {
-        let repo = ProductRepo::new(pool);
-        let created = repo
-            .create(ProductNew {
-                code: unique_code("prod-active"),
-                name: "Widget".into(),
-                description: "".into(),
-            })
-            .await
-            .expect("create");
-        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-        let updated = repo
-            .update(ProductUpdate {
-                id: created.id,
-                active: Some(false),
-                ..Default::default()
-            })
-            .await
-            .expect("update");
-        assert!(!updated.active);
-        assert!(
-            updated.updated_at > created.updated_at,
-            "products_set_updated_at trigger must bump updated_at"
-        );
-        assert_eq!(updated.created_at, created.created_at);
-    })
-    .await;
-}
-
-#[tokio::test]
-#[ignore = "requires AEGIS_DATABASE_URL pointing at a live PostgreSQL"]
-async fn project_create_with_no_membership_round_trip() {
-    with_pool(|pool| async move {
-        let products = ProductRepo::new(pool.clone());
         let projects = ProjectRepo::new(pool.clone());
-        let product = products
-            .create(ProductNew {
-                code: unique_code("prod-shell"),
-                name: "Shell".into(),
-                description: "".into(),
-            })
-            .await
-            .expect("create product");
         let created = projects
             .create(ProjectNew {
                 code: unique_code("proj-shell"),
                 description: "".into(),
-                product_id: product.id,
                 members: None,
                 unblind_members: None,
+                tags: None,
             })
             .await
             .expect("create project");
-        assert_eq!(created.product_id, product.id);
         assert!(created.members.leaders.is_empty());
         assert!(created.members.workers.is_empty());
         assert!(created.unblind_members.leaders.is_empty());
         assert!(created.unblind_members.workers.is_empty());
+        assert!(created.tags.is_empty());
     })
     .await;
 }
@@ -163,26 +92,17 @@ async fn project_create_with_no_membership_round_trip() {
 #[ignore = "requires AEGIS_DATABASE_URL pointing at a live PostgreSQL"]
 async fn project_create_with_membership_then_update_replaces_it() {
     with_pool(|pool| async move {
-        let products = ProductRepo::new(pool.clone());
         let projects = ProjectRepo::new(pool.clone());
-        let product = products
-            .create(ProductNew {
-                code: unique_code("prod-mem"),
-                name: "Mem".into(),
-                description: "".into(),
-            })
-            .await
-            .expect("create product");
         let created = projects
             .create(ProjectNew {
                 code: unique_code("proj-mem"),
                 description: "".into(),
-                product_id: product.id,
                 members: Some(ProjectMember {
                     leaders: vec!["u1".into()],
                     workers: vec!["u2".into()],
                 }),
                 unblind_members: Some(ProjectMember::default()),
+                tags: None,
             })
             .await
             .expect("create project");
@@ -216,6 +136,80 @@ async fn project_create_with_membership_then_update_replaces_it() {
                 .await
                 .expect("query members");
         assert!(rows.iter().all(|(t,)| t != "unblind_members"));
+    })
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires AEGIS_DATABASE_URL pointing at a live PostgreSQL"]
+async fn project_create_with_tags_round_trip() {
+    with_pool(|pool| async move {
+        let projects = ProjectRepo::new(pool.clone());
+        let created = projects
+            .create(ProjectNew {
+                code: unique_code("proj-tags"),
+                description: "".into(),
+                members: None,
+                unblind_members: None,
+                tags: Some(vec![
+                    ProjectTag::for_repository("Product".into(), "DEMO-001".into()),
+                    ProjectTag::for_repository("Region".into(), "EU".into()),
+                ]),
+            })
+            .await
+            .expect("create project");
+        assert_eq!(created.tags.len(), 2);
+        assert_eq!(created.tags[0].key, "Product");
+        assert_eq!(created.tags[1].value, "EU");
+    })
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires AEGIS_DATABASE_URL pointing at a live PostgreSQL"]
+async fn project_update_replaces_tags_whole_list() {
+    with_pool(|pool| async move {
+        let projects = ProjectRepo::new(pool.clone());
+        let created = projects
+            .create(ProjectNew {
+                code: unique_code("proj-tags-replace"),
+                description: "".into(),
+                members: None,
+                unblind_members: None,
+                tags: Some(vec![
+                    ProjectTag::for_repository("k1".into(), "v1".into()),
+                ]),
+            })
+            .await
+            .expect("create project");
+        let updated = projects
+            .update(ProjectUpdate {
+                id: created.id,
+                tags: Some(vec![
+                    ProjectTag::for_repository("k2".into(), "v2".into()),
+                    ProjectTag::for_repository("k3".into(), "v3".into()),
+                ]),
+                ..Default::default()
+            })
+            .await
+            .expect("update");
+        assert_eq!(updated.tags.len(), 2);
+        assert_eq!(updated.tags[0].key, "k2");
+        assert_eq!(updated.tags[1].key, "k3");
+        // Spot-check via direct JSONB query. We deserialize the JSONB
+        // payload as `Vec<serde_json::Value>` rather than `Json<Vec<ProjectTag>>`
+        // because the runtime `query_as` API doesn't pick up the
+        // `sqlx::FromRow` impl for the latter without an explicit
+        // derive on a wrapper struct.
+        let raw: Vec<serde_json::Value> =
+            sqlx::query_scalar("SELECT tags FROM projects WHERE id = $1")
+                .bind(created.id)
+                .fetch_one(&pool)
+                .await
+                .expect("query tags");
+        assert_eq!(raw.len(), 2);
+        assert_eq!(raw[0]["key"], "k2");
+        assert_eq!(raw[1]["value"], "v3");
     })
     .await;
 }
