@@ -9,15 +9,20 @@ tokio = { workspace = true }
 async-trait = { workspace = true }
 thiserror = { workspace = true }
 # `chrono` provides `DateTime<Utc>` for the `created_at` / `updated_at`
-# columns surfaced by `Product` and `Project` and carried by every view
-# DTO in the crate. The `clock` feature keeps the binary small while
-# still enabling `NOW()`-style integration through `chrono::Utc`.
+# columns surfaced by `Project` and `ProjectTag` and carried by every
+# view DTO in the crate. The `clock` feature keeps the binary small
+# while still enabling `NOW()`-style integration through `chrono::Utc`.
 chrono = { workspace = true }
 # `apis` provides the outbound `apis::project::ProjectService` port
 # the facade implements and the `apis::user::UserService` port the
 # domain-level `UserService` adapter delegates to. Path-dep because
 # both crates share the workspace.
 apis = { path = "../apis" }
+# `serde` / `serde_json` back the `ProjectTag` value object's JSON
+# serialisation; combined with sqlx's `json` feature they let the tag
+# list round-trip through the `tags` JSONB column.
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 # Loads `.env` at test startup so live-DB integration tests can find

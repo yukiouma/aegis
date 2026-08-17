@@ -79,85 +79,21 @@ fn project_member_accepts_empty_lists() {
 }
 
 #[test]
-fn product_new_rejects_empty_code() {
-    let err = Product::new(
-        1,
-        "".into(),
-        "Alice".into(),
-        "".into(),
-        true,
-        test_now(),
-        test_now(),
-    )
-    .unwrap_err();
-    assert!(matches!(err, DomainError::EmptyCode));
-}
-
-#[test]
-fn product_new_rejects_empty_name() {
-    let err = Product::new(
-        1,
-        "p1".into(),
-        "".into(),
-        "".into(),
-        true,
-        test_now(),
-        test_now(),
-    )
-    .unwrap_err();
-    assert!(matches!(err, DomainError::EmptyName));
-}
-
-#[test]
-fn product_new_accepts_valid_input() {
-    let p = Product::new(
-        7,
-        "p7".into(),
-        "Alice".into(),
-        "desc".into(),
-        true,
-        test_now(),
-        test_now(),
-    )
-    .unwrap();
-    assert_eq!(p.id, 7);
-    assert_eq!(p.code, "p7");
-}
-
-#[test]
 fn project_new_rejects_empty_code() {
     let m = ProjectMember::default();
     let err = Project::new(
         1,
         "".into(),
         "desc".into(),
-        1,
         m.clone(),
         m,
+        vec![],
         true,
         test_now(),
         test_now(),
     )
     .unwrap_err();
     assert!(matches!(err, DomainError::EmptyCode));
-}
-
-#[test]
-fn project_new_rejects_zero_product_id() {
-    let m = ProjectMember::default();
-    let err = Project::new(
-        1,
-        "proj1".into(),
-        "desc".into(),
-        0,
-        m.clone(),
-        m,
-        true,
-        test_now(),
-        test_now(),
-    )
-    .unwrap_err();
-    assert!(matches!(err, DomainError::ZeroProductId));
 }
 
 #[test]
@@ -167,14 +103,33 @@ fn project_new_accepts_valid_input() {
         9,
         "proj9".into(),
         "desc".into(),
-        3,
         m.clone(),
         m,
+        vec![],
         true,
         test_now(),
         test_now(),
     )
     .unwrap();
     assert_eq!(p.id, 9);
-    assert_eq!(p.product_id, 3);
+    assert_eq!(p.tags, vec![]);
+}
+
+#[test]
+fn project_tag_new_rejects_empty_key() {
+    let err = ProjectTag::new("".into(), "v".into()).unwrap_err();
+    assert!(matches!(err, DomainError::EmptyTagKey));
+}
+
+#[test]
+fn project_tag_new_rejects_empty_value() {
+    let err = ProjectTag::new("k".into(), "   ".into()).unwrap_err();
+    assert!(matches!(err, DomainError::EmptyTagValue));
+}
+
+#[test]
+fn project_tag_new_accepts_valid_input() {
+    let t = ProjectTag::new("Product".into(), "DEMO-001".into()).unwrap();
+    assert_eq!(t.key, "Product");
+    assert_eq!(t.value, "DEMO-001");
 }

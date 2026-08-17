@@ -3,15 +3,16 @@ use chrono::{DateTime, Utc};
 
 use super::error::DomainError;
 use super::project_member::ProjectMember;
+use super::project_tag::ProjectTag;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Project {
     pub id: i32,
     pub code: String,
     pub description: String,
-    pub product_id: i32,
     pub members: ProjectMember,
     pub unblind_members: ProjectMember,
+    pub tags: Vec<ProjectTag>,
     pub active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -25,9 +26,9 @@ impl Project {
         id: i32,
         code: String,
         description: String,
-        product_id: i32,
         members: ProjectMember,
         unblind_members: ProjectMember,
+        tags: Vec<ProjectTag>,
         active: bool,
         created_at: DateTime<Utc>,
         updated_at: DateTime<Utc>,
@@ -35,16 +36,13 @@ impl Project {
         if code.trim().is_empty() {
             return Err(DomainError::EmptyCode);
         }
-        if product_id == 0 {
-            return Err(DomainError::ZeroProductId);
-        }
         Ok(Self {
             id,
             code,
             description,
-            product_id,
             members,
             unblind_members,
+            tags,
             active,
             created_at,
             updated_at,
@@ -58,9 +56,9 @@ impl Project {
         id: i32,
         code: String,
         description: String,
-        product_id: i32,
         members: ProjectMember,
         unblind_members: ProjectMember,
+        tags: Vec<ProjectTag>,
         active: bool,
         created_at: DateTime<Utc>,
         updated_at: DateTime<Utc>,
@@ -69,9 +67,9 @@ impl Project {
             id,
             code,
             description,
-            product_id,
             members,
             unblind_members,
+            tags,
             active,
             created_at,
             updated_at,
@@ -85,9 +83,9 @@ impl std::fmt::Debug for Project {
             .field("id", &self.id)
             .field("code", &self.code)
             .field("description", &self.description)
-            .field("product_id", &self.product_id)
             .field("members", &self.members)
             .field("unblind_members", &self.unblind_members)
+            .field("tags", &self.tags)
             .field("active", &self.active)
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
@@ -100,13 +98,15 @@ impl std::fmt::Debug for Project {
 pub struct ProjectNew {
     pub code: String,
     pub description: String,
-    pub product_id: i32,
     /// Optional. `None` and `Some(empty)` are equivalent — neither
     /// inserts any `project_members` rows for that team. Letting the
     /// field be absent keeps the "create shell, add members later"
     /// flow ergonomic.
     pub members: Option<ProjectMember>,
     pub unblind_members: Option<ProjectMember>,
+    /// Optional. `None` and `Some(empty)` are equivalent — neither
+    /// inserts any tags. Same ergonomics as `members`.
+    pub tags: Option<Vec<ProjectTag>>,
 }
 
 /// Input DTO for `ProjectRepository::update`. Every field is optional
@@ -116,12 +116,13 @@ pub struct ProjectUpdate {
     pub id: i32,
     pub code: Option<String>,
     pub description: Option<String>,
-    pub product_id: Option<i32>,
     pub active: Option<bool>,
     /// `None` = leave that team unchanged; `Some(empty)` = wipe that
     /// team's rows. The two are distinct on update.
     pub members: Option<ProjectMember>,
     pub unblind_members: Option<ProjectMember>,
+    /// `None` = leave tags unchanged; `Some(vec)` = whole-list replace.
+    pub tags: Option<Vec<ProjectTag>>,
 }
 
 /// Outbound port for persistence of `Project` aggregates.
