@@ -6,6 +6,10 @@ import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
 import { SettingsPage } from "../../../features/settings/pages/SettingsPage";
 import { renderInRouter } from "../../../test/helpers/file-route-utils";
+import { mockCommands } from "../../../test/helpers/tauri-mock";
+import { TestQueryProvider } from "../../../test/helpers/test-query-provider";
+
+vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 function createMemoryStorage(): Storage {
   const data = new Map<string, string>();
@@ -35,6 +39,19 @@ beforeEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.stubGlobal("localStorage", createMemoryStorage());
+  // SettingsPage now reads the current user via useCurrentUser, so the
+  // test renderer must satisfy the Tauri `current_user` command.
+  mockCommands({
+    current_user: () => ({
+      id: 1,
+      code: "alice",
+      name: "Alice",
+      role: "general",
+      active: true,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    }),
+  });
 });
 
 afterEach(() => {
@@ -44,9 +61,11 @@ afterEach(() => {
 function renderSettings(defaultLocale: "en" | "zh-CN" = "en") {
   return renderInRouter(
     <AegisThemeProvider>
-      <AegisI18nProvider defaultLocale={defaultLocale}>
-        <SettingsPage />
-      </AegisI18nProvider>
+      <TestQueryProvider>
+        <AegisI18nProvider defaultLocale={defaultLocale}>
+          <SettingsPage />
+        </AegisI18nProvider>
+      </TestQueryProvider>
     </AegisThemeProvider>,
   );
 }
