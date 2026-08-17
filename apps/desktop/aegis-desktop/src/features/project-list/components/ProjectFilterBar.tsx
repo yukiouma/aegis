@@ -2,8 +2,10 @@ import {
   Box,
   Checkbox,
   FormControlLabel,
+  InputAdornment,
   TextField,
 } from "@aegis/ui/mui";
+import { Search as SearchIcon } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
 
 export interface ProjectFilterBarProps {
@@ -32,10 +34,19 @@ export function ProjectFilterBar({
     <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
       <TextField
         size="small"
-        label={t("project.search.label")}
+        placeholder={t("project.search.label")}
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
-        sx={{ minWidth: 320 }}
+        slotProps={{
+          input: {
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon fontSize="small" />
+              </InputAdornment>
+            ),
+          },
+        }}
+        sx={{ minWidth: 420 }}
       />
       <FormControlLabel
         sx={{ ml: "auto" }}
