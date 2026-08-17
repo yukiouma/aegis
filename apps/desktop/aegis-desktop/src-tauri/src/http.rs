@@ -8,7 +8,6 @@ pub mod client;
 pub mod config;
 pub mod dto;
 pub mod healthz;
-pub mod product;
 pub mod project;
 pub mod user;
 pub mod user_credential;

@@ -3,7 +3,7 @@ use tauri::State;
 use crate::http::client::HttpClient;
 use crate::http::dto::ApiError;
 use crate::http::project::{
-    self, CreateProjectRequest, ProjectMemberDataRequest, ProjectViewResponse,
+    self, CreateProjectRequest, ProjectMemberDataRequest, ProjectViewResponse, TagDataRequest,
     UpdateProjectRequest,
 };
 
@@ -12,7 +12,7 @@ pub async fn create_project(
     client: State<'_, HttpClient>,
     code: String,
     description: String,
-    product_id: i32,
+    tags: Option<Vec<TagDataRequest>>,
     members: Option<ProjectMemberDataRequest>,
     unblind_members: Option<ProjectMemberDataRequest>,
 ) -> Result<ProjectViewResponse, ApiError> {
@@ -21,7 +21,7 @@ pub async fn create_project(
         CreateProjectRequest {
             code,
             description,
-            product_id,
+            tags,
             members,
             unblind_members,
         },

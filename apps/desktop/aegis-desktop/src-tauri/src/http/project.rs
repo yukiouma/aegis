@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 
 use super::client::HttpClient;
 use super::dto::ApiError;
-use super::product::ProductViewResponse;
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -14,6 +13,20 @@ pub struct ProjectMemberDataRequest {
     pub leaders: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub workers: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagDataRequest {
+    pub key: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagViewResponse {
+    pub key: String,
+    pub value: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -36,7 +49,7 @@ pub struct ProjectViewResponse {
     pub id: i32,
     pub code: String,
     pub description: String,
-    pub product: ProductViewResponse,
+    pub tags: Vec<TagViewResponse>,
     pub members: ProjectMemberViewResponse,
     pub unblind_members: ProjectMemberViewResponse,
     pub active: bool,
@@ -55,7 +68,8 @@ pub struct ProjectListResponse {
 pub struct CreateProjectRequest {
     pub code: String,
     pub description: String,
-    pub product_id: i32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<TagDataRequest>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub members: Option<ProjectMemberDataRequest>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -70,7 +84,7 @@ pub struct UpdateProjectRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub product_id: Option<i32>,
+    pub tags: Option<Vec<TagDataRequest>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -142,12 +156,9 @@ mod tests {
                         serde_json::json!({
                             "projects": [{
                                 "id": 1, "code": "p", "description": "",
-                                "product": {
-                                    "id": 1, "code": "x", "name": "X",
-                                    "description": "", "active": true,
-                                    "createdAt": "2026-01-01T00:00:00Z",
-                                    "updatedAt": "2026-01-02T00:00:00Z"
-                                },
+                                "tags": [
+                                    { "key": "Product", "value": "DEMO-001" }
+                                ],
                                 "members": { "leaders": [], "workers": [] },
                                 "unblindMembers": { "leaders": [], "workers": [] },
                                 "active": true,
@@ -162,7 +173,8 @@ mod tests {
         let projects = list(&c).await.unwrap();
         assert_eq!(projects.len(), 1);
         assert_eq!(projects[0].code, "p");
-        assert_eq!(projects[0].product.code, "x");
+        assert_eq!(projects[0].tags.len(), 1);
+        assert_eq!(projects[0].tags[0].key, "Product");
     }
 
     #[test]
@@ -186,5 +198,17 @@ mod tests {
         };
         let j = serde_json::to_string(&body).unwrap();
         assert_eq!(j, r#"{"leaders":["a"]}"#);
+    }
+
+    #[test]
+    fn tag_data_request_round_trips() {
+        let body = TagDataRequest {
+            key: "Product".into(),
+            value: "DEMO-001".into(),
+        };
+        let j = serde_json::to_string(&body).unwrap();
+        assert_eq!(j, r#"{"key":"Product","value":"DEMO-001"}"#);
+        let parsed: TagDataRequest = serde_json::from_str(&j).unwrap();
+        assert_eq!(parsed, body);
     }
 }
