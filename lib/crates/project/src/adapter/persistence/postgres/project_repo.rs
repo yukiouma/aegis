@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::domain::{
-    DomainError, Project, ProjectMember, ProjectNew, ProjectRepository, ProjectTag, ProjectUpdate,
-    RoleType, TeamType,
+    DomainError, Project, ProjectMember, ProjectNew, ProjectRepository, ProjectUpdate, RoleType,
+    TeamType,
 };
 
 use super::row::{ProjectMemberRow, ProjectRow};

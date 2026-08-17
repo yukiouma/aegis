@@ -1,105 +1,44 @@
 use async_trait::async_trait;
 
 use apis::project::{
-    CreateProductRequest, CreateProjectRequest, ProductView as ApiProductView, ProjectApiError,
-    ProjectMemberData, ProjectMemberView as ApiProjectMemberView, ProjectService, ProjectView,
-    UpdateProductRequest, UpdateProjectRequest, UserSummaryView as ApiUserSummaryView,
+    CreateProjectRequest, ProjectApiError, ProjectMemberData, ProjectMemberView as ApiProjectMemberView,
+    ProjectService, ProjectView, TagData, TagView, UpdateProjectRequest,
+    UserSummaryView as ApiUserSummaryView,
 };
 
-use crate::domain::{ProductRepository, ProjectMember, ProjectRepository, UserService};
+use crate::domain::{ProjectMember, ProjectRepository, ProjectTag, UserService};
 use crate::usecase::{
-    CreateProduct, CreateProject, ProjectUsecase, UpdateProduct, UpdateProject,
-    UserSummaryView as DomainUserSummaryView,
+    CreateProject, ProjectUsecase, UpdateProject, UserSummaryView as DomainUserSummaryView,
 };
 
-/// Facade adapting `ProjectUsecase<P, R, U>` to
+/// Facade adapting `ProjectUsecase<R, U>` to
 /// `apis::project::ProjectService`. The construction is the same
-/// regardless of the underlying storage: the generic `P / R / U`
+/// regardless of the underlying storage: the generic `R / U`
 /// arguments stay concrete in the caller.
-pub struct ProjectServiceImpl<P, R, U>
+pub struct ProjectServiceImpl<R, U>
 where
-    P: ProductRepository,
     R: ProjectRepository,
     U: UserService,
 {
-    usecase: ProjectUsecase<P, R, U>,
+    usecase: ProjectUsecase<R, U>,
 }
 
-impl<P, R, U> ProjectServiceImpl<P, R, U>
+impl<R, U> ProjectServiceImpl<R, U>
 where
-    P: ProductRepository,
     R: ProjectRepository,
     U: UserService,
 {
-    pub fn new(usecase: ProjectUsecase<P, R, U>) -> Self {
+    pub fn new(usecase: ProjectUsecase<R, U>) -> Self {
         Self { usecase }
     }
 }
 
 #[async_trait]
-impl<P, R, U> ProjectService for ProjectServiceImpl<P, R, U>
+impl<R, U> ProjectService for ProjectServiceImpl<R, U>
 where
-    P: ProductRepository + 'static,
     R: ProjectRepository + 'static,
     U: UserService + 'static,
 {
-    async fn create_product(
-        &self,
-        req: CreateProductRequest,
-    ) -> Result<ApiProductView, ProjectApiError> {
-        let view = self
-            .usecase
-            .create_product(CreateProduct {
-                code: req.code,
-                name: req.name,
-                description: req.description,
-            })
-            .await
-            .map_err(map_error)?;
-        Ok(view.into())
-    }
-
-    async fn get_product_by_id(&self, id: i32) -> Result<ApiProductView, ProjectApiError> {
-        let view = self
-            .usecase
-            .get_product_by_id(id)
-            .await
-            .map_err(map_error)?;
-        Ok(view.into())
-    }
-
-    async fn get_product_by_code(&self, code: &str) -> Result<ApiProductView, ProjectApiError> {
-        let view = self
-            .usecase
-            .get_product_by_code(code)
-            .await
-            .map_err(map_error)?;
-        Ok(view.into())
-    }
-
-    async fn list_products(&self) -> Result<Vec<ApiProductView>, ProjectApiError> {
-        let views = self.usecase.list_products().await.map_err(map_error)?;
-        Ok(views.into_iter().map(Into::into).collect())
-    }
-
-    async fn update_product(
-        &self,
-        req: UpdateProductRequest,
-    ) -> Result<ApiProductView, ProjectApiError> {
-        let view = self
-            .usecase
-            .update_product(UpdateProduct {
-                id: req.id,
-                code: req.code,
-                name: req.name,
-                description: req.description,
-                active: req.active,
-            })
-            .await
-            .map_err(map_error)?;
-        Ok(view.into())
-    }
-
     async fn create_project(
         &self,
         req: CreateProjectRequest,
@@ -109,9 +48,9 @@ where
             .create_project(CreateProject {
                 code: req.code,
                 description: req.description,
-                product_id: req.product_id,
                 members: req.members.map(member_data_to_domain),
                 unblind_members: req.unblind_members.map(member_data_to_domain),
+                tags: req.tags.map(|ts| ts.into_iter().map(tag_data_to_domain).collect()),
             })
             .await
             .map_err(map_error)?;
@@ -119,11 +58,7 @@ where
     }
 
     async fn get_project_by_id(&self, id: i32) -> Result<ProjectView, ProjectApiError> {
-        let view = self
-            .usecase
-            .get_project_by_id(id)
-            .await
-            .map_err(map_error)?;
+        let view = self.usecase.get_project_by_id(id).await.map_err(map_error)?;
         Ok(view.into())
     }
 
@@ -151,10 +86,10 @@ where
                 id: req.id,
                 code: req.code,
                 description: req.description,
-                product_id: req.product_id,
                 active: req.active,
                 members: req.members.map(member_data_to_domain),
                 unblind_members: req.unblind_members.map(member_data_to_domain),
+                tags: req.tags.map(|ts| ts.into_iter().map(tag_data_to_domain).collect()),
             })
             .await
             .map_err(map_error)?;
@@ -166,6 +101,15 @@ fn member_data_to_domain(d: ProjectMemberData) -> ProjectMember {
     ProjectMember::for_repository(d.leaders, d.workers)
 }
 
+/// Bridge for the request-side `TagData` so the apis port doesn't need
+/// to reach into the domain types. The usecase / domain layer
+/// re-validates via `ProjectTag::new`; if the wire payload violated
+/// the non-empty contract, that re-validation surfaces as
+/// `UsecaseError::Validation(EmptyTagKey | EmptyTagValue)`.
+fn tag_data_to_domain(t: TagData) -> ProjectTag {
+    ProjectTag::for_repository(t.key, t.value)
+}
+
 fn map_error(err: crate::usecase::UsecaseError) -> ProjectApiError {
     use crate::domain::DomainError;
     use crate::usecase::UsecaseError;
@@ -173,7 +117,6 @@ fn map_error(err: crate::usecase::UsecaseError) -> ProjectApiError {
         UsecaseError::Validation(d) => ProjectApiError::Validation(d.to_string()),
         UsecaseError::Repository(d) => match d {
             DomainError::NotFound => ProjectApiError::NotFound,
-            DomainError::ProductNotFound(id) => ProjectApiError::ProductNotFound(id),
             DomainError::UserNotFound(code) => ProjectApiError::UserNotFound(code),
             DomainError::DuplicateCode(code) => ProjectApiError::DuplicateCode(code),
             other => ProjectApiError::Repository(other.to_string()),
@@ -183,13 +126,15 @@ fn map_error(err: crate::usecase::UsecaseError) -> ProjectApiError {
 
 // ---- From impls: domain usecase views -> apis views ----
 
-impl From<crate::usecase::ProductView> for ApiProductView {
-    fn from(v: crate::usecase::ProductView) -> Self {
+impl From<crate::usecase::ProjectView> for ProjectView {
+    fn from(v: crate::usecase::ProjectView) -> Self {
         Self {
             id: v.id,
             code: v.code,
-            name: v.name,
             description: v.description,
+            members: v.members.into(),
+            unblind_members: v.unblind_members.into(),
+            tags: v.tags.into_iter().map(TagView::from).collect(),
             active: v.active,
             created_at: v.created_at,
             updated_at: v.updated_at,
@@ -197,18 +142,11 @@ impl From<crate::usecase::ProductView> for ApiProductView {
     }
 }
 
-impl From<crate::usecase::ProjectView> for ProjectView {
-    fn from(v: crate::usecase::ProjectView) -> Self {
+impl From<crate::usecase::TagView> for TagView {
+    fn from(v: crate::usecase::TagView) -> Self {
         Self {
-            id: v.id,
-            code: v.code,
-            description: v.description,
-            product: v.product.into(),
-            members: v.members.into(),
-            unblind_members: v.unblind_members.into(),
-            active: v.active,
-            created_at: v.created_at,
-            updated_at: v.updated_at,
+            key: v.key,
+            value: v.value,
         }
     }
 }
