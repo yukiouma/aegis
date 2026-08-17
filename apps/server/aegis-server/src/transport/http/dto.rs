@@ -272,64 +272,34 @@ impl From<apis::auth::RegisterUserResponse> for RegisterUserResponse {
     }
 }
 
-// -- product requests / responses ------------------------------------------
+// -- tag DTOs --------------------------------------------------------------
 
-/// Wire-level request body for `POST /api/product`.
+/// Wire-level request body for a single tag. Mirrors
+/// `apis::project::TagData` field-for-field. Two strings, both
+/// required (and validated non-empty after trim by the domain layer).
 #[derive(Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct CreateProductRequest {
-    pub code: String,
-    pub name: String,
-    pub description: String,
+pub struct TagDataRequest {
+    pub key: String,
+    pub value: String,
 }
 
-/// Wire-level request body for `PATCH /api/product/{code}`. Every
-/// field is optional; `skip_serializing_if` keeps a partial update
-/// round-trip lossless.
-#[derive(Serialize, Deserialize, ToSchema, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct UpdateProductRequest {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub code: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub description: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub active: Option<bool>,
-}
-
-/// Wire-level projection of a product.
+/// Wire-level projection of a single tag. Mirrors
+/// `apis::project::TagView` field-for-field.
 #[derive(Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct ProductViewResponse {
-    pub id: i32,
-    pub code: String,
-    pub name: String,
-    pub description: String,
-    pub active: bool,
-    pub created_at: chrono::DateTime<chrono::Utc>,
-    pub updated_at: chrono::DateTime<chrono::Utc>,
+pub struct TagViewResponse {
+    pub key: String,
+    pub value: String,
 }
 
-impl From<apis::project::ProductView> for ProductViewResponse {
-    fn from(view: apis::project::ProductView) -> Self {
+impl From<apis::project::TagView> for TagViewResponse {
+    fn from(view: apis::project::TagView) -> Self {
         Self {
-            id: view.id,
-            code: view.code,
-            name: view.name,
-            description: view.description,
-            active: view.active,
-            created_at: view.created_at,
-            updated_at: view.updated_at,
+            key: view.key,
+            value: view.value,
         }
     }
-}
-
-#[derive(Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ProductListResponse {
-    pub products: Vec<ProductViewResponse>,
 }
 
 // -- project membership DTOs -----------------------------------------------
@@ -389,11 +359,12 @@ impl From<apis::project::ProjectMemberView> for ProjectMemberViewResponse {
 pub struct CreateProjectRequest {
     pub code: String,
     pub description: String,
-    pub product_id: i32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub members: Option<ProjectMemberDataRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unblind_members: Option<ProjectMemberDataRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<TagDataRequest>>,
 }
 
 /// Wire-level request body for `PATCH /api/project/{code}`.
@@ -403,7 +374,9 @@ pub struct CreateProjectRequest {
 /// `Some(empty)` (a present `{}`) wipes the team. Both vector
 /// fields use `#[serde(default)]` so a present `{}` deserializes to
 /// `Some(ProjectMemberDataRequest { leaders: vec![], workers: vec![] })`
-/// rather than failing on missing keys.
+/// rather than failing on missing keys. `tags` follows the same
+/// `None`-vs-`Some(empty)` semantics: missing leaves the tag list
+/// alone, present-with-vec replaces it whole-list.
 #[derive(Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateProjectRequest {
@@ -412,13 +385,13 @@ pub struct UpdateProjectRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub product_id: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub active: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub members: Option<ProjectMemberDataRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unblind_members: Option<ProjectMemberDataRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tags: Option<Vec<TagDataRequest>>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -427,9 +400,9 @@ pub struct ProjectViewResponse {
     pub id: i32,
     pub code: String,
     pub description: String,
-    pub product: ProductViewResponse,
     pub members: ProjectMemberViewResponse,
     pub unblind_members: ProjectMemberViewResponse,
+    pub tags: Vec<TagViewResponse>,
     pub active: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
@@ -441,9 +414,9 @@ impl From<apis::project::ProjectView> for ProjectViewResponse {
             id: view.id,
             code: view.code,
             description: view.description,
-            product: view.product.into(),
             members: view.members.into(),
             unblind_members: view.unblind_members.into(),
+            tags: view.tags.into_iter().map(Into::into).collect(),
             active: view.active,
             created_at: view.created_at,
             updated_at: view.updated_at,
@@ -680,30 +653,13 @@ mod tests {
         assert_eq!(resp.token_version, 5);
     }
 
-    // ---- product DTO round-trips -----
-
-    fn sample_product_view() -> apis::project::ProductView {
-        apis::project::ProductView {
-            id: 1,
-            code: "product-1".into(),
-            name: "Atlas".into(),
-            description: "core platform".into(),
-            active: true,
-            created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
-                .unwrap()
-                .with_timezone(&chrono::Utc),
-            updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
-                .unwrap()
-                .with_timezone(&chrono::Utc),
-        }
-    }
+    // ---- project DTO round-trips -----
 
     fn sample_project_view() -> apis::project::ProjectView {
         apis::project::ProjectView {
             id: 2,
             code: "project-1".into(),
             description: "alpha".into(),
-            product: sample_product_view(),
             members: apis::project::ProjectMemberView {
                 leaders: vec![apis::project::UserSummaryView {
                     code: "leader-1".into(),
@@ -718,6 +674,16 @@ mod tests {
                     name: "Worker Two".into(),
                 }],
             },
+            tags: vec![
+                apis::project::TagView {
+                    key: "Product".into(),
+                    value: "DEMO-001".into(),
+                },
+                apis::project::TagView {
+                    key: "Region".into(),
+                    value: "EU".into(),
+                },
+            ],
             active: true,
             created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
                 .unwrap()
@@ -729,78 +695,35 @@ mod tests {
     }
 
     #[test]
-    fn create_product_request_roundtrip() {
-        let json = r#"{"code":"p1","name":"Atlas","description":"core"}"#;
-        let req: CreateProductRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.code, "p1");
-        assert_eq!(req.name, "Atlas");
-        assert_eq!(req.description, "core");
-        assert_eq!(serde_json::to_string(&req).unwrap(), json);
-    }
-
-    #[test]
-    fn update_product_request_partial_roundtrip() {
-        let json = r#"{"name":"Atlas v2"}"#;
-        let req: UpdateProductRequest = serde_json::from_str(json).unwrap();
-        assert!(req.code.is_none());
-        assert_eq!(req.name.as_deref(), Some("Atlas v2"));
-        assert!(req.description.is_none());
-        assert!(req.active.is_none());
-        assert_eq!(serde_json::to_string(&req).unwrap(), json);
-    }
-
-    #[test]
-    fn update_product_request_full_roundtrip() {
-        let json = r#"{"code":"p2","name":"B","description":"d","active":false}"#;
-        let req: UpdateProductRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.code.as_deref(), Some("p2"));
-        assert_eq!(req.name.as_deref(), Some("B"));
-        assert_eq!(req.description.as_deref(), Some("d"));
-        assert_eq!(req.active, Some(false));
-        assert_eq!(serde_json::to_string(&req).unwrap(), json);
-    }
-
-    #[test]
-    fn product_view_response_from_apis_view() {
-        let view = sample_product_view();
-        let resp: ProductViewResponse = view.into();
-        assert_eq!(resp.id, 1);
-        assert_eq!(resp.code, "product-1");
-        assert_eq!(resp.name, "Atlas");
-        assert_eq!(resp.description, "core platform");
-        assert!(resp.active);
-    }
-
-    #[test]
-    fn product_list_response_roundtrip() {
-        let json = r#"{"products":[]}"#;
-        let resp: ProductListResponse = serde_json::from_str(json).unwrap();
-        assert!(resp.products.is_empty());
-        assert_eq!(serde_json::to_string(&resp).unwrap(), json);
-    }
-
-    // ---- project DTO round-trips -----
-
-    #[test]
     fn create_project_request_minimal_roundtrip() {
-        let json = r#"{"code":"pr1","description":"x","product_id":42}"#;
+        let json = r#"{"code":"pr1","description":"x"}"#;
         let req: CreateProjectRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.code, "pr1");
         assert_eq!(req.description, "x");
-        assert_eq!(req.product_id, 42);
         assert!(req.members.is_none());
         assert!(req.unblind_members.is_none());
+        assert!(req.tags.is_none());
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
     }
 
     #[test]
     fn create_project_request_with_empty_members_roundtrip() {
-        let json =
-            r#"{"code":"pr1","description":"x","product_id":42,"members":{},"unblind_members":{}}"#;
+        let json = r#"{"code":"pr1","description":"x","members":{},"unblindMembers":{}}"#;
         let req: CreateProjectRequest = serde_json::from_str(json).unwrap();
         let members = req.members.as_ref().expect("members present");
         assert!(members.leaders.is_empty());
         assert!(members.workers.is_empty());
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn create_project_request_with_tags_roundtrip() {
+        let json = r#"{"code":"pr1","description":"x","tags":[{"key":"Product","value":"DEMO-001"}]}"#;
+        let req: CreateProjectRequest = serde_json::from_str(json).unwrap();
+        let tags = req.tags.as_ref().expect("tags present");
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].key, "Product");
+        assert_eq!(tags[0].value, "DEMO-001");
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
     }
 
@@ -810,12 +733,13 @@ mod tests {
         let req: UpdateProjectRequest = serde_json::from_str(json).unwrap();
         assert!(req.members.is_none());
         assert!(req.unblind_members.is_none());
+        assert!(req.tags.is_none());
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
     }
 
     #[test]
     fn update_project_request_empty_membership_becomes_some_empty() {
-        let json = r#"{"members":{},"unblind_members":{}}"#;
+        let json = r#"{"members":{},"unblindMembers":{}}"#;
         let req: UpdateProjectRequest = serde_json::from_str(json).unwrap();
         let members = req.members.as_ref().expect("members present");
         assert!(members.leaders.is_empty());
@@ -840,6 +764,26 @@ mod tests {
         assert!(members.workers.is_empty());
         assert!(req.unblind_members.is_none());
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn update_project_request_empty_tags_becomes_some_empty() {
+        let json = r#"{"tags":[]}"#;
+        let req: UpdateProjectRequest = serde_json::from_str(json).unwrap();
+        let tags = req.tags.as_ref().expect("tags present");
+        assert!(tags.is_empty());
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn tag_view_response_from_apis_view() {
+        let view = apis::project::TagView {
+            key: "Product".into(),
+            value: "DEMO-001".into(),
+        };
+        let resp: TagViewResponse = view.into();
+        assert_eq!(resp.key, "Product");
+        assert_eq!(resp.value, "DEMO-001");
     }
 
     #[test]
@@ -878,13 +822,15 @@ mod tests {
         let resp: ProjectViewResponse = view.into();
         assert_eq!(resp.id, 2);
         assert_eq!(resp.code, "project-1");
-        assert_eq!(resp.product.code, "product-1");
         assert_eq!(resp.members.leaders.len(), 1);
         assert_eq!(resp.members.leaders[0].code, "leader-1");
         assert!(resp.members.workers.is_empty());
         assert!(resp.unblind_members.leaders.is_empty());
         assert_eq!(resp.unblind_members.workers.len(), 1);
         assert_eq!(resp.unblind_members.workers[0].code, "worker-2");
+        assert_eq!(resp.tags.len(), 2);
+        assert_eq!(resp.tags[0].key, "Product");
+        assert_eq!(resp.tags[1].value, "EU");
     }
 
     #[test]

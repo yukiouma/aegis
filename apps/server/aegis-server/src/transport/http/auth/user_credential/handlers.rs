@@ -239,35 +239,6 @@ mod tests {
 
     #[async_trait]
     impl apis::project::ProjectService for NullProjectService {
-        async fn create_product(
-            &self,
-            _req: apis::project::CreateProductRequest,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            unimplemented!()
-        }
-        async fn get_product_by_id(
-            &self,
-            _id: i32,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            unimplemented!()
-        }
-        async fn get_product_by_code(
-            &self,
-            _code: &str,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            unimplemented!()
-        }
-        async fn list_products(
-            &self,
-        ) -> Result<Vec<apis::project::ProductView>, apis::project::ProjectApiError> {
-            unimplemented!()
-        }
-        async fn update_product(
-            &self,
-            _req: apis::project::UpdateProductRequest,
-        ) -> Result<apis::project::ProductView, apis::project::ProjectApiError> {
-            unimplemented!()
-        }
         async fn create_project(
             &self,
             _req: apis::project::CreateProjectRequest,
