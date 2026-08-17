@@ -16,6 +16,7 @@ sqlx = { version = "0.9", default-features = false, features = [
     "macros",
     "migrate",
     "chrono",
+    "json",
 ] }
 tokio = { version = "1.53", features = ["macros", "rt-multi-thread"] }
 argon2 = "0.5.3"
