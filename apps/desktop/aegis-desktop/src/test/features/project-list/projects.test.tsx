@@ -23,15 +23,6 @@ const projectFixture: ProjectView = {
   id: 1,
   code: "alpha",
   description: "Alpha project description",
-  product: {
-    id: 10,
-    code: "prod-a",
-    name: "Product A",
-    description: "Product A description",
-    active: true,
-    createdAt: "2026-01-01T00:00:00Z",
-    updatedAt: "2026-01-01T00:00:00Z",
-  },
   members: {
     leaders: [{ code: "alice", name: "Alice" }],
     workers: [{ code: "carol", name: "Carol" }],
@@ -40,6 +31,7 @@ const projectFixture: ProjectView = {
     leaders: [{ code: "bob", name: "Bob" }],
     workers: [],
   },
+  tags: [],
   active: true,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
@@ -73,7 +65,6 @@ function CreateHarness() {
         m.mutate({
           code: "newproj",
           description: "New",
-          productId: 10,
           members: { leaders: [], workers: [] },
           unblindMembers: { leaders: [], workers: [] },
         });
@@ -187,7 +178,6 @@ describe("useCreateProject", () => {
       expect(invoke).toHaveBeenCalledWith("create_project", {
         code: "newproj",
         description: "New",
-        productId: 10,
         members: { leaders: [], workers: [] },
         unblindMembers: { leaders: [], workers: [] },
       });

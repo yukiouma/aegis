@@ -18,20 +18,12 @@ const projectA: ProjectView = {
   id: 1,
   code: "alpha",
   description: "Alpha project",
-  product: {
-    id: 10,
-    code: "prod-a",
-    name: "Product A",
-    description: "",
-    active: true,
-    createdAt: "2026-01-01T00:00:00Z",
-    updatedAt: "2026-01-01T00:00:00Z",
-  },
   members: {
     leaders: [{ code: "alice", name: "Alice" }],
     workers: [{ code: "alice", name: "Alice" }],
   },
   unblindMembers: { leaders: [], workers: [] },
+  tags: [{ key: "Product", value: "DEMO-001" }],
   active: true,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
@@ -41,20 +33,12 @@ const projectB: ProjectView = {
   id: 2,
   code: "beta",
   description: "Beta project",
-  product: {
-    id: 10,
-    code: "prod-a",
-    name: "Product A",
-    description: "",
-    active: true,
-    createdAt: "2026-01-01T00:00:00Z",
-    updatedAt: "2026-01-01T00:00:00Z",
-  },
   members: { leaders: [], workers: [] },
   unblindMembers: {
     leaders: [{ code: "alice", name: "Alice" }],
     workers: [],
   },
+  tags: [{ key: "Product", value: "OTHER-002" }],
   active: false,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
@@ -67,6 +51,7 @@ const projectC: ProjectView = {
   description: "Gamma project",
   members: { leaders: [{ code: "zoe", name: "Zoe" }], workers: [] },
   unblindMembers: { leaders: [], workers: [] },
+  tags: [{ key: "Client", value: "ACME" }],
 };
 
 const adminUser: UserView = {
@@ -197,5 +182,39 @@ describe("ProjectListPage — role gating", () => {
     expect(
       await screen.findByRole("heading", { name: /create project/i }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("ProjectListPage — search filter spans tags", () => {
+  it("filters rows by tag value substring (case-insensitive) through the single search field", async () => {
+    await renderPage(adminUser, [projectA, projectB, projectC]);
+    await screen.findByText("alpha");
+    await userEvent.type(screen.getByLabelText(/search/i), "demo");
+    await waitFor(() => {
+      expect(screen.getByText("alpha")).toBeInTheDocument();
+      expect(screen.queryByText("beta")).not.toBeInTheDocument();
+      expect(screen.queryByText("gamma")).not.toBeInTheDocument();
+    });
+  });
+
+  it("tag match ORs with the existing code / description / leaders match", async () => {
+    // projectB has tag value "OTHER-002"; projectC has tag "ACME";
+    // projectA has tag "DEMO-001". Typing "002" matches projectB via
+    // its tag, even though no code/description/leader contains "002".
+    await renderPage(adminUser, [projectA, projectB, projectC]);
+    await screen.findByText("alpha");
+    await userEvent.type(screen.getByLabelText(/search/i), "002");
+    await waitFor(() => {
+      expect(screen.queryByText("alpha")).not.toBeInTheDocument();
+      expect(screen.getByText("beta")).toBeInTheDocument();
+      expect(screen.queryByText("gamma")).not.toBeInTheDocument();
+    });
+  });
+
+  it("leaves all rows visible when search is empty", async () => {
+    await renderPage(adminUser, [projectA, projectB, projectC]);
+    await screen.findByText("alpha");
+    expect(screen.getByText("beta")).toBeInTheDocument();
+    expect(screen.getByText("gamma")).toBeInTheDocument();
   });
 });

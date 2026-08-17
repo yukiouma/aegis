@@ -15,9 +15,10 @@ export interface ProjectFilterBarProps {
 
 /**
  * Search field + Involve toggle. Pure controlled component — the
- * orchestrator owns the state. The search field stays enabled even
- * when no current user is loaded; toggling Involve with no user just
- * produces an empty result.
+ * orchestrator owns the state. The search field matches across code,
+ * description, leaders, and tag values (see `ProjectListPage`'s
+ * filter); it stays enabled even when no current user is loaded,
+ * and toggling Involve with no user just produces an empty result.
  */
 export function ProjectFilterBar({
   query,

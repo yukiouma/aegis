@@ -17,6 +17,8 @@ interface DrawerState {
  * Project list page. Owns the search / Involve filter state and the
  * drawer mode; passes filtered rows down to the table. Filters are
  * applied client-side as a single useMemo over the project list.
+ * The single `query` search spans code, description, leaders, AND
+ * tag values (any one match keeps the row).
  */
 export function ProjectListPage() {
   const projects = useListProjects();
@@ -37,14 +39,17 @@ export function ProjectListPage() {
     const trimmed = query.trim();
     const q = trimmed.toLowerCase();
     return all.filter((row) => {
-      // Search filter.
+      // Search filter — matches code / description / leaders / tag values.
       if (q.length > 0) {
         const inCode = row.code.toLowerCase().includes(q);
         const inDescription = row.description.toLowerCase().includes(q);
         const inLeaders =
           leaderMatches(row.members.leaders, q) ||
           leaderMatches(row.unblindMembers.leaders, q);
-        if (!inCode && !inDescription && !inLeaders) return false;
+        const inTag = row.tags.some((tag) =>
+          tag.value.toLowerCase().includes(q),
+        );
+        if (!inCode && !inDescription && !inLeaders && !inTag) return false;
       }
       // Involve filter.
       if (involve && currentCode) {

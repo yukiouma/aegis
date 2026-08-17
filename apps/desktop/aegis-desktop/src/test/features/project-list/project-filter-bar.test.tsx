@@ -25,8 +25,8 @@ function renderBar(props: {
         <AegisI18nProvider>
           <ProjectFilterBar
             query={props.query ?? ""}
-            onQueryChange={onQueryChange}
             involve={props.involve ?? false}
+            onQueryChange={onQueryChange}
             onInvolveChange={onInvolveChange}
           />
         </AegisI18nProvider>
@@ -61,5 +61,11 @@ describe("ProjectFilterBar", () => {
     const { onInvolveChange } = renderBar({ involve: false });
     await userEvent.click(screen.getByRole("checkbox", { name: /involve/i }));
     expect(onInvolveChange).toHaveBeenCalledWith(true);
+  });
+
+  it("does not render a separate tag filter input (merged into search)", () => {
+    renderBar({ query: "demo" });
+    expect(screen.queryByLabelText(/filter by tag/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/search/i)).toHaveValue("demo");
   });
 });

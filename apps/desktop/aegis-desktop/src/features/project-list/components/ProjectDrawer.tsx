@@ -19,15 +19,15 @@ import {
   useProject,
   useUpdateProject,
 } from "../data/projects";
-import { useListProducts } from "../data/products";
 import {
   type ApiError,
   type CreateProjectInput,
-  type ProductView,
+  type Tag,
   type UpdateProjectBody,
   type UserSummary,
 } from "../../../shared/api";
 import { errorMessage } from "../../../shared/api/error";
+import { TagEditor } from "./TagEditor";
 
 export interface ProjectDrawerProps {
   mode: "closed" | "create" | "edit";
@@ -40,12 +40,16 @@ export interface ProjectDrawerProps {
  * mounts when `mode !== "closed"` because the underlying Modal unmounts
  * children when `open={false}`. Edit mode triggers a one-shot
  * `get_project_by_code` fetch via `refetch()` to seed the form. The
- * `lookedUp` ref guards against React StrictMode double-fire.
+ * `lookedUp` ref guards against React StrictMode double-fire. The
+ * server's update endpoint treats a missing `tags` field as "leave
+ * alone" and a present `tags` field as "replace whole list"; we honour
+ * that by tracking `tagsTouched` and only including `tags` in the
+ * update body when the user actually edited the editor in this
+ * session.
  */
 export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
   const { t } = useI18n();
 
-  const products = useListProducts();
   const users = useListUsers();
   const fetched = useProject(code);
   const create = useCreateProject();
@@ -54,11 +58,12 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
   // Form state.
   const [formCode, setFormCode] = useState("");
   const [description, setDescription] = useState("");
-  const [productId, setProductId] = useState<number | null>(null);
   const [memberLeaders, setMemberLeaders] = useState<UserSummary[]>([]);
   const [memberWorkers, setMemberWorkers] = useState<UserSummary[]>([]);
   const [unblindLeaders, setUnblindLeaders] = useState<UserSummary[]>([]);
   const [unblindWorkers, setUnblindWorkers] = useState<UserSummary[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [tagsTouched, setTagsTouched] = useState(false);
   const [active, setActive] = useState(true);
 
   // Seed form when edit mode opens. StrictMode-safe via `lookedUp` ref.
@@ -72,11 +77,12 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
       if (r.isError || !r.data) return;
       setFormCode(r.data.code);
       setDescription(r.data.description);
-      setProductId(r.data.product.id);
       setMemberLeaders(r.data.members.leaders);
       setMemberWorkers(r.data.members.workers);
       setUnblindLeaders(r.data.unblindMembers.leaders);
       setUnblindWorkers(r.data.unblindMembers.workers);
+      setTags(r.data.tags);
+      setTagsTouched(false);
       setActive(r.data.active);
     })();
   }, [mode, code, fetched]);
@@ -84,7 +90,6 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
   const submitDisabled =
     !formCode.trim() ||
     !description.trim() ||
-    productId === null ||
     create.isPending ||
     update.isPending;
 
@@ -98,22 +103,22 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
       workers: unblindWorkers.map((u) => u.code),
     };
     try {
-      if (mode === "create" && productId !== null) {
+      if (mode === "create") {
         const input: CreateProjectInput = {
           code: formCode.trim(),
           description: description.trim(),
-          productId,
           members,
           unblindMembers,
+          tags,
         };
         await create.mutateAsync(input);
       } else if (mode === "edit" && code) {
         const body: UpdateProjectBody = {
           description: description.trim(),
-          productId: productId ?? undefined,
           active,
           members,
           unblindMembers,
+          ...(tagsTouched ? { tags } : {}),
         };
         await update.mutateAsync({ code, body });
       }
@@ -157,21 +162,10 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
           required
         />
 
-        <Autocomplete
-          options={products.data ?? []}
-          getOptionLabel={(p: ProductView) => `${p.code} — ${p.name}`}
-          value={products.data?.find((p) => p.id === productId) ?? null}
-          onChange={(_e, value: ProductView | null) =>
-            setProductId(value?.id ?? null)
-          }
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label={t("project.field.product")}
-              size="small"
-              required
-            />
-          )}
+        <TagEditor
+          value={tags}
+          onChange={setTags}
+          onTouched={() => setTagsTouched(true)}
         />
 
         <Autocomplete<UserSummary, true>

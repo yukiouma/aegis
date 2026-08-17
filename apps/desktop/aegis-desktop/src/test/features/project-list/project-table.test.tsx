@@ -12,15 +12,6 @@ const baseRow: ProjectView = {
   id: 1,
   code: "alpha",
   description: "Alpha project",
-  product: {
-    id: 10,
-    code: "prod-a",
-    name: "Product A",
-    description: "",
-    active: true,
-    createdAt: "2026-01-01T00:00:00Z",
-    updatedAt: "2026-01-01T00:00:00Z",
-  },
   members: {
     leaders: [{ code: "alice", name: "Alice" }],
     workers: [],
@@ -29,6 +20,7 @@ const baseRow: ProjectView = {
     leaders: [{ code: "bob", name: "Bob" }],
     workers: [],
   },
+  tags: [],
   active: true,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
@@ -71,11 +63,12 @@ function renderTable(props: {
 }
 
 describe("ProjectTable — column rendering", () => {
-  it("renders all five column headers", () => {
+  it("renders all six column headers", () => {
     renderTable();
     expect(screen.getByRole("columnheader", { name: /^code$/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /^description$/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /^leaders$/i })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: /^tags$/i })).toBeInTheDocument();
     expect(screen.getByRole("columnheader", { name: /^status$/i })).toBeInTheDocument();
   });
 
@@ -103,7 +96,51 @@ describe("ProjectTable — column rendering", () => {
         },
       ],
     });
-    expect(screen.getByText("—")).toBeInTheDocument();
+    expect(screen.getAllByText("—").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("renders a Tags column header between Leaders and Status", () => {
+    renderTable();
+    const headers = screen.getAllByRole("columnheader");
+    const headersText = headers.map((h) => h.textContent?.trim().toLowerCase() ?? "");
+    expect(headersText).toContain("tags");
+    expect(headersText.indexOf("leaders")).toBeLessThan(headersText.indexOf("tags"));
+    expect(headersText.indexOf("tags")).toBeLessThan(headersText.indexOf("status"));
+  });
+
+  it("renders each tag as a chip labelled by value with the key in title", () => {
+    renderTable({
+      rows: [
+        {
+          ...baseRow,
+          tags: [
+            { key: "Product", value: "DEMO-001" },
+            { key: "Client", value: "ACME" },
+          ],
+        },
+      ],
+    });
+    expect(screen.getByText("DEMO-001")).toBeInTheDocument();
+    expect(screen.getByText("ACME")).toBeInTheDocument();
+    expect(screen.getByTitle("Product")).toBeInTheDocument();
+    expect(screen.getByTitle("Client")).toBeInTheDocument();
+  });
+
+  it("renders an em-dash in the tags cell when tags is empty", () => {
+    renderTable({
+      rows: [
+        {
+          ...baseRow,
+          // Force at least the leaders cell to also render an em-dash
+          // so we have multiple dashes; the test asserts only the count.
+          members: { leaders: [], workers: [] },
+          unblindMembers: { leaders: [], workers: [] },
+          tags: [],
+        },
+      ],
+    });
+    const dashes = screen.getAllByText("—");
+    expect(dashes.length).toBeGreaterThanOrEqual(2);
   });
 
   it("renders a CheckCircle icon for active=true", () => {
