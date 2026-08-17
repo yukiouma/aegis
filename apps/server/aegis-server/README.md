@@ -45,10 +45,6 @@ tests/
 | GET    | `/api/user`                   | list users                           | Bearer                     |
 | GET    | `/api/user/{code}`            | get user                             | Bearer                     |
 | PATCH  | `/api/user/{code}`            | partial update user                  | Bearer                     |
-| POST   | `/api/product`                | create product                       | Bearer (`Root`/`Admin`)    |
-| GET    | `/api/product`                | list products                        | Bearer                     |
-| GET    | `/api/product/{code}`         | get product by code                  | Bearer                     |
-| PATCH  | `/api/product/{code}`         | partial update product               | Bearer (`Root`/`Admin`)    |
 | POST   | `/api/project`                | create project                       | Bearer (`Root`/`Admin`)    |
 | GET    | `/api/project`                | list projects                        | Bearer                     |
 | GET    | `/api/project/{code}`         | get project by code                  | Bearer                     |
@@ -126,7 +122,6 @@ Every error is rendered as a typed `ErrorBody`:
 | ---------------------------- | ---- | ------------------------------------ |
 | `validation_failed`          | 400  | request body failed validation       |
 | `not_found`                  | 404  | user / domain identity not found     |
-| `product_not_found`          | 404  | project references a missing product |
 | `user_not_found`             | 404  | project member references a missing user |
 | `user_inactive`              | 403  | user exists but `active = false`     |
 | `invalid_credentials`        | 401  | wrong password                       |
