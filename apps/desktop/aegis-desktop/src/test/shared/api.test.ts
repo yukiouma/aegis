@@ -105,37 +105,6 @@ describe("api wrappers", () => {
     });
   });
 
-  it("createProduct -> invoke('create_product', input)", async () => {
-    mockInvoke.mockResolvedValueOnce({});
-    await api.createProduct({ code: "p", name: "P", description: "" });
-    expect(mockInvoke).toHaveBeenCalledWith("create_product", {
-      code: "p",
-      name: "P",
-      description: "",
-    });
-  });
-
-  it("listProducts -> invoke('list_products')", async () => {
-    mockInvoke.mockResolvedValueOnce([]);
-    await api.listProducts();
-    expect(mockInvoke).toHaveBeenCalledWith("list_products");
-  });
-
-  it("getProductByCode -> invoke('get_product_by_code', { code })", async () => {
-    mockInvoke.mockResolvedValueOnce({});
-    await api.getProductByCode("p");
-    expect(mockInvoke).toHaveBeenCalledWith("get_product_by_code", { code: "p" });
-  });
-
-  it("updateProduct -> invoke('update_product', { code, body })", async () => {
-    mockInvoke.mockResolvedValueOnce({});
-    await api.updateProduct("p", { active: false });
-    expect(mockInvoke).toHaveBeenCalledWith("update_product", {
-      code: "p",
-      body: { active: false },
-    });
-  });
-
   it("createProject -> invoke('create_project', input)", async () => {
     mockInvoke.mockResolvedValueOnce({});
     await api.createProject({ code: "p", description: "" });

@@ -2,15 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 import type {
-  CreateProductInput,
   CreateProjectInput,
   CreateUserInput,
   Identity,
-  ProductView,
   ProjectView,
   RegisterUserInput,
   RegisterUserResponse,
-  UpdateProductBody,
   UpdateProjectBody,
   UpdateUserBody,
   UpdateUserCredentialInput,
@@ -61,13 +58,8 @@ export const api = {
     call<UserView>("update_user", { code, body: { ...body } }),
 
   // product
-  createProduct: (input: CreateProductInput): Promise<ProductView> =>
-    call<ProductView>("create_product", { ...input }),
-  listProducts: (): Promise<ProductView[]> => call<ProductView[]>("list_products"),
-  getProductByCode: (code: string): Promise<ProductView> =>
-    call<ProductView>("get_product_by_code", { code }),
-  updateProduct: (code: string, body: UpdateProductBody): Promise<ProductView> =>
-    call<ProductView>("update_product", { code, body: { ...body } }),
+  // (Product CRUD was removed from the server alongside the retired
+  //  Product aggregate; the desktop wrappers were dropped with it.)
 
   // project
   createProject: (input: CreateProjectInput): Promise<ProjectView> =>
@@ -104,11 +96,9 @@ export const api = {
 
 export type { ApiError } from "./types";
 export type {
-  CreateProductInput,
   CreateProjectInput,
   CreateUserInput,
   Identity,
-  ProductView,
   ProjectMembers,
   ProjectMembersView,
   ProjectView,
@@ -116,7 +106,6 @@ export type {
   RegisterUserInput,
   RegisterUserResponse,
   Tag,
-  UpdateProductBody,
   UpdateProjectBody,
   UpdateUserBody,
   UpdateUserCredentialInput,

@@ -6,4 +6,3 @@ export {
   useUpdateProject,
   useProject,
 } from "./data/projects";
-export { useListProducts } from "./data/products";
