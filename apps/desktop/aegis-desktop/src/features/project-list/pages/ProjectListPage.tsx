@@ -14,9 +14,11 @@ interface DrawerState {
 }
 
 /**
- * Project list page. Owns the search / tag / Involve filter state and
- * the drawer mode; passes filtered rows down to the table. Filters
- * are applied client-side as a single useMemo over the project list.
+ * Project list page. Owns the search / Involve filter state and the
+ * drawer mode; passes filtered rows down to the table. Filters are
+ * applied client-side as a single useMemo over the project list.
+ * The single `query` search spans code, description, leaders, AND
+ * tag values (any one match keeps the row).
  */
 export function ProjectListPage() {
   const projects = useListProjects();
@@ -26,7 +28,6 @@ export function ProjectListPage() {
   const canEdit = role === "root" || role === "admin";
 
   const [query, setQuery] = useState("");
-  const [tagQuery, setTagQuery] = useState("");
   const [involve, setInvolve] = useState(false);
   const [drawer, setDrawer] = useState<DrawerState>({
     mode: "closed",
@@ -37,23 +38,18 @@ export function ProjectListPage() {
     const all = projects.data ?? [];
     const trimmed = query.trim();
     const q = trimmed.toLowerCase();
-    const t = tagQuery.trim().toLowerCase();
     return all.filter((row) => {
-      // Search filter.
+      // Search filter — matches code / description / leaders / tag values.
       if (q.length > 0) {
         const inCode = row.code.toLowerCase().includes(q);
         const inDescription = row.description.toLowerCase().includes(q);
         const inLeaders =
           leaderMatches(row.members.leaders, q) ||
           leaderMatches(row.unblindMembers.leaders, q);
-        if (!inCode && !inDescription && !inLeaders) return false;
-      }
-      // Tag value substring filter.
-      if (t.length > 0) {
         const inTag = row.tags.some((tag) =>
-          tag.value.toLowerCase().includes(t),
+          tag.value.toLowerCase().includes(q),
         );
-        if (!inTag) return false;
+        if (!inCode && !inDescription && !inLeaders && !inTag) return false;
       }
       // Involve filter.
       if (involve && currentCode) {
@@ -66,7 +62,7 @@ export function ProjectListPage() {
       }
       return true;
     });
-  }, [projects.data, query, tagQuery, involve, currentCode]);
+  }, [projects.data, query, involve, currentCode]);
 
   const handleOpenWorkspace = useCallback((code: string) => {
     void api.openProjectWorkspace(code);
@@ -77,8 +73,6 @@ export function ProjectListPage() {
       <ProjectFilterBar
         query={query}
         onQueryChange={setQuery}
-        tagQuery={tagQuery}
-        onTagQueryChange={setTagQuery}
         involve={involve}
         onInvolveChange={setInvolve}
       />

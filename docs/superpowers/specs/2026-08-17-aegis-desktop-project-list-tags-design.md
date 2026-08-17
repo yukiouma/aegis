@@ -6,7 +6,7 @@ Surface the project tag data the server already returns (Rust wire DTOs are wire
 
 1. Display each project's tags in the list table, immediately before the status column.
 2. Let the user add / remove / edit `key:value` tags from the `ProjectDrawer`, in both create and edit mode.
-3. Add a free-text filter so the user can narrow the list to projects whose tag **values** contain a substring.
+3. Add a free-text filter so the user can narrow the list to projects whose tag **values** contain a substring. The tag-value filter is folded into the existing search field — one input that matches across code, description, leaders, and tag values.
 
 Server-side contracts and the Tauri `src-tauri/src/http/dto.rs` are already in place — see [the server-side tag spec](2026-08-17-project-tag-design.md) — and require no changes from this design.
 
@@ -19,7 +19,7 @@ In scope:
 - `apps/desktop/aegis-desktop/src/features/project-list/components/ProjectFilterBar.tsx` — new tag-value filter input.
 - `apps/desktop/aegis-desktop/src/features/project-list/components/TagEditor.tsx` — new file, controllable row-stack editor.
 - `apps/desktop/aegis-desktop/src/features/project-list/components/ProjectDrawer.tsx` — integrate `TagEditor`, gate "send tags" on a `tagsTouched` flag.
-- `apps/desktop/aegis-desktop/src/features/project-list/pages/ProjectListPage.tsx` — own `tagQuery` state, AND it into the existing client-side filter `useMemo`.
+- `apps/desktop/aegis-desktop/src/features/project-list/pages/ProjectListPage.tsx` — extend the existing `query` filter to also match tag values (no new state shape).
 
 Out of scope:
 
@@ -45,10 +45,10 @@ features/project-list/
   data/projects.ts                            ← unchanged (Create/Update hooks already take the input/body types)
   components/
     ProjectTable.tsx                          ← inserts Tags column
-    ProjectFilterBar.tsx                      ← adds tagQuery input (controlled)
+    ProjectFilterBar.tsx                      ← unchanged (no new field; existing search label updated)
     TagEditor.tsx (new)                       ← {key,value} row stack, pure controlled
     ProjectDrawer.tsx                         ← wires TagEditor, gates body on tagsTouched
-  pages/ProjectListPage.tsx                   ← owns tagQuery, ANDs it into filteredRows
+  pages/ProjectListPage.tsx                   ← extends `query` filter to also match tag values
 ```
 
 No data hooks change — `useListProjects`, `useCreateProject`, `useUpdateProject`, `useProject` already invalidate the right caches on success.
@@ -115,7 +115,7 @@ The `tagsTouched` flag flips to `true` on the first `onChange` and is **not** re
 const [tagQuery, setTagQuery] = useState("");
 ```
 
-The three filter dimensions (`query`, `involve`, `tagQuery`) compose with AND in the same `useMemo`.
+The two filter dimensions (`query`, `involve`) compose with AND in the same `useMemo`. The single `query` input matches across code, description, leaders, **and** tag values — OR-ed within the `query` dimension.
 
 ## Components
 
@@ -151,9 +151,8 @@ export interface TagEditorProps {
 
 ### `ProjectFilterBar` (modify)
 
-- New prop pair: `tagQuery: string`, `onTagQueryChange: (value: string) => void`.
-- Renders a second `TextField size="small" label={t("project.filter.tag.label")} value={tagQuery} onChange={...} sx={{ minWidth: 240 }}` to the right of the existing search field.
-- Wrap with the same `Box sx={{ display: "flex", alignItems: "center", gap: 2 }}` — the existing `Involve` checkbox stays right-aligned via the existing `sx={{ ml: "auto" }}`.
+- **No new props.** Tag values are now matched by the existing `query` input — the bar's render shape is unchanged.
+- The `query` field's label is updated via i18n (see Global Constraints) so users know the search spans tags too.
 - Pure controlled component, same pattern as today.
 
 ### `ProjectDrawer` (modify)
@@ -207,13 +206,15 @@ if (mode === "create") {
 
 ### `ProjectListPage` (modify)
 
-- New state: `const [tagQuery, setTagQuery] = useState("")`.
-- Pass `tagQuery` / `setTagQuery` down to `ProjectFilterBar`.
-- Inside `filteredRows = useMemo(...)`, append an AND clause:
-  - `if (t.length > 0 && !row.tags.some(tag => tag.value.toLowerCase().includes(t))) return false;`
-  - where `t = tagQuery.trim().toLowerCase()`.
-- Dependency array: add `tagQuery`.
-- All other behavior (search filter over code/description/leaders, Involve filter) is unchanged.
+- **No new state.** Tag-value matching lives in the existing `query` filter.
+- Inside `filteredRows = useMemo(...)`, extend the search filter clause:
+  - When `q.length > 0`, the row passes if any of `code`, `description`, `members.leaders.{code,name}`, `unblindMembers.leaders.{code,name}`, or any `tags[].value` contains `q`.
+  - This is OR-ed within the `query` dimension; `involve` is still AND-ed at the next dimension.
+- All other behavior is unchanged.
+
+### Behavioral note
+
+A substring like `"demo"` typed into the single search field now matches a project's tag value `DEMO-007` AND its code/description/leaders. Substrings continue to be case-insensitive and trimmed.
 
 ## Tests
 
