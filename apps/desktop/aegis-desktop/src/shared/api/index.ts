@@ -115,6 +115,7 @@ export type {
   Role,
   RegisterUserInput,
   RegisterUserResponse,
+  Tag,
   UpdateProductBody,
   UpdateProjectBody,
   UpdateUserBody,

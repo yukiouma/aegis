@@ -120,13 +120,17 @@ export interface ProjectMembersView {
   leaders: UserSummary[];
   workers: UserSummary[];
 }
+export interface Tag {
+  key: string;
+  value: string;
+}
 export interface ProjectView {
   id: number;
   code: string;
   description: string;
-  product: ProductView;
   members: ProjectMembersView;
   unblindMembers: ProjectMembersView;
+  tags: Tag[];
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -134,15 +138,15 @@ export interface ProjectView {
 export interface CreateProjectInput {
   code: string;
   description: string;
-  productId: number;
   members?: ProjectMembers;
   unblindMembers?: ProjectMembers;
+  tags?: Tag[];
 }
 export interface UpdateProjectBody {
   code?: string;
   description?: string;
-  productId?: number;
   active?: boolean;
   members?: ProjectMembers;
   unblindMembers?: ProjectMembers;
+  tags?: Tag[];
 }

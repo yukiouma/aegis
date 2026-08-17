@@ -12,15 +12,6 @@ const baseRow: ProjectView = {
   id: 1,
   code: "alpha",
   description: "Alpha project",
-  product: {
-    id: 10,
-    code: "prod-a",
-    name: "Product A",
-    description: "",
-    active: true,
-    createdAt: "2026-01-01T00:00:00Z",
-    updatedAt: "2026-01-01T00:00:00Z",
-  },
   members: {
     leaders: [{ code: "alice", name: "Alice" }],
     workers: [],
@@ -29,6 +20,7 @@ const baseRow: ProjectView = {
     leaders: [{ code: "bob", name: "Bob" }],
     workers: [],
   },
+  tags: [],
   active: true,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",

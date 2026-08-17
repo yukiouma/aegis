@@ -19,11 +19,9 @@ import {
   useProject,
   useUpdateProject,
 } from "../data/projects";
-import { useListProducts } from "../data/products";
 import {
   type ApiError,
   type CreateProjectInput,
-  type ProductView,
   type UpdateProjectBody,
   type UserSummary,
 } from "../../../shared/api";
@@ -45,7 +43,6 @@ export interface ProjectDrawerProps {
 export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
   const { t } = useI18n();
 
-  const products = useListProducts();
   const users = useListUsers();
   const fetched = useProject(code);
   const create = useCreateProject();
@@ -54,7 +51,6 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
   // Form state.
   const [formCode, setFormCode] = useState("");
   const [description, setDescription] = useState("");
-  const [productId, setProductId] = useState<number | null>(null);
   const [memberLeaders, setMemberLeaders] = useState<UserSummary[]>([]);
   const [memberWorkers, setMemberWorkers] = useState<UserSummary[]>([]);
   const [unblindLeaders, setUnblindLeaders] = useState<UserSummary[]>([]);
@@ -72,7 +68,6 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
       if (r.isError || !r.data) return;
       setFormCode(r.data.code);
       setDescription(r.data.description);
-      setProductId(r.data.product.id);
       setMemberLeaders(r.data.members.leaders);
       setMemberWorkers(r.data.members.workers);
       setUnblindLeaders(r.data.unblindMembers.leaders);
@@ -84,7 +79,6 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
   const submitDisabled =
     !formCode.trim() ||
     !description.trim() ||
-    productId === null ||
     create.isPending ||
     update.isPending;
 
@@ -98,11 +92,10 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
       workers: unblindWorkers.map((u) => u.code),
     };
     try {
-      if (mode === "create" && productId !== null) {
+      if (mode === "create") {
         const input: CreateProjectInput = {
           code: formCode.trim(),
           description: description.trim(),
-          productId,
           members,
           unblindMembers,
         };
@@ -110,7 +103,6 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
       } else if (mode === "edit" && code) {
         const body: UpdateProjectBody = {
           description: description.trim(),
-          productId: productId ?? undefined,
           active,
           members,
           unblindMembers,
@@ -155,23 +147,6 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
           minRows={2}
           size="small"
           required
-        />
-
-        <Autocomplete
-          options={products.data ?? []}
-          getOptionLabel={(p: ProductView) => `${p.code} — ${p.name}`}
-          value={products.data?.find((p) => p.id === productId) ?? null}
-          onChange={(_e, value: ProductView | null) =>
-            setProductId(value?.id ?? null)
-          }
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label={t("project.field.product")}
-              size="small"
-              required
-            />
-          )}
         />
 
         <Autocomplete<UserSummary, true>

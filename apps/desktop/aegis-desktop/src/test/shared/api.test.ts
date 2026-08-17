@@ -138,11 +138,10 @@ describe("api wrappers", () => {
 
   it("createProject -> invoke('create_project', input)", async () => {
     mockInvoke.mockResolvedValueOnce({});
-    await api.createProject({ code: "p", description: "", productId: 1 });
+    await api.createProject({ code: "p", description: "" });
     expect(mockInvoke).toHaveBeenCalledWith("create_project", {
       code: "p",
       description: "",
-      productId: 1,
     });
   });
 

@@ -53,7 +53,6 @@ const projectFixture: ProjectView = {
   id: 1,
   code: "alpha",
   description: "Alpha description",
-  product: productFixture,
   members: {
     leaders: [{ code: "alice", name: "Alice" }],
     workers: [],
@@ -62,6 +61,7 @@ const projectFixture: ProjectView = {
     leaders: [],
     workers: [],
   },
+  tags: [],
   active: true,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
