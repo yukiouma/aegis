@@ -66,12 +66,35 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
   const [tagsTouched, setTagsTouched] = useState(false);
   const [active, setActive] = useState(true);
 
-  // Seed form when edit mode opens. StrictMode-safe via `lookedUp` ref.
-  const lookedUp = useRef(false);
+  // Reset form to a clean slate when entering create mode. Depending
+  // only on `mode` (not on the setters) means subsequent renders
+  // while staying in "create" don't re-fire — only the transition
+  // into "create" wipes the form. Without this, a previous edit
+  // session's fields would bleed into the next create session
+  // because the drawer component itself never unmounts.
+  useEffect(() => {
+    if (mode !== "create") return;
+    setFormCode("");
+    setDescription("");
+    setMemberLeaders([]);
+    setMemberWorkers([]);
+    setUnblindLeaders([]);
+    setUnblindWorkers([]);
+    setTags([]);
+    setTagsTouched(false);
+    setActive(true);
+  }, [mode]);
+
+  // Seed form when edit mode opens. The ref tracks which `code` we've
+  // already seeded for, so StrictMode re-runs of the same code are a
+  // no-op, but opening the drawer for a *different* project still
+  // re-seeds. (`lookedUp: boolean` would persist across project
+  // switches and freeze the form on the first project's data.)
+  const lookedUpCode = useRef<string | null>(null);
   useEffect(() => {
     if (mode !== "edit" || code === null) return;
-    if (lookedUp.current) return;
-    lookedUp.current = true;
+    if (lookedUpCode.current === code) return;
+    lookedUpCode.current = code;
     void (async () => {
       const r = await fetched.refetch();
       if (r.isError || !r.data) return;
