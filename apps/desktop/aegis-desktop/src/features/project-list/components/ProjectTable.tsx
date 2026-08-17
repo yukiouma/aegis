@@ -80,6 +80,7 @@ export function ProjectTable({
               <TableCell>{t("project.field.code")}</TableCell>
               <TableCell>{t("project.field.description")}</TableCell>
               <TableCell>{t("project.col.leaders")}</TableCell>
+              <TableCell>{t("project.col.tags")}</TableCell>
               <TableCell>{t("project.col.active")}</TableCell>
               <TableCell align="right">
                 {canEdit ? (
@@ -128,6 +129,23 @@ export function ProjectTable({
                         />
                       ))}
                       {noLeaders && <span>—</span>}
+                    </Stack>
+                  </TableCell>
+                  <TableCell>
+                    <Stack
+                      direction="row"
+                      spacing={0.5}
+                      sx={{ flexWrap: "wrap", gap: 0.5 }}
+                    >
+                      {row.tags.map((tag, i) => (
+                        <Chip
+                          key={`tag-${i}-${tag.key}-${tag.value}`}
+                          size="small"
+                          label={tag.value}
+                          title={tag.key}
+                        />
+                      ))}
+                      {row.tags.length === 0 && <span>—</span>}
                     </Stack>
                   </TableCell>
                   <TableCell>
