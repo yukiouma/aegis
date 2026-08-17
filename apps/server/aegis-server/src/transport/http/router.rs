@@ -520,10 +520,7 @@ mod tests {
                 "{method} {path} must require BearerAuth",
             );
         }
-        for (method, path) in [
-            ("post", "/api/project"),
-            ("patch", "/api/project/{code}"),
-        ] {
+        for (method, path) in [("post", "/api/project"), ("patch", "/api/project/{code}")] {
             let op = &doc["paths"][path][method];
             let response_keys: Vec<&str> = op["responses"]
                 .as_object()

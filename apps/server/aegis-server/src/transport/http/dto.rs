@@ -718,7 +718,8 @@ mod tests {
 
     #[test]
     fn create_project_request_with_tags_roundtrip() {
-        let json = r#"{"code":"pr1","description":"x","tags":[{"key":"Product","value":"DEMO-001"}]}"#;
+        let json =
+            r#"{"code":"pr1","description":"x","tags":[{"key":"Product","value":"DEMO-001"}]}"#;
         let req: CreateProjectRequest = serde_json::from_str(json).unwrap();
         let tags = req.tags.as_ref().expect("tags present");
         assert_eq!(tags.len(), 1);
