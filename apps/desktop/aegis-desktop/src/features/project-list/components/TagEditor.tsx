@@ -78,11 +78,9 @@ export function TagEditor({ value, onChange, onTouched }: TagEditorProps) {
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
       <Stack spacing={1}>
         {value.map((tag, i) => (
-          <Stack
+          <Box
             key={`row-${i}-${tag.key}-${tag.value}`}
-            direction="row"
-            spacing={1}
-            alignItems="center"
+            sx={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 1 }}
           >
             <TextField
               size="small"
@@ -107,7 +105,7 @@ export function TagEditor({ value, onChange, onTouched }: TagEditorProps) {
             >
               <Close />
             </IconButton>
-          </Stack>
+          </Box>
         ))}
       </Stack>
       <Box sx={{ display: "flex", justifyContent: "flex-start" }}>

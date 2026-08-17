@@ -14,9 +14,9 @@ interface DrawerState {
 }
 
 /**
- * Project list page. Owns the search / Involve filter state and the
- * drawer mode; passes filtered rows down to the table. Filters are
- * applied client-side as a single useMemo over the project list.
+ * Project list page. Owns the search / tag / Involve filter state and
+ * the drawer mode; passes filtered rows down to the table. Filters
+ * are applied client-side as a single useMemo over the project list.
  */
 export function ProjectListPage() {
   const projects = useListProjects();
@@ -26,6 +26,7 @@ export function ProjectListPage() {
   const canEdit = role === "root" || role === "admin";
 
   const [query, setQuery] = useState("");
+  const [tagQuery, setTagQuery] = useState("");
   const [involve, setInvolve] = useState(false);
   const [drawer, setDrawer] = useState<DrawerState>({
     mode: "closed",
@@ -36,6 +37,7 @@ export function ProjectListPage() {
     const all = projects.data ?? [];
     const trimmed = query.trim();
     const q = trimmed.toLowerCase();
+    const t = tagQuery.trim().toLowerCase();
     return all.filter((row) => {
       // Search filter.
       if (q.length > 0) {
@@ -45,6 +47,13 @@ export function ProjectListPage() {
           leaderMatches(row.members.leaders, q) ||
           leaderMatches(row.unblindMembers.leaders, q);
         if (!inCode && !inDescription && !inLeaders) return false;
+      }
+      // Tag value substring filter.
+      if (t.length > 0) {
+        const inTag = row.tags.some((tag) =>
+          tag.value.toLowerCase().includes(t),
+        );
+        if (!inTag) return false;
       }
       // Involve filter.
       if (involve && currentCode) {
@@ -57,7 +66,7 @@ export function ProjectListPage() {
       }
       return true;
     });
-  }, [projects.data, query, involve, currentCode]);
+  }, [projects.data, query, tagQuery, involve, currentCode]);
 
   const handleOpenWorkspace = useCallback((code: string) => {
     void api.openProjectWorkspace(code);
@@ -68,6 +77,8 @@ export function ProjectListPage() {
       <ProjectFilterBar
         query={query}
         onQueryChange={setQuery}
+        tagQuery={tagQuery}
+        onTagQueryChange={setTagQuery}
         involve={involve}
         onInvolveChange={setInvolve}
       />

@@ -11,22 +11,28 @@ afterEach(() => cleanup());
 
 function renderBar(props: {
   query?: string;
+  tagQuery?: string;
   involve?: boolean;
   onQueryChange?: (v: string) => void;
+  onTagQueryChange?: (v: string) => void;
   onInvolveChange?: (v: boolean) => void;
 } = {}) {
   const onQueryChange = props.onQueryChange ?? vi.fn();
+  const onTagQueryChange = props.onTagQueryChange ?? vi.fn();
   const onInvolveChange = props.onInvolveChange ?? vi.fn();
   return {
     onQueryChange,
+    onTagQueryChange,
     onInvolveChange,
     ...render(
       <AegisThemeProvider>
         <AegisI18nProvider>
           <ProjectFilterBar
             query={props.query ?? ""}
-            onQueryChange={onQueryChange}
+            tagQuery={props.tagQuery ?? ""}
             involve={props.involve ?? false}
+            onQueryChange={onQueryChange}
+            onTagQueryChange={onTagQueryChange}
             onInvolveChange={onInvolveChange}
           />
         </AegisI18nProvider>
@@ -61,5 +67,23 @@ describe("ProjectFilterBar", () => {
     const { onInvolveChange } = renderBar({ involve: false });
     await userEvent.click(screen.getByRole("checkbox", { name: /involve/i }));
     expect(onInvolveChange).toHaveBeenCalledWith(true);
+  });
+});
+
+describe("ProjectFilterBar — tag filter", () => {
+  it("renders the tag filter field with the current value", () => {
+    renderBar({ tagQuery: "demo" });
+    expect(screen.getByLabelText(/filter by tag/i)).toHaveValue("demo");
+  });
+
+  it("calls onTagQueryChange when the tag filter field changes", async () => {
+    const { onTagQueryChange } = renderBar();
+    await userEvent.type(screen.getByLabelText(/filter by tag/i), "x");
+    expect(onTagQueryChange).toHaveBeenLastCalledWith("x");
+  });
+
+  it("leaves Involve checkbox gated as before (regression)", () => {
+    renderBar({ involve: true });
+    expect(screen.getByRole("checkbox", { name: /involve/i })).toBeChecked();
   });
 });

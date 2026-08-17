@@ -9,19 +9,23 @@ import { useI18n } from "@aegis/ui/i18n";
 export interface ProjectFilterBarProps {
   query: string;
   onQueryChange: (value: string) => void;
+  tagQuery: string;
+  onTagQueryChange: (value: string) => void;
   involve: boolean;
   onInvolveChange: (value: boolean) => void;
 }
 
 /**
- * Search field + Involve toggle. Pure controlled component — the
- * orchestrator owns the state. The search field stays enabled even
- * when no current user is loaded; toggling Involve with no user just
- * produces an empty result.
+ * Search field + tag filter + Involve toggle. Pure controlled
+ * component — the orchestrator owns the state. The search and tag
+ * filter fields stay enabled even when no current user is loaded;
+ * toggling Involve with no user just produces an empty result.
  */
 export function ProjectFilterBar({
   query,
   onQueryChange,
+  tagQuery,
+  onTagQueryChange,
   involve,
   onInvolveChange,
 }: ProjectFilterBarProps) {
@@ -35,6 +39,13 @@ export function ProjectFilterBar({
         value={query}
         onChange={(event) => onQueryChange(event.target.value)}
         sx={{ minWidth: 320 }}
+      />
+      <TextField
+        size="small"
+        label={t("project.filter.tag.label")}
+        value={tagQuery}
+        onChange={(event) => onTagQueryChange(event.target.value)}
+        sx={{ minWidth: 240 }}
       />
       <FormControlLabel
         sx={{ ml: "auto" }}

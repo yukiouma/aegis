@@ -23,7 +23,7 @@ const projectA: ProjectView = {
     workers: [{ code: "alice", name: "Alice" }],
   },
   unblindMembers: { leaders: [], workers: [] },
-  tags: [],
+  tags: [{ key: "Product", value: "DEMO-001" }],
   active: true,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
@@ -38,7 +38,7 @@ const projectB: ProjectView = {
     leaders: [{ code: "alice", name: "Alice" }],
     workers: [],
   },
-  tags: [],
+  tags: [{ key: "Product", value: "OTHER-002" }],
   active: false,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
@@ -51,6 +51,7 @@ const projectC: ProjectView = {
   description: "Gamma project",
   members: { leaders: [{ code: "zoe", name: "Zoe" }], workers: [] },
   unblindMembers: { leaders: [], workers: [] },
+  tags: [{ key: "Client", value: "ACME" }],
 };
 
 const adminUser: UserView = {
@@ -181,5 +182,36 @@ describe("ProjectListPage — role gating", () => {
     expect(
       await screen.findByRole("heading", { name: /create project/i }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("ProjectListPage — tag filter", () => {
+  it("filters rows by tag value substring (case-insensitive)", async () => {
+    await renderPage(adminUser, [projectA, projectB, projectC]);
+    await screen.findByText("alpha");
+    await userEvent.type(screen.getByLabelText(/filter by tag/i), "demo");
+    await waitFor(() => {
+      expect(screen.getByText("alpha")).toBeInTheDocument();
+      expect(screen.queryByText("beta")).not.toBeInTheDocument();
+      expect(screen.queryByText("gamma")).not.toBeInTheDocument();
+    });
+  });
+
+  it("leaves all rows visible when tag filter is empty", async () => {
+    await renderPage(adminUser, [projectA, projectB, projectC]);
+    await screen.findByText("alpha");
+    expect(screen.getByText("beta")).toBeInTheDocument();
+    expect(screen.getByText("gamma")).toBeInTheDocument();
+  });
+
+  it("combines tag filter with the existing search filter (AND)", async () => {
+    await renderPage(adminUser, [projectA, projectB, projectC]);
+    await screen.findByText("alpha");
+    await userEvent.type(screen.getByLabelText(/filter by tag/i), "demo");
+    await userEvent.type(screen.getByLabelText(/search/i), "ALPHA");
+    await waitFor(() => {
+      expect(screen.getByText("alpha")).toBeInTheDocument();
+      expect(screen.queryByText("beta")).not.toBeInTheDocument();
+    });
   });
 });

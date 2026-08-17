@@ -80,7 +80,8 @@ describe("TagEditor", () => {
     // change directly so we exercise the same handler the user would.
     fireEvent.change(keyInput, { target: { value: "Owner" } });
     expect(onChange).toHaveBeenCalled();
-    const lastCall = onChange.mock.calls.at(-1)?.[0] as Tag[] | undefined;
+    const calls = onChange.mock.calls as unknown[][];
+    const lastCall = calls[calls.length - 1]?.[0] as Tag[] | undefined;
     expect(lastCall).toBeDefined();
     expect(lastCall![0].key).toBe("Owner");
     expect(lastCall![0].value).toBe("DEMO-001");
