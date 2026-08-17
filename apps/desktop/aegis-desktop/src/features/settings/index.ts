@@ -5,3 +5,5 @@ export {
   useListenForSettingsChanges,
   persistSettings,
 } from "./data/persist";
+
+export { useUpdatePassword } from "./data/update-password";
