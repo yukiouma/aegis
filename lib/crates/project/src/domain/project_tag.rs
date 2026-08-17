@@ -29,9 +29,11 @@ impl ProjectTag {
     }
 
     /// Bypasses validation. Reserved for the adapter layer when
-    /// materialising rows from the JSONB column.
+    /// materialising rows from the JSONB column, and for downstream
+    /// test / integration code that needs to construct a tag from a
+    /// trusted source.
     #[allow(dead_code)]
-    pub(crate) fn for_repository(key: String, value: String) -> Self {
+    pub fn for_repository(key: String, value: String) -> Self {
         Self { key, value }
     }
 }

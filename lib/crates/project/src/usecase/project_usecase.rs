@@ -153,7 +153,20 @@ fn validate_create_project(cmd: &CreateProject) -> Result<(), UsecaseError> {
     }
     if let Some(ref tags) = cmd.tags {
         for tag in tags {
-            ProjectTag::new(tag.key.clone(), tag.value.clone())?;
+            // Tag validation surfaces as `Validation`, not
+            // `Repository`. The domain `From<DomainError>` impl maps
+            // straight to `Repository`, so map the two tag variants
+            // explicitly.
+            match ProjectTag::new(tag.key.clone(), tag.value.clone()) {
+                Ok(_) => {}
+                Err(DomainError::EmptyTagKey) => {
+                    return Err(UsecaseError::Validation(DomainError::EmptyTagKey));
+                }
+                Err(DomainError::EmptyTagValue) => {
+                    return Err(UsecaseError::Validation(DomainError::EmptyTagValue));
+                }
+                Err(other) => return Err(UsecaseError::Repository(other)),
+            }
         }
     }
     Ok(())
@@ -173,7 +186,16 @@ fn validate_update_project(cmd: &UpdateProject) -> Result<(), UsecaseError> {
     }
     if let Some(ref tags) = cmd.tags {
         for tag in tags {
-            ProjectTag::new(tag.key.clone(), tag.value.clone())?;
+            match ProjectTag::new(tag.key.clone(), tag.value.clone()) {
+                Ok(_) => {}
+                Err(DomainError::EmptyTagKey) => {
+                    return Err(UsecaseError::Validation(DomainError::EmptyTagKey));
+                }
+                Err(DomainError::EmptyTagValue) => {
+                    return Err(UsecaseError::Validation(DomainError::EmptyTagValue));
+                }
+                Err(other) => return Err(UsecaseError::Repository(other)),
+            }
         }
     }
     Ok(())
