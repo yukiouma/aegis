@@ -79,7 +79,10 @@ export function TagEditor({ value, onChange, onTouched }: TagEditorProps) {
       <Stack spacing={1}>
         {value.map((tag, i) => (
           <Box
-            key={`row-${i}-${tag.key}-${tag.value}`}
+            // Stable row key: editing the row's own key/value would
+            // change its identity and remount its inputs, dropping the
+            // in-flight character. Use just the row index.
+            key={`tag-row-${i}`}
             sx={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 1 }}
           >
             <TextField

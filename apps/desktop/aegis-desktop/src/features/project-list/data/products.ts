@@ -1,3 +1,4 @@
+// currently unused — pending product surface removal
 import { useQuery } from "@tanstack/react-query";
 
 import { api, type ApiError, type ProductView } from "../../../shared/api";
