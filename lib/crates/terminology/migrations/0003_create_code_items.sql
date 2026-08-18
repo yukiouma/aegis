@@ -12,9 +12,11 @@
 --     `updated_at` on UPDATE.
 --
 -- `version_id` is a denormalised copy of the parent codelist's
--- `version_id`. It lets the application answer
--- `list_by_version_and_codelist_code` without a self-join and
--- keeps the version context on every item. It is populated by the
+-- `version_id`. It is the leading column of the composite index
+-- `code_items_version_id_code_idx` that backs the natural-key
+-- lookup `list_by_version_and_code`. The composite index also
+-- serves queries on `version_id` alone, so no separate
+-- `(version_id)` index is needed. The column is populated by the
 -- adapter on insert and is not a foreign key by itself (the parent
 -- `code_lists` row is the source of truth).
 
@@ -39,7 +41,7 @@ CREATE TABLE code_items (
 );
 
 CREATE INDEX code_items_codelist_id_idx ON code_items (codelist_id);
-CREATE INDEX code_items_version_id_idx ON code_items (version_id);
+CREATE INDEX code_items_version_id_code_idx ON code_items (version_id, code);
 CREATE INDEX code_items_tsv_idx ON code_items USING GIN (tsv);
 
 CREATE OR REPLACE FUNCTION code_items_set_updated_at()

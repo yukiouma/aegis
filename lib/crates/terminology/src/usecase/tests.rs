@@ -248,17 +248,12 @@ struct ItemsState {
 #[derive(Clone, Default)]
 struct FakeCodeItemRepo {
     state: Arc<Mutex<ItemsState>>,
-    /// Shared with `FakeCodeListRepo` so the natural-key lookup
-    /// `list_by_version_and_codelist_code` can resolve a codelist
-    /// by `(version_id, code)`.
-    lists: Arc<Mutex<ListsState>>,
 }
 
 impl FakeCodeItemRepo {
-    fn new(lists: Arc<Mutex<ListsState>>) -> Self {
+    fn new() -> Self {
         Self {
             state: Arc::new(Mutex::new(ItemsState::default())),
-            lists,
         }
     }
 }
@@ -313,29 +308,18 @@ impl CodeItemRepository for FakeCodeItemRepo {
             .cloned()
             .collect())
     }
-    async fn list_by_version_and_codelist_code(
+    async fn list_by_version_and_code(
         &self,
         version_id: i64,
         code: &str,
     ) -> Result<Vec<CodeItem>, DomainError> {
-        let codelist_id = {
-            let lists = self.lists.lock().unwrap();
-            lists
-                .by_id
-                .values()
-                .find(|c| c.version_id == version_id && c.code == code)
-                .map(|c| c.id)
-        };
-        let Some(codelist_id) = codelist_id else {
-            return Ok(vec![]);
-        };
         Ok(self
             .state
             .lock()
             .unwrap()
             .by_id
             .values()
-            .filter(|i| i.codelist_id == codelist_id)
+            .filter(|i| i.version_id == version_id && i.code == code)
             .cloned()
             .collect())
     }
@@ -388,10 +372,7 @@ fn make_usecase() -> (
 ) {
     let v = FakeVersionRepo::new();
     let l = FakeCodeListRepo::new();
-    // Share the codelist state with the item fake so
-    // `list_by_version_and_codelist_code` can resolve a codelist
-    // by `(version_id, code)`.
-    let i = FakeCodeItemRepo::new(l.state.clone());
+    let i = FakeCodeItemRepo::new();
     let usecase = TerminologyUsecase::new(TerminologyUsecaseConfig {
         version_repo: v.clone(),
         code_list_repo: l.clone(),
@@ -593,12 +574,12 @@ async fn create_code_item_round_trip_then_list_by_codelist() {
 }
 
 #[tokio::test]
-async fn list_code_items_by_version_and_codelist_code_returns_only_target_items() {
+async fn list_code_items_by_version_and_code_returns_matching_items() {
     let (_, _, _, usecase) = make_usecase();
 
-    // Two versions, each owning two codelists. We want to make
-    // sure the natural-key lookup returns only items from the
-    // matching (version_id, code) pair.
+    // Two versions, two codelists under v_a and one under v_b.
+    // The same item code appears in multiple codelists so the
+    // lookup must return more than one row.
     let v_a = usecase
         .create_version(CreateTerminologyVersion {
             kind: TerminologyKind::Sdtm,
@@ -614,7 +595,7 @@ async fn list_code_items_by_version_and_codelist_code_returns_only_target_items(
         .await
         .expect("v_b");
 
-    let age_v_a = usecase
+    let age_a = usecase
         .create_code_list(CreateCodeList {
             version_id: v_a.id,
             code: "C66741".into(),
@@ -626,8 +607,8 @@ async fn list_code_items_by_version_and_codelist_code_returns_only_target_items(
             nci_preferred_term: "".into(),
         })
         .await
-        .expect("age_v_a");
-    let sex_v_a = usecase
+        .expect("age_a");
+    let sex_a = usecase
         .create_code_list(CreateCodeList {
             version_id: v_a.id,
             code: "C66732".into(),
@@ -639,8 +620,8 @@ async fn list_code_items_by_version_and_codelist_code_returns_only_target_items(
             nci_preferred_term: "".into(),
         })
         .await
-        .expect("sex_v_a");
-    let age_v_b = usecase
+        .expect("sex_a");
+    let age_b = usecase
         .create_code_list(CreateCodeList {
             version_id: v_b.id,
             code: "C66741".into(),
@@ -652,13 +633,14 @@ async fn list_code_items_by_version_and_codelist_code_returns_only_target_items(
             nci_preferred_term: "".into(),
         })
         .await
-        .expect("age_v_b");
+        .expect("age_b");
 
-    // Two items in age_v_a, one in sex_v_a, one in age_v_b.
-    for code in ["C1", "C2"] {
+    // Code "C1" appears in age_a and sex_a (same version, two
+    // codelists) — should return both.
+    for (cl_id, code) in [(age_a.id, "C1"), (sex_a.id, "C1"), (age_a.id, "C2")] {
         usecase
             .create_code_item(CreateCodeItem {
-                codelist_id: age_v_a.id,
+                codelist_id: cl_id,
                 version_id: v_a.id,
                 code: code.into(),
                 submission_value: "".into(),
@@ -667,64 +649,68 @@ async fn list_code_items_by_version_and_codelist_code_returns_only_target_items(
                 nci_preferred_term: "".into(),
             })
             .await
-            .expect("age_v_a item");
+            .expect("v_a item");
     }
-    usecase
+    let v_b_item = usecase
         .create_code_item(CreateCodeItem {
-            codelist_id: sex_v_a.id,
-            version_id: v_a.id,
-            code: "C3".into(),
-            submission_value: "".into(),
-            synonym: "".into(),
-            definition: "".into(),
-            nci_preferred_term: "".into(),
-        })
-        .await
-        .expect("sex_v_a item");
-    let age_v_b_item = usecase
-        .create_code_item(CreateCodeItem {
-            codelist_id: age_v_b.id,
+            codelist_id: age_b.id,
             version_id: v_b.id,
-            code: "C4".into(),
+            code: "C1".into(),
             submission_value: "".into(),
             synonym: "".into(),
             definition: "".into(),
             nci_preferred_term: "".into(),
         })
         .await
-        .expect("age_v_b item");
+        .expect("v_b item");
 
-    let age_items = usecase
-        .list_code_items_by_version_and_codelist_code(v_a.id, "C66741")
+    // (v_a, "C1") covers both codelists of v_a.
+    let c1_a = usecase
+        .list_code_items_by_version_and_code(v_a.id, "C1")
         .await
-        .expect("lookup");
-    assert_eq!(age_items.len(), 2, "two items in v_a / C66741");
-    assert!(
-        age_items.iter().all(|i| i.codelist_id == age_v_a.id),
-        "all returned items belong to the v_a AGE codelist"
+        .expect("lookup C1 in v_a");
+    assert_eq!(
+        c1_a.len(),
+        2,
+        "C1 appears in both AGE and SEX codelists of v_a"
     );
+    assert!(
+        c1_a.iter().all(|i| i.version_id == v_a.id),
+        "all returned items are scoped to v_a"
+    );
+    let mut codelist_ids: Vec<i64> = c1_a.iter().map(|i| i.codelist_id).collect();
+    codelist_ids.sort();
+    assert_eq!(codelist_ids, vec![age_a.id, sex_a.id]);
 
-    // Same NCI code under a different version: must not bleed.
-    let age_v_b_items = usecase
-        .list_code_items_by_version_and_codelist_code(v_b.id, "C66741")
+    // (v_a, "C2") matches only the AGE entry.
+    let c2_a = usecase
+        .list_code_items_by_version_and_code(v_a.id, "C2")
         .await
-        .expect("lookup v_b");
-    assert_eq!(age_v_b_items.len(), 1);
-    assert_eq!(age_v_b_items[0].id, age_v_b_item.id);
+        .expect("lookup C2 in v_a");
+    assert_eq!(c2_a.len(), 1);
+    assert_eq!(c2_a[0].codelist_id, age_a.id);
 
-    // Codelist that does not exist: empty result, not an error.
+    // (v_b, "C1") must not bleed into v_a.
+    let c1_b = usecase
+        .list_code_items_by_version_and_code(v_b.id, "C1")
+        .await
+        .expect("lookup C1 in v_b");
+    assert_eq!(c1_b.len(), 1);
+    assert_eq!(c1_b[0].id, v_b_item.id);
+
+    // Unknown code under a known version: empty, not an error.
     let empty = usecase
-        .list_code_items_by_version_and_codelist_code(v_a.id, "C99999")
+        .list_code_items_by_version_and_code(v_a.id, "C99999")
         .await
         .expect("lookup missing");
     assert!(empty.is_empty());
 }
 
 #[tokio::test]
-async fn list_code_items_by_version_and_codelist_code_rejects_empty_code() {
+async fn list_code_items_by_version_and_code_rejects_empty_code() {
     let (_, _, _, usecase) = make_usecase();
     let err = usecase
-        .list_code_items_by_version_and_codelist_code(1, "   ")
+        .list_code_items_by_version_and_code(1, "   ")
         .await
         .unwrap_err();
     assert!(matches!(

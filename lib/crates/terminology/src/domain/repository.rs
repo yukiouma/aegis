@@ -61,11 +61,15 @@ pub trait CodeItemRepository: Send + Sync {
     async fn create(&self, input: CodeItemNew) -> Result<CodeItem, DomainError>;
     async fn find_by_id(&self, id: i64) -> Result<CodeItem, DomainError>;
     async fn list_by_codelist(&self, codelist_id: i64) -> Result<Vec<CodeItem>, DomainError>;
-    /// Natural-key lookup: items belonging to the codelist
-    /// identified by `(version_id, code)` — typically the NCI C-code
-    /// on `code_lists`. Returns an empty `Vec` when no such codelist
-    /// exists.
-    async fn list_by_version_and_codelist_code(
+    /// Natural-key lookup on the `code_items` table itself. Returns
+    /// every item whose `version_id` matches the given value and
+    /// whose `code` matches the given value — i.e. all items with
+    /// the same value code across the codelists of a single
+    /// version. Multiple rows are expected when the same item
+    /// code appears in more than one codelist of the version.
+    /// Backed by the composite index
+    /// `code_items_version_id_code_idx (version_id, code)`.
+    async fn list_by_version_and_code(
         &self,
         version_id: i64,
         code: &str,

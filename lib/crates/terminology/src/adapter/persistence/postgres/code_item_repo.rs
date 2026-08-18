@@ -129,23 +129,21 @@ impl CodeItemRepository for CodeItemRepo {
         rows.into_iter().map(CodeItem::try_from).collect()
     }
 
-    async fn list_by_version_and_codelist_code(
+    async fn list_by_version_and_code(
         &self,
         version_id: i64,
         code: &str,
     ) -> Result<Vec<CodeItem>, DomainError> {
         let rows: Vec<CodeItemRow> = sqlx::QueryBuilder::new(
-            "SELECT ci.id, ci.codelist_id, ci.version_id, ci.code, ci.submission_value, \
-                    ci.synonym, ci.definition, ci.nci_preferred_term, \
-                    ci.created_at, ci.updated_at \
-             FROM code_items ci \
-             JOIN code_lists cl ON cl.id = ci.codelist_id \
-             WHERE ci.version_id = ",
+            "SELECT id, codelist_id, version_id, code, submission_value, \
+                    synonym, definition, nci_preferred_term, \
+                    created_at, updated_at \
+             FROM code_items WHERE version_id = ",
         )
         .push_bind(version_id)
-        .push(" AND cl.code = ")
+        .push(" AND code = ")
         .push_bind(code)
-        .push(" ORDER BY ci.id")
+        .push(" ORDER BY id")
         .build_query_as::<CodeItemRow>()
         .fetch_all(&self.pool)
         .await

@@ -209,12 +209,13 @@ where
         Ok(items.into_iter().map(Into::into).collect())
     }
 
-    /// Natural-key lookup: items belonging to the codelist
-    /// identified by `(version_id, code)` — typically the NCI
-    /// C-code on `code_lists`. Lets consumers pass the version
-    /// and codelist code directly without first resolving the
-    /// surrogate `codelist_id`.
-    pub async fn list_code_items_by_version_and_codelist_code(
+    /// Natural-key lookup on the `code_items` table. Returns every
+    /// item whose `version_id` matches and whose `code` matches —
+    /// i.e. all rows sharing the same item value code across the
+    /// codelists of a single version. Multiple rows are expected
+    /// when one item code appears in more than one codelist of the
+    /// version.
+    pub async fn list_code_items_by_version_and_code(
         &self,
         version_id: i64,
         code: &str,
@@ -224,7 +225,7 @@ where
         }
         let items = self
             .code_item_repo
-            .list_by_version_and_codelist_code(version_id, code)
+            .list_by_version_and_code(version_id, code)
             .await?;
         Ok(items.into_iter().map(Into::into).collect())
     }
