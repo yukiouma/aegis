@@ -13,12 +13,14 @@
 --                          permissible values.
 --   * `name`, `submission_value`, `synonym`, `definition`,
 --     `nci_preferred_term` - five text columns surfaced through
---                            full-text search.
+--                            full-text search. The search port
+--                            treats all five uniformly — there is
+--                            no per-column weight.
 --   * `created_at`, `updated_at` - DEFAULT NOW(); trigger
 --                            refreshes updated_at on UPDATE.
 --   * `tsv`              - GENERATED tsvector over the five
---                          text columns. GIN index backs the
---                          search port.
+--                            text columns (unweighted). GIN index
+--                            backs the search port.
 
 CREATE TABLE code_lists (
     id BIGSERIAL PRIMARY KEY,
@@ -32,13 +34,7 @@ CREATE TABLE code_lists (
     nci_preferred_term TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    tsv tsvector GENERATED ALWAYS AS (
-        setweight(to_tsvector('english', coalesce(name, '')), 'A') ||
-        setweight(to_tsvector('english', coalesce(submission_value, '')), 'A') ||
-        setweight(to_tsvector('english', coalesce(synonym, '')), 'B') ||
-        setweight(to_tsvector('english', coalesce(definition, '')), 'C') ||
-        setweight(to_tsvector('english', coalesce(nci_preferred_term, '')), 'B')
-    ) STORED,
+    tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', coalesce(name, '') || ' ' || coalesce(submission_value, '') || ' ' || coalesce(synonym, '') || ' ' || coalesce(definition, '') || ' ' || coalesce(nci_preferred_term, ''))) STORED,
     CONSTRAINT code_lists_version_code_unique UNIQUE (version_id, code)
 );
 

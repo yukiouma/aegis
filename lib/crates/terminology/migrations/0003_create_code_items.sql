@@ -6,8 +6,9 @@
 -- Layout mirrors code_lists:
 --   * FK to code_lists(id) ON DELETE CASCADE.
 --   * UNIQUE (codelist_id, code).
---   * `tsv` GENERATED over the same five text columns with the
---     same weights, plus a GIN index.
+--   * `tsv` GENERATED over the same four text columns as the
+--     search port (unweighted — every column contributes equally
+--     to `ts_rank`), plus a GIN index.
 --   * `code_items_set_updated_at` trigger refreshes
 --     `updated_at` on UPDATE.
 --
@@ -31,12 +32,7 @@ CREATE TABLE code_items (
     nci_preferred_term TEXT NOT NULL DEFAULT '',
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    tsv tsvector GENERATED ALWAYS AS (
-        setweight(to_tsvector('english', coalesce(submission_value, '')), 'A') ||
-        setweight(to_tsvector('english', coalesce(synonym, '')), 'B') ||
-        setweight(to_tsvector('english', coalesce(definition, '')), 'C') ||
-        setweight(to_tsvector('english', coalesce(nci_preferred_term, '')), 'B')
-    ) STORED,
+    tsv tsvector GENERATED ALWAYS AS (to_tsvector('english', coalesce(submission_value, '') || ' ' || coalesce(synonym, '') || ' ' || coalesce(definition, '') || ' ' || coalesce(nci_preferred_term, ''))) STORED,
     CONSTRAINT code_items_codelist_code_unique UNIQUE (codelist_id, code)
 );
 
