@@ -225,8 +225,7 @@ async fn search_code_lists_ranks_hits() {
 
         let hits = l_repo
             .search(CodeListSearchQuery {
-                kind: TerminologyKind::Sdtm,
-                version_name: v.name.clone(),
+                version_id: v.id,
                 text: "age".into(),
                 limit: 10,
             })

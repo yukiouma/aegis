@@ -759,8 +759,7 @@ async fn search_code_lists_returns_empty_for_in_memory_backend() {
     let svc = service();
     let hits = svc
         .search_code_lists(apis::terminology::CodeListSearchQuery {
-            kind: ApiKind::Sdtm,
-            version_name: "2026-03-27".into(),
+            version_id: 1,
             text: "age".into(),
             limit: 10,
         })
@@ -970,8 +969,7 @@ async fn search_code_items_returns_empty_for_in_memory_backend() {
     let svc = service();
     let hits = svc
         .search_code_items(apis::terminology::CodeItemSearchQuery {
-            kind: ApiKind::Sdtm,
-            version_name: "2026-03-27".into(),
+            version_id: 1,
             text: "age".into(),
             limit: 10,
         })
@@ -1037,8 +1035,7 @@ async fn code_list_search_hit_projects_codelist_and_score() {
     let svc = service();
     let hits: Vec<CodeListSearchHit> = svc
         .search_code_lists(apis::terminology::CodeListSearchQuery {
-            kind: ApiKind::Sdtm,
-            version_name: "v1".into(),
+            version_id: 1,
             text: "x".into(),
             limit: 10,
         })
@@ -1052,8 +1049,7 @@ async fn code_item_search_hit_projects_item_and_score() {
     let svc = service();
     let hits: Vec<CodeItemSearchHit> = svc
         .search_code_items(apis::terminology::CodeItemSearchQuery {
-            kind: ApiKind::Sdtm,
-            version_name: "v1".into(),
+            version_id: 1,
             text: "x".into(),
             limit: 10,
         })

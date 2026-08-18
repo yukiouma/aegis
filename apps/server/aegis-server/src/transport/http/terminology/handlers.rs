@@ -337,8 +337,7 @@ pub async fn delete_code_list(
     get, path = "/code-lists/search", tag = "terminology",
     operation_id = "terminology_search_code_lists",
     params(
-        ("kind" = dto::TerminologyKind, Query, description = "Terminology kind"),
-        ("versionName" = String, Query, description = "Version name"),
+        ("versionId" = i64, Query, description = "Version ID"),
         ("text" = String, Query, description = "Free-text query"),
         ("limit" = u32, Query, description = "Maximum hits (0 = default)"),
     ),
@@ -357,8 +356,7 @@ pub async fn search_code_lists(
     let hits = state
         .terminology
         .search_code_lists(apis::terminology::CodeListSearchQuery {
-            kind: q.kind.into(),
-            version_name: q.version_name,
+            version_id: q.version_id,
             text: q.text,
             limit: q.limit,
         })
@@ -532,8 +530,7 @@ pub async fn delete_code_item(
     get, path = "/code-items/search", tag = "terminology",
     operation_id = "terminology_search_code_items",
     params(
-        ("kind" = dto::TerminologyKind, Query, description = "Terminology kind"),
-        ("versionName" = String, Query, description = "Version name"),
+        ("versionId" = i64, Query, description = "Version ID"),
         ("text" = String, Query, description = "Free-text query"),
         ("limit" = u32, Query, description = "Maximum hits (0 = default)"),
     ),
@@ -552,8 +549,7 @@ pub async fn search_code_items(
     let hits = state
         .terminology
         .search_code_items(apis::terminology::CodeItemSearchQuery {
-            kind: q.kind.into(),
-            version_name: q.version_name,
+            version_id: q.version_id,
             text: q.text,
             limit: q.limit,
         })

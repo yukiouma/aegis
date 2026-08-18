@@ -722,8 +722,7 @@ pub struct UpdateCodeItemRequest {
 #[derive(Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminologySearchBaseQuery {
-    pub kind: TerminologyKind,
-    pub version_name: String,
+    pub version_id: i64,
     pub text: String,
     #[serde(default)]
     pub limit: u32,
@@ -1408,8 +1407,7 @@ mod tests {
     fn code_list_search_query_request_roundtrip() {
         let json = r#"{"kind":"sdtm","versionName":"2026-03-27","text":"age","limit":10}"#;
         let req: CodeListSearchQueryRequest = serde_json::from_str(json).unwrap();
-        assert!(matches!(req.kind, TerminologyKind::Sdtm));
-        assert_eq!(req.version_name, "2026-03-27");
+        assert_eq!(req.version_id, 1);
         assert_eq!(req.text, "age");
         assert_eq!(req.limit, 10);
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
@@ -1419,7 +1417,6 @@ mod tests {
     fn code_item_search_query_request_roundtrip() {
         let json = r#"{"kind":"adam","versionName":"v1","text":"x","limit":50}"#;
         let req: CodeItemSearchQueryRequest = serde_json::from_str(json).unwrap();
-        assert!(matches!(req.kind, TerminologyKind::Adam));
         assert_eq!(req.limit, 50);
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
     }

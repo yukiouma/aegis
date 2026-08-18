@@ -302,8 +302,7 @@ where
         q: ApiCodeListSearchQuery,
     ) -> Result<Vec<ApiCodeListSearchHit>, TerminologyApiError> {
         let internal_q = CodeListSearchQuery {
-            kind: to_internal_kind(q.kind),
-            version_name: q.version_name,
+            version_id: q.version_id,
             text: q.text,
             limit: q.limit,
         };
@@ -388,8 +387,7 @@ where
         q: ApiCodeItemSearchQuery,
     ) -> Result<Vec<ApiCodeItemSearchHit>, TerminologyApiError> {
         let internal_q = CodeItemSearchQuery {
-            kind: to_internal_kind(q.kind),
-            version_name: q.version_name,
+            version_id: q.version_id,
             text: q.text,
             limit: q.limit,
         };

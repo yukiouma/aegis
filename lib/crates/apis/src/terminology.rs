@@ -100,8 +100,7 @@ pub struct CodeItemView {
 /// backend clamps `limit` to a documented default + cap.
 #[derive(Debug, Clone)]
 pub struct CodeListSearchQuery {
-    pub kind: TerminologyKind,
-    pub version_name: String,
+    pub version_id: i64,
     pub text: String,
     pub limit: u32,
 }
@@ -117,8 +116,7 @@ pub struct CodeListSearchHit {
 /// backend clamps `limit` to a documented default + cap.
 #[derive(Debug, Clone)]
 pub struct CodeItemSearchQuery {
-    pub kind: TerminologyKind,
-    pub version_name: String,
+    pub version_id: i64,
     pub text: String,
     pub limit: u32,
 }

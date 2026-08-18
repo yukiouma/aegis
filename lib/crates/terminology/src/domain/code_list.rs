@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 
 use super::error::DomainError;
-use super::terminology_kind::TerminologyKind;
 
 /// A CDISC codelist and the items that belong to it. The
 /// in-memory shape mirrors the workbook; the persisted shape
@@ -132,12 +131,11 @@ pub struct CodeListUpdate {
 }
 
 /// Query for `CodeListRepository::search`. Search is scoped to a
-/// single `(kind, version_name)` pair so callers cannot accidentally
+/// single `(kind, version_id)` pair so callers cannot accidentally
 /// cross-releases.
 #[derive(Debug, Clone)]
 pub struct CodeListSearchQuery {
-    pub kind: TerminologyKind,
-    pub version_name: String,
+    pub version_id: i64,
     pub text: String,
     /// Default 50. Hard cap 500 (clamped, not rejected).
     pub limit: u32,

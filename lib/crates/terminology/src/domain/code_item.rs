@@ -1,7 +1,6 @@
 use chrono::{DateTime, Utc};
 
 use super::error::DomainError;
-use super::terminology_kind::TerminologyKind;
 
 /// A single permissible value inside a `CodeList`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -109,8 +108,7 @@ pub struct CodeItemUpdate {
 /// Query for `CodeItemRepository::search`.
 #[derive(Debug, Clone)]
 pub struct CodeItemSearchQuery {
-    pub kind: TerminologyKind,
-    pub version_name: String,
+    pub version_id: i64,
     pub text: String,
     /// Default 50. Hard cap 500 (clamped, not rejected).
     pub limit: u32,

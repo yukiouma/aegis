@@ -523,8 +523,7 @@ async fn search_code_lists_clamps_limit_to_default_when_zero() {
     let (_, _, _, usecase) = make_usecase();
     let hits = usecase
         .search_code_lists(CodeListSearchQuery {
-            kind: TerminologyKind::Sdtm,
-            version_name: "2026-03-27".into(),
+            version_id: 1,
             text: "age".into(),
             limit: 0,
         })
