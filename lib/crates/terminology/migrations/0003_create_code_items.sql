@@ -1,0 +1,46 @@
+-- 0003_create_code_items.sql
+--
+-- Permissible values inside each codelist, one row per
+-- (codelist, code) pair.
+--
+-- Layout mirrors code_lists:
+--   * FK to code_lists(id) ON DELETE CASCADE.
+--   * UNIQUE (codelist_id, code).
+--   * `tsv` GENERATED over the same five text columns with the
+--     same weights, plus a GIN index.
+--   * `code_items_set_updated_at` trigger refreshes
+--     `updated_at` on UPDATE.
+
+CREATE TABLE code_items (
+    id BIGSERIAL PRIMARY KEY,
+    codelist_id BIGINT NOT NULL REFERENCES code_lists(id) ON DELETE CASCADE,
+    code TEXT NOT NULL,
+    submission_value TEXT NOT NULL DEFAULT '',
+    synonym TEXT NOT NULL DEFAULT '',
+    definition TEXT NOT NULL DEFAULT '',
+    nci_preferred_term TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    tsv tsvector GENERATED ALWAYS AS (
+        setweight(to_tsvector('english', coalesce(submission_value, '')), 'A') ||
+        setweight(to_tsvector('english', coalesce(synonym, '')), 'B') ||
+        setweight(to_tsvector('english', coalesce(definition, '')), 'C') ||
+        setweight(to_tsvector('english', coalesce(nci_preferred_term, '')), 'B')
+    ) STORED,
+    CONSTRAINT code_items_codelist_code_unique UNIQUE (codelist_id, code)
+);
+
+CREATE INDEX code_items_codelist_id_idx ON code_items (codelist_id);
+CREATE INDEX code_items_tsv_idx ON code_items USING GIN (tsv);
+
+CREATE OR REPLACE FUNCTION code_items_set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER code_items_set_updated_at
+    BEFORE UPDATE ON code_items
+    FOR EACH ROW EXECUTE FUNCTION code_items_set_updated_at();
