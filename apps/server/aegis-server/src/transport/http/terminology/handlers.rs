@@ -243,7 +243,7 @@ pub async fn create_code_list(
     get, path = "/code-lists", tag = "terminology",
     operation_id = "terminology_list_code_lists",
     params(
-        ("version_id" = i64, Query, description = "Owning terminology version id"),
+        ("versionId" = i64, Query, description = "Owning terminology version id"),
     ),
     responses(
         (status = 200, description = "Codelists list", body = dto::CodeListListResponse),
@@ -412,7 +412,7 @@ pub async fn create_code_item(
     get, path = "/code-items", tag = "terminology",
     operation_id = "terminology_list_code_items",
     params(
-        ("codelist_id" = i64, Query, description = "Owning codelist id"),
+        ("codelistId" = i64, Query, description = "Owning codelist id"),
     ),
     responses(
         (status = 200, description = "Code items list", body = dto::CodeItemListResponse),
@@ -437,7 +437,7 @@ pub async fn list_code_items(
     get, path = "/code-items/by-version-and-code", tag = "terminology",
     operation_id = "terminology_list_code_items_by_version_and_code",
     params(
-        ("version_id" = i64, Query, description = "Owning terminology version id"),
+        ("versionId" = i64, Query, description = "Owning terminology version id"),
         ("code" = String, Query, description = "Item value code"),
     ),
     responses(
