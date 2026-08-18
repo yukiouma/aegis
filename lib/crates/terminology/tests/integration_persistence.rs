@@ -108,6 +108,7 @@ async fn create_then_find_round_trip_for_all_three_levels() {
         let item: CodeItem = i_repo
             .create(CodeItemNew {
                 codelist_id: cl.id,
+                version_id: v.id,
                 code: unique("ci"),
                 submission_value: ">0".into(),
                 synonym: "".into(),
@@ -120,6 +121,7 @@ async fn create_then_find_round_trip_for_all_three_levels() {
         assert_eq!(v.name, v_name);
         assert_eq!(cl.version_id, v.id);
         assert_eq!(item.codelist_id, cl.id);
+        assert_eq!(item.version_id, v.id);
     })
     .await;
 }
@@ -157,6 +159,7 @@ async fn delete_version_cascades_to_children() {
         let _item = i_repo
             .create(CodeItemNew {
                 codelist_id: cl.id,
+                version_id: v.id,
                 code: unique("cascade-ci"),
                 submission_value: "".into(),
                 synonym: "".into(),
@@ -269,6 +272,118 @@ async fn usecase_wires_through_all_three_repos() {
             .await
             .expect("usecase get");
         assert_eq!(created_v.name, v_name);
+    })
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires AEGIS_TERMINOLOGY_DATABASE_URL"]
+async fn list_code_items_by_version_and_codelist_code_end_to_end() {
+    with_pool(|pool| async move {
+        let v_repo = TerminologyVersionRepo::new(pool.clone());
+        let l_repo = CodeListRepo::new(pool.clone());
+        let i_repo = CodeItemRepo::new(pool.clone());
+
+        let v = v_repo
+            .create(TerminologyVersionNew {
+                kind: TerminologyKind::Sdtm,
+                name: unique("natural-v"),
+            })
+            .await
+            .expect("version");
+
+        let age_code = unique("natural-age");
+        let sex_code = unique("natural-sex");
+        let age = l_repo
+            .create(CodeListNew {
+                version_id: v.id,
+                code: age_code.clone(),
+                extensible: true,
+                name: "AGE".into(),
+                submission_value: "AGE".into(),
+                synonym: "".into(),
+                definition: "".into(),
+                nci_preferred_term: "".into(),
+            })
+            .await
+            .expect("age cl");
+        let sex = l_repo
+            .create(CodeListNew {
+                version_id: v.id,
+                code: sex_code.clone(),
+                extensible: true,
+                name: "SEX".into(),
+                submission_value: "SEX".into(),
+                synonym: "".into(),
+                definition: "".into(),
+                nci_preferred_term: "".into(),
+            })
+            .await
+            .expect("sex cl");
+
+        for code in ["C1", "C2"] {
+            i_repo
+                .create(CodeItemNew {
+                    codelist_id: age.id,
+                    version_id: v.id,
+                    code: code.into(),
+                    submission_value: "".into(),
+                    synonym: "".into(),
+                    definition: "".into(),
+                    nci_preferred_term: "".into(),
+                })
+                .await
+                .expect("age item");
+        }
+        let sex_item = i_repo
+            .create(CodeItemNew {
+                codelist_id: sex.id,
+                version_id: v.id,
+                code: "C3".into(),
+                submission_value: "".into(),
+                synonym: "".into(),
+                definition: "".into(),
+                nci_preferred_term: "".into(),
+            })
+            .await
+            .expect("sex item");
+
+        let usecase = TerminologyUsecase::new(TerminologyUsecaseConfig {
+            version_repo: v_repo,
+            code_list_repo: l_repo,
+            code_item_repo: i_repo,
+        });
+
+        let age_items = usecase
+            .list_code_items_by_version_and_codelist_code(v.id, &age_code)
+            .await
+            .expect("age lookup");
+        assert_eq!(age_items.len(), 2);
+        assert!(
+            age_items.iter().all(|i| i.codelist_id == age.id),
+            "all returned items belong to the AGE codelist"
+        );
+        assert!(
+            age_items.iter().all(|i| i.version_id == v.id),
+            "all returned items carry the version_id"
+        );
+        assert!(
+            age_items.iter().all(|i| i.code != "C3"),
+            "the SEX item must not leak into the AGE lookup"
+        );
+
+        let sex_items = usecase
+            .list_code_items_by_version_and_codelist_code(v.id, &sex_code)
+            .await
+            .expect("sex lookup");
+        assert_eq!(sex_items.len(), 1);
+        assert_eq!(sex_items[0].id, sex_item.id);
+
+        let empty = usecase
+            .list_code_items_by_version_and_codelist_code(v.id, "C99999")
+            .await
+            .expect("missing lookup");
+        assert!(empty.is_empty());
     })
     .await;
 }

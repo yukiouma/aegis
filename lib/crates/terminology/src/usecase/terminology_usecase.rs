@@ -190,6 +190,7 @@ where
             .code_item_repo
             .create(CodeItemNew {
                 codelist_id: cmd.codelist_id,
+                version_id: cmd.version_id,
                 code: cmd.code,
                 submission_value: cmd.submission_value,
                 synonym: cmd.synonym,
@@ -205,6 +206,26 @@ where
         codelist_id: i64,
     ) -> Result<Vec<CodeItemView>, UsecaseError> {
         let items = self.code_item_repo.list_by_codelist(codelist_id).await?;
+        Ok(items.into_iter().map(Into::into).collect())
+    }
+
+    /// Natural-key lookup: items belonging to the codelist
+    /// identified by `(version_id, code)` — typically the NCI
+    /// C-code on `code_lists`. Lets consumers pass the version
+    /// and codelist code directly without first resolving the
+    /// surrogate `codelist_id`.
+    pub async fn list_code_items_by_version_and_codelist_code(
+        &self,
+        version_id: i64,
+        code: &str,
+    ) -> Result<Vec<CodeItemView>, UsecaseError> {
+        if code.trim().is_empty() {
+            return Err(UsecaseError::Validation(DomainError::EmptyCode));
+        }
+        let items = self
+            .code_item_repo
+            .list_by_version_and_codelist_code(version_id, code)
+            .await?;
         Ok(items.into_iter().map(Into::into).collect())
     }
 

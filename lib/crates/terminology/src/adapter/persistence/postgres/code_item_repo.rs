@@ -18,6 +18,7 @@ const SQLSTATE_FK_VIOLATION: &str = "23503";
 struct CodeItemRow {
     id: i64,
     codelist_id: i64,
+    version_id: i64,
     code: String,
     submission_value: String,
     synonym: String,
@@ -34,6 +35,7 @@ impl TryFrom<CodeItemRow> for CodeItem {
         Ok(CodeItem::for_repository(
             row.id,
             row.codelist_id,
+            row.version_id,
             row.code,
             row.submission_value,
             row.synonym,
@@ -49,6 +51,7 @@ impl TryFrom<CodeItemRow> for CodeItem {
 struct CodeItemSearchRow {
     id: i64,
     codelist_id: i64,
+    version_id: i64,
     code: String,
     submission_value: String,
     synonym: String,
@@ -74,10 +77,12 @@ impl CodeItemRepository for CodeItemRepo {
     async fn create(&self, input: CodeItemNew) -> Result<CodeItem, DomainError> {
         let row: CodeItemRow = sqlx::QueryBuilder::new(
             "INSERT INTO code_items \
-             (codelist_id, code, submission_value, synonym, definition, nci_preferred_term) \
+             (codelist_id, version_id, code, submission_value, synonym, definition, nci_preferred_term) \
              VALUES (",
         )
         .push_bind(input.codelist_id)
+        .push(", ")
+        .push_bind(input.version_id)
         .push(", ")
         .push_bind(&input.code)
         .push(", ")
@@ -88,7 +93,7 @@ impl CodeItemRepository for CodeItemRepo {
         .push_bind(&input.definition)
         .push(", ")
         .push_bind(&input.nci_preferred_term)
-        .push(") RETURNING id, codelist_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at")
+        .push(") RETURNING id, codelist_id, version_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at")
         .build_query_as::<CodeItemRow>()
         .fetch_one(&self.pool)
         .await
@@ -98,7 +103,7 @@ impl CodeItemRepository for CodeItemRepo {
 
     async fn find_by_id(&self, id: i64) -> Result<CodeItem, DomainError> {
         let row: CodeItemRow = sqlx::QueryBuilder::new(
-            "SELECT id, codelist_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at \
+            "SELECT id, codelist_id, version_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at \
              FROM code_items WHERE id = ",
         )
         .push_bind(id)
@@ -112,11 +117,35 @@ impl CodeItemRepository for CodeItemRepo {
 
     async fn list_by_codelist(&self, codelist_id: i64) -> Result<Vec<CodeItem>, DomainError> {
         let rows: Vec<CodeItemRow> = sqlx::QueryBuilder::new(
-            "SELECT id, codelist_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at \
+            "SELECT id, codelist_id, version_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at \
              FROM code_items WHERE codelist_id = ",
         )
         .push_bind(codelist_id)
         .push(" ORDER BY id")
+        .build_query_as::<CodeItemRow>()
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_error_simple)?;
+        rows.into_iter().map(CodeItem::try_from).collect()
+    }
+
+    async fn list_by_version_and_codelist_code(
+        &self,
+        version_id: i64,
+        code: &str,
+    ) -> Result<Vec<CodeItem>, DomainError> {
+        let rows: Vec<CodeItemRow> = sqlx::QueryBuilder::new(
+            "SELECT ci.id, ci.codelist_id, ci.version_id, ci.code, ci.submission_value, \
+                    ci.synonym, ci.definition, ci.nci_preferred_term, \
+                    ci.created_at, ci.updated_at \
+             FROM code_items ci \
+             JOIN code_lists cl ON cl.id = ci.codelist_id \
+             WHERE ci.version_id = ",
+        )
+        .push_bind(version_id)
+        .push(" AND cl.code = ")
+        .push_bind(code)
+        .push(" ORDER BY ci.id")
         .build_query_as::<CodeItemRow>()
         .fetch_all(&self.pool)
         .await
@@ -158,7 +187,7 @@ impl CodeItemRepository for CodeItemRepo {
             return self.find_by_id(input.id).await;
         }
         qb.push(" WHERE id = ").push_bind(input.id);
-        qb.push(" RETURNING id, codelist_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at");
+        qb.push(" RETURNING id, codelist_id, version_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at");
         let row: CodeItemRow = qb
             .build_query_as::<CodeItemRow>()
             .fetch_optional(&self.pool)
@@ -190,7 +219,7 @@ impl CodeItemRepository for CodeItemRepo {
         let version_name = query.version_name.clone();
         let limit = query.limit as i64;
         let rows: Vec<CodeItemSearchRow> = sqlx::QueryBuilder::new(
-            "SELECT ci.id, ci.codelist_id, ci.code, ci.submission_value, \
+            "SELECT ci.id, ci.codelist_id, ci.version_id, ci.code, ci.submission_value, \
                     ci.synonym, ci.definition, ci.nci_preferred_term, \
                     ci.created_at, ci.updated_at, \
                     ts_rank_cd(ci.tsv, websearch_to_tsquery('english', ",
@@ -220,6 +249,7 @@ impl CodeItemRepository for CodeItemRepo {
                 let item = CodeItem::try_from(CodeItemRow {
                     id: row.id,
                     codelist_id,
+                    version_id: row.version_id,
                     code: row.code,
                     submission_value: row.submission_value,
                     synonym: row.synonym,

@@ -10,10 +10,18 @@
 --     same weights, plus a GIN index.
 --   * `code_items_set_updated_at` trigger refreshes
 --     `updated_at` on UPDATE.
+--
+-- `version_id` is a denormalised copy of the parent codelist's
+-- `version_id`. It lets the application answer
+-- `list_by_version_and_codelist_code` without a self-join and
+-- keeps the version context on every item. It is populated by the
+-- adapter on insert and is not a foreign key by itself (the parent
+-- `code_lists` row is the source of truth).
 
 CREATE TABLE code_items (
     id BIGSERIAL PRIMARY KEY,
     codelist_id BIGINT NOT NULL REFERENCES code_lists(id) ON DELETE CASCADE,
+    version_id BIGINT NOT NULL,
     code TEXT NOT NULL,
     submission_value TEXT NOT NULL DEFAULT '',
     synonym TEXT NOT NULL DEFAULT '',
@@ -31,6 +39,7 @@ CREATE TABLE code_items (
 );
 
 CREATE INDEX code_items_codelist_id_idx ON code_items (codelist_id);
+CREATE INDEX code_items_version_id_idx ON code_items (version_id);
 CREATE INDEX code_items_tsv_idx ON code_items USING GIN (tsv);
 
 CREATE OR REPLACE FUNCTION code_items_set_updated_at()

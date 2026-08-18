@@ -43,6 +43,7 @@ pub struct UpdateCodeList {
 
 pub struct CreateCodeItem {
     pub codelist_id: i64,
+    pub version_id: i64,
     pub code: String,
     pub submission_value: String,
     pub synonym: String,

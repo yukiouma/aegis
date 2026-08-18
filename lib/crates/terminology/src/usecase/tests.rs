@@ -248,12 +248,17 @@ struct ItemsState {
 #[derive(Clone, Default)]
 struct FakeCodeItemRepo {
     state: Arc<Mutex<ItemsState>>,
+    /// Shared with `FakeCodeListRepo` so the natural-key lookup
+    /// `list_by_version_and_codelist_code` can resolve a codelist
+    /// by `(version_id, code)`.
+    lists: Arc<Mutex<ListsState>>,
 }
 
 impl FakeCodeItemRepo {
-    fn new() -> Self {
+    fn new(lists: Arc<Mutex<ListsState>>) -> Self {
         Self {
             state: Arc::new(Mutex::new(ItemsState::default())),
+            lists,
         }
     }
 }
@@ -276,6 +281,7 @@ impl CodeItemRepository for FakeCodeItemRepo {
         let item = CodeItem::for_repository(
             id,
             input.codelist_id,
+            input.version_id,
             input.code,
             input.submission_value,
             input.synonym,
@@ -297,6 +303,32 @@ impl CodeItemRepository for FakeCodeItemRepo {
             .ok_or(DomainError::CodeItemNotFound(id))
     }
     async fn list_by_codelist(&self, codelist_id: i64) -> Result<Vec<CodeItem>, DomainError> {
+        Ok(self
+            .state
+            .lock()
+            .unwrap()
+            .by_id
+            .values()
+            .filter(|i| i.codelist_id == codelist_id)
+            .cloned()
+            .collect())
+    }
+    async fn list_by_version_and_codelist_code(
+        &self,
+        version_id: i64,
+        code: &str,
+    ) -> Result<Vec<CodeItem>, DomainError> {
+        let codelist_id = {
+            let lists = self.lists.lock().unwrap();
+            lists
+                .by_id
+                .values()
+                .find(|c| c.version_id == version_id && c.code == code)
+                .map(|c| c.id)
+        };
+        let Some(codelist_id) = codelist_id else {
+            return Ok(vec![]);
+        };
         Ok(self
             .state
             .lock()
@@ -356,7 +388,10 @@ fn make_usecase() -> (
 ) {
     let v = FakeVersionRepo::new();
     let l = FakeCodeListRepo::new();
-    let i = FakeCodeItemRepo::new();
+    // Share the codelist state with the item fake so
+    // `list_by_version_and_codelist_code` can resolve a codelist
+    // by `(version_id, code)`.
+    let i = FakeCodeItemRepo::new(l.state.clone());
     let usecase = TerminologyUsecase::new(TerminologyUsecaseConfig {
         version_repo: v.clone(),
         code_list_repo: l.clone(),
@@ -523,6 +558,7 @@ async fn create_code_item_rejects_empty_code() {
     let err = usecase
         .create_code_item(CreateCodeItem {
             codelist_id: 1,
+            version_id: 1,
             code: "".into(),
             submission_value: "X".into(),
             synonym: "".into(),
@@ -543,6 +579,7 @@ async fn create_code_item_round_trip_then_list_by_codelist() {
     let created = usecase
         .create_code_item(CreateCodeItem {
             codelist_id: 9,
+            version_id: 7,
             code: "C12345".into(),
             submission_value: "> 0".into(),
             synonym: "positive".into(),
@@ -553,4 +590,145 @@ async fn create_code_item_round_trip_then_list_by_codelist() {
         .expect("create");
     let listed = usecase.list_code_items(9).await.expect("list");
     assert!(listed.iter().any(|i| i.id == created.id));
+}
+
+#[tokio::test]
+async fn list_code_items_by_version_and_codelist_code_returns_only_target_items() {
+    let (_, _, _, usecase) = make_usecase();
+
+    // Two versions, each owning two codelists. We want to make
+    // sure the natural-key lookup returns only items from the
+    // matching (version_id, code) pair.
+    let v_a = usecase
+        .create_version(CreateTerminologyVersion {
+            kind: TerminologyKind::Sdtm,
+            name: "v-a".into(),
+        })
+        .await
+        .expect("v_a");
+    let v_b = usecase
+        .create_version(CreateTerminologyVersion {
+            kind: TerminologyKind::Sdtm,
+            name: "v-b".into(),
+        })
+        .await
+        .expect("v_b");
+
+    let age_v_a = usecase
+        .create_code_list(CreateCodeList {
+            version_id: v_a.id,
+            code: "C66741".into(),
+            extensible: true,
+            name: "AGE".into(),
+            submission_value: "AGE".into(),
+            synonym: "".into(),
+            definition: "".into(),
+            nci_preferred_term: "".into(),
+        })
+        .await
+        .expect("age_v_a");
+    let sex_v_a = usecase
+        .create_code_list(CreateCodeList {
+            version_id: v_a.id,
+            code: "C66732".into(),
+            extensible: true,
+            name: "SEX".into(),
+            submission_value: "SEX".into(),
+            synonym: "".into(),
+            definition: "".into(),
+            nci_preferred_term: "".into(),
+        })
+        .await
+        .expect("sex_v_a");
+    let age_v_b = usecase
+        .create_code_list(CreateCodeList {
+            version_id: v_b.id,
+            code: "C66741".into(),
+            extensible: true,
+            name: "AGE".into(),
+            submission_value: "AGE".into(),
+            synonym: "".into(),
+            definition: "".into(),
+            nci_preferred_term: "".into(),
+        })
+        .await
+        .expect("age_v_b");
+
+    // Two items in age_v_a, one in sex_v_a, one in age_v_b.
+    for code in ["C1", "C2"] {
+        usecase
+            .create_code_item(CreateCodeItem {
+                codelist_id: age_v_a.id,
+                version_id: v_a.id,
+                code: code.into(),
+                submission_value: "".into(),
+                synonym: "".into(),
+                definition: "".into(),
+                nci_preferred_term: "".into(),
+            })
+            .await
+            .expect("age_v_a item");
+    }
+    usecase
+        .create_code_item(CreateCodeItem {
+            codelist_id: sex_v_a.id,
+            version_id: v_a.id,
+            code: "C3".into(),
+            submission_value: "".into(),
+            synonym: "".into(),
+            definition: "".into(),
+            nci_preferred_term: "".into(),
+        })
+        .await
+        .expect("sex_v_a item");
+    let age_v_b_item = usecase
+        .create_code_item(CreateCodeItem {
+            codelist_id: age_v_b.id,
+            version_id: v_b.id,
+            code: "C4".into(),
+            submission_value: "".into(),
+            synonym: "".into(),
+            definition: "".into(),
+            nci_preferred_term: "".into(),
+        })
+        .await
+        .expect("age_v_b item");
+
+    let age_items = usecase
+        .list_code_items_by_version_and_codelist_code(v_a.id, "C66741")
+        .await
+        .expect("lookup");
+    assert_eq!(age_items.len(), 2, "two items in v_a / C66741");
+    assert!(
+        age_items.iter().all(|i| i.codelist_id == age_v_a.id),
+        "all returned items belong to the v_a AGE codelist"
+    );
+
+    // Same NCI code under a different version: must not bleed.
+    let age_v_b_items = usecase
+        .list_code_items_by_version_and_codelist_code(v_b.id, "C66741")
+        .await
+        .expect("lookup v_b");
+    assert_eq!(age_v_b_items.len(), 1);
+    assert_eq!(age_v_b_items[0].id, age_v_b_item.id);
+
+    // Codelist that does not exist: empty result, not an error.
+    let empty = usecase
+        .list_code_items_by_version_and_codelist_code(v_a.id, "C99999")
+        .await
+        .expect("lookup missing");
+    assert!(empty.is_empty());
+}
+
+#[tokio::test]
+async fn list_code_items_by_version_and_codelist_code_rejects_empty_code() {
+    let (_, _, _, usecase) = make_usecase();
+    let err = usecase
+        .list_code_items_by_version_and_codelist_code(1, "   ")
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        UsecaseError::Validation(DomainError::EmptyCode)
+    ));
 }

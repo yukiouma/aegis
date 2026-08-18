@@ -62,7 +62,8 @@ fn code_list_new_accepts_valid_input() {
 
 #[test]
 fn code_item_new_rejects_empty_code() {
-    let err = CodeItem::new(1, "".into(), "X".into(), "".into(), "".into(), "".into()).unwrap_err();
+    let err =
+        CodeItem::new(1, 1, "".into(), "X".into(), "".into(), "".into(), "".into()).unwrap_err();
     assert!(matches!(err, DomainError::EmptyCode));
 }
 
@@ -70,6 +71,7 @@ fn code_item_new_rejects_empty_code() {
 fn code_item_new_accepts_valid_input() {
     let item = CodeItem::new(
         1,
+        7,
         "C12345".into(),
         "> 0".into(),
         "".into(),
@@ -78,4 +80,5 @@ fn code_item_new_accepts_valid_input() {
     )
     .unwrap();
     assert_eq!(item.code, "C12345");
+    assert_eq!(item.version_id, 7);
 }

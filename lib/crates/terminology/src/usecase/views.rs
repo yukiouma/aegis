@@ -60,6 +60,7 @@ impl From<CodeList> for CodeListView {
 pub struct CodeItemView {
     pub id: i64,
     pub codelist_id: i64,
+    pub version_id: i64,
     pub code: String,
     pub submission_value: String,
     pub synonym: String,
@@ -74,6 +75,7 @@ impl From<CodeItem> for CodeItemView {
         Self {
             id: i.id,
             codelist_id: i.codelist_id,
+            version_id: i.version_id,
             code: i.code,
             submission_value: i.submission_value,
             synonym: i.synonym,

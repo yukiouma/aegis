@@ -61,6 +61,15 @@ pub trait CodeItemRepository: Send + Sync {
     async fn create(&self, input: CodeItemNew) -> Result<CodeItem, DomainError>;
     async fn find_by_id(&self, id: i64) -> Result<CodeItem, DomainError>;
     async fn list_by_codelist(&self, codelist_id: i64) -> Result<Vec<CodeItem>, DomainError>;
+    /// Natural-key lookup: items belonging to the codelist
+    /// identified by `(version_id, code)` — typically the NCI C-code
+    /// on `code_lists`. Returns an empty `Vec` when no such codelist
+    /// exists.
+    async fn list_by_version_and_codelist_code(
+        &self,
+        version_id: i64,
+        code: &str,
+    ) -> Result<Vec<CodeItem>, DomainError>;
     async fn update(&self, input: CodeItemUpdate) -> Result<CodeItem, DomainError>;
     async fn delete(&self, id: i64) -> Result<(), DomainError>;
     async fn search(

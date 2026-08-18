@@ -8,6 +8,11 @@ use super::terminology_kind::TerminologyKind;
 pub struct CodeItem {
     pub id: i64,
     pub codelist_id: i64,
+    /// Denormalised copy of the parent codelist's `version_id`.
+    /// Lets the repository answer
+    /// `list_by_version_and_codelist_code` without a self-join,
+    /// and lets consumers read the owning version off the item.
+    pub version_id: i64,
     pub code: String,
     pub submission_value: String,
     pub synonym: String,
@@ -23,6 +28,7 @@ impl CodeItem {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         codelist_id: i64,
+        version_id: i64,
         code: String,
         submission_value: String,
         synonym: String,
@@ -35,6 +41,7 @@ impl CodeItem {
         Ok(Self {
             id: 0,
             codelist_id,
+            version_id,
             code,
             submission_value,
             synonym,
@@ -51,6 +58,7 @@ impl CodeItem {
     pub(crate) fn for_repository(
         id: i64,
         codelist_id: i64,
+        version_id: i64,
         code: String,
         submission_value: String,
         synonym: String,
@@ -62,6 +70,7 @@ impl CodeItem {
         Self {
             id,
             codelist_id,
+            version_id,
             code,
             submission_value,
             synonym,
@@ -77,6 +86,7 @@ impl CodeItem {
 #[derive(Debug, Clone)]
 pub struct CodeItemNew {
     pub codelist_id: i64,
+    pub version_id: i64,
     pub code: String,
     pub submission_value: String,
     pub synonym: String,
