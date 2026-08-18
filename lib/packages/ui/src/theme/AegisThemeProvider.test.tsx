@@ -100,6 +100,20 @@ describe('AegisThemeProvider', () => {
     expect(screen.getByTestId('theme-mode')).toHaveTextContent('light');
   });
 
+  it('reads a non-binary theme ID like "totoro" from localStorage and writes it back', () => {
+    localStorage.setItem(STORAGE_KEY, 'totoro');
+    render(
+      <AegisThemeProvider>
+        <ReadThemeMode />
+      </AegisThemeProvider>,
+    );
+    // The MUI theme palette.mode is not authoritative for character
+    // themes — totoro's palette omits `mode`, so MUI defaults it to
+    // 'light'. We assert the localStorage round-trip instead, which
+    // is what the Settings page dropdown reads from.
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('totoro');
+  });
+
   it('writes the current mode to localStorage on mount', () => {
     render(
       <AegisThemeProvider>
