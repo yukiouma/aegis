@@ -168,6 +168,8 @@ mod tests {
     use std::sync::Arc;
     use tower::ServiceExt;
 
+    use crate::state::test_support::NullTerminologyService;
+
     use apis::auth::{
         AuthApiError, AuthClaims, AuthService, CreateUserCredentialRequest,
         LoginWithDomainUserInfoRequest, LoginWithPasswordRequest, LogoutRequest, LogoutResponse,
@@ -361,6 +363,8 @@ mod tests {
             auth: Arc::new(mock) as Arc<dyn AuthService>,
             user: Arc::new(NullUserService) as Arc<dyn apis::user::UserService>,
             project: Arc::new(NullProjectService) as Arc<dyn apis::project::ProjectService>,
+            terminology: Arc::new(NullTerminologyService)
+                as Arc<dyn apis::terminology::TerminologyService>,
         }
     }
 

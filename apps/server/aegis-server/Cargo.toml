@@ -63,6 +63,10 @@ user = { path = "../../../lib/crates/user" }
 # project provides product/project Postgres repositories, the user-service
 # adapter, usecase, and ProjectService implementation.
 project = { path = "../../../lib/crates/project" }
+# terminology provides the terminology Postgres repositories, the
+# TerminologyUsecase, and the apis::TerminologyService adapter that
+# the HTTP layer consumes through AppState.
+terminology = { path = "../../../lib/crates/terminology" }
 
 [dev-dependencies]
 # `argon2` is used by `tests/integration_auth.rs` to seed a real

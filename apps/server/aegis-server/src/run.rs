@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use apis::auth::AuthService;
+use apis::terminology::TerminologyService;
 use apis::user::UserService;
 use auth::{
     AuthServiceImpl, AuthUsecase, AuthUsecaseConfig, DomainIdentityRepo, InMemoryTokenVersionCache,
@@ -19,6 +20,10 @@ use auth::{
 use auth::{UserService as AuthUserService, UserServiceImpl as AuthUserServiceImpl};
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
+use terminology::{
+    CodeItemRepo, CodeListRepo, TerminologyServiceImpl, TerminologyUsecase,
+    TerminologyUsecaseConfig, TerminologyVersionRepo,
+};
 use tokio::net::TcpListener;
 use tracing_subscriber::EnvFilter;
 use user::{UserRepo, UserServiceImpl, UserUsecase};
@@ -39,12 +44,14 @@ pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send 
 
     let auth = build_auth_service(&config, pool.clone(), cache)?;
     let user = build_user_service(pool.clone());
-    let project = build_project_service(pool, user.clone());
+    let project = build_project_service(pool.clone(), user.clone());
+    let terminology = build_terminology_service(pool);
 
     let state = AppState {
         auth,
         user,
         project,
+        terminology,
     };
     let app = transport::http::router(state);
 
@@ -185,6 +192,22 @@ fn build_project_service(
         users,
     });
     Arc::new(project::ProjectServiceImpl::new(usecase))
+}
+
+/// Wire the terminology crate's adapters into the apis
+/// `TerminologyService` trait object. The three Postgres repos
+/// share the same pool as auth / user / project; no second pool
+/// or env var is introduced.
+fn build_terminology_service(pool: PgPool) -> Arc<dyn TerminologyService> {
+    let version_repo = TerminologyVersionRepo::new(pool.clone());
+    let code_list_repo = CodeListRepo::new(pool.clone());
+    let code_item_repo = CodeItemRepo::new(pool);
+    let usecase = TerminologyUsecase::new(TerminologyUsecaseConfig {
+        version_repo,
+        code_list_repo,
+        code_item_repo,
+    });
+    Arc::new(TerminologyServiceImpl::new(usecase))
 }
 
 #[cfg(test)]

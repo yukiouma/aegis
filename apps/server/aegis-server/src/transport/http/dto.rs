@@ -1,10 +1,11 @@
 //! Wire-level DTOs for the HTTP transport.
 //!
 //! Each wire DTO is a thin Rust struct with `Serialize`,
-//! `Deserialize`, and `ToSchema`. Field names are `snake_case` to
-//! match the apis surface. Handler code translates JSON ↔ apis DTOs
-//! at the boundary; the apis crate deliberately has no serde /
-//! utoipa derives.
+//! `Deserialize`, and `ToSchema`. JSON field names use `camelCase`
+//! (`#[serde(rename_all = "camelCase")]`) per the public API
+//! conventions. Handler code translates JSON ↔ apis DTOs at the
+//! boundary; the apis crate deliberately has no serde / utoipa
+//! derives.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -430,6 +431,351 @@ pub struct ProjectListResponse {
     pub projects: Vec<ProjectViewResponse>,
 }
 
+// -- terminology kind --------------------------------------------------------
+
+/// Wire-level mirror of `apis::terminology::TerminologyKind`. The two
+/// enums have identical variants; the conversion is a single 2-arm
+/// `match`. Kept separate so the apis crate stays free of serde /
+/// utoipa derives. `Default` is derived (defaulting to `Sdtm`, the
+/// more common standard) so query DTOs that wrap it can derive
+/// `Default` for serde-deserialization of partial query strings.
+#[derive(Debug, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum TerminologyKind {
+    #[default]
+    Sdtm,
+    Adam,
+}
+
+impl From<apis::terminology::TerminologyKind> for TerminologyKind {
+    fn from(k: apis::terminology::TerminologyKind) -> Self {
+        match k {
+            apis::terminology::TerminologyKind::Sdtm => TerminologyKind::Sdtm,
+            apis::terminology::TerminologyKind::Adam => TerminologyKind::Adam,
+        }
+    }
+}
+
+impl From<TerminologyKind> for apis::terminology::TerminologyKind {
+    fn from(k: TerminologyKind) -> Self {
+        match k {
+            TerminologyKind::Sdtm => apis::terminology::TerminologyKind::Sdtm,
+            TerminologyKind::Adam => apis::terminology::TerminologyKind::Adam,
+        }
+    }
+}
+
+// -- terminology view DTOs ---------------------------------------------------
+
+/// Wire-level extractor for the `{id}` URL parameter used by every
+/// version / code-list / code-item path.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PathId {
+    pub id: i64,
+}
+
+/// Wire-level projection of a `TerminologyVersion`. Mirrors
+/// `apis::terminology::TerminologyVersionView` field-for-field.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminologyVersionViewResponse {
+    pub id: i64,
+    pub kind: TerminologyKind,
+    pub name: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::terminology::TerminologyVersionView> for TerminologyVersionViewResponse {
+    fn from(view: apis::terminology::TerminologyVersionView) -> Self {
+        Self {
+            id: view.id,
+            kind: view.kind.into(),
+            name: view.name,
+            created_at: view.created_at,
+            updated_at: view.updated_at,
+        }
+    }
+}
+
+/// Wire-level wrapper for `GET /api/terminology/versions`.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminologyVersionListResponse {
+    pub versions: Vec<TerminologyVersionViewResponse>,
+}
+
+/// Wire-level projection of a `CodeList`.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeListViewResponse {
+    pub id: i64,
+    pub version_id: i64,
+    pub code: String,
+    pub extensible: bool,
+    pub name: String,
+    pub submission_value: String,
+    pub synonym: String,
+    pub definition: String,
+    pub nci_preferred_term: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::terminology::CodeListView> for CodeListViewResponse {
+    fn from(view: apis::terminology::CodeListView) -> Self {
+        Self {
+            id: view.id,
+            version_id: view.version_id,
+            code: view.code,
+            extensible: view.extensible,
+            name: view.name,
+            submission_value: view.submission_value,
+            synonym: view.synonym,
+            definition: view.definition,
+            nci_preferred_term: view.nci_preferred_term,
+            created_at: view.created_at,
+            updated_at: view.updated_at,
+        }
+    }
+}
+
+/// Wire-level wrapper for `GET /api/terminology/code-lists`.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeListListResponse {
+    pub codelists: Vec<CodeListViewResponse>,
+}
+
+/// Wire-level projection of a `CodeItem`.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeItemViewResponse {
+    pub id: i64,
+    pub codelist_id: i64,
+    pub version_id: i64,
+    pub code: String,
+    pub submission_value: String,
+    pub synonym: String,
+    pub definition: String,
+    pub nci_preferred_term: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::terminology::CodeItemView> for CodeItemViewResponse {
+    fn from(view: apis::terminology::CodeItemView) -> Self {
+        Self {
+            id: view.id,
+            codelist_id: view.codelist_id,
+            version_id: view.version_id,
+            code: view.code,
+            submission_value: view.submission_value,
+            synonym: view.synonym,
+            definition: view.definition,
+            nci_preferred_term: view.nci_preferred_term,
+            created_at: view.created_at,
+            updated_at: view.updated_at,
+        }
+    }
+}
+
+/// Wire-level wrapper for `GET /api/terminology/code-items`.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeItemListResponse {
+    pub items: Vec<CodeItemViewResponse>,
+}
+
+/// Wire-level projection of one codelist search hit.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeListSearchHitResponse {
+    pub codelist: CodeListViewResponse,
+}
+
+impl From<apis::terminology::CodeListSearchHit> for CodeListSearchHitResponse {
+    fn from(hit: apis::terminology::CodeListSearchHit) -> Self {
+        Self {
+            codelist: hit.codelist.into(),
+        }
+    }
+}
+
+/// Wire-level projection of one code-item search hit.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeItemSearchHitResponse {
+    pub item: CodeItemViewResponse,
+}
+
+impl From<apis::terminology::CodeItemSearchHit> for CodeItemSearchHitResponse {
+    fn from(hit: apis::terminology::CodeItemSearchHit) -> Self {
+        Self {
+            item: hit.item.into(),
+        }
+    }
+}
+
+/// Wire-level wrapper for `GET /api/terminology/code-lists/search`.
+/// Wrapping the hit list in a struct leaves room for future
+/// pagination metadata (`total`, `next_cursor`, …) without
+/// breaking the response shape.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeListSearchHitsResponse {
+    pub hits: Vec<CodeListSearchHitResponse>,
+}
+
+/// Wire-level wrapper for `GET /api/terminology/code-items/search`.
+/// Wrapping the hit list in a struct leaves room for future
+/// pagination metadata (`total`, `next_cursor`, …) without
+/// breaking the response shape.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeItemSearchHitsResponse {
+    pub hits: Vec<CodeItemSearchHitResponse>,
+}
+
+// -- terminology request DTOs -----------------------------------------------
+
+/// Wire-level request body for `POST /api/terminology/versions`.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateTerminologyVersionRequest {
+    pub kind: TerminologyKind,
+    pub name: String,
+}
+
+/// Wire-level request body for `PATCH /api/terminology/versions/{id}`.
+/// Every field except `id` is optional. `skip_serializing_if` keeps a
+/// partial update round-trip lossless.
+#[derive(Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateTerminologyVersionRequest {
+    pub id: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<TerminologyKind>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+/// Wire-level request body for `POST /api/terminology/code-lists`.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCodeListRequest {
+    pub version_id: i64,
+    pub code: String,
+    pub extensible: bool,
+    pub name: String,
+    pub submission_value: String,
+    pub synonym: String,
+    pub definition: String,
+    pub nci_preferred_term: String,
+}
+
+/// Wire-level request body for `PATCH /api/terminology/code-lists/{id}`.
+#[derive(Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCodeListRequest {
+    pub id: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensible: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub submission_value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub synonym: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub definition: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nci_preferred_term: Option<String>,
+}
+
+/// Wire-level request body for `POST /api/terminology/code-items`.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCodeItemRequest {
+    pub codelist_id: i64,
+    pub version_id: i64,
+    pub code: String,
+    pub submission_value: String,
+    pub synonym: String,
+    pub definition: String,
+    pub nci_preferred_term: String,
+}
+
+/// Wire-level request body for `PATCH /api/terminology/code-items/{id}`.
+#[derive(Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCodeItemRequest {
+    pub id: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub submission_value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub synonym: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub definition: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub nci_preferred_term: Option<String>,
+}
+
+// -- terminology search query DTOs ------------------------------------------
+
+/// Query string for `GET /api/terminology/code-lists/search` and the
+/// item search route. Scoped to a single `versionId`; `fragment` is
+/// matched against the row's text columns via Postgres FTS
+/// (`tsv @@ plainto_tsquery`). `limit = 0` lets the usecase apply
+/// its default.
+#[derive(Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminologySearchBaseQuery {
+    pub version_id: i64,
+    pub fragment: String,
+    #[serde(default)]
+    pub limit: u32,
+}
+
+/// Query string for `GET /api/terminology/code-lists/search` —
+/// searches within a single terminology version for codelists
+/// matching `fragment`.
+pub type CodeListSearchQueryRequest = TerminologySearchBaseQuery;
+
+/// Query string for `GET /api/terminology/code-items/search` —
+/// searches within a single terminology version for items matching
+/// `fragment`.
+pub type CodeItemSearchQueryRequest = TerminologySearchBaseQuery;
+
+/// Query string for `GET /api/terminology/code-lists` (list by
+/// version).
+#[derive(Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeListListQuery {
+    pub version_id: i64,
+}
+
+/// Query string for `GET /api/terminology/code-items` (list by
+/// codelist).
+#[derive(Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeItemListQuery {
+    pub codelist_id: i64,
+}
+
+/// Query string for `GET /api/terminology/code-items/by-version-and-code`.
+#[derive(Serialize, Deserialize, ToSchema, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeItemByVersionAndCodeQuery {
+    pub version_id: i64,
+    pub code: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -840,5 +1186,266 @@ mod tests {
         let resp: ProjectListResponse = serde_json::from_str(json).unwrap();
         assert!(resp.projects.is_empty());
         assert_eq!(serde_json::to_string(&resp).unwrap(), json);
+    }
+
+    // ---- terminology DTO round-trips -----
+
+    fn sample_terminology_version_view() -> apis::terminology::TerminologyVersionView {
+        apis::terminology::TerminologyVersionView {
+            id: 1,
+            kind: apis::terminology::TerminologyKind::Sdtm,
+            name: "2026-03-27".into(),
+            created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+            updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        }
+    }
+
+    fn sample_code_list_view() -> apis::terminology::CodeListView {
+        apis::terminology::CodeListView {
+            id: 11,
+            version_id: 1,
+            code: "C66741".into(),
+            extensible: true,
+            name: "AGE".into(),
+            submission_value: "AGE".into(),
+            synonym: String::new(),
+            definition: String::new(),
+            nci_preferred_term: "Age".into(),
+            created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+            updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        }
+    }
+
+    fn sample_code_item_view() -> apis::terminology::CodeItemView {
+        apis::terminology::CodeItemView {
+            id: 100,
+            codelist_id: 11,
+            version_id: 1,
+            code: "C1".into(),
+            submission_value: "Y".into(),
+            synonym: String::new(),
+            definition: String::new(),
+            nci_preferred_term: "Yes".into(),
+            created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+            updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        }
+    }
+
+    #[test]
+    fn terminology_kind_round_trip_all_variants() {
+        for k in [TerminologyKind::Sdtm, TerminologyKind::Adam] {
+            let s = serde_json::to_string(&k).unwrap();
+            let back: TerminologyKind = serde_json::from_str(&s).unwrap();
+            assert_eq!(format!("{k:?}"), format!("{back:?}"));
+        }
+    }
+
+    #[test]
+    fn terminology_kind_from_apis_all_variants() {
+        assert!(matches!(
+            TerminologyKind::from(apis::terminology::TerminologyKind::Sdtm),
+            TerminologyKind::Sdtm
+        ));
+        assert!(matches!(
+            TerminologyKind::from(apis::terminology::TerminologyKind::Adam),
+            TerminologyKind::Adam
+        ));
+    }
+
+    #[test]
+    fn path_id_roundtrip() {
+        let json = r#"{"id":42}"#;
+        let p: PathId = serde_json::from_str(json).unwrap();
+        assert_eq!(p.id, 42);
+        assert_eq!(serde_json::to_string(&p).unwrap(), json);
+    }
+
+    #[test]
+    fn terminology_version_view_response_from_apis_view() {
+        let resp: TerminologyVersionViewResponse = sample_terminology_version_view().into();
+        assert_eq!(resp.id, 1);
+        assert!(matches!(resp.kind, TerminologyKind::Sdtm));
+        assert_eq!(resp.name, "2026-03-27");
+    }
+
+    #[test]
+    fn terminology_version_list_response_roundtrip() {
+        let json = r#"{"versions":[]}"#;
+        let resp: TerminologyVersionListResponse = serde_json::from_str(json).unwrap();
+        assert!(resp.versions.is_empty());
+        assert_eq!(serde_json::to_string(&resp).unwrap(), json);
+    }
+
+    #[test]
+    fn code_list_view_response_from_apis_view() {
+        let resp: CodeListViewResponse = sample_code_list_view().into();
+        assert_eq!(resp.id, 11);
+        assert_eq!(resp.version_id, 1);
+        assert_eq!(resp.code, "C66741");
+        assert!(resp.extensible);
+        assert_eq!(resp.name, "AGE");
+    }
+
+    #[test]
+    fn code_list_list_response_roundtrip() {
+        let json = r#"{"codelists":[]}"#;
+        let resp: CodeListListResponse = serde_json::from_str(json).unwrap();
+        assert!(resp.codelists.is_empty());
+        assert_eq!(serde_json::to_string(&resp).unwrap(), json);
+    }
+
+    #[test]
+    fn code_item_view_response_from_apis_view() {
+        let resp: CodeItemViewResponse = sample_code_item_view().into();
+        assert_eq!(resp.id, 100);
+        assert_eq!(resp.codelist_id, 11);
+        assert_eq!(resp.version_id, 1);
+        assert_eq!(resp.code, "C1");
+        assert_eq!(resp.nci_preferred_term, "Yes");
+    }
+
+    #[test]
+    fn code_item_list_response_roundtrip() {
+        let json = r#"{"items":[]}"#;
+        let resp: CodeItemListResponse = serde_json::from_str(json).unwrap();
+        assert!(resp.items.is_empty());
+        assert_eq!(serde_json::to_string(&resp).unwrap(), json);
+    }
+
+    #[test]
+    fn code_list_search_hit_response_from_apis_hit() {
+        let hit = apis::terminology::CodeListSearchHit {
+            codelist: sample_code_list_view(),
+        };
+        let resp: CodeListSearchHitResponse = hit.into();
+        assert_eq!(resp.codelist.code, "C66741");
+    }
+
+    #[test]
+    fn code_item_search_hit_response_from_apis_hit() {
+        let hit = apis::terminology::CodeItemSearchHit {
+            item: sample_code_item_view(),
+        };
+        let resp: CodeItemSearchHitResponse = hit.into();
+        assert_eq!(resp.item.code, "C1");
+        assert_eq!(resp.item.codelist_id, 11);
+    }
+
+    #[test]
+    fn create_terminology_version_request_roundtrip() {
+        let json = r#"{"kind":"sdtm","name":"2026-03-27"}"#;
+        let req: CreateTerminologyVersionRequest = serde_json::from_str(json).unwrap();
+        assert!(matches!(req.kind, TerminologyKind::Sdtm));
+        assert_eq!(req.name, "2026-03-27");
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn update_terminology_version_request_partial_roundtrip() {
+        let json = r#"{"id":7,"name":"new"}"#;
+        let req: UpdateTerminologyVersionRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.id, 7);
+        assert!(req.kind.is_none());
+        assert_eq!(req.name.as_deref(), Some("new"));
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn create_code_list_request_roundtrip() {
+        let json = r#"{"versionId":1,"code":"C66741","extensible":true,"name":"AGE","submissionValue":"AGE","synonym":"","definition":"","nciPreferredTerm":"Age"}"#;
+        let req: CreateCodeListRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.version_id, 1);
+        assert_eq!(req.code, "C66741");
+        assert!(req.extensible);
+        assert_eq!(req.nci_preferred_term, "Age");
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn update_code_list_request_partial_roundtrip() {
+        let json = r#"{"id":11,"name":"new"}"#;
+        let req: UpdateCodeListRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.id, 11);
+        assert_eq!(req.name.as_deref(), Some("new"));
+        assert!(req.code.is_none());
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn create_code_item_request_roundtrip() {
+        let json = r#"{"codelistId":11,"versionId":1,"code":"C1","submissionValue":"Y","synonym":"","definition":"","nciPreferredTerm":"Yes"}"#;
+        let req: CreateCodeItemRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.codelist_id, 11);
+        assert_eq!(req.version_id, 1);
+        assert_eq!(req.code, "C1");
+        assert_eq!(req.nci_preferred_term, "Yes");
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn update_code_item_request_partial_roundtrip() {
+        let json = r#"{"id":100,"code":"C2"}"#;
+        let req: UpdateCodeItemRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.id, 100);
+        assert_eq!(req.code.as_deref(), Some("C2"));
+        assert!(req.synonym.is_none());
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn code_list_search_query_request_roundtrip() {
+        let json = r#"{"versionId":1,"fragment":"age","limit":10}"#;
+        let req: CodeListSearchQueryRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.version_id, 1);
+        assert_eq!(req.fragment, "age");
+        assert_eq!(req.limit, 10);
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn code_item_search_query_request_roundtrip() {
+        let json = r#"{"versionId":7,"fragment":"x","limit":50}"#;
+        let req: CodeItemSearchQueryRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.version_id, 7);
+        assert_eq!(req.fragment, "x");
+        assert_eq!(req.limit, 50);
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn code_list_list_query_roundtrip() {
+        let json = r#"{"versionId":1}"#;
+        let q: CodeListListQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(q.version_id, 1);
+        assert_eq!(serde_json::to_string(&q).unwrap(), json);
+    }
+
+    #[test]
+    fn code_item_list_query_roundtrip() {
+        let json = r#"{"codelistId":11}"#;
+        let q: CodeItemListQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(q.codelist_id, 11);
+        assert_eq!(serde_json::to_string(&q).unwrap(), json);
+    }
+
+    #[test]
+    fn code_item_by_version_and_code_query_roundtrip() {
+        let json = r#"{"versionId":1,"code":"C1"}"#;
+        let q: CodeItemByVersionAndCodeQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(q.version_id, 1);
+        assert_eq!(q.code, "C1");
+        assert_eq!(serde_json::to_string(&q).unwrap(), json);
     }
 }

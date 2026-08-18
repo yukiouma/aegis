@@ -44,6 +44,20 @@ impl FromRequestParts<AppState> for AuthClaims {
     }
 }
 
+/// Accept only `Root` or `Admin` callers. Other roles — including
+/// `General` — receive [`ApiError::Forbidden`], which renders as
+/// `403 forbidden` with the message
+/// `admin or root role required`.
+///
+/// Shared by every module that needs a write-role guard (project,
+/// terminology, etc.) so the role policy lives in exactly one place.
+pub(crate) fn require_admin_or_root(claims: &AuthClaims) -> Result<(), ApiError> {
+    match claims.0.role {
+        apis::user::Role::Root | apis::user::Role::Admin => Ok(()),
+        apis::user::Role::General => Err(ApiError::Forbidden),
+    }
+}
+
 /// Extract the bearer token from the `Authorization` header.
 ///
 /// Returns `AuthApiError::Verification` (mapped to HTTP 401) for
@@ -88,6 +102,8 @@ mod tests {
     use axum::routing::get;
     use std::sync::Arc;
     use tower::ServiceExt;
+
+    use crate::state::test_support::NullTerminologyService;
 
     use apis::auth::{
         AuthApiError, AuthClaims as ApiAuthClaims, AuthService, CreateUserCredentialRequest,
@@ -245,6 +261,8 @@ mod tests {
             auth: Arc::new(MockAuth) as Arc<dyn AuthService>,
             user: Arc::new(NullUserService) as Arc<dyn apis::user::UserService>,
             project: Arc::new(NullProjectService) as Arc<dyn apis::project::ProjectService>,
+            terminology: Arc::new(NullTerminologyService)
+                as Arc<dyn apis::terminology::TerminologyService>,
         }
     }
 

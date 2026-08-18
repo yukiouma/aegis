@@ -117,6 +117,8 @@ mod tests {
     use axum::http::{Request, StatusCode as AxStatus};
     use axum::routing::post;
     use std::sync::{Arc, Mutex};
+
+    use crate::state::test_support::NullTerminologyService;
     use tower::ServiceExt;
 
     use apis::auth::{
@@ -306,6 +308,8 @@ mod tests {
             auth: Arc::new(mock) as Arc<dyn AuthService>,
             user: Arc::new(NullUserService) as Arc<dyn apis::user::UserService>,
             project: Arc::new(NullProjectService) as Arc<dyn apis::project::ProjectService>,
+            terminology: Arc::new(NullTerminologyService)
+                as Arc<dyn apis::terminology::TerminologyService>,
         }
     }
 

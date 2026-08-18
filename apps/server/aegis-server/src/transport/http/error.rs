@@ -45,6 +45,9 @@ pub enum ApiError {
     #[error("{0}")]
     Project(#[from] apis::project::ProjectApiError),
 
+    #[error("{0}")]
+    Terminology(#[from] apis::terminology::TerminologyApiError),
+
     #[error("admin or root role required")]
     Forbidden,
 }
@@ -56,6 +59,7 @@ impl ApiError {
             Self::Auth(e) => auth_status(e),
             Self::User(e) => user_status(e),
             Self::Project(e) => project_status(e),
+            Self::Terminology(e) => terminology_status(e),
             Self::Forbidden => StatusCode::FORBIDDEN,
         }
     }
@@ -66,6 +70,7 @@ impl ApiError {
             Self::Auth(e) => auth_code(e),
             Self::User(e) => user_code(e),
             Self::Project(e) => project_code(e),
+            Self::Terminology(e) => terminology_code(e),
             Self::Forbidden => "forbidden",
         }
     }
@@ -139,6 +144,30 @@ fn project_code(e: &apis::project::ProjectApiError) -> &'static str {
         ProjectApiError::UserNotFound(_) => "user_not_found",
         ProjectApiError::DuplicateCode(_) => "duplicate_code",
         ProjectApiError::Repository(_) => "repository_error",
+    }
+}
+
+fn terminology_status(e: &apis::terminology::TerminologyApiError) -> StatusCode {
+    use apis::terminology::TerminologyApiError;
+    match e {
+        TerminologyApiError::Validation(_) => StatusCode::BAD_REQUEST,
+        TerminologyApiError::NotFound => StatusCode::NOT_FOUND,
+        TerminologyApiError::DuplicateVersion { .. }
+        | TerminologyApiError::DuplicateCodeList { .. }
+        | TerminologyApiError::DuplicateCodeItem { .. } => StatusCode::CONFLICT,
+        TerminologyApiError::Repository(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn terminology_code(e: &apis::terminology::TerminologyApiError) -> &'static str {
+    use apis::terminology::TerminologyApiError;
+    match e {
+        TerminologyApiError::Validation(_) => "validation_failed",
+        TerminologyApiError::NotFound => "not_found",
+        TerminologyApiError::DuplicateVersion { .. } => "duplicate_terminology_version",
+        TerminologyApiError::DuplicateCodeList { .. } => "duplicate_code_list",
+        TerminologyApiError::DuplicateCodeItem { .. } => "duplicate_code_item",
+        TerminologyApiError::Repository(_) => "repository_error",
     }
 }
 
@@ -367,5 +396,84 @@ mod tests {
         let parsed: ErrorBody = serde_json::from_slice(&body).unwrap();
         assert_eq!(parsed.code, "forbidden");
         assert_eq!(parsed.message, "admin or root role required");
+    }
+
+    // ---- TerminologyApiError mapping -----
+
+    async fn render_terminology(
+        err: apis::terminology::TerminologyApiError,
+    ) -> (StatusCode, ErrorBody) {
+        let api = ApiError::from(err);
+        let response = api.into_response();
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap();
+        let parsed: ErrorBody = serde_json::from_slice(&body).unwrap();
+        (status, parsed)
+    }
+
+    #[tokio::test]
+    async fn terminology_validation_maps_to_400() {
+        let (status, body) = render_terminology(
+            apis::terminology::TerminologyApiError::Validation("bad".into()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body.code, "validation_failed");
+    }
+
+    #[tokio::test]
+    async fn terminology_not_found_maps_to_404() {
+        let (status, body) =
+            render_terminology(apis::terminology::TerminologyApiError::NotFound).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "not_found");
+    }
+
+    #[tokio::test]
+    async fn terminology_duplicate_version_maps_to_409() {
+        let (status, body) =
+            render_terminology(apis::terminology::TerminologyApiError::DuplicateVersion {
+                kind: apis::terminology::TerminologyKind::Sdtm,
+                name: "v1".into(),
+            })
+            .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body.code, "duplicate_terminology_version");
+    }
+
+    #[tokio::test]
+    async fn terminology_duplicate_code_list_maps_to_409() {
+        let (status, body) =
+            render_terminology(apis::terminology::TerminologyApiError::DuplicateCodeList {
+                version_id: 1,
+                code: "C66741".into(),
+            })
+            .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body.code, "duplicate_code_list");
+    }
+
+    #[tokio::test]
+    async fn terminology_duplicate_code_item_maps_to_409() {
+        let (status, body) =
+            render_terminology(apis::terminology::TerminologyApiError::DuplicateCodeItem {
+                codelist_id: 1,
+                code: "C1".into(),
+            })
+            .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body.code, "duplicate_code_item");
+    }
+
+    #[tokio::test]
+    async fn terminology_repository_maps_to_500() {
+        let (status, body) = render_terminology(
+            apis::terminology::TerminologyApiError::Repository("db".into()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body.code, "repository_error");
     }
 }

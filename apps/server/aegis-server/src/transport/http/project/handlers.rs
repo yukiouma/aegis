@@ -10,20 +10,9 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 
 use crate::state::AppState;
-use crate::transport::http::auth::middleware::AuthClaims;
+use crate::transport::http::auth::middleware::{AuthClaims, require_admin_or_root};
 use crate::transport::http::dto::{self, PathCode};
 use crate::transport::http::error::ApiError;
-
-/// Accept only `Root` or `Admin` callers. Other roles — including
-/// `General` — receive `ApiError::Forbidden`, which renders as
-/// `403 forbidden` with the message
-/// `admin or root role required`.
-fn require_admin_or_root(claims: &AuthClaims) -> Result<(), ApiError> {
-    match claims.0.role {
-        apis::user::Role::Root | apis::user::Role::Admin => Ok(()),
-        apis::user::Role::General => Err(ApiError::Forbidden),
-    }
-}
 
 /// Translate the wire DTO into the apis DTO for project membership.
 fn member_data(value: dto::ProjectMemberDataRequest) -> apis::project::ProjectMemberData {
@@ -194,6 +183,8 @@ mod tests {
     use axum::routing::{get, post};
     use std::sync::{Arc, Mutex};
     use tower::ServiceExt;
+
+    use crate::state::test_support::NullTerminologyService;
 
     use apis::auth::{
         AuthApiError, AuthClaims as ApisAuthClaims, AuthService, CreateUserCredentialRequest,
@@ -384,6 +375,8 @@ mod tests {
             auth: Arc::new(auth) as Arc<dyn AuthService>,
             user: Arc::new(NullUserService) as Arc<dyn apis::user::UserService>,
             project: Arc::new(project) as Arc<dyn apis::project::ProjectService>,
+            terminology: Arc::new(NullTerminologyService)
+                as Arc<dyn apis::terminology::TerminologyService>,
         }
     }
 
