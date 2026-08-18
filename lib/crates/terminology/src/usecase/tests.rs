@@ -524,7 +524,7 @@ async fn search_code_lists_clamps_limit_to_default_when_zero() {
     let hits = usecase
         .search_code_lists(CodeListSearchQuery {
             version_id: 1,
-            text: "age".into(),
+            fragment: "age".into(),
             limit: 0,
         })
         .await

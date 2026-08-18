@@ -260,9 +260,40 @@ impl CodeListRepository for InMemoryCodeListRepo {
 
     async fn search(
         &self,
-        _query: CodeListSearchQuery,
+        query: CodeListSearchQuery,
     ) -> Result<Vec<InternalCodeListSearchHit>, DomainError> {
-        Ok(vec![])
+        // The in-memory backend mirrors the Postgres semantics on a
+        // best-effort basis: case-insensitive substring match
+        // against the same five text fields the generated `tsv`
+        // column covers. The order is the natural iteration order
+        // of the underlying map; callers that need a stable order
+        // should sort by `id`.
+        let needle = query.fragment.to_lowercase();
+        let limit = query.limit as usize;
+        let mut hits = Vec::new();
+        for cl in self.state.lock().unwrap().by_id.values() {
+            if cl.version_id != query.version_id {
+                continue;
+            }
+            if [
+                cl.name.as_str(),
+                cl.submission_value.as_str(),
+                cl.synonym.as_str(),
+                cl.definition.as_str(),
+                cl.nci_preferred_term.as_str(),
+            ]
+            .iter()
+            .any(|f| f.to_lowercase().contains(&needle))
+            {
+                hits.push(InternalCodeListSearchHit {
+                    codelist: cl.clone(),
+                });
+                if hits.len() >= limit {
+                    break;
+                }
+            }
+        }
+        Ok(hits)
     }
 }
 
@@ -393,9 +424,35 @@ impl CodeItemRepository for InMemoryCodeItemRepo {
 
     async fn search(
         &self,
-        _query: CodeItemSearchQuery,
+        query: CodeItemSearchQuery,
     ) -> Result<Vec<InternalCodeItemSearchHit>, DomainError> {
-        Ok(vec![])
+        // See `InMemoryCodeListRepo::search` for the matching
+        // rationale: case-insensitive substring across the five
+        // text fields, scoped to a single version, ordered by
+        // iteration order (caller can sort by `id` for stability).
+        let needle = query.fragment.to_lowercase();
+        let limit = query.limit as usize;
+        let mut hits = Vec::new();
+        for item in self.state.lock().unwrap().by_id.values() {
+            if item.version_id != query.version_id {
+                continue;
+            }
+            if [
+                item.submission_value.as_str(),
+                item.synonym.as_str(),
+                item.definition.as_str(),
+                item.nci_preferred_term.as_str(),
+            ]
+            .iter()
+            .any(|f| f.to_lowercase().contains(&needle))
+            {
+                hits.push(InternalCodeItemSearchHit { item: item.clone() });
+                if hits.len() >= limit {
+                    break;
+                }
+            }
+        }
+        Ok(hits)
     }
 }
 
@@ -760,7 +817,7 @@ async fn search_code_lists_returns_empty_for_in_memory_backend() {
     let hits = svc
         .search_code_lists(apis::terminology::CodeListSearchQuery {
             version_id: 1,
-            text: "age".into(),
+            fragment: "age".into(),
             limit: 10,
         })
         .await
@@ -970,7 +1027,7 @@ async fn search_code_items_returns_empty_for_in_memory_backend() {
     let hits = svc
         .search_code_items(apis::terminology::CodeItemSearchQuery {
             version_id: 1,
-            text: "age".into(),
+            fragment: "age".into(),
             limit: 10,
         })
         .await
@@ -1031,12 +1088,12 @@ async fn code_item_view_projects_internal_fields() {
 }
 
 #[tokio::test]
-async fn code_list_search_hit_projects_codelist_and_score() {
+async fn code_list_search_hit_projects_codelist() {
     let svc = service();
     let hits: Vec<CodeListSearchHit> = svc
         .search_code_lists(apis::terminology::CodeListSearchQuery {
             version_id: 1,
-            text: "x".into(),
+            fragment: "x".into(),
             limit: 10,
         })
         .await
@@ -1045,12 +1102,12 @@ async fn code_list_search_hit_projects_codelist_and_score() {
 }
 
 #[tokio::test]
-async fn code_item_search_hit_projects_item_and_score() {
+async fn code_item_search_hit_projects_item() {
     let svc = service();
     let hits: Vec<CodeItemSearchHit> = svc
         .search_code_items(apis::terminology::CodeItemSearchQuery {
             version_id: 1,
-            text: "x".into(),
+            fragment: "x".into(),
             limit: 10,
         })
         .await

@@ -49,22 +49,6 @@ impl TryFrom<CodeListRow> for CodeList {
     }
 }
 
-#[derive(FromRow)]
-struct CodeListSearchRow {
-    id: i64,
-    version_id: i64,
-    code: String,
-    extensible: bool,
-    name: String,
-    submission_value: String,
-    synonym: String,
-    definition: String,
-    nci_preferred_term: String,
-    created_at: chrono::DateTime<chrono::Utc>,
-    updated_at: chrono::DateTime<chrono::Utc>,
-    score: f32,
-}
-
 pub struct CodeListRepo {
     pool: PgPool,
 }
@@ -203,55 +187,36 @@ impl CodeListRepository for CodeListRepo {
         &self,
         query: CodeListSearchQuery,
     ) -> Result<Vec<CodeListSearchHit>, DomainError> {
-        let text = query.text.clone();
-        let kind = query.kind;
-        let version_name = query.version_name.clone();
-        let limit = query.limit as i64;
-        // `websearch_to_tsquery` returns NULL when the text reduces
-        // to all stopwords; in that case return empty hits instead
-        // of an error.
-        let rows: Vec<CodeListSearchRow> = sqlx::QueryBuilder::new(
-            "SELECT cl.id, cl.version_id, cl.code, cl.extensible, cl.name, \
-                    cl.submission_value, cl.synonym, cl.definition, \
-                    cl.nci_preferred_term, cl.created_at, cl.updated_at, \
-                    ts_rank_cd(cl.tsv, websearch_to_tsquery('english', ",
+        // Full-text search via the generated `tsv` tsvector +
+        // GIN(tsv) index from migration 0002. `plainto_tsquery`
+        // parameterises the entire query string, so no SQL
+        // injection surface. The query plan uses the GIN index for
+        // the `@@` predicate; ordering by `ts_rank` (Postgres
+        // computes it lazily over the candidate rows) plus `LIMIT`
+        // keeps the response bounded.
+        let limit = query.limit;
+        let rows: Vec<CodeListRow> = sqlx::QueryBuilder::new(
+            "SELECT id, version_id, code, extensible, name, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at \
+             FROM code_lists \
+             WHERE version_id = ",
         )
-        .push_bind(&text)
-        .push(
-            ")) AS score \
-             FROM code_lists cl \
-             JOIN terminology_versions v ON v.id = cl.version_id \
-             WHERE v.kind = ",
-        )
-        .push_bind(kind.as_str())
-        .push(" AND v.name = ")
-        .push_bind(&version_name)
-        .push(" AND cl.tsv @@ websearch_to_tsquery('english', ")
-        .push_bind(&text)
-        .push(") ORDER BY score DESC LIMIT ")
-        .push_bind(limit)
-        .build_query_as::<CodeListSearchRow>()
+        .push_bind(query.version_id)
+        .push(" AND tsv @@ plainto_tsquery('english', ")
+        .push_bind(&query.fragment)
+        .push(") \
+             ORDER BY ts_rank(tsv, plainto_tsquery('english', ")
+        .push_bind(&query.fragment)
+        .push(")) DESC \
+             LIMIT ")
+        .push_bind(limit as i64)
+        .build_query_as::<CodeListRow>()
         .fetch_all(&self.pool)
         .await
         .map_err(map_db_error_simple)?;
         rows.into_iter()
             .map(|row| {
-                let cl = CodeList::try_from(CodeListRow {
-                    id: row.id,
-                    version_id: row.version_id,
-                    code: row.code,
-                    extensible: row.extensible,
-                    name: row.name,
-                    submission_value: row.submission_value,
-                    synonym: row.synonym,
-                    definition: row.definition,
-                    nci_preferred_term: row.nci_preferred_term,
-                    created_at: row.created_at,
-                    updated_at: row.updated_at,
-                })?;
                 Ok(CodeListSearchHit {
-                    codelist: cl,
-                    score: row.score,
+                    codelist: row.try_into()?,
                 })
             })
             .collect()

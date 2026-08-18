@@ -332,17 +332,18 @@ pub async fn delete_code_list(
 }
 
 /// `GET /api/terminology/code-lists/search?…` — full-text search
-/// against codelists in a `(kind, version_name)` scope.
+/// against codelists in a single terminology version.
 #[utoipa::path(
     get, path = "/code-lists/search", tag = "terminology",
     operation_id = "terminology_search_code_lists",
     params(
-        ("versionId" = i64, Query, description = "Version ID"),
-        ("text" = String, Query, description = "Free-text query"),
+        ("versionId" = i64, Query, description = "Terminology version id"),
+        ("fragment" = String, Query, description = "Text fragment to match against codelist text fields"),
         ("limit" = u32, Query, description = "Maximum hits (0 = default)"),
     ),
     responses(
         (status = 200, description = "Codelist hits", body = Vec<dto::CodeListSearchHitResponse>),
+        (status = 400, description = "Empty fragment supplied", body = crate::transport::http::error::ErrorBody),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
@@ -357,7 +358,7 @@ pub async fn search_code_lists(
         .terminology
         .search_code_lists(apis::terminology::CodeListSearchQuery {
             version_id: q.version_id,
-            text: q.text,
+            fragment: q.fragment,
             limit: q.limit,
         })
         .await?;
@@ -525,17 +526,18 @@ pub async fn delete_code_item(
 }
 
 /// `GET /api/terminology/code-items/search?…` — full-text search
-/// against items in a `(kind, version_name)` scope.
+/// against items in a single terminology version.
 #[utoipa::path(
     get, path = "/code-items/search", tag = "terminology",
     operation_id = "terminology_search_code_items",
     params(
-        ("versionId" = i64, Query, description = "Version ID"),
-        ("text" = String, Query, description = "Free-text query"),
+        ("versionId" = i64, Query, description = "Terminology version id"),
+        ("fragment" = String, Query, description = "Text fragment to match against item text fields"),
         ("limit" = u32, Query, description = "Maximum hits (0 = default)"),
     ),
     responses(
         (status = 200, description = "Code item hits", body = Vec<dto::CodeItemSearchHitResponse>),
+        (status = 400, description = "Empty fragment supplied", body = crate::transport::http::error::ErrorBody),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
@@ -550,7 +552,7 @@ pub async fn search_code_items(
         .terminology
         .search_code_items(apis::terminology::CodeItemSearchQuery {
             version_id: q.version_id,
-            text: q.text,
+            fragment: q.fragment,
             limit: q.limit,
         })
         .await?;

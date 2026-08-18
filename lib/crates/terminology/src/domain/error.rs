@@ -10,6 +10,9 @@ pub enum DomainError {
     #[error("code must not be empty")]
     EmptyCode,
 
+    #[error("search fragment must not be empty")]
+    EmptyFragment,
+
     #[error("invalid terminology kind: {0}")]
     InvalidKind(String),
 

@@ -131,19 +131,26 @@ pub struct CodeListUpdate {
 }
 
 /// Query for `CodeListRepository::search`. Search is scoped to a
-/// single `(kind, version_id)` pair so callers cannot accidentally
-/// cross-releases.
+/// single `version_id` so callers cannot accidentally cross-
+/// releases; `fragment` is matched against the row's `tsv` (a
+/// generated tsvector over the five text columns — see migration
+/// 0002). The Postgres backend uses
+/// `tsv @@ plainto_tsquery('english', $fragment)`, which gives
+/// stemming + stopword removal and uses the existing GIN(tsv)
+/// index; the in-memory backend does a case-insensitive fragment
+/// match against the same five fields.
 #[derive(Debug, Clone)]
 pub struct CodeListSearchQuery {
     pub version_id: i64,
-    pub text: String,
+    pub fragment: String,
     /// Default 50. Hard cap 500 (clamped, not rejected).
     pub limit: u32,
 }
 
-/// One hit from `CodeListRepository::search`.
+/// One hit from `CodeListRepository::search`. Order is
+/// implementation-defined (Postgres: descending `ts_rank`;
+/// in-memory: insertion order).
 #[derive(Debug, Clone, PartialEq)]
 pub struct CodeListSearchHit {
     pub codelist: CodeList,
-    pub score: f32,
 }

@@ -1,10 +1,11 @@
 //! Wire-level DTOs for the HTTP transport.
 //!
 //! Each wire DTO is a thin Rust struct with `Serialize`,
-//! `Deserialize`, and `ToSchema`. Field names are `snake_case` to
-//! match the apis surface. Handler code translates JSON ↔ apis DTOs
-//! at the boundary; the apis crate deliberately has no serde /
-//! utoipa derives.
+//! `Deserialize`, and `ToSchema`. JSON field names use `camelCase`
+//! (`#[serde(rename_all = "camelCase")]`) per the public API
+//! conventions. Handler code translates JSON ↔ apis DTOs at the
+//! boundary; the apis crate deliberately has no serde / utoipa
+//! derives.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -592,35 +593,27 @@ pub struct CodeItemListResponse {
 #[serde(rename_all = "camelCase")]
 pub struct CodeListSearchHitResponse {
     pub codelist: CodeListViewResponse,
-    pub score: f32,
 }
 
 impl From<apis::terminology::CodeListSearchHit> for CodeListSearchHitResponse {
     fn from(hit: apis::terminology::CodeListSearchHit) -> Self {
         Self {
             codelist: hit.codelist.into(),
-            score: hit.score,
         }
     }
 }
 
-/// Wire-level projection of one code-item search hit. Carries the
-/// `codelist_id` alongside the item so clients can resolve the
-/// enclosing codelist without a second round trip.
+/// Wire-level projection of one code-item search hit.
 #[derive(Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CodeItemSearchHitResponse {
     pub item: CodeItemViewResponse,
-    pub codelist_id: i64,
-    pub score: f32,
 }
 
 impl From<apis::terminology::CodeItemSearchHit> for CodeItemSearchHitResponse {
     fn from(hit: apis::terminology::CodeItemSearchHit) -> Self {
         Self {
             item: hit.item.into(),
-            codelist_id: hit.codelist_id,
-            score: hit.score,
         }
     }
 }
@@ -716,26 +709,27 @@ pub struct UpdateCodeItemRequest {
 // -- terminology search query DTOs ------------------------------------------
 
 /// Query string for `GET /api/terminology/code-lists/search` and the
-/// `by-name` route. Every field uses `default` so a partial query
-/// deserializes cleanly. `limit = 0` lets the usecase apply its
-/// default.
+/// item search route. Scoped to a single `versionId`; `fragment` is
+/// matched against the row's text columns via Postgres FTS
+/// (`tsv @@ plainto_tsquery`). `limit = 0` lets the usecase apply
+/// its default.
 #[derive(Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TerminologySearchBaseQuery {
     pub version_id: i64,
-    pub text: String,
+    pub fragment: String,
     #[serde(default)]
     pub limit: u32,
 }
 
 /// Query string for `GET /api/terminology/code-lists/search` —
-/// searches within a single `(kind, version_name)` for codelists
-/// matching `text`.
+/// searches within a single terminology version for codelists
+/// matching `fragment`.
 pub type CodeListSearchQueryRequest = TerminologySearchBaseQuery;
 
 /// Query string for `GET /api/terminology/code-items/search` —
-/// searches within a single `(kind, version_name)` for items matching
-/// `text`.
+/// searches within a single terminology version for items matching
+/// `fragment`.
 pub type CodeItemSearchQueryRequest = TerminologySearchBaseQuery;
 
 /// Query string for `GET /api/terminology/versions/by-name`.
@@ -1322,24 +1316,19 @@ mod tests {
     fn code_list_search_hit_response_from_apis_hit() {
         let hit = apis::terminology::CodeListSearchHit {
             codelist: sample_code_list_view(),
-            score: 0.9,
         };
         let resp: CodeListSearchHitResponse = hit.into();
         assert_eq!(resp.codelist.code, "C66741");
-        assert!((resp.score - 0.9).abs() < 1e-6);
     }
 
     #[test]
     fn code_item_search_hit_response_from_apis_hit() {
         let hit = apis::terminology::CodeItemSearchHit {
             item: sample_code_item_view(),
-            score: 0.42,
-            codelist_id: 11,
         };
         let resp: CodeItemSearchHitResponse = hit.into();
         assert_eq!(resp.item.code, "C1");
-        assert_eq!(resp.codelist_id, 11);
-        assert!((resp.score - 0.42).abs() < 1e-6);
+        assert_eq!(resp.item.codelist_id, 11);
     }
 
     #[test]
@@ -1405,18 +1394,20 @@ mod tests {
 
     #[test]
     fn code_list_search_query_request_roundtrip() {
-        let json = r#"{"kind":"sdtm","versionName":"2026-03-27","text":"age","limit":10}"#;
+        let json = r#"{"versionId":1,"fragment":"age","limit":10}"#;
         let req: CodeListSearchQueryRequest = serde_json::from_str(json).unwrap();
         assert_eq!(req.version_id, 1);
-        assert_eq!(req.text, "age");
+        assert_eq!(req.fragment, "age");
         assert_eq!(req.limit, 10);
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
     }
 
     #[test]
     fn code_item_search_query_request_roundtrip() {
-        let json = r#"{"kind":"adam","versionName":"v1","text":"x","limit":50}"#;
+        let json = r#"{"versionId":7,"fragment":"x","limit":50}"#;
         let req: CodeItemSearchQueryRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.version_id, 7);
+        assert_eq!(req.fragment, "x");
         assert_eq!(req.limit, 50);
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
     }

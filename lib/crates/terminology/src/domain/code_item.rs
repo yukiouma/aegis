@@ -105,11 +105,12 @@ pub struct CodeItemUpdate {
     pub nci_preferred_term: Option<String>,
 }
 
-/// Query for `CodeItemRepository::search`.
+/// Query for `CodeItemRepository::search`. Mirrors
+/// [`CodeListSearchQuery`].
 #[derive(Debug, Clone)]
 pub struct CodeItemSearchQuery {
     pub version_id: i64,
-    pub text: String,
+    pub fragment: String,
     /// Default 50. Hard cap 500 (clamped, not rejected).
     pub limit: u32,
 }
@@ -118,6 +119,4 @@ pub struct CodeItemSearchQuery {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CodeItemSearchHit {
     pub item: CodeItem,
-    pub score: f32,
-    pub codelist_id: i64,
 }

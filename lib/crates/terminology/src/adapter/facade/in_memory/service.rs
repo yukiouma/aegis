@@ -165,6 +165,7 @@ impl From<UsecaseError> for TerminologyApiError {
                 DomainError::Repository(msg) => TerminologyApiError::Repository(msg),
                 DomainError::EmptyCode
                 | DomainError::EmptyName
+                | DomainError::EmptyFragment
                 | DomainError::InvalidKind(_)
                 | DomainError::FkVersionNotFound(_)
                 | DomainError::FkCodeListNotFound(_) => unreachable!(
@@ -303,7 +304,7 @@ where
     ) -> Result<Vec<ApiCodeListSearchHit>, TerminologyApiError> {
         let internal_q = CodeListSearchQuery {
             version_id: q.version_id,
-            text: q.text,
+            fragment: q.fragment,
             limit: q.limit,
         };
         let hits = self.usecase.search_code_lists(internal_q).await?;
@@ -311,7 +312,6 @@ where
             .into_iter()
             .map(|h| ApiCodeListSearchHit {
                 codelist: code_list_view_from_internal(h.codelist.into()),
-                score: h.score,
             })
             .collect())
     }
@@ -388,7 +388,7 @@ where
     ) -> Result<Vec<ApiCodeItemSearchHit>, TerminologyApiError> {
         let internal_q = CodeItemSearchQuery {
             version_id: q.version_id,
-            text: q.text,
+            fragment: q.fragment,
             limit: q.limit,
         };
         let hits = self.usecase.search_code_items(internal_q).await?;
@@ -396,8 +396,6 @@ where
             .into_iter()
             .map(|h| ApiCodeItemSearchHit {
                 item: code_item_view_from_internal(h.item.into()),
-                score: h.score,
-                codelist_id: h.codelist_id,
             })
             .collect())
     }

@@ -175,7 +175,14 @@ where
         &self,
         q: CodeListSearchQuery,
     ) -> Result<Vec<CodeListSearchHit>, UsecaseError> {
-        let hits = self.code_list_repo.search(clamp_query(q)).await?;
+        validate_fragment(&q.fragment)?;
+        let hits = self
+            .code_list_repo
+            .search(CodeListSearchQuery {
+                limit: clamp_limit(q.limit),
+                ..q
+            })
+            .await?;
         Ok(hits)
     }
 
@@ -258,6 +265,7 @@ where
         &self,
         q: CodeItemSearchQuery,
     ) -> Result<Vec<CodeItemSearchHit>, UsecaseError> {
+        validate_fragment(&q.fragment)?;
         let hits = self
             .code_item_repo
             .search(CodeItemSearchQuery {
@@ -321,15 +329,20 @@ fn validate_update_code_item(cmd: &UpdateCodeItem) -> Result<(), UsecaseError> {
 
 // ---- search-query sanitation ----
 
-/// Apply the default + hard cap to the `limit` field of a search
-/// query, returning a new query with the clamped value. The
-/// Postgres implementation reads the clamped value, so the cap is
-/// enforced even when tests pass an unbounded `u32::MAX`.
-fn clamp_query(mut q: CodeListSearchQuery) -> CodeListSearchQuery {
-    q.limit = clamp_limit(q.limit);
-    q
+/// Reject an empty / whitespace-only fragment. Both Postgres
+/// (`plainto_tsquery`) and the in-memory backend would otherwise
+/// return every row in the version, which is almost certainly
+/// not what the caller asked for.
+fn validate_fragment(fragment: &str) -> Result<(), UsecaseError> {
+    if fragment.trim().is_empty() {
+        return Err(UsecaseError::Validation(DomainError::EmptyFragment));
+    }
+    Ok(())
 }
 
+/// Apply the default + hard cap to the `limit` field of a search
+/// query. The Postgres implementation reads the clamped value, so
+/// the cap is enforced even when tests pass an unbounded `u32::MAX`.
 fn clamp_limit(limit: u32) -> u32 {
     if limit == 0 {
         50

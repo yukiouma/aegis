@@ -226,7 +226,7 @@ async fn search_code_lists_ranks_hits() {
         let hits = l_repo
             .search(CodeListSearchQuery {
                 version_id: v.id,
-                text: "age".into(),
+                fragment: "age".into(),
                 limit: 10,
             })
             .await

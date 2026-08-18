@@ -96,37 +96,38 @@ pub struct CodeItemView {
 
 // ---- search query / hit ----
 
-/// Query for [`TerminologyService::search_code_lists`]. The
-/// backend clamps `limit` to a documented default + cap.
+/// Query for [`TerminologyService::search_code_lists`]. Search is
+/// scoped to a single `version_id` and matches the row's full-text
+/// representation against `fragment`. The backend clamps `limit`
+/// to a documented default + cap.
 #[derive(Debug, Clone)]
 pub struct CodeListSearchQuery {
     pub version_id: i64,
-    pub text: String,
+    pub fragment: String,
     pub limit: u32,
 }
 
 /// One hit from [`TerminologyService::search_code_lists`].
+/// Order is implementation-defined.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CodeListSearchHit {
     pub codelist: CodeListView,
-    pub score: f32,
 }
 
-/// Query for [`TerminologyService::search_code_items`]. The
-/// backend clamps `limit` to a documented default + cap.
+/// Query for [`TerminologyService::search_code_items`]. Mirrors
+/// [`CodeListSearchQuery`].
 #[derive(Debug, Clone)]
 pub struct CodeItemSearchQuery {
     pub version_id: i64,
-    pub text: String,
+    pub fragment: String,
     pub limit: u32,
 }
 
 /// One hit from [`TerminologyService::search_code_items`].
+/// Order is implementation-defined.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CodeItemSearchHit {
     pub item: CodeItemView,
-    pub score: f32,
-    pub codelist_id: i64,
 }
 
 // ---- request DTOs ----
@@ -282,8 +283,9 @@ pub trait TerminologyService: Send + Sync {
     async fn delete_code_list(&self, id: i64) -> Result<(), TerminologyApiError>;
 
     /// Full-text search against codelists under the version
-    /// identified by `(kind, version_name)`. Returns hits ranked
-    /// by relevance.
+    /// identified by `query.version_id`, matching the row's
+    /// full-text representation against `query.fragment`. Returns
+    /// up to `query.limit` hits (clamped by the backend).
     async fn search_code_lists(
         &self,
         q: CodeListSearchQuery,
@@ -329,8 +331,9 @@ pub trait TerminologyService: Send + Sync {
     async fn delete_code_item(&self, id: i64) -> Result<(), TerminologyApiError>;
 
     /// Full-text search against items under the version
-    /// identified by `(kind, version_name)`. Returns hits ranked
-    /// by relevance.
+    /// identified by `query.version_id`, matching the row's
+    /// full-text representation against `query.fragment`. Returns
+    /// up to `query.limit` hits (clamped by the backend).
     async fn search_code_items(
         &self,
         q: CodeItemSearchQuery,
