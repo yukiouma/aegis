@@ -188,7 +188,7 @@ impl CodeListRepository for CodeListRepo {
         query: CodeListSearchQuery,
     ) -> Result<Vec<CodeListSearchHit>, DomainError> {
         // Full-text search via the generated `tsv` tsvector +
-        // GIN(tsv) index from migration 0002. `plainto_tsquery`
+        // GIN(tsv) index from migration 0002. `to_tsquery`
         // parameterises the entire query string, so no SQL
         // injection surface. The query plan uses the GIN index for
         // the `@@` predicate; ordering by `ts_rank` (Postgres
@@ -201,11 +201,11 @@ impl CodeListRepository for CodeListRepo {
              WHERE version_id = ",
         )
         .push_bind(query.version_id)
-        .push(" AND tsv @@ plainto_tsquery('english', ")
-        .push_bind(&query.fragment)
+        .push(" AND tsv @@ to_tsquery('english', ")
+        .push_bind(format!("{}:*", query.fragment))
         .push(") \
-             ORDER BY ts_rank(tsv, plainto_tsquery('english', ")
-        .push_bind(&query.fragment)
+             ORDER BY ts_rank(tsv, to_tsquery('english', ")
+        .push_bind(format!("{}:*", query.fragment))
         .push(")) DESC \
              LIMIT ")
         .push_bind(limit as i64)

@@ -199,7 +199,7 @@ impl CodeItemRepository for CodeItemRepo {
     ) -> Result<Vec<CodeItemSearchHit>, DomainError> {
         // FTS via the generated `tsv` tsvector + GIN(tsv) index
         // from migration 0003. Same pattern as
-        // `CodeListRepo::search`: `plainto_tsquery` parameterises
+        // `CodeListRepo::search`: `to_tsquery` parameterises
         // the entire fragment so there is no SQL injection
         // surface; the GIN index serves the `@@` predicate;
         // `ts_rank` provides an ordering that the cap to `LIMIT`
@@ -211,11 +211,11 @@ impl CodeItemRepository for CodeItemRepo {
              WHERE version_id = ",
         )
         .push_bind(query.version_id)
-        .push(" AND tsv @@ plainto_tsquery('english', ")
-        .push_bind(&query.fragment)
+        .push(" AND tsv @@ to_tsquery('english', ")
+        .push_bind(format!("{}:*", query.fragment))
         .push(") \
-             ORDER BY ts_rank(tsv, plainto_tsquery('english', ")
-        .push_bind(&query.fragment)
+             ORDER BY ts_rank(tsv, to_tsquery('english', ")
+        .push_bind(format!("{}:*", query.fragment))
         .push(")) DESC \
              LIMIT ")
         .push_bind(limit as i64)
