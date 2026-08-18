@@ -15,3 +15,8 @@ pub use domain::{
     TerminologyVersion, TerminologyVersionNew, TerminologyVersionRepository,
     TerminologyVersionUpdate,
 };
+pub use usecase::{
+    CodeItemView, CodeListView, CreateCodeItem, CreateCodeList, CreateTerminologyVersion,
+    TerminologyUsecase, TerminologyUsecaseConfig, TerminologyVersionView, UpdateCodeItem,
+    UpdateCodeList, UpdateTerminologyVersion, UsecaseError,
+};

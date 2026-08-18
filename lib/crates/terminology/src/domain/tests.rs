@@ -1,6 +1,5 @@
 use super::{
-    CodeItem, CodeList, CodeListNew, CodeListUpdate, DomainError, TerminologyKind,
-    TerminologyVersion, TerminologyVersionNew, TerminologyVersionUpdate,
+    CodeItem, CodeList, DomainError, TerminologyKind, TerminologyVersion,
 };
 
 #[test]
