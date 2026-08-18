@@ -1,3 +1,3 @@
 mod persistence;
 
-pub use persistence::postgres::TerminologyVersionRepo;
+pub use persistence::postgres::{CodeListRepo, TerminologyVersionRepo};

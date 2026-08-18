@@ -3,6 +3,8 @@
 //! (`sqlx::query_as`, `QueryBuilder`) rather than the compile-time
 //! macros, mirroring the user / project crates.
 
+pub mod code_list_repo;
 pub mod terminology_version_repo;
 
+pub use code_list_repo::CodeListRepo;
 pub use terminology_version_repo::TerminologyVersionRepo;
