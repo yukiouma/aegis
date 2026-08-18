@@ -4,6 +4,7 @@ members = [
     "apps/server/aegis-server",
     "lib/crates/apis",
     "lib/crates/auth", "lib/crates/project",
+    "lib/crates/terminology",
     "lib/crates/user",
     "lib/crates/windows-utils",
 ]

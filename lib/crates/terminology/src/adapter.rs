@@ -1,0 +1,1 @@
+// Adapter layer; populated in Tasks 4-6.

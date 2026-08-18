@@ -1,0 +1,20 @@
+[package]
+name = "terminology"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sqlx = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+# `chrono` provides the `DateTime<Utc>` type carried on every
+# aggregate's `created_at` / `updated_at` columns. The `clock`
+# feature keeps the binary small (no local time zones) while
+# still allowing `NOW()` round-trips through `chrono::Utc`.
+chrono = { workspace = true }
+
+[dev-dependencies]
+dotenvy = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
