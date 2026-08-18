@@ -1,1 +1,3 @@
-// Adapter layer; populated in Tasks 4-6.
+mod persistence;
+
+pub use persistence::postgres::TerminologyVersionRepo;
