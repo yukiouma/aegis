@@ -618,6 +618,26 @@ impl From<apis::terminology::CodeItemSearchHit> for CodeItemSearchHitResponse {
     }
 }
 
+/// Wire-level wrapper for `GET /api/terminology/code-lists/search`.
+/// Wrapping the hit list in a struct leaves room for future
+/// pagination metadata (`total`, `next_cursor`, …) without
+/// breaking the response shape.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeListSearchHitsResponse {
+    pub hits: Vec<CodeListSearchHitResponse>,
+}
+
+/// Wire-level wrapper for `GET /api/terminology/code-items/search`.
+/// Wrapping the hit list in a struct leaves room for future
+/// pagination metadata (`total`, `next_cursor`, …) without
+/// breaking the response shape.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeItemSearchHitsResponse {
+    pub hits: Vec<CodeItemSearchHitResponse>,
+}
+
 // -- terminology request DTOs -----------------------------------------------
 
 /// Wire-level request body for `POST /api/terminology/versions`.

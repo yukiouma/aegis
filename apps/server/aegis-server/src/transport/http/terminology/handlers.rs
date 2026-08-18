@@ -342,7 +342,7 @@ pub async fn delete_code_list(
         ("limit" = u32, Query, description = "Maximum hits (0 = default)"),
     ),
     responses(
-        (status = 200, description = "Codelist hits", body = Vec<dto::CodeListSearchHitResponse>),
+        (status = 200, description = "Codelist hits", body = dto::CodeListSearchHitsResponse),
         (status = 400, description = "Empty fragment supplied", body = crate::transport::http::error::ErrorBody),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
@@ -353,7 +353,7 @@ pub async fn search_code_lists(
     State(state): State<AppState>,
     _claims: AuthClaims,
     Query(q): Query<TerminologySearchBaseQuery>,
-) -> Result<Json<Vec<dto::CodeListSearchHitResponse>>, ApiError> {
+) -> Result<Json<dto::CodeListSearchHitsResponse>, ApiError> {
     let hits = state
         .terminology
         .search_code_lists(apis::terminology::CodeListSearchQuery {
@@ -362,8 +362,9 @@ pub async fn search_code_lists(
             limit: q.limit,
         })
         .await?;
-    let hits = hits.into_iter().map(Into::into).collect();
-    Ok(Json(hits))
+    Ok(Json(dto::CodeListSearchHitsResponse {
+        hits: hits.into_iter().map(Into::into).collect(),
+    }))
 }
 
 // ---- CodeItem ----
@@ -536,7 +537,7 @@ pub async fn delete_code_item(
         ("limit" = u32, Query, description = "Maximum hits (0 = default)"),
     ),
     responses(
-        (status = 200, description = "Code item hits", body = Vec<dto::CodeItemSearchHitResponse>),
+        (status = 200, description = "Code item hits", body = dto::CodeItemSearchHitsResponse),
         (status = 400, description = "Empty fragment supplied", body = crate::transport::http::error::ErrorBody),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
@@ -547,7 +548,7 @@ pub async fn search_code_items(
     State(state): State<AppState>,
     _claims: AuthClaims,
     Query(q): Query<TerminologySearchBaseQuery>,
-) -> Result<Json<Vec<dto::CodeItemSearchHitResponse>>, ApiError> {
+) -> Result<Json<dto::CodeItemSearchHitsResponse>, ApiError> {
     let hits = state
         .terminology
         .search_code_items(apis::terminology::CodeItemSearchQuery {
@@ -556,6 +557,7 @@ pub async fn search_code_items(
             limit: q.limit,
         })
         .await?;
-    let hits = hits.into_iter().map(Into::into).collect();
-    Ok(Json(hits))
+    Ok(Json(dto::CodeItemSearchHitsResponse {
+        hits: hits.into_iter().map(Into::into).collect(),
+    }))
 }
