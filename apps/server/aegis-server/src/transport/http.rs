@@ -14,6 +14,7 @@ pub mod healthz;
 pub mod openapi;
 pub mod project;
 pub mod router;
+pub mod terminology;
 pub mod user;
 
 pub use router::router;

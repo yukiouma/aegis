@@ -25,6 +25,7 @@ use crate::transport::http::auth;
 use crate::transport::http::healthz;
 use crate::transport::http::openapi::ApiDoc;
 use crate::transport::http::project::router as project_router;
+use crate::transport::http::terminology::router as terminology_router;
 use crate::transport::http::user;
 
 /// Build the full HTTP router with `state` attached.
@@ -37,10 +38,12 @@ use crate::transport::http::user;
 /// `TraceLayer` for tracing.
 pub fn router(state: AppState) -> axum::Router {
     let project_routes = project_router::router();
+    let terminology_routes = terminology_router::router();
     let api_routers = OpenApiRouter::new()
         .nest("/auth", auth::router())
         .nest("/user", user::router())
-        .nest("/project", project_routes);
+        .nest("/project", project_routes)
+        .nest("/terminology", terminology_routes);
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/api", api_routers)
@@ -198,6 +201,10 @@ mod tests {
         }
     }
 
+    /// Null terminology service for tests that don't exercise the
+    /// terminology surface. Re-exported from `crate::state::test_support`
+    /// so every test module can share one implementation.
+
     #[derive(Clone)]
     struct NullUserService;
 
@@ -310,6 +317,8 @@ mod tests {
             auth: Arc::new(MockAuth) as Arc<dyn AuthService>,
             user: Arc::new(NullUserService) as Arc<dyn apis::user::UserService>,
             project: Arc::new(NullProjectService) as Arc<dyn apis::project::ProjectService>,
+            terminology: Arc::new(crate::state::test_support::NullTerminologyService)
+                as Arc<dyn apis::terminology::TerminologyService>,
         }
     }
 
@@ -321,6 +330,8 @@ mod tests {
             auth: Arc::new(MockAuth) as Arc<dyn AuthService>,
             user: Arc::new(StubUserService) as Arc<dyn apis::user::UserService>,
             project: Arc::new(NullProjectService) as Arc<dyn apis::project::ProjectService>,
+            terminology: Arc::new(crate::state::test_support::NullTerminologyService)
+                as Arc<dyn apis::terminology::TerminologyService>,
         }
     }
 
@@ -331,6 +342,8 @@ mod tests {
             auth: Arc::new(MockAuth) as Arc<dyn AuthService>,
             user: Arc::new(NullUserService) as Arc<dyn apis::user::UserService>,
             project: Arc::new(StubProjectService) as Arc<dyn apis::project::ProjectService>,
+            terminology: Arc::new(crate::state::test_support::NullTerminologyService)
+                as Arc<dyn apis::terminology::TerminologyService>,
         }
     }
 
@@ -521,6 +534,56 @@ mod tests {
             );
         }
         for (method, path) in [("post", "/api/project"), ("patch", "/api/project/{code}")] {
+            let op = &doc["paths"][path][method];
+            let response_keys: Vec<&str> = op["responses"]
+                .as_object()
+                .expect("responses object")
+                .keys()
+                .map(|s| s.as_str())
+                .collect();
+            assert!(
+                response_keys.contains(&"403"),
+                "{method} {path} must advertise a 403 response (got {response_keys:?})",
+            );
+        }
+
+        // /api/terminology namespace must advertise every verb with
+        // the BearerAuth requirement. Read routes (GET) call the
+        // usecase without a role guard; write routes (POST / PATCH /
+        // DELETE) additionally advertise a 403 response, because the
+        // shared `require_admin_or_root` helper rejects general
+        // callers before the usecase is invoked.
+        let terminology_reads = [
+            ("get", "/api/terminology/versions"),
+            ("get", "/api/terminology/versions/{id}"),
+            ("get", "/api/terminology/versions/by-name"),
+            ("get", "/api/terminology/code-lists"),
+            ("get", "/api/terminology/code-lists/search"),
+            ("get", "/api/terminology/code-items"),
+            ("get", "/api/terminology/code-items/by-version-and-code"),
+            ("get", "/api/terminology/code-items/search"),
+        ];
+        let terminology_writes = [
+            ("post", "/api/terminology/versions"),
+            ("patch", "/api/terminology/versions/{id}"),
+            ("delete", "/api/terminology/versions/{id}"),
+            ("post", "/api/terminology/code-lists"),
+            ("patch", "/api/terminology/code-lists/{id}"),
+            ("delete", "/api/terminology/code-lists/{id}"),
+            ("post", "/api/terminology/code-items"),
+            ("patch", "/api/terminology/code-items/{id}"),
+            ("delete", "/api/terminology/code-items/{id}"),
+        ];
+        for (method, path) in terminology_reads.iter().chain(terminology_writes.iter()) {
+            let op = &doc["paths"][path][method];
+            assert!(op.is_object(), "missing {method} {path} in openapi",);
+            assert_eq!(
+                op["security"][0]["BearerAuth"],
+                serde_json::json!([]),
+                "{method} {path} must require BearerAuth",
+            );
+        }
+        for (method, path) in terminology_writes.iter() {
             let op = &doc["paths"][path][method];
             let response_keys: Vec<&str> = op["responses"]
                 .as_object()
@@ -773,6 +836,228 @@ mod tests {
                     .body(Body::from(
                         r#"{"user_code":"u2","user_name":"Bob","domain_name":"aegis.local","hostname":"h","sid":"s","password":"p"}"#,
                     ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::UNAUTHORIZED);
+    }
+
+    // ---- /api/terminology integration --------------------------------
+
+    /// `MockAuth::verify` returns `Role::Admin` so the role gate in the
+    /// terminology write handlers passes — the `StubTerminologyService`
+    /// below only needs to satisfy the usecase contract.
+    fn sample_terminology_version_view(id: i64) -> apis::terminology::TerminologyVersionView {
+        apis::terminology::TerminologyVersionView {
+            id,
+            kind: apis::terminology::TerminologyKind::Sdtm,
+            name: format!("v{id}"),
+            created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+            updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        }
+    }
+
+    /// Minimal `TerminologyService` for router-integration tests.
+    /// Returns a single-version list from `list_versions`, a single
+    /// version from `get_version_by_id` / `get_version` /
+    /// `create_version` / `update_version`, and panics on every
+    /// other call. The per-handler tests in
+    /// `terminology::handlers::tests` cover the rest of the
+    /// surface.
+    #[derive(Clone)]
+    struct StubTerminologyService;
+
+    #[async_trait]
+    impl apis::terminology::TerminologyService for StubTerminologyService {
+        async fn create_version(
+            &self,
+            req: apis::terminology::CreateTerminologyVersionRequest,
+        ) -> Result<apis::terminology::TerminologyVersionView, apis::terminology::TerminologyApiError>
+        {
+            Ok(apis::terminology::TerminologyVersionView {
+                id: 1,
+                kind: req.kind,
+                name: req.name,
+                created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+                updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+            })
+        }
+        async fn list_versions(
+            &self,
+        ) -> Result<
+            Vec<apis::terminology::TerminologyVersionView>,
+            apis::terminology::TerminologyApiError,
+        > {
+            Ok(vec![sample_terminology_version_view(1)])
+        }
+        async fn get_version_by_id(
+            &self,
+            id: i64,
+        ) -> Result<apis::terminology::TerminologyVersionView, apis::terminology::TerminologyApiError>
+        {
+            Ok(sample_terminology_version_view(id))
+        }
+        async fn get_version(
+            &self,
+            _kind: apis::terminology::TerminologyKind,
+            _name: &str,
+        ) -> Result<apis::terminology::TerminologyVersionView, apis::terminology::TerminologyApiError>
+        {
+            Ok(sample_terminology_version_view(1))
+        }
+        async fn update_version(
+            &self,
+            req: apis::terminology::UpdateTerminologyVersionRequest,
+        ) -> Result<apis::terminology::TerminologyVersionView, apis::terminology::TerminologyApiError>
+        {
+            Ok(sample_terminology_version_view(req.id))
+        }
+        async fn delete_version(
+            &self,
+            _id: i64,
+        ) -> Result<(), apis::terminology::TerminologyApiError> {
+            Ok(())
+        }
+        async fn create_code_list(
+            &self,
+            _req: apis::terminology::CreateCodeListRequest,
+        ) -> Result<apis::terminology::CodeListView, apis::terminology::TerminologyApiError>
+        {
+            unimplemented!()
+        }
+        async fn list_code_lists(
+            &self,
+            _version_id: i64,
+        ) -> Result<Vec<apis::terminology::CodeListView>, apis::terminology::TerminologyApiError>
+        {
+            unimplemented!()
+        }
+        async fn update_code_list(
+            &self,
+            _req: apis::terminology::UpdateCodeListRequest,
+        ) -> Result<apis::terminology::CodeListView, apis::terminology::TerminologyApiError>
+        {
+            unimplemented!()
+        }
+        async fn delete_code_list(
+            &self,
+            _id: i64,
+        ) -> Result<(), apis::terminology::TerminologyApiError> {
+            unimplemented!()
+        }
+        async fn search_code_lists(
+            &self,
+            _query: apis::terminology::CodeListSearchQuery,
+        ) -> Result<Vec<apis::terminology::CodeListSearchHit>, apis::terminology::TerminologyApiError>
+        {
+            unimplemented!()
+        }
+        async fn create_code_item(
+            &self,
+            _req: apis::terminology::CreateCodeItemRequest,
+        ) -> Result<apis::terminology::CodeItemView, apis::terminology::TerminologyApiError>
+        {
+            unimplemented!()
+        }
+        async fn list_code_items(
+            &self,
+            _codelist_id: i64,
+        ) -> Result<Vec<apis::terminology::CodeItemView>, apis::terminology::TerminologyApiError>
+        {
+            unimplemented!()
+        }
+        async fn list_code_items_by_version_and_code(
+            &self,
+            _version_id: i64,
+            _code: &str,
+        ) -> Result<Vec<apis::terminology::CodeItemView>, apis::terminology::TerminologyApiError>
+        {
+            unimplemented!()
+        }
+        async fn update_code_item(
+            &self,
+            _req: apis::terminology::UpdateCodeItemRequest,
+        ) -> Result<apis::terminology::CodeItemView, apis::terminology::TerminologyApiError>
+        {
+            unimplemented!()
+        }
+        async fn delete_code_item(
+            &self,
+            _id: i64,
+        ) -> Result<(), apis::terminology::TerminologyApiError> {
+            unimplemented!()
+        }
+        async fn search_code_items(
+            &self,
+            _query: apis::terminology::CodeItemSearchQuery,
+        ) -> Result<Vec<apis::terminology::CodeItemSearchHit>, apis::terminology::TerminologyApiError>
+        {
+            unimplemented!()
+        }
+    }
+
+    /// State builder for terminology-integration tests: `MockAuth`
+    /// (so verify returns OK with Role::Admin) plus a
+    /// `StubTerminologyService` that returns positive responses
+    /// for the version routes.
+    fn test_state_with_terminology() -> AppState {
+        AppState {
+            auth: Arc::new(MockAuth) as Arc<dyn AuthService>,
+            user: Arc::new(NullUserService) as Arc<dyn apis::user::UserService>,
+            project: Arc::new(NullProjectService) as Arc<dyn apis::project::ProjectService>,
+            terminology: Arc::new(StubTerminologyService)
+                as Arc<dyn apis::terminology::TerminologyService>,
+        }
+    }
+
+    /// `GET /api/terminology/versions` round-trips through the
+    /// top-level router: 200 OK with the projected body.
+    #[tokio::test]
+    async fn terminology_list_versions_route_is_wired() {
+        let app = router(test_state_with_terminology());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/terminology/versions")
+                    .header("authorization", "Bearer good")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::OK);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let versions = value["versions"].as_array().expect("versions array");
+        assert_eq!(versions.len(), 1);
+        assert_eq!(versions[0]["name"], "v1");
+        assert_eq!(versions[0]["kind"], "sdtm");
+    }
+
+    /// No bearer at all: the top-level router must reject every
+    /// `/api/terminology/*` route with 401, regardless of HTTP
+    /// method. Sample one representative read route (GET).
+    #[tokio::test]
+    async fn terminology_route_without_authorization_returns_401() {
+        let app = router(test_state_with_terminology());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/terminology/versions")
+                    .body(Body::empty())
                     .unwrap(),
             )
             .await
