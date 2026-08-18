@@ -209,18 +209,6 @@ where
         Ok(version_view_from_internal(view))
     }
 
-    async fn get_version(
-        &self,
-        kind: ApiKind,
-        name: &str,
-    ) -> Result<TerminologyVersionView, TerminologyApiError> {
-        let view = self
-            .usecase
-            .get_version(to_internal_kind(kind), name)
-            .await?;
-        Ok(version_view_from_internal(view))
-    }
-
     async fn list_versions(&self) -> Result<Vec<TerminologyVersionView>, TerminologyApiError> {
         let views = self.usecase.list_versions().await?;
         Ok(views.into_iter().map(version_view_from_internal).collect())

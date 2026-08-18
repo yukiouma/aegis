@@ -752,14 +752,6 @@ pub type CodeListSearchQueryRequest = TerminologySearchBaseQuery;
 /// `fragment`.
 pub type CodeItemSearchQueryRequest = TerminologySearchBaseQuery;
 
-/// Query string for `GET /api/terminology/versions/by-name`.
-#[derive(Serialize, Deserialize, ToSchema, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct TerminologyVersionByNameQuery {
-    pub kind: TerminologyKind,
-    pub name: String,
-}
-
 /// Query string for `GET /api/terminology/code-lists` (list by
 /// version).
 #[derive(Serialize, Deserialize, ToSchema, Default)]
@@ -1430,15 +1422,6 @@ mod tests {
         assert_eq!(req.fragment, "x");
         assert_eq!(req.limit, 50);
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
-    }
-
-    #[test]
-    fn terminology_version_by_name_query_roundtrip() {
-        let json = r#"{"kind":"sdtm","name":"2026-03-27"}"#;
-        let q: TerminologyVersionByNameQuery = serde_json::from_str(json).unwrap();
-        assert!(matches!(q.kind, TerminologyKind::Sdtm));
-        assert_eq!(q.name, "2026-03-27");
-        assert_eq!(serde_json::to_string(&q).unwrap(), json);
     }
 
     #[test]

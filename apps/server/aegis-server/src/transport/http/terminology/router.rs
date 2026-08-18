@@ -20,7 +20,6 @@ pub fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(handlers::create_version))
         .routes(routes!(handlers::list_versions))
         .routes(routes!(handlers::get_version_by_id))
-        .routes(routes!(handlers::get_version_by_name))
         .routes(routes!(handlers::update_version))
         .routes(routes!(handlers::delete_version))
         // ---- CodeList ----

@@ -556,7 +556,6 @@ mod tests {
         let terminology_reads = [
             ("get", "/api/terminology/versions"),
             ("get", "/api/terminology/versions/{id}"),
-            ("get", "/api/terminology/versions/by-name"),
             ("get", "/api/terminology/code-lists"),
             ("get", "/api/terminology/code-lists/search"),
             ("get", "/api/terminology/code-items"),
@@ -864,8 +863,8 @@ mod tests {
 
     /// Minimal `TerminologyService` for router-integration tests.
     /// Returns a single-version list from `list_versions`, a single
-    /// version from `get_version_by_id` / `get_version` /
-    /// `create_version` / `update_version`, and panics on every
+    /// version from `get_version_by_id` / `create_version` /
+    /// `update_version`, and panics on every
     /// other call. The per-handler tests in
     /// `terminology::handlers::tests` cover the rest of the
     /// surface.
@@ -905,14 +904,6 @@ mod tests {
         ) -> Result<apis::terminology::TerminologyVersionView, apis::terminology::TerminologyApiError>
         {
             Ok(sample_terminology_version_view(id))
-        }
-        async fn get_version(
-            &self,
-            _kind: apis::terminology::TerminologyKind,
-            _name: &str,
-        ) -> Result<apis::terminology::TerminologyVersionView, apis::terminology::TerminologyApiError>
-        {
-            Ok(sample_terminology_version_view(1))
         }
         async fn update_version(
             &self,

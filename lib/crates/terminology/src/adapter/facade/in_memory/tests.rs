@@ -588,28 +588,6 @@ async fn get_version_by_id_returns_not_found_for_unknown_id() {
 }
 
 #[tokio::test]
-async fn get_version_by_kind_and_name_returns_seeded_version() {
-    let svc = service();
-    let created = svc.create_version(create_version_req("v1")).await.unwrap();
-    let fetched = svc.get_version(ApiKind::Sdtm, "v1").await.unwrap();
-    assert_eq!(fetched, created);
-}
-
-#[tokio::test]
-async fn get_version_by_kind_and_name_returns_not_found_for_unknown() {
-    let svc = service();
-    let err = svc.get_version(ApiKind::Sdtm, "ghost").await.unwrap_err();
-    assert!(matches!(err, TerminologyApiError::NotFound));
-}
-
-#[tokio::test]
-async fn get_version_by_kind_and_name_rejects_empty_name() {
-    let svc = service();
-    let err = svc.get_version(ApiKind::Sdtm, "   ").await.unwrap_err();
-    assert!(matches!(err, TerminologyApiError::Validation(_)));
-}
-
-#[tokio::test]
 async fn list_versions_returns_all_seeded_versions() {
     let svc = service();
     for name in ["v1", "v2", "v3"] {

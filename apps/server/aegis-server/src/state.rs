@@ -57,14 +57,6 @@ pub(crate) mod test_support {
         {
             unimplemented!()
         }
-        async fn get_version(
-            &self,
-            _kind: apis::terminology::TerminologyKind,
-            _name: &str,
-        ) -> Result<apis::terminology::TerminologyVersionView, apis::terminology::TerminologyApiError>
-        {
-            unimplemented!()
-        }
         async fn update_version(
             &self,
             _req: apis::terminology::UpdateTerminologyVersionRequest,

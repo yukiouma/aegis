@@ -23,7 +23,7 @@ use crate::state::AppState;
 use crate::transport::http::auth::middleware::{AuthClaims, require_admin_or_root};
 use crate::transport::http::dto::{
     self, CodeItemByVersionAndCodeQuery, CodeItemListQuery, CodeListListQuery,
-    TerminologySearchBaseQuery, TerminologyVersionByNameQuery,
+    TerminologySearchBaseQuery,
 };
 use crate::transport::http::error::ApiError;
 
@@ -101,36 +101,6 @@ pub async fn get_version_by_id(
     Path(dto::PathId { id }): Path<dto::PathId>,
 ) -> Result<Json<dto::TerminologyVersionViewResponse>, ApiError> {
     let view = state.terminology.get_version_by_id(id).await?;
-    Ok(Json(view.into()))
-}
-
-/// `GET /api/terminology/versions/by-name?kind=…&name=…` — fetch a
-/// version by its natural `(kind, name)` key.
-#[utoipa::path(
-    get, path = "/versions/by-name", tag = "terminology",
-    operation_id = "terminology_get_version_by_name",
-    params(
-        ("kind" = dto::TerminologyKind, Query, description = "Terminology kind"),
-        ("name" = String, Query, description = "Version name"),
-    ),
-    responses(
-        (status = 200, description = "Version found", body = dto::TerminologyVersionViewResponse),
-        (status = 400, description = "Empty name supplied", body = crate::transport::http::error::ErrorBody),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "Version not found", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn get_version_by_name(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-    Query(q): Query<TerminologyVersionByNameQuery>,
-) -> Result<Json<dto::TerminologyVersionViewResponse>, ApiError> {
-    let view = state
-        .terminology
-        .get_version(q.kind.into(), &q.name)
-        .await?;
     Ok(Json(view.into()))
 }
 

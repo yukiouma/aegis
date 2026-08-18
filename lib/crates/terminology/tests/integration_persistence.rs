@@ -267,7 +267,7 @@ async fn usecase_wires_through_all_three_repos() {
             .await
             .expect("usecase create version");
         let _ = usecase
-            .get_version(TerminologyKind::Sdtm, &v_name)
+            .get_version_by_id(created_v.id)
             .await
             .expect("usecase get");
         assert_eq!(created_v.name, v_name);

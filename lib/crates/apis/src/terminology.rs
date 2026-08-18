@@ -230,14 +230,6 @@ pub trait TerminologyService: Send + Sync {
         id: i64,
     ) -> Result<TerminologyVersionView, TerminologyApiError>;
 
-    /// Look up a version by `(kind, name)`. Returns `NotFound`
-    /// when no such version exists.
-    async fn get_version(
-        &self,
-        kind: TerminologyKind,
-        name: &str,
-    ) -> Result<TerminologyVersionView, TerminologyApiError>;
-
     /// List every version known to the backend. Order is
     /// backend-defined.
     async fn list_versions(&self) -> Result<Vec<TerminologyVersionView>, TerminologyApiError>;

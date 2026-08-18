@@ -1,8 +1,7 @@
 use crate::domain::{
     CodeItemNew, CodeItemRepository, CodeItemSearchHit, CodeItemSearchQuery, CodeItemUpdate,
     CodeListNew, CodeListRepository, CodeListSearchHit, CodeListSearchQuery, CodeListUpdate,
-    DomainError, TerminologyKind, TerminologyVersionNew, TerminologyVersionRepository,
-    TerminologyVersionUpdate,
+    DomainError, TerminologyVersionNew, TerminologyVersionRepository, TerminologyVersionUpdate,
 };
 
 use super::commands::{
@@ -73,18 +72,6 @@ where
 
     pub async fn get_version_by_id(&self, id: i64) -> Result<TerminologyVersionView, UsecaseError> {
         let v = self.version_repo.find_by_id(id).await?;
-        Ok(v.into())
-    }
-
-    pub async fn get_version(
-        &self,
-        kind: TerminologyKind,
-        name: &str,
-    ) -> Result<TerminologyVersionView, UsecaseError> {
-        if name.trim().is_empty() {
-            return Err(UsecaseError::Validation(DomainError::EmptyName));
-        }
-        let v = self.version_repo.find_by_kind_and_name(kind, name).await?;
         Ok(v.into())
     }
 

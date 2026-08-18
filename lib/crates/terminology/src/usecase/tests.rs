@@ -400,7 +400,7 @@ async fn create_version_rejects_empty_name() {
 }
 
 #[tokio::test]
-async fn create_then_get_version_round_trip() {
+async fn create_then_get_version_by_id_round_trip() {
     let (_, _, _, usecase) = make_usecase();
     let created = usecase
         .create_version(CreateTerminologyVersion {
@@ -410,10 +410,7 @@ async fn create_then_get_version_round_trip() {
         .await
         .expect("create");
     assert_eq!(created.name, "2026-03-27");
-    let fetched = usecase
-        .get_version(TerminologyKind::Sdtm, "2026-03-27")
-        .await
-        .expect("get");
+    let fetched = usecase.get_version_by_id(created.id).await.expect("get");
     assert_eq!(fetched.id, created.id);
 }
 
