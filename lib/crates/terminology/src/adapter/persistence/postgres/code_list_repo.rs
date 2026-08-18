@@ -282,10 +282,10 @@ fn map_db_error_simple(err: sqlx::Error) -> DomainError {
 /// `create` mapper: knows about the version_id it just inserted
 /// with, so SQLSTATE `23503` becomes `FkVersionNotFound(version_id)`.
 fn map_db_error(err: sqlx::Error, version_id_hint: Option<i64>) -> DomainError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some(SQLSTATE_FK_VIOLATION) {
-            return DomainError::FkVersionNotFound(version_id_hint.unwrap_or(0));
-        }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some(SQLSTATE_FK_VIOLATION)
+    {
+        return DomainError::FkVersionNotFound(version_id_hint.unwrap_or(0));
     }
     map_db_error_simple(err)
 }

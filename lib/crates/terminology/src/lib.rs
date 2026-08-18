@@ -12,9 +12,8 @@ pub use adapter::{CodeItemRepo, CodeListRepo, TerminologyVersionRepo};
 pub use domain::{
     CodeItem, CodeItemNew, CodeItemRepository, CodeItemSearchHit, CodeItemSearchQuery,
     CodeItemUpdate, CodeList, CodeListNew, CodeListRepository, CodeListSearchHit,
-    CodeListSearchQuery, CodeListUpdate, DomainError, TerminologyKind,
-    TerminologyVersion, TerminologyVersionNew, TerminologyVersionRepository,
-    TerminologyVersionUpdate,
+    CodeListSearchQuery, CodeListUpdate, DomainError, TerminologyKind, TerminologyVersion,
+    TerminologyVersionNew, TerminologyVersionRepository, TerminologyVersionUpdate,
 };
 pub use usecase::{
     CodeItemView, CodeListView, CreateCodeItem, CreateCodeList, CreateTerminologyVersion,

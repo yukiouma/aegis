@@ -16,10 +16,8 @@ use super::terminology_version::{
 /// aggregates. Implementations live in the adapter layer.
 #[async_trait]
 pub trait TerminologyVersionRepository: Send + Sync {
-    async fn create(
-        &self,
-        input: TerminologyVersionNew,
-    ) -> Result<TerminologyVersion, DomainError>;
+    async fn create(&self, input: TerminologyVersionNew)
+    -> Result<TerminologyVersion, DomainError>;
 
     async fn find_by_id(&self, id: i64) -> Result<TerminologyVersion, DomainError>;
 
@@ -62,10 +60,7 @@ pub trait CodeListRepository: Send + Sync {
 pub trait CodeItemRepository: Send + Sync {
     async fn create(&self, input: CodeItemNew) -> Result<CodeItem, DomainError>;
     async fn find_by_id(&self, id: i64) -> Result<CodeItem, DomainError>;
-    async fn list_by_codelist(
-        &self,
-        codelist_id: i64,
-    ) -> Result<Vec<CodeItem>, DomainError>;
+    async fn list_by_codelist(&self, codelist_id: i64) -> Result<Vec<CodeItem>, DomainError>;
     async fn update(&self, input: CodeItemUpdate) -> Result<CodeItem, DomainError>;
     async fn delete(&self, id: i64) -> Result<(), DomainError>;
     async fn search(

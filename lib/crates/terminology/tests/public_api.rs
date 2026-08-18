@@ -8,8 +8,7 @@
 use sqlx::PgPool;
 use terminology::{
     CodeItemRepo, CodeListRepo, CreateCodeList, CreateTerminologyVersion, TerminologyKind,
-    TerminologyUsecase, TerminologyUsecaseConfig, TerminologyVersionRepo,
-    UpdateTerminologyVersion,
+    TerminologyUsecase, TerminologyUsecaseConfig, TerminologyVersionRepo, UpdateTerminologyVersion,
 };
 
 #[test]
@@ -47,6 +46,7 @@ fn repos_construct_from_pg_pool_via_function_pointer() {
 
 #[test]
 fn usecase_constructor_accepts_three_repo_args() {
+    #[allow(clippy::type_complexity)]
     fn assert_new_constructor<V, L, I>(
         _: fn(TerminologyUsecaseConfig<V, L, I>) -> TerminologyUsecase<V, L, I>,
     ) where

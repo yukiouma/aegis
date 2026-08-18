@@ -1,8 +1,8 @@
 use crate::domain::{
     CodeItemNew, CodeItemRepository, CodeItemSearchHit, CodeItemSearchQuery, CodeItemUpdate,
-    CodeListNew, CodeListRepository, CodeListSearchHit, CodeListSearchQuery,
-    CodeListUpdate, DomainError, TerminologyKind,
-    TerminologyVersionNew, TerminologyVersionRepository, TerminologyVersionUpdate,
+    CodeListNew, CodeListRepository, CodeListSearchHit, CodeListSearchQuery, CodeListUpdate,
+    DomainError, TerminologyKind, TerminologyVersionNew, TerminologyVersionRepository,
+    TerminologyVersionUpdate,
 };
 
 use super::commands::{
@@ -71,10 +71,7 @@ where
         Ok(version.into())
     }
 
-    pub async fn get_version_by_id(
-        &self,
-        id: i64,
-    ) -> Result<TerminologyVersionView, UsecaseError> {
+    pub async fn get_version_by_id(&self, id: i64) -> Result<TerminologyVersionView, UsecaseError> {
         let v = self.version_repo.find_by_id(id).await?;
         Ok(v.into())
     }
@@ -87,16 +84,11 @@ where
         if name.trim().is_empty() {
             return Err(UsecaseError::Validation(DomainError::EmptyName));
         }
-        let v = self
-            .version_repo
-            .find_by_kind_and_name(kind, name)
-            .await?;
+        let v = self.version_repo.find_by_kind_and_name(kind, name).await?;
         Ok(v.into())
     }
 
-    pub async fn list_versions(
-        &self,
-    ) -> Result<Vec<TerminologyVersionView>, UsecaseError> {
+    pub async fn list_versions(&self) -> Result<Vec<TerminologyVersionView>, UsecaseError> {
         let versions = self.version_repo.list().await?;
         Ok(versions.into_iter().map(Into::into).collect())
     }

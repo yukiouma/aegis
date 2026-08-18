@@ -1,6 +1,4 @@
-use super::{
-    CodeItem, CodeList, DomainError, TerminologyKind, TerminologyVersion,
-};
+use super::{CodeItem, CodeList, DomainError, TerminologyKind, TerminologyVersion};
 
 #[test]
 fn terminology_kind_parses_lowercase_strings() {
@@ -64,14 +62,20 @@ fn code_list_new_accepts_valid_input() {
 
 #[test]
 fn code_item_new_rejects_empty_code() {
-    let err = CodeItem::new(1, "".into(), "X".into(), "".into(), "".into(), "".into())
-        .unwrap_err();
+    let err = CodeItem::new(1, "".into(), "X".into(), "".into(), "".into(), "".into()).unwrap_err();
     assert!(matches!(err, DomainError::EmptyCode));
 }
 
 #[test]
 fn code_item_new_accepts_valid_input() {
-    let item = CodeItem::new(1, "C12345".into(), "> 0".into(), "".into(), "".into(), "".into())
-        .unwrap();
+    let item = CodeItem::new(
+        1,
+        "C12345".into(),
+        "> 0".into(),
+        "".into(),
+        "".into(),
+        "".into(),
+    )
+    .unwrap();
     assert_eq!(item.code, "C12345");
 }

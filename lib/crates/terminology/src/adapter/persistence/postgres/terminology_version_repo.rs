@@ -59,17 +59,16 @@ impl TerminologyVersionRepository for TerminologyVersionRepo {
         &self,
         input: TerminologyVersionNew,
     ) -> Result<TerminologyVersion, DomainError> {
-        let row: TerminologyVersionRow = sqlx::QueryBuilder::new(
-            "INSERT INTO terminology_versions (kind, name) VALUES (",
-        )
-        .push_bind(input.kind.as_str())
-        .push(", ")
-        .push_bind(&input.name)
-        .push(") RETURNING id, kind, name, created_at, updated_at")
-        .build_query_as::<TerminologyVersionRow>()
-        .fetch_one(&self.pool)
-        .await
-        .map_err(map_db_error)?;
+        let row: TerminologyVersionRow =
+            sqlx::QueryBuilder::new("INSERT INTO terminology_versions (kind, name) VALUES (")
+                .push_bind(input.kind.as_str())
+                .push(", ")
+                .push_bind(&input.name)
+                .push(") RETURNING id, kind, name, created_at, updated_at")
+                .build_query_as::<TerminologyVersionRow>()
+                .fetch_one(&self.pool)
+                .await
+                .map_err(map_db_error)?;
         row.try_into()
     }
 

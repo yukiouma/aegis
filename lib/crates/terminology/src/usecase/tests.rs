@@ -92,14 +92,7 @@ impl TerminologyVersionRepository for FakeVersionRepo {
             .ok_or(DomainError::NotFound)
     }
     async fn list(&self) -> Result<Vec<TerminologyVersion>, DomainError> {
-        Ok(self
-            .state
-            .lock()
-            .unwrap()
-            .by_id
-            .values()
-            .cloned()
-            .collect())
+        Ok(self.state.lock().unwrap().by_id.values().cloned().collect())
     }
     async fn update(
         &self,
@@ -187,10 +180,7 @@ impl CodeListRepository for FakeCodeListRepo {
             .cloned()
             .ok_or(DomainError::CodeListNotFound(id))
     }
-    async fn list_by_version(
-        &self,
-        version_id: i64,
-    ) -> Result<Vec<CodeList>, DomainError> {
+    async fn list_by_version(&self, version_id: i64) -> Result<Vec<CodeList>, DomainError> {
         Ok(self
             .state
             .lock()
@@ -306,10 +296,7 @@ impl CodeItemRepository for FakeCodeItemRepo {
             .cloned()
             .ok_or(DomainError::CodeItemNotFound(id))
     }
-    async fn list_by_codelist(
-        &self,
-        codelist_id: i64,
-    ) -> Result<Vec<CodeItem>, DomainError> {
+    async fn list_by_codelist(&self, codelist_id: i64) -> Result<Vec<CodeItem>, DomainError> {
         Ok(self
             .state
             .lock()
@@ -434,7 +421,11 @@ async fn update_version_then_list_returns_updated_name() {
         .expect("update");
     assert_eq!(updated.name, "2026-06-15");
     let listed = usecase.list_versions().await.expect("list");
-    assert!(listed.iter().any(|v| v.id == created.id && v.name == "2026-06-15"));
+    assert!(
+        listed
+            .iter()
+            .any(|v| v.id == created.id && v.name == "2026-06-15")
+    );
 }
 
 #[tokio::test]

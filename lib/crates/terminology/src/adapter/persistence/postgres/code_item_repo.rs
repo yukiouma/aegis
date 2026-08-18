@@ -110,10 +110,7 @@ impl CodeItemRepository for CodeItemRepo {
         row.try_into()
     }
 
-    async fn list_by_codelist(
-        &self,
-        codelist_id: i64,
-    ) -> Result<Vec<CodeItem>, DomainError> {
+    async fn list_by_codelist(&self, codelist_id: i64) -> Result<Vec<CodeItem>, DomainError> {
         let rows: Vec<CodeItemRow> = sqlx::QueryBuilder::new(
             "SELECT id, codelist_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at \
              FROM code_items WHERE codelist_id = ",
@@ -261,10 +258,10 @@ fn map_db_error_simple(err: sqlx::Error) -> DomainError {
 /// `create` mapper: knows about the codelist_id it just inserted
 /// with, so SQLSTATE `23503` becomes `FkCodeListNotFound(codelist_id)`.
 fn map_db_error(err: sqlx::Error, codelist_id_hint: Option<i64>) -> DomainError {
-    if let sqlx::Error::Database(db_err) = &err {
-        if db_err.code().as_deref() == Some(SQLSTATE_FK_VIOLATION) {
-            return DomainError::FkCodeListNotFound(codelist_id_hint.unwrap_or(0));
-        }
+    if let sqlx::Error::Database(db_err) = &err
+        && db_err.code().as_deref() == Some(SQLSTATE_FK_VIOLATION)
+    {
+        return DomainError::FkCodeListNotFound(codelist_id_hint.unwrap_or(0));
     }
     map_db_error_simple(err)
 }

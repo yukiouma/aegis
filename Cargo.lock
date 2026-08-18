@@ -5180,6 +5180,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "terminology"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "dotenvy",
+ "sqlx",
+ "thiserror 2.0.19",
+ "tokio",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"

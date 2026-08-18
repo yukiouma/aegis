@@ -26,22 +26,13 @@ pub enum DomainError {
     CodeItemNotFound(i64),
 
     #[error("terminology version already exists for {kind:?} / {name}")]
-    DuplicateVersion {
-        kind: TerminologyKind,
-        name: String,
-    },
+    DuplicateVersion { kind: TerminologyKind, name: String },
 
     #[error("code list already exists for version {version_id} / {code}")]
-    DuplicateCodeList {
-        version_id: i64,
-        code: String,
-    },
+    DuplicateCodeList { version_id: i64, code: String },
 
     #[error("code item already exists for codelist {codelist_id} / {code}")]
-    DuplicateCodeItem {
-        codelist_id: i64,
-        code: String,
-    },
+    DuplicateCodeItem { codelist_id: i64, code: String },
 
     #[error("referenced terminology version not found: {0}")]
     FkVersionNotFound(i64),
