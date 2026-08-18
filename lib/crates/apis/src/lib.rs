@@ -8,4 +8,5 @@
 
 pub mod auth;
 pub mod project;
+pub mod terminology;
 pub mod user;

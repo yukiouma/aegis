@@ -5183,6 +5183,7 @@ dependencies = [
 name = "terminology"
 version = "0.1.0"
 dependencies = [
+ "apis",
  "async-trait",
  "chrono",
  "dotenvy",

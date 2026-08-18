@@ -8,7 +8,7 @@ pub mod adapter;
 pub mod domain;
 pub mod usecase;
 
-pub use adapter::{CodeItemRepo, CodeListRepo, TerminologyVersionRepo};
+pub use adapter::{CodeItemRepo, CodeListRepo, TerminologyServiceImpl, TerminologyVersionRepo};
 pub use domain::{
     CodeItem, CodeItemNew, CodeItemRepository, CodeItemSearchHit, CodeItemSearchQuery,
     CodeItemUpdate, CodeList, CodeListNew, CodeListRepository, CodeListSearchHit,

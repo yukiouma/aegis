@@ -13,6 +13,10 @@ thiserror = { workspace = true }
 # feature keeps the binary small (no local time zones) while
 # still allowing `NOW()` round-trips through `chrono::Utc`.
 chrono = { workspace = true }
+# `apis` provides the outbound `TerminologyService` port the
+# in-memory facade implements. Path-dep because both crates share
+# the workspace.
+apis = { path = "../apis" }
 
 [dev-dependencies]
 dotenvy = { workspace = true }
