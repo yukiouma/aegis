@@ -14,7 +14,7 @@
 4. Add one Tauri command `import_terminology(kind: TerminologyKind, filepath: String) -> Result<TerminologyVersionViewResponse, ApiError>` that parses the workbook in `spawn_blocking`, then orchestrates the existing per-resource HTTP calls in sequence: version → for each code list { code list → batch of code items }.
 5. Use the existing `POST /api/terminology/code-items/batch` endpoint for code items, so a 1000-item codelist is one HTTP round-trip instead of 1000.
 6. On success: invalidate `queryKeys.terminology.versions()` so the existing SDTM / ADaM list pages show the new version immediately.
-7. Show a `<Snackbar>` on success or failure. Page is locked (form disabled, spinner in place) during the import; the back arrow stays enabled so the user can leave the page.
+7. Show a `<Snackbar>` on success or failure. During the import the form is hidden and replaced by a centered spinner; the back arrow stays enabled so the user can leave the page.
 8. Out of scope: a cancel button, a custom server-side batch endpoint, a versioning name UI (the parsed sheet date is used as the version name).
 
 ---
@@ -40,7 +40,8 @@ The `kind` query param is optional and validated as `z.enum(["sdtm", "adam"]).op
 | Path                                                                                  | Responsibility |
 | ------------------------------------------------------------------------------------- | -------------- |
 | `apps/desktop/aegis-desktop/src/features/terminology/pages/ImportTerminologyPage.tsx` | The new page. |
-| `apps/desktop/aegis-desktop/src/features/terminology/pages/__tests__/ImportTerminologyPage.test.tsx` | Vitest + RTL tests. |
+| `apps/desktop/aegis-desktop/src/test/features/terminology/import-terminology-page.test.tsx` | Vitest + RTL tests for the page. |
+| `apps/desktop/aegis-desktop/src/test/features/terminology/import-button.test.tsx` | Vitest + RTL test for the modified `ImportButton`. |
 
 #### Tauri (Rust)
 
@@ -66,7 +67,7 @@ The new types and HTTP wrapper live inside existing files:
 | `apps/desktop/aegis-desktop/src/shared/api/types.ts`                                       | + `BatchCodeItemEntry`, `BatchCreateCodeItemsInput`, `BatchCreateCodeItemsResponse`. |
 | `apps/desktop/aegis-desktop/src/shared/api/index.ts`                                       | + `importTerminology(kind, filepath)` wrapper. |
 | `apps/desktop/aegis-desktop/src-tauri/src/lib.rs`                                          | + `commands::terminology::import::import_terminology` in `invoke_handler!`. |
-| `lib/packages/ui/src/i18n/locales/en.ts`                                                    | + 7 keys under `terminology.import.*`. |
+| `lib/packages/ui/src/i18n/locales/en.ts`                                                    | + 7 keys under `terminology.import.*` and + `common.submit` (which is currently missing from the locale). |
 | `lib/packages/ui/src/i18n/locales/zhCN.ts`                                                  | + matching zh-CN translations. |
 
 ### 3.3 Removed
@@ -84,10 +85,11 @@ apps/desktop/aegis-desktop/
 │   │   ├── components/ImportButton.tsx             (modified — now a nav button)
 │   │   ├── pages/
 │   │   │   ├── TerminologyPage.tsx                 (modified — passes kind to ImportButton)
-│   │   │   ├── ImportTerminologyPage.tsx            NEW
-│   │   │   └── __tests__/
-│   │   │       └── ImportTerminologyPage.test.tsx   NEW
+│   │   │   └── ImportTerminologyPage.tsx           NEW
 │   │   └── pages/index.ts                          (modified — re-exports)
+│   ├── test/features/terminology/                   NEW test directory
+│   │   ├── import-terminology-page.test.tsx        NEW
+│   │   └── import-button.test.tsx                  NEW
 │   └── routes/_authed/_layout/terminology/
 │       ├── sdtm.tsx                                (unchanged)
 │       ├── adam.tsx                                (unchanged)
@@ -100,9 +102,12 @@ apps/desktop/aegis-desktop/
     │       ├── version.rs                          (unchanged)
     │       ├── code_list.rs                        (unchanged)
     │       └── code_item.rs                        (unchanged — receives new wrapper)
-    └── http/terminology/
-        ├── code_item.rs                            (modified — +batch_create + 3 DTOs)
-        └── dto.rs (or http/dto.rs)                 (modified — +Parse variant on ApiError)
+    └── http/
+        ├── dto.rs                                   (modified — +Parse variant on ApiError)
+        └── terminology/
+            ├── version.rs                           (unchanged)
+            ├── code_list.rs                         (unchanged)
+            └── code_item.rs                         (modified — +batch_create + 3 DTOs)
 ```
 
 ---
@@ -485,7 +490,7 @@ export function ImportButton({ kind }: { kind: TerminologyKind }) {
 'common.submit': 'Submit',
 ```
 
-`zhCN.ts` receives matching zh-CN translations. The existing `terminology.importComingSoon` key is removed.
+`zhCN.ts` receives matching zh-CN translations (`'提交'` for `common.submit`, etc.). The existing `terminology.importComingSoon` key is removed. The `common.submit` key is **new** — it does not currently exist in either locale, so this PR adds it.
 
 ---
 
@@ -512,7 +517,7 @@ export function ImportButton({ kind }: { kind: TerminologyKind }) {
 
 ## 11. Testing
 
-### 11.1 Vitest + RTL — `ImportTerminologyPage.test.tsx`
+### 11.1 Vitest + RTL — `src/test/features/terminology/import-terminology-page.test.tsx`
 
 Mock `@tauri-apps/api/core` and `@tauri-apps/plugin-dialog`. Cases:
 
@@ -526,7 +531,7 @@ Mock `@tauri-apps/api/core` and `@tauri-apps/plugin-dialog`. Cases:
 8. Clicking the back arrow navigates to `/terminology/sdtm` when no kind is selected, or `/terminology/{kind}` otherwise.
 9. On API failure (mock `import_terminology` to reject with `ApiError::Http { 409, ... }`), the spinner disappears, the form re-enables, and the error Snackbar is shown with `errorMessage(err)`.
 
-### 11.2 Vitest + RTL — `ImportButton.test.tsx`
+### 11.2 Vitest + RTL — `src/test/features/terminology/import-button.test.tsx`
 
 1. Clicking the button navigates to `/terminology/import?kind=sdtm` when `kind="sdtm"` is passed.
 2. Same for `adam`.
