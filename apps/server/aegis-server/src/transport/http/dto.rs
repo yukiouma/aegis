@@ -733,6 +733,35 @@ pub struct UpdateCodeItemRequest {
     pub nci_preferred_term: Option<String>,
 }
 
+/// Wire-level request body for `POST /api/terminology/code-items/batch`.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchCreateCodeItemsRequest {
+    pub codelist_id: i64,
+    pub version_id: i64,
+    pub items: Vec<BatchCodeItemEntry>,
+}
+
+/// Wire-level entry inside a batch request.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchCodeItemEntry {
+    pub code: String,
+    pub submission_value: String,
+    pub synonym: String,
+    pub definition: String,
+    pub nci_preferred_term: String,
+}
+
+/// Wire-level response for `POST /api/terminology/code-items/batch`.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchCreateCodeItemsResponse {
+    pub count: usize,
+    pub codelist_id: i64,
+    pub version_id: i64,
+}
+
 // -- terminology search query DTOs ------------------------------------------
 
 /// Query string for `GET /api/terminology/code-lists/search` and the
@@ -1451,5 +1480,26 @@ mod tests {
         assert_eq!(q.version_id, 1);
         assert_eq!(q.code, "C1");
         assert_eq!(serde_json::to_string(&q).unwrap(), json);
+    }
+
+    #[test]
+    fn batch_create_code_items_request_roundtrip() {
+        let json = r#"{"codelistId":11,"versionId":1,"items":[{"code":"C1","submissionValue":"Y","synonym":"","definition":"","nciPreferredTerm":"Yes"}]}"#;
+        let req: BatchCreateCodeItemsRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.codelist_id, 11);
+        assert_eq!(req.version_id, 1);
+        assert_eq!(req.items.len(), 1);
+        assert_eq!(req.items[0].code, "C1");
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn batch_create_code_items_response_roundtrip() {
+        let json = r#"{"count":3,"codelistId":11,"versionId":1}"#;
+        let resp: BatchCreateCodeItemsResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.count, 3);
+        assert_eq!(resp.codelist_id, 11);
+        assert_eq!(resp.version_id, 1);
+        assert_eq!(serde_json::to_string(&resp).unwrap(), json);
     }
 }
