@@ -11,7 +11,7 @@ use async_trait::async_trait;
 
 use apis::terminology::TerminologyKind as ApiKind;
 use apis::terminology::{
-    BatchCodeItemEntry, BatchCreateCodeItemsRequest, BatchCreateCodeItemsResponse as ApiBatchResp,
+    BatchCreateCodeItemsRequest, BatchCreateCodeItemsResponse as ApiBatchResp,
     CodeItemSearchHit as ApiCodeItemSearchHit, CodeItemSearchQuery as ApiCodeItemSearchQuery,
     CodeItemView, CodeListSearchHit as ApiCodeListSearchHit,
     CodeListSearchQuery as ApiCodeListSearchQuery, CodeListView, CreateCodeItemRequest,
@@ -25,7 +25,7 @@ use crate::domain::{
     TerminologyKind, TerminologyVersionRepository,
 };
 use crate::usecase::{
-    BatchCreateCodeItems, BatchCreateCodeItemsResponse as InternalBatchResp, CodeItemView as InternalCodeItemView,
+    BatchCreateCodeItems, CodeItemView as InternalCodeItemView,
     CodeListView as InternalCodeListView, CreateCodeItem, CreateCodeList,
     CreateTerminologyVersion, TerminologyUsecase, TerminologyUsecaseConfig,
     TerminologyVersionView as InternalTerminologyVersionView, UpdateCodeItem, UpdateCodeList,
@@ -170,7 +170,8 @@ impl From<UsecaseError> for TerminologyApiError {
                 | DomainError::EmptyFragment
                 | DomainError::InvalidKind(_)
                 | DomainError::FkVersionNotFound(_)
-                | DomainError::FkCodeListNotFound(_) => unreachable!(
+                | DomainError::FkCodeListNotFound(_)
+                | DomainError::EmptyCodeAtPosition(_) => unreachable!(
                     "domain validation / FK errors are only produced as UsecaseError::Validation"
                 ),
             },

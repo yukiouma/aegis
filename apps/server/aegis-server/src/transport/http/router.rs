@@ -1021,6 +1021,13 @@ mod tests {
         {
             unimplemented!()
         }
+        async fn batch_create_code_items(
+            &self,
+            _req: apis::terminology::BatchCreateCodeItemsRequest,
+        ) -> Result<apis::terminology::BatchCreateCodeItemsResponse, apis::terminology::TerminologyApiError>
+        {
+            unimplemented!()
+        }
     }
 
     /// State builder for terminology-integration tests: `MockAuth`

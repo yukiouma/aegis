@@ -360,6 +360,37 @@ impl CodeItemRepository for FakeCodeItemRepo {
     ) -> Result<Vec<CodeItemSearchHit>, DomainError> {
         Ok(vec![])
     }
+    async fn bulk_create(&self, inputs: Vec<CodeItemNew>) -> Result<usize, DomainError> {
+        let mut s = self.state.lock().unwrap();
+        let count = inputs.len();
+        for input in inputs {
+            if s.by_id
+                .values()
+                .any(|i| i.codelist_id == input.codelist_id && i.code == input.code)
+            {
+                return Err(DomainError::DuplicateCodeItem {
+                    codelist_id: input.codelist_id,
+                    code: input.code,
+                });
+            }
+            let id = s.next.fetch_add(1, Ordering::SeqCst) + 1;
+            let ts = now();
+            let item = CodeItem::for_repository(
+                id,
+                input.codelist_id,
+                input.version_id,
+                input.code,
+                input.submission_value,
+                input.synonym,
+                input.definition,
+                input.nci_preferred_term,
+                ts,
+                ts,
+            );
+            s.by_id.insert(id, item);
+        }
+        Ok(count)
+    }
 }
 
 // ---------- fixture ----------
