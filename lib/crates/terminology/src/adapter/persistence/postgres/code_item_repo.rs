@@ -231,6 +231,27 @@ impl CodeItemRepository for CodeItemRepo {
             })
             .collect()
     }
+
+    async fn bulk_create(&self, inputs: Vec<CodeItemNew>) -> Result<usize, DomainError> {
+        if inputs.is_empty() {
+            return Ok(0);
+        }
+        let mut qb: sqlx::QueryBuilder<sqlx::Postgres> = sqlx::QueryBuilder::new(
+            "INSERT INTO code_items \
+             (codelist_id, version_id, code, submission_value, synonym, definition, nci_preferred_term) ",
+        );
+        qb.push_values(inputs, |mut b, item| {
+            b.push_bind(item.codelist_id)
+                .push_bind(item.version_id)
+                .push_bind(&item.code)
+                .push_bind(&item.submission_value)
+                .push_bind(&item.synonym)
+                .push_bind(&item.definition)
+                .push_bind(&item.nci_preferred_term);
+        });
+        let result = qb.build().execute(&self.pool).await.map_err(map_db_error_simple)?;
+        Ok(result.rows_affected() as usize)
+    }
 }
 
 fn map_db_error_simple(err: sqlx::Error) -> DomainError {
