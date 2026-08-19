@@ -13,6 +13,7 @@ import type {
   ProjectView,
   RegisterUserInput,
   RegisterUserResponse,
+  TerminologyKind,
   TerminologyVersionView,
   UpdateCodeItemInput,
   UpdateCodeListInput,
@@ -147,6 +148,12 @@ export const api = {
     call<CodeItemView>("update_code_item", { id, body: { ...body } }),
   deleteCodeItem: (id: number): Promise<void> =>
     call<void>("delete_code_item", { id }),
+
+  importTerminology: (
+    kind: TerminologyKind,
+    filepath: string,
+  ): Promise<TerminologyVersionView> =>
+    call<TerminologyVersionView>("import_terminology", { kind, filepath }),
 } as const;
 
 export type { ApiError } from "./types";
