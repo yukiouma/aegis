@@ -14,9 +14,11 @@ import {
   DialogContentText,
   DialogTitle,
   IconButton,
+  Paper,
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableRow,
   Tooltip,
   Typography,
@@ -118,78 +120,81 @@ export function CodeListDetailPage() {
 
   return (
     <Box sx={{ p: 4, display: "flex", flexDirection: "column", gap: 2 }}>
-      <Table size="small">
-        <TableBody>
-          <TableRow>
-            <TableCell sx={{ width: 48 }}>
-              <Tooltip title={t("common.back")}>
-                <span>
-                  <IconButton
-                    onClick={() => navigate({ to: backLink })}
-                    disabled={!backLink}
-                    aria-label={t("common.back")}
-                  >
-                    <ArrowBackIcon />
-                  </IconButton>
-                </span>
-              </Tooltip>
-            </TableCell>
-            {error && !codelist ? (
-              <TableCell colSpan={4}>
-                <Alert severity="error">
-                  {t("terminology.codeitem.loadFailed", {
-                    message: errorMessage(error),
-                  })}
-                </Alert>
-                <Box sx={{ mt: 1 }}>
-                  <Button onClick={() => navigate({ to: backLink })}>
-                    {t("common.back")}
-                  </Button>
-                </Box>
+      <TableContainer component={Paper}>
+        <Table size="small">
+          <TableBody>
+            <TableRow>
+              <TableCell sx={{ width: 48 }}>
+                <Tooltip title={t("common.back")}>
+                  <span>
+                    <IconButton
+                      onClick={() => navigate({ to: backLink })}
+                      disabled={!backLink}
+                      aria-label={t("common.back")}
+                    >
+                      <ArrowBackIcon />
+                    </IconButton>
+                  </span>
+                </Tooltip>
               </TableCell>
-            ) : codelist ? (
-              <>
-                <TableCell>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-                      {codelist.code}
-                    </Typography>
-                    {codelist.extensible && (
-                      <Tooltip title={t("terminology.extensible")}>
-                        <Chip label="EXT" size="small" />
-                      </Tooltip>
-                    )}
+              {error && !codelist ? (
+                <TableCell colSpan={4}>
+                  <Alert severity="error">
+                    {t("terminology.codeitem.loadFailed", {
+                      message: errorMessage(error),
+                    })}
+                  </Alert>
+                  <Box sx={{ mt: 1 }}>
+                    <Button onClick={() => navigate({ to: backLink })}>
+                      {t("common.back")}
+                    </Button>
                   </Box>
                 </TableCell>
-                <TableCell>
-                  <Typography variant="body2" color="textSecondary">
-                    {codelist.name}
-                  </Typography>
-                </TableCell>
-                <TableCell sx={{ color: "text.secondary" }}>
-                  <Typography variant="body2">
-                    {codelist.submissionValue || "—"}
-                  </Typography>
-                </TableCell>
-                <TableCell sx={{ width: 64 }} align="right">
-                  {canMutate && (
-                    <Tooltip title={t("terminology.codelist.edit.title")}>
-                      <IconButton
-                        size="small"
-                        aria-label={t("terminology.codelist.edit.title")}
-                        onClick={() => setEditCodelistDrawerOpen(true)}
-                        disabled={mutationLoading}
-                      >
-                        <EditIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </TableCell>
-              </>
-            ) : null}
-          </TableRow>
-        </TableBody>
-      </Table>
+              ) : codelist ? (
+                <>
+                  <TableCell>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                        {codelist.code}
+                      </Typography>
+                      {codelist.extensible && (
+                        <Tooltip title={t("terminology.extensible")}>
+                          <Chip label="EXT" size="small" />
+                        </Tooltip>
+                      )}
+                    </Box>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" color="textSecondary">
+                      {codelist.name}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ color: "text.secondary" }}>
+                    <Typography variant="body2">
+                      {codelist.submissionValue || "—"}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ width: 64 }} align="right">
+                    {canMutate && (
+                      <Tooltip title={t("terminology.codelist.edit.title")}>
+                        <IconButton
+                          size="small"
+                          aria-label={t("terminology.codelist.edit.title")}
+                          onClick={() => setEditCodelistDrawerOpen(true)}
+                          disabled={mutationLoading}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                </>
+              ) : null}
+            </TableRow>
+          </TableBody>
+        </Table>
+      </TableContainer>
+
 
       <TermFilterBar
         query={search2}
