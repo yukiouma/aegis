@@ -157,6 +157,29 @@ describe("useListenForSettingsChanges", () => {
       expect(screen.getByTestId("locale").textContent).toBe("en");
     });
   });
+
+  it("applies a new character theme ID broadcast from another window", async () => {
+    render(
+      <AegisThemeProvider>
+        <AegisI18nProvider>
+          <ListenProbe />
+          <ThemeProbe label="mode" />
+          <LocaleProbe label="locale" />
+        </AegisI18nProvider>
+      </AegisThemeProvider>,
+    );
+
+    await waitFor(() => expect(handlers.length).toBe(1));
+
+    await act(async () => {
+      handlers[0]({ payload: { theme: "totoro" } });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("mode").textContent).toBe("totoro");
+    });
+    expect(screen.getByTestId("locale").textContent).toBe("en");
+  });
 });
 
 describe("persistSettings", () => {

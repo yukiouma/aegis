@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from "react";
+import { useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import {
   Alert,
@@ -10,17 +10,15 @@ import {
   DialogContentText,
   DialogTitle,
   FormControl,
-  FormControlLabel,
   InputLabel,
   MenuItem,
   Select,
-  Switch,
   TextField,
   Typography,
   type SelectChangeEvent,
 } from "@aegis/ui/mui";
 import { useI18n, type Locale } from "@aegis/ui/i18n";
-import { useThemeMode } from "@aegis/ui/theme";
+import { useThemeMode, type ThemeMode } from "@aegis/ui/theme";
 
 import { useCurrentUser } from "../../auth/data/current-user";
 import { useLogout } from "../../auth/data/logout";
@@ -41,8 +39,19 @@ export function SettingsPage() {
 
   const userCode = currentUser.data?.code;
 
-  const handleThemeChange = (event: ChangeEvent<HTMLInputElement>) => {
-    setMode(event.target.checked ? "dark" : "light");
+  const THEME_OPTIONS: readonly ThemeMode[] = [
+    "light",
+    "dark",
+    "anya",
+    "chihiro",
+    "ntd",
+    "sibly",
+    "totoro",
+    "xi",
+  ];
+
+  const handleThemeSelect = (event: SelectChangeEvent<ThemeMode>) => {
+    setMode(event.target.value as ThemeMode);
   };
   const handleLanguageChange = (event: SelectChangeEvent<Locale>) => {
     setLocale(event.target.value as Locale);
@@ -94,7 +103,7 @@ export function SettingsPage() {
   }
 
   const themeLabel = t("settings.theme.label", {
-    mode: t(mode === "dark" ? "settings.theme.dark" : "settings.theme.light"),
+    mode: t(`settings.theme.${mode}`),
   });
 
   return (
@@ -102,12 +111,23 @@ export function SettingsPage() {
       <Typography variant="h4" gutterBottom>
         {t("settings.heading")}
       </Typography>
-      <FormControlLabel
-        control={
-          <Switch checked={mode === "dark"} onChange={handleThemeChange} />
-        }
-        label={themeLabel}
-      />
+      <FormControl size="small" sx={{ minWidth: 160 }}>
+        <InputLabel id="theme-label">
+          {themeLabel}
+        </InputLabel>
+        <Select<ThemeMode>
+          labelId="theme-label"
+          value={mode}
+          label={themeLabel}
+          onChange={handleThemeSelect}
+        >
+          {THEME_OPTIONS.map((id) => (
+            <MenuItem key={id} value={id}>
+              {t(`settings.theme.${id}`)}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
       <FormControl size="small" sx={{ minWidth: 160 }}>
         <InputLabel id="language-label">
           {t("settings.language.label")}

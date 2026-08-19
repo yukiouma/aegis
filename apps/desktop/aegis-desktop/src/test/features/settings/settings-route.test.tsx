@@ -77,7 +77,9 @@ describe("SettingsPage", () => {
     expect(screen.getByRole("heading", { level: 4 })).toHaveTextContent(
       "Settings",
     );
-    expect(screen.getByLabelText(/Theme: Light/i)).toBeInTheDocument();
+    // Theme dropdown label interpolates the current theme name, so it
+    // reads "Theme: Light" out of the box (default mode = 'light').
+    expect(screen.getByLabelText(/Theme: Light/)).toBeInTheDocument();
     expect(screen.getByLabelText("Language")).toHaveTextContent("English");
   });
 
@@ -85,7 +87,7 @@ describe("SettingsPage", () => {
     await renderSettings("zh-CN");
 
     expect(screen.getByRole("heading", { level: 4 })).toHaveTextContent("设置");
-    expect(screen.getByLabelText(/主题：浅色/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/主题：浅色/)).toBeInTheDocument();
     expect(screen.getByLabelText("语言")).toHaveTextContent("简体中文");
   });
 
@@ -98,6 +100,6 @@ describe("SettingsPage", () => {
     );
 
     expect(screen.getByRole("heading", { level: 4 })).toHaveTextContent("设置");
-    expect(screen.getByLabelText(/主题：浅色/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/主题：浅色/)).toBeInTheDocument();
   });
 });

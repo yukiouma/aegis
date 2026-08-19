@@ -7,7 +7,16 @@ import { getTheme } from './registry';
 const STORAGE_KEY = 'aegis:theme:mode';
 
 function isThemeMode(value: string | null): value is ThemeMode {
-  return value === 'light' || value === 'dark';
+  return (
+    value === 'light' ||
+    value === 'dark' ||
+    value === 'anya' ||
+    value === 'chihiro' ||
+    value === 'ntd' ||
+    value === 'sibly' ||
+    value === 'totoro' ||
+    value === 'xi'
+  );
 }
 
 function readInitialMode(): ThemeMode {
