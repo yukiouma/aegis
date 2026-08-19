@@ -66,6 +66,32 @@ pub struct UpdateCodeItemRequest {
     pub nci_preferred_term: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchCodeItemEntry {
+    pub code: String,
+    pub submission_value: String,
+    pub synonym: String,
+    pub definition: String,
+    pub nci_preferred_term: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchCreateCodeItemsRequest {
+    pub codelist_id: i64,
+    pub version_id: i64,
+    pub items: Vec<BatchCodeItemEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BatchCreateCodeItemsResponse {
+    pub count: usize,
+    pub codelist_id: i64,
+    pub version_id: i64,
+}
+
 #[derive(Debug, Clone)]
 pub struct CodeItemSearchQuery {
     pub version_id: i64,
@@ -80,6 +106,18 @@ pub async fn create(
     c.request(
         reqwest::Method::POST,
         "/api/terminology/code-items",
+        Some(&body),
+    )
+    .await
+}
+
+pub async fn batch_create(
+    c: &HttpClient,
+    body: BatchCreateCodeItemsRequest,
+) -> Result<BatchCreateCodeItemsResponse, ApiError> {
+    c.request(
+        reqwest::Method::POST,
+        "/api/terminology/code-items/batch",
         Some(&body),
     )
     .await
@@ -303,5 +341,61 @@ mod tests {
         };
         let j = serde_json::to_string(&body).unwrap();
         assert_eq!(j, r#"{"submissionValue":"SV"}"#);
+    }
+
+    fn batch_response_json(codelist_id: i64, version_id: i64, count: usize) -> serde_json::Value {
+        serde_json::json!({
+            "count": count, "codelistId": codelist_id, "versionId": version_id
+        })
+    }
+
+    #[tokio::test]
+    async fn batch_create_returns_count() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/terminology/code-items/batch"))
+            .respond_with(ResponseTemplate::new(201)
+                .set_body_json(batch_response_json(11, 7, 42)))
+            .mount(&server)
+            .await;
+        let resp = batch_create(
+            &client(&server),
+            BatchCreateCodeItemsRequest {
+                codelist_id: 11,
+                version_id: 7,
+                items: vec![BatchCodeItemEntry {
+                    code: "Y".into(),
+                    submission_value: "SV".into(),
+                    synonym: "syn".into(),
+                    definition: "def".into(),
+                    nci_preferred_term: "nci".into(),
+                }],
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.count, 42);
+        assert_eq!(resp.codelist_id, 11);
+        assert_eq!(resp.version_id, 7);
+    }
+
+    #[test]
+    fn batch_request_serializes_camel_case() {
+        let body = BatchCreateCodeItemsRequest {
+            codelist_id: 11,
+            version_id: 7,
+            items: vec![BatchCodeItemEntry {
+                code: "Y".into(),
+                submission_value: "SV".into(),
+                synonym: "syn".into(),
+                definition: "def".into(),
+                nci_preferred_term: "nci".into(),
+            }],
+        };
+        let j = serde_json::to_string(&body).unwrap();
+        assert_eq!(
+            j,
+            r#"{"codelistId":11,"versionId":7,"items":[{"code":"Y","submissionValue":"SV","synonym":"syn","definition":"def","nciPreferredTerm":"nci"}]}"#
+        );
     }
 }
