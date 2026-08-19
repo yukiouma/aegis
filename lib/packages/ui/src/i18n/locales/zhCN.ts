@@ -151,7 +151,6 @@ export const zhCN = {
   'terminology.version.placeholder': '暂无版本',
   'terminology.version.helper': '术语版本',
   'terminology.extensible': '可扩展',
-  'terminology.importComingSoon': '术语导入功能即将上线',
   'terminology.import.title': '导入术语',
   'terminology.import.subtitle': '上传 CDISC 术语表',
   'terminology.import.dropZone': '将 .xls 或 .xlsx 文件拖到此处，或点击选择',

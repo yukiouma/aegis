@@ -153,7 +153,6 @@ export const en = {
   'terminology.version.placeholder': 'No versions yet',
   'terminology.version.helper': 'Terminology Version',
   'terminology.extensible': 'Extensible',
-  'terminology.importComingSoon': 'Terminology import is coming soon',
   'terminology.import.title': 'Import terminology',
   'terminology.import.subtitle': 'Upload a CDISC terminology workbook',
   'terminology.import.dropZone': 'Drop an .xls or .xlsx file here, or click to choose',
