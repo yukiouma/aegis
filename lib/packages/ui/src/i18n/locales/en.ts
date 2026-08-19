@@ -153,7 +153,13 @@ export const en = {
   'terminology.version.placeholder': 'No versions yet',
   'terminology.version.helper': 'Terminology Version',
   'terminology.extensible': 'Extensible',
-  'terminology.importComingSoon': 'Terminology import is coming soon',
+  'terminology.import.title': 'Import terminology',
+  'terminology.import.subtitle': 'Upload a CDISC terminology workbook',
+  'terminology.import.dropZone': 'Drop an .xls or .xlsx file here, or click to choose',
+  'terminology.import.fileTypeHint': 'Only .xls or .xlsx files are supported',
+  'terminology.import.importing': 'Importing terminology…',
+  'terminology.import.success': 'Imported terminology version {name}',
+  'terminology.import.failure': 'Import failed: {message}',
 
   'terminology.codelist.search.placeholder':
     'Search by code, name, submission value, or description',
@@ -200,4 +206,5 @@ export const en = {
 
   'common.confirm': 'Confirm',
   'common.back': 'Back',
+  'common.submit': 'Submit',
 } as const;

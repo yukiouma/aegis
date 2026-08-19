@@ -151,7 +151,13 @@ export const zhCN = {
   'terminology.version.placeholder': '暂无版本',
   'terminology.version.helper': '术语版本',
   'terminology.extensible': '可扩展',
-  'terminology.importComingSoon': '术语导入功能即将上线',
+  'terminology.import.title': '导入术语',
+  'terminology.import.subtitle': '上传 CDISC 术语表',
+  'terminology.import.dropZone': '将 .xls 或 .xlsx 文件拖到此处，或点击选择',
+  'terminology.import.fileTypeHint': '仅支持 .xls 或 .xlsx 文件',
+  'terminology.import.importing': '正在导入术语…',
+  'terminology.import.success': '已导入术语版本 {name}',
+  'terminology.import.failure': '导入失败：{message}',
 
   'terminology.codelist.search.placeholder': '按代码、名称、提交值或描述搜索',
   'terminology.codelist.field.code': '代码',
@@ -194,4 +200,5 @@ export const zhCN = {
 
   'common.confirm': '确认',
   'common.back': '返回',
+  'common.submit': '提交',
 } satisfies Record<keyof typeof en, string>;

@@ -233,6 +233,26 @@ export interface UpdateCodeItemInput {
   nciPreferredTerm?: string;
 }
 
+export interface BatchCodeItemEntry {
+  code: string;
+  submissionValue: string;
+  synonym: string;
+  definition: string;
+  nciPreferredTerm: string;
+}
+
+export interface BatchCreateCodeItemsInput {
+  codelistId: number;
+  versionId: number;
+  items: BatchCodeItemEntry[];
+}
+
+export interface BatchCreateCodeItemsResponse {
+  count: number;
+  codelistId: number;
+  versionId: number;
+}
+
 export interface SearchTerminologyQuery {
   versionId: number;
   fragment: string;

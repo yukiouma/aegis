@@ -119,7 +119,7 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
           value={selectedVersionId}
           onChange={setSelectedVersionId}
         />
-        <ImportButton />
+        <ImportButton kind={kind} />
       </Box>
 
       <CodeListTable
