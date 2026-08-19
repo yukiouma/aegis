@@ -127,13 +127,14 @@ pub async fn get_version_by_id(
 pub async fn update_version(
     State(state): State<AppState>,
     claims: AuthClaims,
+    Path(dto::PathId { id }): Path<dto::PathId>,
     Json(req): Json<dto::UpdateTerminologyVersionRequest>,
 ) -> Result<Json<dto::TerminologyVersionViewResponse>, ApiError> {
     require_admin_or_root(&claims)?;
     let view = state
         .terminology
         .update_version(apis::terminology::UpdateTerminologyVersionRequest {
-            id: req.id,
+            id,
             kind: req.kind.map(Into::into),
             name: req.name,
         })
@@ -280,13 +281,14 @@ pub async fn get_code_list_by_id(
 pub async fn update_code_list(
     State(state): State<AppState>,
     claims: AuthClaims,
+    Path(dto::PathId { id }): Path<dto::PathId>,
     Json(req): Json<dto::UpdateCodeListRequest>,
 ) -> Result<Json<dto::CodeListViewResponse>, ApiError> {
     require_admin_or_root(&claims)?;
     let view = state
         .terminology
         .update_code_list(apis::terminology::UpdateCodeListRequest {
-            id: req.id,
+            id,
             code: req.code,
             extensible: req.extensible,
             name: req.name,
@@ -477,13 +479,14 @@ pub async fn list_code_items_by_version_and_code(
 pub async fn update_code_item(
     State(state): State<AppState>,
     claims: AuthClaims,
+    Path(dto::PathId { id }): Path<dto::PathId>,
     Json(req): Json<dto::UpdateCodeItemRequest>,
 ) -> Result<Json<dto::CodeItemViewResponse>, ApiError> {
     require_admin_or_root(&claims)?;
     let view = state
         .terminology
         .update_code_item(apis::terminology::UpdateCodeItemRequest {
-            id: req.id,
+            id,
             code: req.code,
             submission_value: req.submission_value,
             synonym: req.synonym,
