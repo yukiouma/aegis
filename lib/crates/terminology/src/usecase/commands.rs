@@ -60,3 +60,11 @@ pub struct UpdateCodeItem {
     pub definition: Option<String>,
     pub nci_preferred_term: Option<String>,
 }
+
+// Batch
+
+pub struct BatchCreateCodeItems {
+    pub codelist_id: i64,
+    pub version_id: i64,
+    pub items: Vec<CreateCodeItem>,
+}

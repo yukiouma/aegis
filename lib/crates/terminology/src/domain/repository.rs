@@ -80,4 +80,10 @@ pub trait CodeItemRepository: Send + Sync {
         &self,
         query: CodeItemSearchQuery,
     ) -> Result<Vec<CodeItemSearchHit>, DomainError>;
+
+    /// Insert several `CodeItem` rows in a single SQL statement.
+    /// Returns the number of rows inserted on success. The backend
+    /// must execute this atomically — if any row violates a constraint
+    /// the entire call fails and zero rows are inserted.
+    async fn bulk_create(&self, inputs: Vec<CodeItemNew>) -> Result<usize, DomainError>;
 }

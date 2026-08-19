@@ -28,6 +28,9 @@ pub enum DomainError {
     #[error("code item not found: {0}")]
     CodeItemNotFound(i64),
 
+    #[error("code at position {0} must not be empty")]
+    EmptyCodeAtPosition(usize),
+
     #[error("terminology version already exists for {kind:?} / {name}")]
     DuplicateVersion { kind: TerminologyKind, name: String },
 

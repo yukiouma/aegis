@@ -5,11 +5,11 @@ use crate::domain::{
 };
 
 use super::commands::{
-    CreateCodeItem, CreateCodeList, CreateTerminologyVersion, UpdateCodeItem, UpdateCodeList,
-    UpdateTerminologyVersion,
+    BatchCreateCodeItems, CreateCodeItem, CreateCodeList, CreateTerminologyVersion,
+    UpdateCodeItem, UpdateCodeList, UpdateTerminologyVersion,
 };
 use super::error::UsecaseError;
-use super::views::{CodeItemView, CodeListView, TerminologyVersionView};
+use super::views::{BatchCreateCodeItemsResponse, CodeItemView, CodeListView, TerminologyVersionView};
 
 /// Configuration for `TerminologyUsecase::new`. Wraps the three
 /// concrete (or fake) repositories so the constructor stays
@@ -267,6 +267,35 @@ where
             .await?;
         Ok(hits)
     }
+
+    pub async fn batch_create_code_items(
+        &self,
+        cmd: BatchCreateCodeItems,
+    ) -> Result<BatchCreateCodeItemsResponse, UsecaseError> {
+        validate_batch_code_items(&cmd)?;
+
+        let inputs: Vec<CodeItemNew> = cmd
+            .items
+            .iter()
+            .map(|item| CodeItemNew {
+                codelist_id: cmd.codelist_id,
+                version_id: cmd.version_id,
+                code: item.code.clone(),
+                submission_value: item.submission_value.clone(),
+                synonym: item.synonym.clone(),
+                definition: item.definition.clone(),
+                nci_preferred_term: item.nci_preferred_term.clone(),
+            })
+            .collect();
+
+        let count = self.code_item_repo.bulk_create(inputs).await?;
+
+        Ok(BatchCreateCodeItemsResponse {
+            count,
+            codelist_id: cmd.codelist_id,
+            version_id: cmd.version_id,
+        })
+    }
 }
 
 // ---- pre-flight validation ----
@@ -315,6 +344,17 @@ fn validate_update_code_item(cmd: &UpdateCodeItem) -> Result<(), UsecaseError> {
         && code.trim().is_empty()
     {
         return Err(UsecaseError::Validation(DomainError::EmptyCode));
+    }
+    Ok(())
+}
+
+fn validate_batch_code_items(cmd: &BatchCreateCodeItems) -> Result<(), UsecaseError> {
+    for (i, item) in cmd.items.iter().enumerate() {
+        if item.code.trim().is_empty() {
+            return Err(UsecaseError::Validation(
+                DomainError::EmptyCodeAtPosition(i),
+            ));
+        }
     }
     Ok(())
 }

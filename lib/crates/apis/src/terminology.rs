@@ -202,6 +202,34 @@ pub struct UpdateCodeItemRequest {
     pub nci_preferred_term: Option<String>,
 }
 
+/// One entry inside a batch request. All fields map 1-to-1 with
+/// `CreateCodeItemRequest` minus codelist_id/version_id
+/// (those are fixed at the batch level).
+#[derive(Debug, Clone)]
+pub struct BatchCodeItemEntry {
+    pub code: String,
+    pub submission_value: String,
+    pub synonym: String,
+    pub definition: String,
+    pub nci_preferred_term: String,
+}
+
+/// Input DTO for [`TerminologyService::batch_create_code_items`].
+#[derive(Debug, Clone)]
+pub struct BatchCreateCodeItemsRequest {
+    pub codelist_id: i64,
+    pub version_id: i64,
+    pub items: Vec<BatchCodeItemEntry>,
+}
+
+/// Response for [`TerminologyService::batch_create_code_items`].
+#[derive(Debug, Clone)]
+pub struct BatchCreateCodeItemsResponse {
+    pub count: usize,
+    pub codelist_id: i64,
+    pub version_id: i64,
+}
+
 /// Outbound port for terminology lifecycle operations.
 ///
 /// `Send + Sync` so a `Box<dyn TerminologyService>` can be shared
@@ -336,4 +364,14 @@ pub trait TerminologyService: Send + Sync {
         &self,
         q: CodeItemSearchQuery,
     ) -> Result<Vec<CodeItemSearchHit>, TerminologyApiError>;
+
+    /// Create several `CodeItem`s in one logical operation. All items
+    /// must share `req.codelist_id` and `req.version_id`. If any item
+    /// fails validation the entire batch is rolled back and the first
+    /// error is returned with the failing item's position annotated:
+    /// `"item 23: code cannot be empty"`.
+    async fn batch_create_code_items(
+        &self,
+        req: BatchCreateCodeItemsRequest,
+    ) -> Result<BatchCreateCodeItemsResponse, TerminologyApiError>;
 }
