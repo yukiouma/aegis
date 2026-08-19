@@ -132,3 +132,109 @@ export interface UpdateProjectBody {
   unblindMembers?: ProjectMembers;
   tags?: Tag[];
 }
+
+// Terminology
+
+export type TerminologyKind = "sdtm" | "adam";
+
+export interface TerminologyVersionView {
+  id: number;
+  kind: TerminologyKind;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TerminologyVersionListResponse {
+  versions: TerminologyVersionView[];
+}
+
+export interface CreateTerminologyVersionInput {
+  kind: TerminologyKind;
+  name: string;
+}
+
+export interface UpdateTerminologyVersionInput {
+  kind?: TerminologyKind;
+  name?: string;
+}
+
+export interface CodeListView {
+  id: number;
+  versionId: number;
+  code: string;
+  extensible: boolean;
+  name: string;
+  submissionValue: string;
+  synonym: string;
+  definition: string;
+  nciPreferredTerm: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CodeListListResponse {
+  codelists: CodeListView[];
+}
+
+export interface CreateCodeListInput {
+  versionId: number;
+  code: string;
+  extensible: boolean;
+  name: string;
+  submissionValue: string;
+  synonym: string;
+  definition: string;
+  nciPreferredTerm: string;
+}
+
+export interface UpdateCodeListInput {
+  code?: string;
+  extensible?: boolean;
+  name?: string;
+  submissionValue?: string;
+  synonym?: string;
+  definition?: string;
+  nciPreferredTerm?: string;
+}
+
+export interface CodeItemView {
+  id: number;
+  codelistId: number;
+  versionId: number;
+  code: string;
+  submissionValue: string;
+  synonym: string;
+  definition: string;
+  nciPreferredTerm: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CodeItemListResponse {
+  items: CodeItemView[];
+}
+
+export interface CreateCodeItemInput {
+  codelistId: number;
+  versionId: number;
+  code: string;
+  submissionValue: string;
+  synonym: string;
+  definition: string;
+  nciPreferredTerm: string;
+}
+
+export interface UpdateCodeItemInput {
+  code?: string;
+  submissionValue?: string;
+  synonym?: string;
+  definition?: string;
+  nciPreferredTerm?: string;
+}
+
+export interface SearchTerminologyQuery {
+  versionId: number;
+  fragment: string;
+  limit?: number;
+}

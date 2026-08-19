@@ -41,6 +41,23 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::project::list_projects,
             commands::project::get_project_by_code,
             commands::project::update_project,
+            // terminology
+            commands::terminology::version::create_terminology_version,
+            commands::terminology::version::list_terminology_versions,
+            commands::terminology::version::get_terminology_version_by_id,
+            commands::terminology::version::update_terminology_version,
+            commands::terminology::version::delete_terminology_version,
+            commands::terminology::code_list::create_code_list,
+            commands::terminology::code_list::list_code_lists,
+            commands::terminology::code_list::get_code_list_by_id,
+            commands::terminology::code_list::update_code_list,
+            commands::terminology::code_list::delete_code_list,
+            commands::terminology::code_list::search_code_lists,
+            commands::terminology::code_item::create_code_item,
+            commands::terminology::code_item::list_code_items,
+            commands::terminology::code_item::update_code_item,
+            commands::terminology::code_item::delete_code_item,
+            commands::terminology::code_item::search_code_items,
             // health
             commands::healthz::healthz,
             // legacy greet (kept for the existing test)

@@ -53,12 +53,12 @@ export const anyaTheme = createTheme({
             backgroundColor: '#FFD1DC',
           },
         },
-        containedSecondary: {
-          boxShadow: '0 4px 0px #B8860B',
-          '&:hover': {
-            boxShadow: '0 2px 0px #B8860B',
-          },
-        },
+        // containedSecondary: {
+        //   boxShadow: '0 4px 0px #B8860B',
+        //   '&:hover': {
+        //     boxShadow: '0 2px 0px #B8860B',
+        //   },
+        // },
       },
     },
     MuiPaper: {

@@ -22,4 +22,17 @@ export const queryKeys = {
   product: {
     all: () => ["product", "list"] as const,
   },
+  terminology: {
+    versions: () => ["terminology", "versions"] as const,
+    version: (id: number) => ["terminology", "version", id] as const,
+    codeLists: (versionId: number) =>
+      ["terminology", "codeLists", versionId] as const,
+    codeList: (id: number) => ["terminology", "codeList", id] as const,
+    codeItems: (codelistId: number) =>
+      ["terminology", "codeItems", codelistId] as const,
+    searchCodeLists: (versionId: number, fragment: string) =>
+      ["terminology", "searchCodeLists", versionId, fragment] as const,
+    searchCodeItems: (versionId: number, fragment: string) =>
+      ["terminology", "searchCodeItems", versionId, fragment] as const,
+  },
 } as const;

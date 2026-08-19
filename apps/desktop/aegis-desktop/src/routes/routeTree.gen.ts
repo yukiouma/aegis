@@ -20,9 +20,12 @@ import { Route as AuthedLayoutProjectsRouteImport } from './_authed/_layout/proj
 import { Route as AuthedLayoutSettingsRouteImport } from './_authed/_layout/settings'
 import { Route as AuthedProjectProjectCodeRouteRouteImport } from './_authed/project/$projectCode/route'
 import { Route as AuthedLayoutManagementUsersRouteImport } from './_authed/_layout/management/users'
+import { Route as AuthedLayoutTerminologyAdamRouteImport } from './_authed/_layout/terminology/adam'
+import { Route as AuthedLayoutTerminologySdtmRouteImport } from './_authed/_layout/terminology/sdtm'
 import { Route as AuthedProjectProjectCodeIndexRouteImport } from './_authed/project/$projectCode/index'
 import { Route as AuthedProjectProjectCodeConfigurationRouteImport } from './_authed/project/$projectCode/configuration'
 import { Route as AuthedProjectProjectCodeDashboardRouteImport } from './_authed/project/$projectCode/dashboard'
+import { Route as AuthedLayoutTerminologyKindCodelistsCodelistIdRouteImport } from './_authed/_layout/terminology/$kind/codelists/$codelistId'
 
 const AuthedRouteRoute = AuthedRouteRouteImport.update({
   id: '/_authed',
@@ -80,6 +83,18 @@ const AuthedLayoutManagementUsersRoute =
     path: '/users',
     getParentRoute: () => AuthedLayoutManagementRouteRoute,
   } as any)
+const AuthedLayoutTerminologyAdamRoute =
+  AuthedLayoutTerminologyAdamRouteImport.update({
+    id: '/terminology/adam',
+    path: '/terminology/adam',
+    getParentRoute: () => AuthedLayoutRouteRoute,
+  } as any)
+const AuthedLayoutTerminologySdtmRoute =
+  AuthedLayoutTerminologySdtmRouteImport.update({
+    id: '/terminology/sdtm',
+    path: '/terminology/sdtm',
+    getParentRoute: () => AuthedLayoutRouteRoute,
+  } as any)
 const AuthedProjectProjectCodeIndexRoute =
   AuthedProjectProjectCodeIndexRouteImport.update({
     id: '/',
@@ -98,6 +113,12 @@ const AuthedProjectProjectCodeDashboardRoute =
     path: '/dashboard',
     getParentRoute: () => AuthedProjectProjectCodeRouteRoute,
   } as any)
+const AuthedLayoutTerminologyKindCodelistsCodelistIdRoute =
+  AuthedLayoutTerminologyKindCodelistsCodelistIdRouteImport.update({
+    id: '/terminology/$kind/codelists/$codelistId',
+    path: '/terminology/$kind/codelists/$codelistId',
+    getParentRoute: () => AuthedLayoutRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthedLayoutIndexRoute
@@ -109,9 +130,12 @@ export interface FileRoutesByFullPath {
   '/projects': typeof AuthedLayoutProjectsRoute
   '/settings': typeof AuthedLayoutSettingsRoute
   '/management/users': typeof AuthedLayoutManagementUsersRoute
+  '/terminology/adam': typeof AuthedLayoutTerminologyAdamRoute
+  '/terminology/sdtm': typeof AuthedLayoutTerminologySdtmRoute
   '/project/$projectCode/configuration': typeof AuthedProjectProjectCodeConfigurationRoute
   '/project/$projectCode/dashboard': typeof AuthedProjectProjectCodeDashboardRoute
   '/project/$projectCode/': typeof AuthedProjectProjectCodeIndexRoute
+  '/terminology/$kind/codelists/$codelistId': typeof AuthedLayoutTerminologyKindCodelistsCodelistIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof AuthedLayoutIndexRoute
@@ -122,9 +146,12 @@ export interface FileRoutesByTo {
   '/projects': typeof AuthedLayoutProjectsRoute
   '/settings': typeof AuthedLayoutSettingsRoute
   '/management/users': typeof AuthedLayoutManagementUsersRoute
+  '/terminology/adam': typeof AuthedLayoutTerminologyAdamRoute
+  '/terminology/sdtm': typeof AuthedLayoutTerminologySdtmRoute
   '/project/$projectCode/configuration': typeof AuthedProjectProjectCodeConfigurationRoute
   '/project/$projectCode/dashboard': typeof AuthedProjectProjectCodeDashboardRoute
   '/project/$projectCode': typeof AuthedProjectProjectCodeIndexRoute
+  '/terminology/$kind/codelists/$codelistId': typeof AuthedLayoutTerminologyKindCodelistsCodelistIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -139,9 +166,12 @@ export interface FileRoutesById {
   '/_authed/_layout/settings': typeof AuthedLayoutSettingsRoute
   '/_authed/_layout/': typeof AuthedLayoutIndexRoute
   '/_authed/_layout/management/users': typeof AuthedLayoutManagementUsersRoute
+  '/_authed/_layout/terminology/adam': typeof AuthedLayoutTerminologyAdamRoute
+  '/_authed/_layout/terminology/sdtm': typeof AuthedLayoutTerminologySdtmRoute
   '/_authed/project/$projectCode/configuration': typeof AuthedProjectProjectCodeConfigurationRoute
   '/_authed/project/$projectCode/dashboard': typeof AuthedProjectProjectCodeDashboardRoute
   '/_authed/project/$projectCode/': typeof AuthedProjectProjectCodeIndexRoute
+  '/_authed/_layout/terminology/$kind/codelists/$codelistId': typeof AuthedLayoutTerminologyKindCodelistsCodelistIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -155,9 +185,12 @@ export interface FileRouteTypes {
     | '/projects'
     | '/settings'
     | '/management/users'
+    | '/terminology/adam'
+    | '/terminology/sdtm'
     | '/project/$projectCode/configuration'
     | '/project/$projectCode/dashboard'
     | '/project/$projectCode/'
+    | '/terminology/$kind/codelists/$codelistId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -168,9 +201,12 @@ export interface FileRouteTypes {
     | '/projects'
     | '/settings'
     | '/management/users'
+    | '/terminology/adam'
+    | '/terminology/sdtm'
     | '/project/$projectCode/configuration'
     | '/project/$projectCode/dashboard'
     | '/project/$projectCode'
+    | '/terminology/$kind/codelists/$codelistId'
   id:
     | '__root__'
     | '/_authed'
@@ -184,9 +220,12 @@ export interface FileRouteTypes {
     | '/_authed/_layout/settings'
     | '/_authed/_layout/'
     | '/_authed/_layout/management/users'
+    | '/_authed/_layout/terminology/adam'
+    | '/_authed/_layout/terminology/sdtm'
     | '/_authed/project/$projectCode/configuration'
     | '/_authed/project/$projectCode/dashboard'
     | '/_authed/project/$projectCode/'
+    | '/_authed/_layout/terminology/$kind/codelists/$codelistId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -275,6 +314,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedLayoutManagementUsersRouteImport
       parentRoute: typeof AuthedLayoutManagementRouteRoute
     }
+    '/_authed/_layout/terminology/adam': {
+      id: '/_authed/_layout/terminology/adam'
+      path: '/terminology/adam'
+      fullPath: '/terminology/adam'
+      preLoaderRoute: typeof AuthedLayoutTerminologyAdamRouteImport
+      parentRoute: typeof AuthedLayoutRouteRoute
+    }
+    '/_authed/_layout/terminology/sdtm': {
+      id: '/_authed/_layout/terminology/sdtm'
+      path: '/terminology/sdtm'
+      fullPath: '/terminology/sdtm'
+      preLoaderRoute: typeof AuthedLayoutTerminologySdtmRouteImport
+      parentRoute: typeof AuthedLayoutRouteRoute
+    }
     '/_authed/project/$projectCode/': {
       id: '/_authed/project/$projectCode/'
       path: '/'
@@ -295,6 +348,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/project/$projectCode/dashboard'
       preLoaderRoute: typeof AuthedProjectProjectCodeDashboardRouteImport
       parentRoute: typeof AuthedProjectProjectCodeRouteRoute
+    }
+    '/_authed/_layout/terminology/$kind/codelists/$codelistId': {
+      id: '/_authed/_layout/terminology/$kind/codelists/$codelistId'
+      path: '/terminology/$kind/codelists/$codelistId'
+      fullPath: '/terminology/$kind/codelists/$codelistId'
+      preLoaderRoute: typeof AuthedLayoutTerminologyKindCodelistsCodelistIdRouteImport
+      parentRoute: typeof AuthedLayoutRouteRoute
     }
   }
 }
@@ -318,6 +378,9 @@ interface AuthedLayoutRouteRouteChildren {
   AuthedLayoutProjectsRoute: typeof AuthedLayoutProjectsRoute
   AuthedLayoutSettingsRoute: typeof AuthedLayoutSettingsRoute
   AuthedLayoutIndexRoute: typeof AuthedLayoutIndexRoute
+  AuthedLayoutTerminologyAdamRoute: typeof AuthedLayoutTerminologyAdamRoute
+  AuthedLayoutTerminologySdtmRoute: typeof AuthedLayoutTerminologySdtmRoute
+  AuthedLayoutTerminologyKindCodelistsCodelistIdRoute: typeof AuthedLayoutTerminologyKindCodelistsCodelistIdRoute
 }
 
 const AuthedLayoutRouteRouteChildren: AuthedLayoutRouteRouteChildren = {
@@ -326,6 +389,10 @@ const AuthedLayoutRouteRouteChildren: AuthedLayoutRouteRouteChildren = {
   AuthedLayoutProjectsRoute: AuthedLayoutProjectsRoute,
   AuthedLayoutSettingsRoute: AuthedLayoutSettingsRoute,
   AuthedLayoutIndexRoute: AuthedLayoutIndexRoute,
+  AuthedLayoutTerminologyAdamRoute: AuthedLayoutTerminologyAdamRoute,
+  AuthedLayoutTerminologySdtmRoute: AuthedLayoutTerminologySdtmRoute,
+  AuthedLayoutTerminologyKindCodelistsCodelistIdRoute:
+    AuthedLayoutTerminologyKindCodelistsCodelistIdRoute,
 }
 
 const AuthedLayoutRouteRouteWithChildren =
