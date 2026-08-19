@@ -649,12 +649,13 @@ pub struct CreateTerminologyVersionRequest {
 }
 
 /// Wire-level request body for `PATCH /api/terminology/versions/{id}`.
-/// Every field except `id` is optional. `skip_serializing_if` keeps a
-/// partial update round-trip lossless.
+/// Every field is optional. `skip_serializing_if` keeps a
+/// partial update round-trip lossless. Deliberately omits `id`: the
+/// handler reads it from the `{id}` URL parameter and threads it
+/// into `apis::terminology::UpdateTerminologyVersionRequest`.
 #[derive(Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateTerminologyVersionRequest {
-    pub id: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub kind: Option<TerminologyKind>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -676,10 +677,13 @@ pub struct CreateCodeListRequest {
 }
 
 /// Wire-level request body for `PATCH /api/terminology/code-lists/{id}`.
+///
+/// Deliberately omits `id`: the handler reads it from the `{id}`
+/// URL parameter and threads it into
+/// `apis::terminology::UpdateCodeListRequest`.
 #[derive(Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCodeListRequest {
-    pub id: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -710,10 +714,13 @@ pub struct CreateCodeItemRequest {
 }
 
 /// Wire-level request body for `PATCH /api/terminology/code-items/{id}`.
+///
+/// Deliberately omits `id`: the handler reads it from the `{id}`
+/// URL parameter and threads it into
+/// `apis::terminology::UpdateCodeItemRequest`.
 #[derive(Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCodeItemRequest {
-    pub id: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub code: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1354,9 +1361,8 @@ mod tests {
 
     #[test]
     fn update_terminology_version_request_partial_roundtrip() {
-        let json = r#"{"id":7,"name":"new"}"#;
+        let json = r#"{"name":"new"}"#;
         let req: UpdateTerminologyVersionRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.id, 7);
         assert!(req.kind.is_none());
         assert_eq!(req.name.as_deref(), Some("new"));
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
@@ -1375,9 +1381,8 @@ mod tests {
 
     #[test]
     fn update_code_list_request_partial_roundtrip() {
-        let json = r#"{"id":11,"name":"new"}"#;
+        let json = r#"{"name":"new"}"#;
         let req: UpdateCodeListRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.id, 11);
         assert_eq!(req.name.as_deref(), Some("new"));
         assert!(req.code.is_none());
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
@@ -1396,9 +1401,8 @@ mod tests {
 
     #[test]
     fn update_code_item_request_partial_roundtrip() {
-        let json = r#"{"id":100,"code":"C2"}"#;
+        let json = r#"{"code":"C2"}"#;
         let req: UpdateCodeItemRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.id, 100);
         assert_eq!(req.code.as_deref(), Some("C2"));
         assert!(req.synonym.is_none());
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
