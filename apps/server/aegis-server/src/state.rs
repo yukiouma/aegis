@@ -84,6 +84,13 @@ pub(crate) mod test_support {
         {
             unimplemented!()
         }
+        async fn get_code_list_by_id(
+            &self,
+            _id: i64,
+        ) -> Result<apis::terminology::CodeListView, apis::terminology::TerminologyApiError>
+        {
+            unimplemented!()
+        }
         async fn update_code_list(
             &self,
             _req: apis::terminology::UpdateCodeListRequest,

@@ -25,6 +25,7 @@ pub fn router() -> OpenApiRouter<AppState> {
         // ---- CodeList ----
         .routes(routes!(handlers::create_code_list))
         .routes(routes!(handlers::list_code_lists))
+        .routes(routes!(handlers::get_code_list_by_id))
         .routes(routes!(handlers::update_code_list))
         .routes(routes!(handlers::delete_code_list))
         .routes(routes!(handlers::search_code_lists))

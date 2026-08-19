@@ -252,6 +252,18 @@ where
         Ok(code_list_view_from_internal(view))
     }
 
+    async fn get_code_list_by_id(
+        &self,
+        id: i64,
+    ) -> Result<CodeListView, TerminologyApiError> {
+        let view = self
+            .usecase
+            .get_code_list_by_id(id)
+            .await
+            .map_err(TerminologyApiError::from)?;
+        Ok(code_list_view_from_internal(view))
+    }
+
     async fn list_code_lists(
         &self,
         version_id: i64,

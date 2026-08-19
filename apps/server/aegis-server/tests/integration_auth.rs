@@ -286,6 +286,12 @@ impl apis::terminology::TerminologyService for NullTerminologyService {
     ) -> Result<Vec<apis::terminology::CodeListView>, apis::terminology::TerminologyApiError> {
         unimplemented!()
     }
+    async fn get_code_list_by_id(
+        &self,
+        _id: i64,
+    ) -> Result<apis::terminology::CodeListView, apis::terminology::TerminologyApiError> {
+        unimplemented!()
+    }
     async fn update_code_list(
         &self,
         _req: apis::terminology::UpdateCodeListRequest,
