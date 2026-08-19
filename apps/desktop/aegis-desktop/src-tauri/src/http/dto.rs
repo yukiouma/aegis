@@ -64,6 +64,12 @@ pub enum ApiError {
     /// Persistent token-store error.
     #[error("store error: {message}")]
     Store { message: String },
+
+    /// Workbook parse failure (the `terminology` git crate could not read the
+    /// .xls/.xlsx file). The frontend renders this through `errorMessage(err)`
+    /// the same way as the other variants.
+    #[error("workbook parse error: {message}")]
+    Parse { message: String },
 }
 
 impl From<reqwest::Error> for ApiError {
@@ -143,5 +149,21 @@ mod tests {
         assert_eq!(k, TerminologyKind::Sdtm);
         let k: TerminologyKind = serde_json::from_str("\"adam\"").unwrap();
         assert_eq!(k, TerminologyKind::Adam);
+    }
+
+    #[test]
+    fn parse_error_serializes_camel_case() {
+        let e = super::ApiError::Parse { message: "no sheet".into() };
+        let j = serde_json::to_string(&e).unwrap();
+        assert_eq!(j, r#"{"kind":"parse","message":"no sheet"}"#);
+    }
+
+    #[test]
+    fn parse_error_roundtrips() {
+        let e = super::ApiError::Parse { message: "bad row".into() };
+        let j = serde_json::to_string(&e).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&j).unwrap();
+        assert_eq!(v["kind"], "parse");
+        assert_eq!(v["message"], "bad row");
     }
 }
