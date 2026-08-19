@@ -2,13 +2,22 @@ import { invoke } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 import type {
+  CodeItemView,
+  CodeListView,
+  CreateCodeItemInput,
+  CreateCodeListInput,
   CreateProjectInput,
+  CreateTerminologyVersionInput,
   CreateUserInput,
   Identity,
   ProjectView,
   RegisterUserInput,
   RegisterUserResponse,
+  TerminologyVersionView,
+  UpdateCodeItemInput,
+  UpdateCodeListInput,
   UpdateProjectBody,
+  UpdateTerminologyVersionInput,
   UpdateUserBody,
   UpdateUserCredentialInput,
   UserCredentialView,
@@ -92,11 +101,62 @@ export const api = {
       maximized: true,
     });
   },
+
+  // terminology
+  listTerminologyVersions: (): Promise<TerminologyVersionView[]> =>
+    call<TerminologyVersionView[]>("list_terminology_versions"),
+  createTerminologyVersion: (
+    input: CreateTerminologyVersionInput,
+  ): Promise<TerminologyVersionView> =>
+    call<TerminologyVersionView>("create_terminology_version", { ...input }),
+  getTerminologyVersionById: (id: number): Promise<TerminologyVersionView> =>
+    call<TerminologyVersionView>("get_terminology_version_by_id", { id }),
+  updateTerminologyVersion: (
+    id: number,
+    body: UpdateTerminologyVersionInput,
+  ): Promise<TerminologyVersionView> =>
+    call<TerminologyVersionView>("update_terminology_version", {
+      id,
+      body: { ...body },
+    }),
+  deleteTerminologyVersion: (id: number): Promise<void> =>
+    call<void>("delete_terminology_version", { id }),
+
+  listCodeLists: (versionId: number): Promise<CodeListView[]> =>
+    call<CodeListView[]>("list_code_lists", { versionId }),
+  createCodeList: (input: CreateCodeListInput): Promise<CodeListView> =>
+    call<CodeListView>("create_code_list", { ...input }),
+  updateCodeList: (
+    id: number,
+    body: UpdateCodeListInput,
+  ): Promise<CodeListView> =>
+    call<CodeListView>("update_code_list", { id, body: { ...body } }),
+  deleteCodeList: (id: number): Promise<void> =>
+    call<void>("delete_code_list", { id }),
+
+  listCodeItems: (codelistId: number): Promise<CodeItemView[]> =>
+    call<CodeItemView[]>("list_code_items", { codelistId }),
+  createCodeItem: (input: CreateCodeItemInput): Promise<CodeItemView> =>
+    call<CodeItemView>("create_code_item", { ...input }),
+  updateCodeItem: (
+    id: number,
+    body: UpdateCodeItemInput,
+  ): Promise<CodeItemView> =>
+    call<CodeItemView>("update_code_item", { id, body: { ...body } }),
+  deleteCodeItem: (id: number): Promise<void> =>
+    call<void>("delete_code_item", { id }),
 } as const;
 
 export type { ApiError } from "./types";
 export type {
+  CodeItemListResponse,
+  CodeItemView,
+  CodeListListResponse,
+  CodeListView,
+  CreateCodeItemInput,
+  CreateCodeListInput,
   CreateProjectInput,
+  CreateTerminologyVersionInput,
   CreateUserInput,
   Identity,
   ProjectMembers,
@@ -105,8 +165,15 @@ export type {
   Role,
   RegisterUserInput,
   RegisterUserResponse,
+  SearchTerminologyQuery,
   Tag,
+  TerminologyKind,
+  TerminologyVersionListResponse,
+  TerminologyVersionView,
+  UpdateCodeItemInput,
+  UpdateCodeListInput,
   UpdateProjectBody,
+  UpdateTerminologyVersionInput,
   UpdateUserBody,
   UpdateUserCredentialInput,
   UserCredentialView,
