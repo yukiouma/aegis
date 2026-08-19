@@ -2,6 +2,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   IconButton,
   Paper,
@@ -25,7 +26,6 @@ import { useI18n } from "@aegis/ui/i18n";
 import { errorMessage } from "../../../shared/api/error";
 import type { ApiError, CodeListView } from "../../../shared/api";
 import { DescriptionsCell } from "./DescriptionsCell";
-import { ExtensibleIcon } from "./ExtensibleIcon";
 
 /**
  * `mode: "list"` — used by the Terminology list page. Renders the
@@ -129,8 +129,14 @@ export function CodeListTable(props: CodeListTableProps) {
               return (
                 <TableRow key={row.id} hover>
                   <TableCell>
-                    {row.code}
-                    <ExtensibleIcon visible={row.extensible} />
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <span>{row.code}</span>
+                      {row.extensible && (
+                        <Tooltip title={t("terminology.extensible")}>
+                          <Chip label="EXT" size="small" />
+                        </Tooltip>
+                      )}
+                    </Box>
                   </TableCell>
                   <TableCell>{row.name}</TableCell>
                   <TableCell>{row.submissionValue}</TableCell>
