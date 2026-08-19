@@ -16,6 +16,7 @@ fn greet(name: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -68,10 +69,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .store("auth.bin")
                 .map_err(|e| format!("failed to open auth.bin store: {e}"))?;
             let tokens = Arc::new(http::client::TauriStore::new(store));
-            let client = http::client::HttpClient::new(
-                http::config::BASE_URL.to_string(),
-                tokens,
-            );
+            let client = http::client::HttpClient::new(http::config::BASE_URL.to_string(), tokens);
             app.manage(client);
             Ok(())
         })
