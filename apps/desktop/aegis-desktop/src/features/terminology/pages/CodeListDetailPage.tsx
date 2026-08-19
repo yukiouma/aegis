@@ -135,7 +135,7 @@ export function CodeListDetailPage() {
               </Tooltip>
             </TableCell>
             {error && !codelist ? (
-              <TableCell colSpan={3}>
+              <TableCell colSpan={4}>
                 <Alert severity="error">
                   {t("terminology.codeitem.loadFailed", {
                     message: errorMessage(error),
@@ -159,14 +159,15 @@ export function CodeListDetailPage() {
                         <Chip label="EXT" size="small" />
                       </Tooltip>
                     )}
-                    <Typography variant="body2" color="textSecondary">
-                      {codelist.name}
-                    </Typography>
                   </Box>
+                </TableCell>
+                <TableCell>
+                  <Typography variant="body2" color="textSecondary">
+                    {codelist.name}
+                  </Typography>
                 </TableCell>
                 <TableCell sx={{ color: "text.secondary" }}>
                   <Typography variant="body2">
-                    {t("terminology.codelist.field.submissionValue")}:{" "}
                     {codelist.submissionValue || "—"}
                   </Typography>
                 </TableCell>
