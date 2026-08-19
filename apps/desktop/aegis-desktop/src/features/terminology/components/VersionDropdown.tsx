@@ -1,4 +1,4 @@
-import { FormControl, MenuItem, Select } from "@aegis/ui/mui";
+import { FormControl, InputLabel, MenuItem, Select } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
 
 import type {
@@ -19,11 +19,10 @@ export interface VersionDropdownProps {
  * with helper text when the filtered list is empty; the parent
  * page renders the empty-state message in the table area.
  *
- * The `label` prop is on `<Select>` only — NOT paired with a separate
- * `<InputLabel>` child — so MUI manages the float / shrink state
- * itself. Pairing both causes the label to overlap the selected
- * text once a value is chosen. `displayEmpty` keeps the floating
- * label visible while the user hasn't picked a version yet.
+ * The label is rendered as a sibling `<InputLabel>` (no `label` prop
+ * on `<Select>`) so MUI's FormControl automatically notches the
+ * label up to the top edge once a value is selected, instead of
+ * overlapping the chosen text in the middle of the field.
  */
 export function VersionDropdown({
   kind,
@@ -41,10 +40,10 @@ export function VersionDropdown({
 
   return (
     <FormControl size="small" sx={{ minWidth: 220 }} disabled={disabled || empty}>
+      <InputLabel id={`version-label-${kind}`}>{labelText}</InputLabel>
       <Select<number | null>
-        label={labelText}
+        labelId={`version-label-${kind}`}
         value={value ?? ""}
-        displayEmpty
         onChange={(e) =>
           onChange(
             e.target.value === "" ? null : Number(e.target.value),
