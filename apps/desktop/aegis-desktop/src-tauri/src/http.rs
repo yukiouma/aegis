@@ -9,5 +9,6 @@ pub mod config;
 pub mod dto;
 pub mod healthz;
 pub mod project;
+pub mod terminology;
 pub mod user;
 pub mod user_credential;
