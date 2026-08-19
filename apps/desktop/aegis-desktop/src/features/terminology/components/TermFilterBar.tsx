@@ -37,7 +37,7 @@ export function TermFilterBar({
           ),
         },
       }}
-      sx={{ minWidth: 320 }}
+      sx={{ flex: 1 }}
     />
   );
 }
