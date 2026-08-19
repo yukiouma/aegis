@@ -124,6 +124,8 @@ export const api = {
 
   listCodeLists: (versionId: number): Promise<CodeListView[]> =>
     call<CodeListView[]>("list_code_lists", { versionId }),
+  getCodeListById: (id: number): Promise<CodeListView> =>
+    call<CodeListView>("get_code_list_by_id", { id }),
   createCodeList: (input: CreateCodeListInput): Promise<CodeListView> =>
     call<CodeListView>("create_code_list", { ...input }),
   updateCodeList: (

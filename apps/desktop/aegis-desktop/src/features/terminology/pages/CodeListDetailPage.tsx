@@ -28,8 +28,8 @@ import { useCurrentUser } from "../../auth";
 import {
   useCreateCodeItem,
   useDeleteCodeItem,
+  useGetCodeList,
   useListCodeItems,
-  useListCodeLists,
   useListTerminologyVersions,
   useUpdateCodeItem,
   useUpdateCodeList,
@@ -69,17 +69,13 @@ export function CodeListDetailPage() {
 
   const currentUser = useCurrentUser();
   const versionsQuery = useListTerminologyVersions();
-  const codeListsQuery = useListCodeLists(versionIdFromUrl ?? null);
+  const codelistQuery = useGetCodeList(codelistId);
   const itemsQuery = useListCodeItems(codelistId);
 
   const role = currentUser.data?.role;
   const canMutate = role === "admin" || role === "root";
 
-  const codelist = useMemo(
-    () =>
-      (codeListsQuery.data ?? []).find((cl) => cl.id === codelistId),
-    [codeListsQuery.data, codelistId],
-  );
+  const codelist = codelistQuery.data;
 
   const versionId = codelist?.versionId ?? versionIdFromUrl ?? 0;
   const backLink = `/terminology/${kind}`;
@@ -114,7 +110,7 @@ export function CodeListDetailPage() {
     updateItem.isPending ||
     deleteItem.isPending;
 
-  const error = codelist ? null : (codeListsQuery.error ?? itemsQuery.error);
+  const error = codelist ? null : (codelistQuery.error ?? itemsQuery.error);
 
   return (
     <Box sx={{ p: 4, display: "flex", flexDirection: "column", gap: 2 }}>

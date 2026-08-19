@@ -117,6 +117,18 @@ pub async fn list(
     Ok(resp.codelists)
 }
 
+pub async fn get_by_id(
+    c: &HttpClient,
+    id: i64,
+) -> Result<CodeListViewResponse, ApiError> {
+    c.request(
+        reqwest::Method::GET,
+        &format!("/api/terminology/code-lists/{id}"),
+        None::<&()>,
+    )
+    .await
+}
+
 pub async fn update(
     c: &HttpClient,
     id: i64,
@@ -202,6 +214,19 @@ mod tests {
         assert_eq!(lists.len(), 2);
         assert_eq!(lists[0].code, "C1");
         assert!(lists[1].extensible);
+    }
+
+    #[tokio::test]
+    async fn get_by_id_returns_view() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/terminology/code-lists/42"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(codelist_json(42, "C42")))
+            .mount(&server)
+            .await;
+        let v = get_by_id(&client(&server), 42).await.unwrap();
+        assert_eq!(v.id, 42);
+        assert_eq!(v.code, "C42");
     }
 
     #[tokio::test]

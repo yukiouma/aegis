@@ -46,6 +46,14 @@ pub async fn list_code_lists(
 }
 
 #[tauri::command]
+pub async fn get_code_list_by_id(
+    client: State<'_, HttpClient>,
+    id: i64,
+) -> Result<CodeListViewResponse, ApiError> {
+    code_list::get_by_id(&client, id).await
+}
+
+#[tauri::command]
 pub async fn update_code_list(
     client: State<'_, HttpClient>,
     id: i64,

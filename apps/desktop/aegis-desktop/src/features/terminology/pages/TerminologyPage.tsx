@@ -138,11 +138,9 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
         onCreate={() => setDrawer({ mode: "create" })}
         onDelete={(row) => setConfirmDelete(row)}
         onOpen={(row) => {
-          if (selectedVersionId == null) return;
           void navigate({
             to: "/terminology/$kind/codelists/$codelistId",
             params: { kind, codelistId: row.id },
-            search: { versionId: selectedVersionId },
           });
         }}
         emptyMessage={

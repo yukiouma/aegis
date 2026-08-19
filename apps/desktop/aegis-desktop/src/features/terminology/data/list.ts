@@ -82,6 +82,18 @@ export function useListCodeLists(versionId: number | null) {
   });
 }
 
+/**
+ * Single codelist by id. `id === null` disables the query — the page
+ * starts disabled until the route provides the id.
+ */
+export function useGetCodeList(id: number | null) {
+  return useQuery<CodeListView, ApiError>({
+    queryKey: queryKeys.terminology.codeList(id ?? 0),
+    queryFn: () => api.getCodeListById(id!),
+    enabled: id != null && id > 0,
+  });
+}
+
 export function useCreateCodeList() {
   const qc = useQueryClient();
   return useMutation<CodeListView, ApiError, CreateCodeListInput>({
@@ -105,6 +117,9 @@ export function useUpdateCodeList() {
     onSuccess: (updated) => {
       qc.invalidateQueries({
         queryKey: queryKeys.terminology.codeLists(updated.versionId),
+      });
+      qc.invalidateQueries({
+        queryKey: queryKeys.terminology.codeList(updated.id),
       });
     },
   });

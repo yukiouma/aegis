@@ -49,6 +49,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::terminology::version::delete_terminology_version,
             commands::terminology::code_list::create_code_list,
             commands::terminology::code_list::list_code_lists,
+            commands::terminology::code_list::get_code_list_by_id,
             commands::terminology::code_list::update_code_list,
             commands::terminology::code_list::delete_code_list,
             commands::terminology::code_list::search_code_lists,
