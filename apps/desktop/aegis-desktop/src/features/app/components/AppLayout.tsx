@@ -4,9 +4,12 @@ import { Box } from "@aegis/ui/mui";
 import { Sidebar, type MenuItem, type SidebarProps } from "@aegis/ui";
 import {
   AdminPanelSettings as AdminPanelSettingsIcon,
+  Analytics as AnalyticsIcon,
   Home as HomeIcon,
+  MenuBook as MenuBookIcon,
   People as PeopleIcon,
   Settings as SettingsIcon,
+  Storage as StorageIcon,
   Workspaces as WorkspacesIcon,
 } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
@@ -18,6 +21,9 @@ const ProjectsMenuIcon = () => <WorkspacesIcon />;
 const SettingsMenuIcon = () => <SettingsIcon />;
 const ManagementMenuIcon = () => <AdminPanelSettingsIcon />;
 const UsersMenuIcon = () => <PeopleIcon />;
+const TerminologyMenuIcon = () => <MenuBookIcon />;
+const SdtmMenuIcon = () => <StorageIcon />;
+const AdamMenuIcon = () => <AnalyticsIcon />;
 
 /**
  * Authenticated app shell: the `Sidebar` plus the active child route.
@@ -53,9 +59,28 @@ export function AppLayout() {
     ],
   };
 
+  const terminologyEntry: MenuItem = {
+    link: "#",
+    title: t("nav.terminology"),
+    icon: TerminologyMenuIcon,
+    subMenu: [
+      {
+        link: "/terminology/sdtm",
+        title: t("nav.terminology.sdtm"),
+        icon: SdtmMenuIcon,
+      },
+      {
+        link: "/terminology/adam",
+        title: t("nav.terminology.adam"),
+        icon: AdamMenuIcon,
+      },
+    ],
+  };
+
   const menu: MenuItem[] = canManage
     ? [
         ...baseMenu.slice(0, 2),     // Home, Projects
+        terminologyEntry,            // Terminology (submenu: SDTM, ADaM)
         managementEntry,             // Management (submenu: Users)
         ...baseMenu.slice(2),        // Settings
       ]
