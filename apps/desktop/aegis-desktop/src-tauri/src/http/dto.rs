@@ -21,6 +21,14 @@ pub enum Role {
     General,
 }
 
+/// CDISC terminology kind. Wire form is lowercase (`"sdtm"`, `"adam"`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TerminologyKind {
+    Sdtm,
+    Adam,
+}
+
 /// The single error type every `#[tauri::command]` returns to the frontend.
 /// Serialized as a tagged object (`{"kind": "http", ...}` etc.) so the
 /// frontend can discriminate by `kind`.
@@ -115,5 +123,25 @@ mod tests {
         let e = ApiError::RefreshFailed;
         let j = serde_json::to_string(&e).unwrap();
         assert!(j.contains("\"kind\":\"refreshFailed\""));
+    }
+
+    #[test]
+    fn terminology_kind_serializes_lowercase() {
+        assert_eq!(
+            serde_json::to_string(&TerminologyKind::Sdtm).unwrap(),
+            "\"sdtm\""
+        );
+        assert_eq!(
+            serde_json::to_string(&TerminologyKind::Adam).unwrap(),
+            "\"adam\""
+        );
+    }
+
+    #[test]
+    fn terminology_kind_deserializes_lowercase() {
+        let k: TerminologyKind = serde_json::from_str("\"sdtm\"").unwrap();
+        assert_eq!(k, TerminologyKind::Sdtm);
+        let k: TerminologyKind = serde_json::from_str("\"adam\"").unwrap();
+        assert_eq!(k, TerminologyKind::Adam);
     }
 }
