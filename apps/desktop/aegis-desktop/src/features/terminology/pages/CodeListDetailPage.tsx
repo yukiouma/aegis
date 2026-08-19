@@ -7,6 +7,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -16,7 +17,10 @@ import {
   Tooltip,
   Typography,
 } from "@aegis/ui/mui";
-import { ArrowBack as ArrowBackIcon } from "@aegis/ui/icons";
+import {
+  ArrowBack as ArrowBackIcon,
+  Edit as EditIcon,
+} from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
 
 import { errorMessage } from "../../../shared/api/error";
@@ -40,7 +44,6 @@ import type {
 import { CodeItemDrawer } from "../components/CodeItemDrawer";
 import { CodeItemTable } from "../components/CodeItemTable";
 import { CodeListDrawer } from "../components/CodeListDrawer";
-import { CodeListTable } from "../components/CodeListTable";
 import { TermFilterBar } from "../components/TermFilterBar";
 
 // Single route under `/_authed/_layout/terminology/$kind/...`
@@ -153,16 +156,44 @@ export function CodeListDetailPage() {
       )}
 
       {codelist && (
-        <CodeListTable
-          mode="single"
-          rows={[codelist]}
-          loading={codeListsQuery.isLoading}
-          mutationLoading={mutationLoading}
-          error={null}
-          canMutate={canMutate}
-          onRetry={() => codeListsQuery.refetch()}
-          onEdit={() => setEditCodelistDrawerOpen(true)}
-        />
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              {codelist.code}
+            </Typography>
+            {codelist.extensible && (
+              <Tooltip title={t("terminology.extensible")}>
+                <Chip label="EXT" size="small" />
+              </Tooltip>
+            )}
+            <Typography variant="body2" color="textSecondary">
+              {codelist.name}
+            </Typography>
+          </Box>
+          <Typography variant="body2" color="textSecondary">
+            {t("terminology.codelist.field.submissionValue")}:{" "}
+            {codelist.submissionValue || "—"}
+          </Typography>
+          {canMutate && (
+            <Tooltip title={t("terminology.codelist.edit.title")}>
+              <IconButton
+                size="small"
+                aria-label={t("terminology.codelist.edit.title")}
+                onClick={() => setEditCodelistDrawerOpen(true)}
+                disabled={mutationLoading}
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Box>
       )}
 
       <TermFilterBar

@@ -136,7 +136,6 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
         canMutate={canMutate}
         onRetry={codeListsQuery.refetch}
         onCreate={() => setDrawer({ mode: "create" })}
-        onEdit={(row) => setDrawer({ mode: "edit", row })}
         onDelete={(row) => setConfirmDelete(row)}
         onOpen={(row) => {
           if (selectedVersionId == null) return;

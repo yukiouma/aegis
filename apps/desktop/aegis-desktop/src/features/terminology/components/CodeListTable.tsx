@@ -18,7 +18,6 @@ import {
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
-  Edit as EditIcon,
   Launch as LaunchIcon,
 } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
@@ -29,46 +28,28 @@ import { DescriptionsCell } from "./DescriptionsCell";
 
 /**
  * `mode: "list"` — used by the Terminology list page. Renders the
- * `+` header button and per-row edit / delete / open icons (each
- * gated on `canMutate`).
- *
- * `mode: "single"` — used by the detail page to render exactly one
- * row with edit only; the header `+` button is never rendered.
+ * `+` header button and per-row launch + delete icons (each gated
+ * on `canMutate`). The edit affordance lives on the detail page's
+ * codelist header, not on the table.
  */
-export type CodeListTableProps =
-  | {
-      mode: "list";
-      rows: CodeListView[];
-      loading: boolean;
-      mutationLoading: boolean;
-      error: ApiError | null;
-      canMutate: boolean;
-      onRetry: () => void;
-      onCreate: () => void;
-      onEdit: (row: CodeListView) => void;
-      onDelete: (row: CodeListView) => void;
-      onOpen: (row: CodeListView) => void;
-      emptyMessage?: string;
-    }
-  | {
-      mode: "single";
-      rows: CodeListView[];
-      loading: boolean;
-      mutationLoading: boolean;
-      error: ApiError | null;
-      canMutate: boolean;
-      onRetry: () => void;
-      onEdit: (row: CodeListView) => void;
-      emptyMessage?: string;
-    };
+export type CodeListTableProps = {
+  mode: "list";
+  rows: CodeListView[];
+  loading: boolean;
+  mutationLoading: boolean;
+  error: ApiError | null;
+  canMutate: boolean;
+  onRetry: () => void;
+  onCreate: () => void;
+  onDelete: (row: CodeListView) => void;
+  onOpen: (row: CodeListView) => void;
+  emptyMessage?: string;
+};
 
 export function CodeListTable(props: CodeListTableProps) {
   const { t } = useI18n();
-  const isList = props.mode === "list";
   const showSpinner = props.loading && props.rows.length === 0;
-  const emptyMessage =
-    ("emptyMessage" in props ? props.emptyMessage : undefined) ??
-    t("terminology.codelist.empty");
+  const emptyMessage = props.emptyMessage ?? t("terminology.codelist.empty");
 
   if (props.error && props.rows.length === 0) {
     return (
@@ -105,8 +86,8 @@ export function CodeListTable(props: CodeListTableProps) {
               <TableCell>
                 {t("terminology.codelist.field.descriptions")}
               </TableCell>
-              <TableCell sx={{ width: isList ? 140 : 64 }} align="right">
-                {isList && props.canMutate ? (
+              <TableCell sx={{ width: 110 }} align="right">
+                {props.canMutate ? (
                   <Tooltip
                     title={t("terminology.codelist.create.title")}
                   >
@@ -157,20 +138,6 @@ export function CodeListTable(props: CodeListTableProps) {
                     >
                       {props.canMutate && (
                         <Tooltip
-                          title={t("terminology.codelist.edit.title")}
-                        >
-                          <IconButton
-                            size="small"
-                            aria-label={t("terminology.codelist.edit.title")}
-                            onClick={() => props.onEdit(row)}
-                            disabled={disabled}
-                          >
-                            <EditIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      {isList && props.canMutate && (
-                        <Tooltip
                           title={t("terminology.codelist.field.code")}
                         >
                           <IconButton
@@ -183,7 +150,7 @@ export function CodeListTable(props: CodeListTableProps) {
                           </IconButton>
                         </Tooltip>
                       )}
-                      {isList && props.canMutate && (
+                      {props.canMutate && (
                         <Tooltip
                           title={t(
                             "terminology.action.delete.confirmTitle",
