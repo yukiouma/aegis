@@ -11,6 +11,7 @@ use async_trait::async_trait;
 
 use apis::terminology::TerminologyKind as ApiKind;
 use apis::terminology::{
+    BatchCodeItemEntry, BatchCreateCodeItemsRequest, BatchCreateCodeItemsResponse as ApiBatchResp,
     CodeItemSearchHit as ApiCodeItemSearchHit, CodeItemSearchQuery as ApiCodeItemSearchQuery,
     CodeItemView, CodeListSearchHit as ApiCodeListSearchHit,
     CodeListSearchQuery as ApiCodeListSearchQuery, CodeListView, CreateCodeItemRequest,
@@ -24,8 +25,9 @@ use crate::domain::{
     TerminologyKind, TerminologyVersionRepository,
 };
 use crate::usecase::{
-    CodeItemView as InternalCodeItemView, CodeListView as InternalCodeListView, CreateCodeItem,
-    CreateCodeList, CreateTerminologyVersion, TerminologyUsecase, TerminologyUsecaseConfig,
+    BatchCreateCodeItems, BatchCreateCodeItemsResponse as InternalBatchResp, CodeItemView as InternalCodeItemView,
+    CodeListView as InternalCodeListView, CreateCodeItem, CreateCodeList,
+    CreateTerminologyVersion, TerminologyUsecase, TerminologyUsecaseConfig,
     TerminologyVersionView as InternalTerminologyVersionView, UpdateCodeItem, UpdateCodeList,
     UpdateTerminologyVersion, UsecaseError,
 };
@@ -398,5 +400,38 @@ where
                 item: code_item_view_from_internal(h.item.into()),
             })
             .collect())
+    }
+
+    async fn batch_create_code_items(
+        &self,
+        req: BatchCreateCodeItemsRequest,
+    ) -> Result<ApiBatchResp, TerminologyApiError> {
+        let cmd = BatchCreateCodeItems {
+            codelist_id: req.codelist_id,
+            version_id: req.version_id,
+            items: req
+                .items
+                .into_iter()
+                .map(|e| CreateCodeItem {
+                    codelist_id: req.codelist_id,
+                    version_id: req.version_id,
+                    code: e.code,
+                    submission_value: e.submission_value,
+                    synonym: e.synonym,
+                    definition: e.definition,
+                    nci_preferred_term: e.nci_preferred_term,
+                })
+                .collect(),
+        };
+        let resp = self
+            .usecase
+            .batch_create_code_items(cmd)
+            .await
+            .map_err(TerminologyApiError::from)?;
+        Ok(ApiBatchResp {
+            count: resp.count,
+            codelist_id: resp.codelist_id,
+            version_id: resp.version_id,
+        })
     }
 }
