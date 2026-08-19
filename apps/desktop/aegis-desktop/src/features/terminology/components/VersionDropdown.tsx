@@ -14,16 +14,6 @@ export interface VersionDropdownProps {
   disabled?: boolean;
 }
 
-/**
- * `<Select>` of terminology versions filtered by `kind`. Disabled
- * with helper text when the filtered list is empty; the parent
- * page renders the empty-state message in the table area.
- *
- * The label is rendered as a sibling `<InputLabel>` (no `label` prop
- * on `<Select>`) so MUI's FormControl automatically notches the
- * label up to the top edge once a value is selected, instead of
- * overlapping the chosen text in the middle of the field.
- */
 export function VersionDropdown({
   kind,
   versions,
@@ -43,6 +33,7 @@ export function VersionDropdown({
       <InputLabel id={`version-label-${kind}`}>{labelText}</InputLabel>
       <Select<number | null>
         labelId={`version-label-${kind}`}
+        label={labelText}
         value={value ?? ""}
         onChange={(e) =>
           onChange(

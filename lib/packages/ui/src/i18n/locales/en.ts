@@ -152,7 +152,7 @@ export const en = {
   'terminology.heading': 'Terminology — {kind}',
   'terminology.detail.heading': 'Terminology — {kind} › {code}',
   'terminology.version.placeholder': 'No versions yet',
-  'terminology.version.helper': 'Select a terminology version',
+  'terminology.version.helper': 'Terminology Version',
   'terminology.extensible': 'Extensible',
   'terminology.importComingSoon': 'Terminology import is coming soon',
 

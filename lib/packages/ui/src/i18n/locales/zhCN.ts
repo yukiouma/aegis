@@ -150,7 +150,7 @@ export const zhCN = {
   'terminology.heading': '术语 — {kind}',
   'terminology.detail.heading': '术语 — {kind} › {code}',
   'terminology.version.placeholder': '暂无版本',
-  'terminology.version.helper': '选择术语版本',
+  'terminology.version.helper': '术语版本',
   'terminology.extensible': '可扩展',
   'terminology.importComingSoon': '术语导入功能即将上线',
 
