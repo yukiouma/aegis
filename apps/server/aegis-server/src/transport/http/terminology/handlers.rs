@@ -402,6 +402,52 @@ pub async fn create_code_item(
     Ok((StatusCode::CREATED, Json(view.into())))
 }
 
+/// `POST /api/terminology/code-items/batch` — create several code items
+/// in a single SQL statement.
+#[utoipa::path(
+    post, path = "/code-items/batch", tag = "terminology",
+    operation_id = "terminology_batch_create_code_items",
+    request_body = dto::BatchCreateCodeItemsRequest,
+    responses(
+        (status = 201, description = "Items created", body = dto::BatchCreateCodeItemsResponse),
+        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 403, description = "Admin or root required", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
+    ),
+    security(("BearerAuth" = [])),
+)]
+pub async fn batch_create_code_items(
+    State(state): State<AppState>,
+    claims: AuthClaims,
+    Json(req): Json<dto::BatchCreateCodeItemsRequest>,
+) -> Result<(StatusCode, Json<dto::BatchCreateCodeItemsResponse>), ApiError> {
+    require_admin_or_root(&claims)?;
+    let resp = state
+        .terminology
+        .batch_create_code_items(apis::terminology::BatchCreateCodeItemsRequest {
+            codelist_id: req.codelist_id,
+            version_id: req.version_id,
+            items: req
+                .items
+                .into_iter()
+                .map(|e| apis::terminology::BatchCodeItemEntry {
+                    code: e.code,
+                    submission_value: e.submission_value,
+                    synonym: e.synonym,
+                    definition: e.definition,
+                    nci_preferred_term: e.nci_preferred_term,
+                })
+                .collect(),
+        })
+        .await?;
+    Ok((StatusCode::CREATED, Json(dto::BatchCreateCodeItemsResponse {
+        count: resp.count,
+        codelist_id: resp.codelist_id,
+        version_id: resp.version_id,
+    })))
+}
+
 /// `GET /api/terminology/code-items?codelist_id=…` — list items in a
 /// codelist.
 #[utoipa::path(

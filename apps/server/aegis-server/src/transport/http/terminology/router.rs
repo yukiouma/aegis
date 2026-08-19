@@ -31,6 +31,7 @@ pub fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(handlers::search_code_lists))
         // ---- CodeItem ----
         .routes(routes!(handlers::create_code_item))
+        .routes(routes!(handlers::batch_create_code_items))
         .routes(routes!(handlers::list_code_items))
         .routes(routes!(handlers::list_code_items_by_version_and_code))
         .routes(routes!(handlers::update_code_item))
