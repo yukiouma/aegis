@@ -699,6 +699,25 @@ async fn create_code_list_rejects_duplicate_version_and_code() {
 }
 
 #[tokio::test]
+async fn get_code_list_by_id_returns_seeded_codelist() {
+    let svc = service();
+    let v = svc.create_version(create_version_req("v1")).await.unwrap();
+    let created = svc
+        .create_code_list(create_code_list_req(v.id, "C66741"))
+        .await
+        .unwrap();
+    let fetched = svc.get_code_list_by_id(created.id).await.unwrap();
+    assert_eq!(fetched, created);
+}
+
+#[tokio::test]
+async fn get_code_list_by_id_returns_not_found_for_unknown_id() {
+    let svc = service();
+    let err = svc.get_code_list_by_id(999).await.unwrap_err();
+    assert!(matches!(err, TerminologyApiError::NotFound));
+}
+
+#[tokio::test]
 async fn list_code_lists_returns_codelists_owned_by_version() {
     let svc = service();
     let v1 = svc.create_version(create_version_req("v1")).await.unwrap();

@@ -861,6 +861,26 @@ mod tests {
         }
     }
 
+    fn sample_code_list_view(id: i64) -> apis::terminology::CodeListView {
+        apis::terminology::CodeListView {
+            id,
+            version_id: 1,
+            code: format!("C{id}"),
+            extensible: true,
+            name: format!("codelist {id}"),
+            submission_value: format!("C{id}"),
+            synonym: String::new(),
+            definition: String::new(),
+            nci_preferred_term: String::new(),
+            created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+            updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        }
+    }
+
     /// Minimal `TerminologyService` for router-integration tests.
     /// Returns a single-version list from `list_versions`, a single
     /// version from `get_version_by_id` / `create_version` /
@@ -931,6 +951,13 @@ mod tests {
         ) -> Result<Vec<apis::terminology::CodeListView>, apis::terminology::TerminologyApiError>
         {
             unimplemented!()
+        }
+        async fn get_code_list_by_id(
+            &self,
+            id: i64,
+        ) -> Result<apis::terminology::CodeListView, apis::terminology::TerminologyApiError>
+        {
+            Ok(sample_code_list_view(id))
         }
         async fn update_code_list(
             &self,

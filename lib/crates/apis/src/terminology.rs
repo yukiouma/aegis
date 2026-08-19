@@ -256,6 +256,12 @@ pub trait TerminologyService: Send + Sync {
         req: CreateCodeListRequest,
     ) -> Result<CodeListView, TerminologyApiError>;
 
+    /// Look up a codelist by its surrogate id.
+    async fn get_code_list_by_id(
+        &self,
+        id: i64,
+    ) -> Result<CodeListView, TerminologyApiError>;
+
     /// List every codelist owned by the given version. Order is
     /// backend-defined.
     async fn list_code_lists(

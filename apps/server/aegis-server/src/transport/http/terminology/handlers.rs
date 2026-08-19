@@ -233,6 +233,30 @@ pub async fn list_code_lists(
     Ok(Json(dto::CodeListListResponse { codelists }))
 }
 
+/// `GET /api/terminology/code-lists/{id}` — fetch a codelist by id.
+#[utoipa::path(
+    get, path = "/code-lists/{id}", tag = "terminology",
+    operation_id = "terminology_get_code_list_by_id",
+    params(
+        ("id" = i64, Path, description = "Codelist id"),
+    ),
+    responses(
+        (status = 200, description = "Codelist found", body = dto::CodeListViewResponse),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 404, description = "Codelist not found", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
+    ),
+    security(("BearerAuth" = [])),
+)]
+pub async fn get_code_list_by_id(
+    State(state): State<AppState>,
+    _claims: AuthClaims,
+    Path(dto::PathId { id }): Path<dto::PathId>,
+) -> Result<Json<dto::CodeListViewResponse>, ApiError> {
+    let view = state.terminology.get_code_list_by_id(id).await?;
+    Ok(Json(view.into()))
+}
+
 /// `PATCH /api/terminology/code-lists/{id}` — partial update of a
 /// codelist.
 #[utoipa::path(

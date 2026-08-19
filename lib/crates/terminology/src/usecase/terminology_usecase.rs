@@ -124,6 +124,11 @@ where
         Ok(cl.into())
     }
 
+    pub async fn get_code_list_by_id(&self, id: i64) -> Result<CodeListView, UsecaseError> {
+        let cl = self.code_list_repo.find_by_id(id).await?;
+        Ok(cl.into())
+    }
+
     pub async fn list_code_lists(
         &self,
         version_id: i64,
