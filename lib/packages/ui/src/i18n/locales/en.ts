@@ -144,4 +144,61 @@ export const en = {
   'workspace.configuration.heading': 'Configuration — {projectCode}',
   'workspace.placeholder': 'Coming soon',
   'workspace.focusMain': 'Back to main',
+
+  'nav.terminology': 'Terminology',
+  'nav.terminology.sdtm': 'SDTM',
+  'nav.terminology.adam': 'ADaM',
+
+  'terminology.heading': 'Terminology — {kind}',
+  'terminology.detail.heading': 'Terminology — {kind} › {code}',
+  'terminology.version.placeholder': 'No versions yet',
+  'terminology.version.helper': 'Select a terminology version',
+  'terminology.extensible': 'Extensible',
+  'terminology.importComingSoon': 'Terminology import is coming soon',
+
+  'terminology.codelist.search.placeholder':
+    'Search by code, name, submission value, or description',
+  'terminology.codelist.field.code': 'Code',
+  'terminology.codelist.field.name': 'Name',
+  'terminology.codelist.field.submissionValue': 'Submission value',
+  'terminology.codelist.field.descriptions': 'Descriptions',
+  'terminology.codelist.field.extensible': 'Extensible',
+  'terminology.codelist.field.synonym': 'Synonym',
+  'terminology.codelist.field.definition': 'Definition',
+  'terminology.codelist.field.nciPreferredTerm': 'NCI preferred term',
+  'terminology.codelist.empty': 'No code lists in this version',
+  'terminology.codelist.noMatches': 'No matching code lists',
+  'terminology.codelist.loadFailed': 'Failed to load code lists: {message}',
+  'terminology.codelist.create.title': 'Create code list',
+  'terminology.codelist.edit.title': 'Edit code list',
+  'terminology.codelist.action.create': 'Create',
+  'terminology.codelist.action.save': 'Save',
+  'terminology.codelist.readOnly': 'Read-only',
+
+  'terminology.codeitem.search.placeholder':
+    'Search by code, submission value, or description',
+  'terminology.codeitem.field.code': 'Code',
+  'terminology.codeitem.field.submissionValue': 'Submission value',
+  'terminology.codeitem.field.descriptions': 'Descriptions',
+  'terminology.codeitem.field.synonym': 'Synonym',
+  'terminology.codeitem.field.definition': 'Definition',
+  'terminology.codeitem.field.nciPreferredTerm': 'NCI preferred term',
+  'terminology.codeitem.empty': 'No code items in this code list',
+  'terminology.codeitem.noMatches': 'No matching code items',
+  'terminology.codeitem.loadFailed': 'Failed to load code items: {message}',
+  'terminology.codeitem.create.title': 'Create code item',
+  'terminology.codeitem.edit.title': 'Edit code item',
+  'terminology.codeitem.action.create': 'Create',
+  'terminology.codeitem.action.save': 'Save',
+  'terminology.codeitem.readOnly': 'Read-only',
+
+  'terminology.action.delete.confirmTitle': 'Delete code list',
+  'terminology.action.delete.confirmMessage':
+    'Delete this code list and all of its items? This cannot be undone.',
+  'terminology.codeitem.action.delete.confirmTitle': 'Delete code item',
+  'terminology.codeitem.action.delete.confirmMessage':
+    'Delete this code item? This cannot be undone.',
+
+  'common.confirm': 'Confirm',
+  'common.back': 'Back',
 } as const;
