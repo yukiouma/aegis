@@ -147,7 +147,6 @@ export const zhCN = {
   'nav.terminology.sdtm': 'SDTM',
   'nav.terminology.adam': 'ADaM',
 
-  'terminology.heading': '术语 — {kind}',
   'terminology.detail.heading': '术语 — {kind} › {code}',
   'terminology.version.placeholder': '暂无版本',
   'terminology.version.helper': '术语版本',

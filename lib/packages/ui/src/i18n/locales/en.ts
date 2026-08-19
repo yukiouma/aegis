@@ -149,7 +149,6 @@ export const en = {
   'nav.terminology.sdtm': 'SDTM',
   'nav.terminology.adam': 'ADaM',
 
-  'terminology.heading': 'Terminology — {kind}',
   'terminology.detail.heading': 'Terminology — {kind} › {code}',
   'terminology.version.placeholder': 'No versions yet',
   'terminology.version.helper': 'Terminology Version',

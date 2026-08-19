@@ -8,7 +8,6 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  Typography,
 } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
 
@@ -105,10 +104,6 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
 
   return (
     <Box sx={{ p: 4, display: "flex", flexDirection: "column", gap: 2 }}>
-      <Typography variant="h4" gutterBottom>
-        {t("terminology.heading", { kind: kind.toUpperCase() })}
-      </Typography>
-
       <Box
         sx={{
           display: "flex",

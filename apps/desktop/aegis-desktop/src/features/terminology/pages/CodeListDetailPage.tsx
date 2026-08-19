@@ -14,6 +14,10 @@ import {
   DialogContentText,
   DialogTitle,
   IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableRow,
   Tooltip,
   Typography,
 } from "@aegis/ui/mui";
@@ -114,83 +118,77 @@ export function CodeListDetailPage() {
 
   return (
     <Box sx={{ p: 4, display: "flex", flexDirection: "column", gap: 2 }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <Tooltip title={t("common.back")}>
-          <span>
-            <IconButton
-              onClick={() => navigate({ to: backLink })}
-              disabled={!backLink}
-              aria-label={t("common.back")}
-            >
-              <ArrowBackIcon />
-            </IconButton>
-          </span>
-        </Tooltip>
-        <Typography variant="h6">
-          {codelist
-            ? t("terminology.detail.heading", {
-                kind: kind.toUpperCase(),
-                code: codelist.code,
-              })
-            : t("terminology.heading", { kind: kind.toUpperCase() })}
-        </Typography>
-      </Box>
-
-      {error && !codelist && (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-          <Alert severity="error">
-            {t("terminology.codeitem.loadFailed", {
-              message: errorMessage(error),
-            })}
-          </Alert>
-          <Box>
-            <Button onClick={() => navigate({ to: backLink })}>
-              {t("common.back")}
-            </Button>
-          </Box>
-        </Box>
-      )}
-
-      {codelist && (
-        <Box
-          sx={{
-            display: "flex",
-            alignItems: "center",
-            gap: 2,
-            flexWrap: "wrap",
-          }}
-        >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-              {codelist.code}
-            </Typography>
-            {codelist.extensible && (
-              <Tooltip title={t("terminology.extensible")}>
-                <Chip label="EXT" size="small" />
+      <Table size="small">
+        <TableBody>
+          <TableRow>
+            <TableCell sx={{ width: 48 }}>
+              <Tooltip title={t("common.back")}>
+                <span>
+                  <IconButton
+                    onClick={() => navigate({ to: backLink })}
+                    disabled={!backLink}
+                    aria-label={t("common.back")}
+                  >
+                    <ArrowBackIcon />
+                  </IconButton>
+                </span>
               </Tooltip>
-            )}
-            <Typography variant="body2" color="textSecondary">
-              {codelist.name}
-            </Typography>
-          </Box>
-          <Typography variant="body2" color="textSecondary">
-            {t("terminology.codelist.field.submissionValue")}:{" "}
-            {codelist.submissionValue || "—"}
-          </Typography>
-          {canMutate && (
-            <Tooltip title={t("terminology.codelist.edit.title")}>
-              <IconButton
-                size="small"
-                aria-label={t("terminology.codelist.edit.title")}
-                onClick={() => setEditCodelistDrawerOpen(true)}
-                disabled={mutationLoading}
-              >
-                <EditIcon fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          )}
-        </Box>
-      )}
+            </TableCell>
+            {error && !codelist ? (
+              <TableCell colSpan={3}>
+                <Alert severity="error">
+                  {t("terminology.codeitem.loadFailed", {
+                    message: errorMessage(error),
+                  })}
+                </Alert>
+                <Box sx={{ mt: 1 }}>
+                  <Button onClick={() => navigate({ to: backLink })}>
+                    {t("common.back")}
+                  </Button>
+                </Box>
+              </TableCell>
+            ) : codelist ? (
+              <>
+                <TableCell>
+                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                      {codelist.code}
+                    </Typography>
+                    {codelist.extensible && (
+                      <Tooltip title={t("terminology.extensible")}>
+                        <Chip label="EXT" size="small" />
+                      </Tooltip>
+                    )}
+                    <Typography variant="body2" color="textSecondary">
+                      {codelist.name}
+                    </Typography>
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ color: "text.secondary" }}>
+                  <Typography variant="body2">
+                    {t("terminology.codelist.field.submissionValue")}:{" "}
+                    {codelist.submissionValue || "—"}
+                  </Typography>
+                </TableCell>
+                <TableCell sx={{ width: 64 }} align="right">
+                  {canMutate && (
+                    <Tooltip title={t("terminology.codelist.edit.title")}>
+                      <IconButton
+                        size="small"
+                        aria-label={t("terminology.codelist.edit.title")}
+                        onClick={() => setEditCodelistDrawerOpen(true)}
+                        disabled={mutationLoading}
+                      >
+                        <EditIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  )}
+                </TableCell>
+              </>
+            ) : null}
+          </TableRow>
+        </TableBody>
+      </Table>
 
       <TermFilterBar
         query={search2}
