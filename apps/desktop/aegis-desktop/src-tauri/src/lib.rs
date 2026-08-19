@@ -59,6 +59,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::terminology::code_item::update_code_item,
             commands::terminology::code_item::delete_code_item,
             commands::terminology::code_item::search_code_items,
+            commands::terminology::import::import_terminology,
             // health
             commands::healthz::healthz,
             // legacy greet (kept for the existing test)
