@@ -6,6 +6,7 @@ import { InfiniteScrollSentinel } from "../../../shared/components/InfiniteScrol
 
 let observers: Array<{
   cb: IntersectionObserverCallback;
+  options: IntersectionObserverInit | undefined;
   observe: ReturnType<typeof vi.fn>;
   unobserve: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
@@ -15,11 +16,16 @@ beforeEach(() => {
   observers = [];
   const fakeObserver = class {
     cb: IntersectionObserverCallback;
+    options: IntersectionObserverInit | undefined;
     observe = vi.fn();
     unobserve = vi.fn();
     disconnect = vi.fn();
-    constructor(cb: IntersectionObserverCallback) {
+    constructor(
+      cb: IntersectionObserverCallback,
+      options?: IntersectionObserverInit,
+    ) {
       this.cb = cb;
+      this.options = options;
       observers.push(this);
     }
   };
@@ -78,5 +84,34 @@ describe("InfiniteScrollSentinel", () => {
     const observer = observers[0];
     rerender(<InfiniteScrollSentinel onIntersect={onIntersect} hasMore={false} loading={false} />);
     expect(observer.disconnect).toHaveBeenCalled();
+  });
+
+  it("forwards root to IntersectionObserver when root is provided", () => {
+    const root = document.createElement("div");
+    const onIntersect = vi.fn();
+    render(
+      <InfiniteScrollSentinel
+        onIntersect={onIntersect}
+        hasMore
+        loading={false}
+        root={root}
+      />,
+    );
+    expect(observers).toHaveLength(1);
+    expect(observers[0].options?.root).toBe(root);
+  });
+
+  it("does not create an observer when root is null even if hasMore is true", () => {
+    const onIntersect = vi.fn();
+    render(
+      <InfiniteScrollSentinel
+        onIntersect={onIntersect}
+        hasMore
+        loading={false}
+        root={null}
+      />,
+    );
+    expect(observers).toHaveLength(0);
+    expect(onIntersect).not.toHaveBeenCalled();
   });
 });
