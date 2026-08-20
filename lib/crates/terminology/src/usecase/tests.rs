@@ -547,8 +547,17 @@ async fn create_code_list_then_list_by_version_round_trip() {
         })
         .await
         .expect("create");
-    let listed = usecase.list_code_lists(7).await.expect("list");
-    assert!(listed.iter().any(|c| c.id == created.id));
+    let page = usecase
+        .list_code_lists(CodeListListQuery {
+            version_id: 7,
+            fragment: None,
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .expect("list");
+    assert!(page.items.iter().any(|c| c.id == created.id));
+    assert_eq!(page.next_offset, None);
 }
 
 #[tokio::test]
@@ -580,21 +589,210 @@ async fn update_code_list_applies_partial_changes() {
 }
 
 #[tokio::test]
-async fn search_code_lists_clamps_limit_to_default_when_zero() {
-    // The clamping happens before the repo is touched, so we
-    // cannot observe it directly through `search_code_lists`.
-    // Instead, this test exercises that the search does not
-    // panic on a zero-limit and that the fake returns empty.
+async fn list_code_lists_with_fragment_filters_to_matches() {
     let (_, _, _, usecase) = make_usecase();
-    let hits = usecase
-        .search_code_lists(CodeListSearchQuery {
-            version_id: 1,
-            fragment: "age".into(),
-            limit: 0,
+
+    // Create two codelists, one with "AGE" in its name, one with
+    // "SEX". Both live under the same version.
+    let v = usecase
+        .create_version(CreateTerminologyVersion {
+            kind: TerminologyKind::Sdtm,
+            name: "v-age-sex".into(),
+        })
+        .await
+        .expect("v");
+    let age = usecase
+        .create_code_list(CreateCodeList {
+            version_id: v.id,
+            code: "C66741".into(),
+            extensible: true,
+            name: "AGE".into(),
+            submission_value: "AGE".into(),
+            synonym: "".into(),
+            definition: "".into(),
+            nci_preferred_term: "".into(),
+        })
+        .await
+        .expect("age");
+    let sex = usecase
+        .create_code_list(CreateCodeList {
+            version_id: v.id,
+            code: "C66732".into(),
+            extensible: true,
+            name: "SEX".into(),
+            submission_value: "SEX".into(),
+            synonym: "".into(),
+            definition: "".into(),
+            nci_preferred_term: "".into(),
+        })
+        .await
+        .expect("sex");
+
+    let page = usecase
+        .list_code_lists(CodeListListQuery {
+            version_id: v.id,
+            fragment: Some("AGE".into()),
+            offset: 0,
+            limit: 50,
         })
         .await
         .expect("search");
-    assert!(hits.is_empty());
+    let ids: Vec<i64> = page.items.iter().map(|c| c.id).collect();
+    assert_eq!(ids, vec![age.id], "AGE fragment matches only AGE");
+    assert_eq!(page.next_offset, None);
+
+    // Empty fragment is treated as "no filter" and returns both.
+    let page = usecase
+        .list_code_lists(CodeListListQuery {
+            version_id: v.id,
+            fragment: Some(String::new()),
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .expect("empty fragment");
+    let mut ids: Vec<i64> = page.items.iter().map(|c| c.id).collect();
+    ids.sort();
+    assert_eq!(ids, vec![age.id, sex.id]);
+
+    // Whitespace-only fragment likewise falls through to "no filter".
+    let page = usecase
+        .list_code_lists(CodeListListQuery {
+            version_id: v.id,
+            fragment: Some("   ".into()),
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .expect("whitespace fragment");
+    assert_eq!(page.items.len(), 2);
+}
+
+#[tokio::test]
+async fn list_code_lists_pagination_signals_next_offset_and_terminates() {
+    let (_, _, _, usecase) = make_usecase();
+    let v = usecase
+        .create_version(CreateTerminologyVersion {
+            kind: TerminologyKind::Sdtm,
+            name: "v-page".into(),
+        })
+        .await
+        .expect("v");
+    // 5 codelists under v.
+    for i in 0..5 {
+        usecase
+            .create_code_list(CreateCodeList {
+                version_id: v.id,
+                code: format!("C{i}"),
+                extensible: false,
+                name: format!("LIST{i}"),
+                submission_value: format!("LIST{i}"),
+                synonym: "".into(),
+                definition: "".into(),
+                nci_preferred_term: "".into(),
+            })
+            .await
+            .expect("create");
+    }
+
+    // Page 1: limit=2 → 2 items + nextOffset = 2.
+    let page1 = usecase
+        .list_code_lists(CodeListListQuery {
+            version_id: v.id,
+            fragment: None,
+            offset: 0,
+            limit: 2,
+        })
+        .await
+        .expect("page 1");
+    assert_eq!(page1.items.len(), 2);
+    assert_eq!(page1.next_offset, Some(2));
+
+    // Page 2: offset=2, limit=2 → 2 items + nextOffset = 4.
+    let page2 = usecase
+        .list_code_lists(CodeListListQuery {
+            version_id: v.id,
+            fragment: None,
+            offset: 2,
+            limit: 2,
+        })
+        .await
+        .expect("page 2");
+    assert_eq!(page2.items.len(), 2);
+    assert_eq!(page2.next_offset, Some(4));
+
+    // Page 3: offset=4, limit=2 → 1 item, no nextOffset (terminator).
+    let page3 = usecase
+        .list_code_lists(CodeListListQuery {
+            version_id: v.id,
+            fragment: None,
+            offset: 4,
+            limit: 2,
+        })
+        .await
+        .expect("page 3");
+    assert_eq!(page3.items.len(), 1);
+    assert_eq!(page3.next_offset, None);
+}
+
+#[tokio::test]
+async fn list_code_lists_rejects_fragment_with_reserved_tsquery_chars() {
+    let (_, _, _, usecase) = make_usecase();
+    for bad in ["a&b", "a|b", "a!b", "a(b", "a)b", "a:b"] {
+        let err = usecase
+            .list_code_lists(CodeListListQuery {
+                version_id: 1,
+                fragment: Some(bad.into()),
+                offset: 0,
+                limit: 50,
+            })
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, UsecaseError::Validation(DomainError::InvalidFragment)),
+            "fragment {bad:?} should be rejected with InvalidFragment, got {err:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn list_code_lists_clamps_limit_to_max_when_excessive() {
+    // limit=0 → server default 50; limit=u32::MAX → clamped to 500.
+    let (_, _, _, usecase) = make_usecase();
+    let v = usecase
+        .create_version(CreateTerminologyVersion {
+            kind: TerminologyKind::Sdtm,
+            name: "v-clamp".into(),
+        })
+        .await
+        .expect("v");
+    // Create a few rows so we can confirm the clamp doesn't zero the page.
+    for i in 0..3 {
+        usecase
+            .create_code_list(CreateCodeList {
+                version_id: v.id,
+                code: format!("C{i}"),
+                extensible: false,
+                name: format!("N{i}"),
+                submission_value: "".into(),
+                synonym: "".into(),
+                definition: "".into(),
+                nci_preferred_term: "".into(),
+            })
+            .await
+            .expect("create");
+    }
+    let page = usecase
+        .list_code_lists(CodeListListQuery {
+            version_id: v.id,
+            fragment: None,
+            offset: 0,
+            limit: u32::MAX,
+        })
+        .await
+        .expect("clamp");
+    assert_eq!(page.items.len(), 3);
+    assert_eq!(page.next_offset, None);
 }
 
 #[tokio::test]
@@ -633,8 +831,17 @@ async fn create_code_item_round_trip_then_list_by_codelist() {
         })
         .await
         .expect("create");
-    let listed = usecase.list_code_items(9).await.expect("list");
-    assert!(listed.iter().any(|i| i.id == created.id));
+    let page = usecase
+        .list_code_items(CodeItemListQuery {
+            codelist_id: 9,
+            fragment: None,
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .expect("list");
+    assert!(page.items.iter().any(|i| i.id == created.id));
+    assert_eq!(page.next_offset, None);
 }
 
 #[tokio::test]
