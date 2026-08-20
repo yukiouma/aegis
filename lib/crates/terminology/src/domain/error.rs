@@ -10,9 +10,6 @@ pub enum DomainError {
     #[error("code must not be empty")]
     EmptyCode,
 
-    #[error("search fragment must not be empty")]
-    EmptyFragment,
-
     #[error("invalid terminology kind: {0}")]
     InvalidKind(String),
 
@@ -30,6 +27,11 @@ pub enum DomainError {
 
     #[error("code at position {0} must not be empty")]
     EmptyCodeAtPosition(usize),
+
+    /// Search fragment contained characters reserved by Postgres
+    /// `to_tsquery` (`& | ! ( ) :`).
+    #[error("search fragment contains reserved tsquery characters: & | ! ( ) :")]
+    InvalidFragment,
 
     #[error("terminology version already exists for {kind:?} / {name}")]
     DuplicateVersion { kind: TerminologyKind, name: String },

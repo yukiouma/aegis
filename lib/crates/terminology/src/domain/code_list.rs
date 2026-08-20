@@ -130,27 +130,19 @@ pub struct CodeListUpdate {
     pub nci_preferred_term: Option<String>,
 }
 
-/// Query for `CodeListRepository::search`. Search is scoped to a
-/// single `version_id` so callers cannot accidentally cross-
-/// releases; `fragment` is matched against the row's `tsv` (a
-/// generated tsvector over the five text columns — see migration
-/// 0002). The Postgres backend uses
-/// `tsv @@ plainto_tsquery('english', $fragment)`, which gives
-/// stemming + stopword removal and uses the existing GIN(tsv)
-/// index; the in-memory backend does a case-insensitive fragment
-/// match against the same five fields.
+/// Query for `CodeListRepository::search_or_list`. Unifies list and
+/// search under a single signature: `fragment = None` is a plain
+/// `ORDER BY id ASC` list; `fragment = Some(_)` is a FTS query with
+/// `ts_rank DESC, id ASC` ordering. Pagination is offset/limit and
+/// `next_offset` in the response is `Some(offset + limit)` while more
+/// rows remain.
 #[derive(Debug, Clone)]
-pub struct CodeListSearchQuery {
+pub struct CodeListListQuery {
     pub version_id: i64,
-    pub fragment: String,
-    /// Default 50. Hard cap 500 (clamped, not rejected).
+    /// None or `Some("")` means "no fragment" (plain list path).
+    pub fragment: Option<String>,
+    pub offset: u32,
+    /// 0 means "use the usecase default (50)". The usecase clamps
+    /// to 50 / 500 before reaching the repo.
     pub limit: u32,
-}
-
-/// One hit from `CodeListRepository::search`. Order is
-/// implementation-defined (Postgres: descending `ts_rank`;
-/// in-memory: insertion order).
-#[derive(Debug, Clone, PartialEq)]
-pub struct CodeListSearchHit {
-    pub codelist: CodeList,
 }

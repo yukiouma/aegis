@@ -16,8 +16,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use sqlx::PgPool;
 use terminology::{
-    CodeItem, CodeItemNew, CodeItemRepo, CodeItemRepository, CodeList, CodeListNew, CodeListRepo,
-    CodeListRepository, CodeListSearchQuery, CreateTerminologyVersion, DomainError,
+    CodeItem, CodeItemNew, CodeItemRepo, CodeItemRepository, CodeList, CodeListListQuery,
+    CodeListNew, CodeListRepo, CodeListRepository, CreateTerminologyVersion, DomainError,
     TerminologyKind, TerminologyUsecase, TerminologyUsecaseConfig, TerminologyVersion,
     TerminologyVersionNew, TerminologyVersionRepo, TerminologyVersionRepository,
 };
@@ -182,7 +182,7 @@ async fn delete_version_cascades_to_children() {
 
 #[tokio::test]
 #[ignore = "requires AEGIS_TERMINOLOGY_DATABASE_URL"]
-async fn search_code_lists_ranks_hits() {
+async fn list_code_lists_paginates_across_multiple_pages() {
     with_pool(|pool| async move {
         let v_repo = TerminologyVersionRepo::new(pool.clone());
         let l_repo = CodeListRepo::new(pool.clone());
@@ -190,57 +190,78 @@ async fn search_code_lists_ranks_hits() {
         let v = v_repo
             .create(TerminologyVersionNew {
                 kind: TerminologyKind::Sdtm,
-                name: unique("search-v"),
+                name: unique("page-v"),
             })
             .await
             .expect("version");
 
-        l_repo
-            .create(CodeListNew {
+        for i in 0..7 {
+            l_repo
+                .create(CodeListNew {
+                    version_id: v.id,
+                    code: format!("page-cl-{i}"),
+                    extensible: true,
+                    name: format!("Codelist {i}"),
+                    submission_value: format!("SV{i}"),
+                    synonym: "".into(),
+                    definition: "".into(),
+                    nci_preferred_term: "".into(),
+                })
+                .await
+                .expect("create");
+        }
+
+        // page 1
+        let p1 = l_repo
+            .search_or_list(CodeListListQuery {
                 version_id: v.id,
-                code: unique("age-cl"),
-                extensible: true,
-                name: "AGE".into(),
-                submission_value: "AGE".into(),
-                synonym: "Age group".into(),
-                definition: "Subject age".into(),
-                nci_preferred_term: "Age".into(),
+                fragment: None,
+                offset: 0,
+                limit: 3,
             })
             .await
-            .expect("age cl");
+            .expect("page 1");
+        assert_eq!(p1.items.len(), 3);
+        assert_eq!(p1.next_offset, Some(3));
 
-        l_repo
-            .create(CodeListNew {
+        // page 2
+        let p2 = l_repo
+            .search_or_list(CodeListListQuery {
                 version_id: v.id,
-                code: unique("sex-cl"),
-                extensible: true,
-                name: "SEX".into(),
-                submission_value: "SEX".into(),
-                synonym: "".into(),
-                definition: "Sex".into(),
-                nci_preferred_term: "Sex".into(),
+                fragment: None,
+                offset: 3,
+                limit: 3,
             })
             .await
-            .expect("sex cl");
+            .expect("page 2");
+        assert_eq!(p2.items.len(), 3);
+        assert_eq!(p2.next_offset, Some(6));
 
-        let hits = l_repo
-            .search(CodeListSearchQuery {
+        // page 3 (final, only 1 row)
+        let p3 = l_repo
+            .search_or_list(CodeListListQuery {
                 version_id: v.id,
-                fragment: "age".into(),
-                limit: 10,
+                fragment: None,
+                offset: 6,
+                limit: 3,
             })
             .await
-            .expect("search");
+            .expect("page 3");
+        assert_eq!(p3.items.len(), 1);
+        assert_eq!(p3.next_offset, None);
 
-        assert!(
-            !hits.is_empty(),
-            "expected at least one hit for `age` in version {}",
-            v.name
-        );
-        assert!(
-            hits.iter().any(|h| h.codelist.name == "AGE"),
-            "AGE row should be in the hits"
-        );
+        // offset >= total
+        let empty = l_repo
+            .search_or_list(CodeListListQuery {
+                version_id: v.id,
+                fragment: None,
+                offset: 100,
+                limit: 3,
+            })
+            .await
+            .expect("empty page");
+        assert!(empty.items.is_empty());
+        assert_eq!(empty.next_offset, None);
     })
     .await;
 }
@@ -408,6 +429,183 @@ async fn list_code_items_by_version_and_code_end_to_end() {
         // only filter by `(version_id, code_items.code)`.
         let _ = &age_code;
         let _ = &sex_code;
+    })
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires AEGIS_TERMINOLOGY_DATABASE_URL"]
+async fn list_code_items_paginates_across_multiple_pages() {
+    use terminology::CodeItemListQuery;
+    with_pool(|pool| async move {
+        let v_repo = TerminologyVersionRepo::new(pool.clone());
+        let l_repo = CodeListRepo::new(pool.clone());
+        let i_repo = CodeItemRepo::new(pool.clone());
+
+        let v = v_repo
+            .create(TerminologyVersionNew {
+                kind: TerminologyKind::Sdtm,
+                name: unique("item-page-v"),
+            })
+            .await
+            .expect("version");
+        let cl = l_repo
+            .create(CodeListNew {
+                version_id: v.id,
+                code: unique("item-page-cl"),
+                extensible: true,
+                name: "items".into(),
+                submission_value: "items".into(),
+                synonym: "".into(),
+                definition: "".into(),
+                nci_preferred_term: "".into(),
+            })
+            .await
+            .expect("codelist");
+
+        for i in 0..5 {
+            i_repo
+                .create(CodeItemNew {
+                    codelist_id: cl.id,
+                    version_id: v.id,
+                    code: format!("CI{i}"),
+                    submission_value: format!("SV{i}"),
+                    synonym: "".into(),
+                    definition: "".into(),
+                    nci_preferred_term: "".into(),
+                })
+                .await
+                .expect("create");
+        }
+
+        // Page 1: limit=2 → 2 items + nextOffset=2.
+        let p1 = i_repo
+            .search_or_list(CodeItemListQuery {
+                codelist_id: cl.id,
+                fragment: None,
+                offset: 0,
+                limit: 2,
+            })
+            .await
+            .expect("page 1");
+        assert_eq!(p1.items.len(), 2);
+        assert_eq!(p1.next_offset, Some(2));
+
+        // Page 2: offset=2, limit=2 → 2 items + nextOffset=4.
+        let p2 = i_repo
+            .search_or_list(CodeItemListQuery {
+                codelist_id: cl.id,
+                fragment: None,
+                offset: 2,
+                limit: 2,
+            })
+            .await
+            .expect("page 2");
+        assert_eq!(p2.items.len(), 2);
+        assert_eq!(p2.next_offset, Some(4));
+
+        // Page 3: offset=4, limit=2 → 1 item, no nextOffset.
+        let p3 = i_repo
+            .search_or_list(CodeItemListQuery {
+                codelist_id: cl.id,
+                fragment: None,
+                offset: 4,
+                limit: 2,
+            })
+            .await
+            .expect("page 3");
+        assert_eq!(p3.items.len(), 1);
+        assert_eq!(p3.next_offset, None);
+    })
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires AEGIS_TERMINOLOGY_DATABASE_URL"]
+async fn list_code_lists_with_fragment_uses_full_text_search() {
+    use terminology::CodeListListQuery;
+    with_pool(|pool| async move {
+        let v_repo = TerminologyVersionRepo::new(pool.clone());
+        let l_repo = CodeListRepo::new(pool.clone());
+
+        let v = v_repo
+            .create(TerminologyVersionNew {
+                kind: TerminologyKind::Sdtm,
+                name: unique("fts-v"),
+            })
+            .await
+            .expect("version");
+
+        let age = l_repo
+            .create(CodeListNew {
+                version_id: v.id,
+                code: unique("fts-age"),
+                extensible: true,
+                name: "AGE codelist".into(),
+                submission_value: "AGE".into(),
+                synonym: "".into(),
+                definition: "Subject age".into(),
+                nci_preferred_term: "Age".into(),
+            })
+            .await
+            .expect("age");
+        let sex = l_repo
+            .create(CodeListNew {
+                version_id: v.id,
+                code: unique("fts-sex"),
+                extensible: true,
+                name: "SEX codelist".into(),
+                submission_value: "SEX".into(),
+                synonym: "".into(),
+                definition: "Subject sex".into(),
+                nci_preferred_term: "Sex".into(),
+            })
+            .await
+            .expect("sex");
+
+        // Prefix-match: "ag" must hit AGE but not SEX. Postgres
+        // FTS uses the `tsv` column with a GIN index, so the
+        // adapter wraps the fragment in `{frag}:*`.
+        let page = l_repo
+            .search_or_list(CodeListListQuery {
+                version_id: v.id,
+                fragment: Some("ag".into()),
+                offset: 0,
+                limit: 50,
+            })
+            .await
+            .expect("search ag");
+        let ids: Vec<i64> = page.items.iter().map(|c| c.id).collect();
+        assert_eq!(ids, vec![age.id], "AG prefix hits AGE only");
+        assert_eq!(page.next_offset, None);
+
+        // Word fragment: "sex" hits SEX only.
+        let page = l_repo
+            .search_or_list(CodeListListQuery {
+                version_id: v.id,
+                fragment: Some("sex".into()),
+                offset: 0,
+                limit: 50,
+            })
+            .await
+            .expect("search sex");
+        let ids: Vec<i64> = page.items.iter().map(|c| c.id).collect();
+        assert_eq!(ids, vec![sex.id], "sex hits SEX only");
+        assert_eq!(page.next_offset, None);
+
+        // Empty fragment falls through to the plain list path.
+        let page = l_repo
+            .search_or_list(CodeListListQuery {
+                version_id: v.id,
+                fragment: Some(String::new()),
+                offset: 0,
+                limit: 50,
+            })
+            .await
+            .expect("empty fragment");
+        let mut ids: Vec<i64> = page.items.iter().map(|c| c.id).collect();
+        ids.sort();
+        assert_eq!(ids, vec![age.id, sex.id]);
     })
     .await;
 }

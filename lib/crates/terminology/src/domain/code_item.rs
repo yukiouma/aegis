@@ -105,18 +105,13 @@ pub struct CodeItemUpdate {
     pub nci_preferred_term: Option<String>,
 }
 
-/// Query for `CodeItemRepository::search`. Mirrors
-/// [`CodeListSearchQuery`].
+/// Query for `CodeItemRepository::search_or_list`. Mirrors
+/// [`CodeListListQuery`](super::code_list::CodeListListQuery) but
+/// scopes to a single `codelist_id` instead of a version.
 #[derive(Debug, Clone)]
-pub struct CodeItemSearchQuery {
-    pub version_id: i64,
-    pub fragment: String,
-    /// Default 50. Hard cap 500 (clamped, not rejected).
+pub struct CodeItemListQuery {
+    pub codelist_id: i64,
+    pub fragment: Option<String>,
+    pub offset: u32,
     pub limit: u32,
-}
-
-/// One hit from `CodeItemRepository::search`.
-#[derive(Debug, Clone, PartialEq)]
-pub struct CodeItemSearchHit {
-    pub item: CodeItem,
 }

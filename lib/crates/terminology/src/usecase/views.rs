@@ -93,7 +93,3 @@ pub struct BatchCreateCodeItemsResponse {
     pub codelist_id: i64,
     pub version_id: i64,
 }
-
-// Re-export the search-hit views so the usecase surface is one
-// `use terminology::*` away.
-pub use crate::domain::{CodeItemSearchHit, CodeListSearchHit};

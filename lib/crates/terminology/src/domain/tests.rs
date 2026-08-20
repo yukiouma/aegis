@@ -1,4 +1,4 @@
-use super::{CodeItem, CodeList, DomainError, TerminologyKind, TerminologyVersion};
+use super::{CodeItem, CodeList, DomainError, Page, TerminologyKind, TerminologyVersion};
 
 #[test]
 fn terminology_kind_parses_lowercase_strings() {
@@ -81,4 +81,20 @@ fn code_item_new_accepts_valid_input() {
     .unwrap();
     assert_eq!(item.code, "C12345");
     assert_eq!(item.version_id, 7);
+}
+
+#[test]
+fn page_struct_accepts_items_and_optional_next_offset() {
+    let p: Page<i32> = Page {
+        items: vec![1, 2, 3],
+        next_offset: Some(3),
+    };
+    assert_eq!(p.items, vec![1, 2, 3]);
+    assert_eq!(p.next_offset, Some(3));
+
+    let last: Page<i32> = Page {
+        items: vec![],
+        next_offset: None,
+    };
+    assert!(last.next_offset.is_none());
 }

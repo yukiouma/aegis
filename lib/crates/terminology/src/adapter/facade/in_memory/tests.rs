@@ -14,18 +14,17 @@ use chrono::{TimeZone, Utc};
 
 use apis::terminology::TerminologyKind as ApiKind;
 use apis::terminology::{
-    CodeItemSearchHit, CodeItemView, CodeListSearchHit, CodeListView, CreateCodeItemRequest,
-    CreateCodeListRequest, CreateTerminologyVersionRequest, TerminologyApiError,
-    TerminologyService, TerminologyVersionView, UpdateCodeItemRequest, UpdateCodeListRequest,
+    CodeItemView, CodeListView, CreateCodeItemRequest, CreateCodeListRequest,
+    CreateTerminologyVersionRequest, TerminologyApiError, TerminologyService,
+    TerminologyVersionView, UpdateCodeItemRequest, UpdateCodeListRequest,
     UpdateTerminologyVersionRequest,
 };
 
 use crate::domain::{
-    CodeItem, CodeItemNew, CodeItemRepository, CodeItemSearchHit as InternalCodeItemSearchHit,
-    CodeItemSearchQuery, CodeItemUpdate, CodeList, CodeListNew, CodeListRepository,
-    CodeListSearchHit as InternalCodeListSearchHit, CodeListSearchQuery, CodeListUpdate,
-    DomainError, TerminologyKind, TerminologyVersion, TerminologyVersionNew,
-    TerminologyVersionRepository, TerminologyVersionUpdate,
+    CodeItem, CodeItemListQuery, CodeItemNew, CodeItemRepository, CodeItemUpdate, CodeList,
+    CodeListListQuery, CodeListNew, CodeListRepository, CodeListUpdate, DomainError, Page,
+    TerminologyKind, TerminologyVersion, TerminologyVersionNew, TerminologyVersionRepository,
+    TerminologyVersionUpdate,
 };
 use crate::usecase::TerminologyUsecase;
 
@@ -202,16 +201,42 @@ impl CodeListRepository for InMemoryCodeListRepo {
             .ok_or(DomainError::CodeListNotFound(id))
     }
 
-    async fn list_by_version(&self, version_id: i64) -> Result<Vec<CodeList>, DomainError> {
-        Ok(self
+    async fn search_or_list(
+        &self,
+        q: CodeListListQuery,
+    ) -> Result<Page<CodeList>, DomainError> {
+        let mut all: Vec<CodeList> = self
             .state
             .lock()
             .unwrap()
             .by_id
             .values()
-            .filter(|c| c.version_id == version_id)
+            .filter(|c| c.version_id == q.version_id)
             .cloned()
-            .collect())
+            .collect();
+
+        if let Some(frag) = q.fragment.as_deref().filter(|s| !s.trim().is_empty()) {
+            let needle = frag.to_lowercase();
+            all.retain(|cl| {
+                cl.name.to_lowercase().contains(&needle)
+                    || cl.submission_value.to_lowercase().contains(&needle)
+                    || cl.synonym.to_lowercase().contains(&needle)
+                    || cl.definition.to_lowercase().contains(&needle)
+                    || cl.nci_preferred_term.to_lowercase().contains(&needle)
+            });
+        }
+
+        all.sort_by_key(|cl| cl.id);
+        let limit = q.limit as usize;
+        let offset = q.offset as usize;
+        let mut items: Vec<CodeList> = all.into_iter().skip(offset).take(limit + 1).collect();
+        let next_offset = if items.len() > limit {
+            items.pop();
+            Some(q.offset + q.limit)
+        } else {
+            None
+        };
+        Ok(Page { items, next_offset })
     }
 
     async fn update(&self, input: CodeListUpdate) -> Result<CodeList, DomainError> {
@@ -256,44 +281,6 @@ impl CodeListRepository for InMemoryCodeListRepo {
             items.by_id.retain(|_, i| i.codelist_id != id);
         }
         Ok(())
-    }
-
-    async fn search(
-        &self,
-        query: CodeListSearchQuery,
-    ) -> Result<Vec<InternalCodeListSearchHit>, DomainError> {
-        // The in-memory backend mirrors the Postgres semantics on a
-        // best-effort basis: case-insensitive substring match
-        // against the same five text fields the generated `tsv`
-        // column covers. The order is the natural iteration order
-        // of the underlying map; callers that need a stable order
-        // should sort by `id`.
-        let needle = query.fragment.to_lowercase();
-        let limit = query.limit as usize;
-        let mut hits = Vec::new();
-        for cl in self.state.lock().unwrap().by_id.values() {
-            if cl.version_id != query.version_id {
-                continue;
-            }
-            if [
-                cl.name.as_str(),
-                cl.submission_value.as_str(),
-                cl.synonym.as_str(),
-                cl.definition.as_str(),
-                cl.nci_preferred_term.as_str(),
-            ]
-            .iter()
-            .any(|f| f.to_lowercase().contains(&needle))
-            {
-                hits.push(InternalCodeListSearchHit {
-                    codelist: cl.clone(),
-                });
-                if hits.len() >= limit {
-                    break;
-                }
-            }
-        }
-        Ok(hits)
     }
 }
 
@@ -362,16 +349,42 @@ impl CodeItemRepository for InMemoryCodeItemRepo {
             .ok_or(DomainError::CodeItemNotFound(id))
     }
 
-    async fn list_by_codelist(&self, codelist_id: i64) -> Result<Vec<CodeItem>, DomainError> {
-        Ok(self
+    async fn search_or_list(
+        &self,
+        q: CodeItemListQuery,
+    ) -> Result<Page<CodeItem>, DomainError> {
+        let mut all: Vec<CodeItem> = self
             .state
             .lock()
             .unwrap()
             .by_id
             .values()
-            .filter(|i| i.codelist_id == codelist_id)
+            .filter(|i| i.codelist_id == q.codelist_id)
             .cloned()
-            .collect())
+            .collect();
+
+        if let Some(frag) = q.fragment.as_deref().filter(|s| !s.trim().is_empty()) {
+            let needle = frag.to_lowercase();
+            all.retain(|item| {
+                item.submission_value.to_lowercase().contains(&needle)
+                    || item.synonym.to_lowercase().contains(&needle)
+                    || item.definition.to_lowercase().contains(&needle)
+                    || item.nci_preferred_term.to_lowercase().contains(&needle)
+                    || item.code.to_lowercase().contains(&needle)
+            });
+        }
+
+        all.sort_by_key(|i| i.id);
+        let limit = q.limit as usize;
+        let offset = q.offset as usize;
+        let mut items: Vec<CodeItem> = all.into_iter().skip(offset).take(limit + 1).collect();
+        let next_offset = if items.len() > limit {
+            items.pop();
+            Some(q.offset + q.limit)
+        } else {
+            None
+        };
+        Ok(Page { items, next_offset })
     }
 
     async fn list_by_version_and_code(
@@ -420,39 +433,6 @@ impl CodeItemRepository for InMemoryCodeItemRepo {
             return Err(DomainError::CodeItemNotFound(id));
         }
         Ok(())
-    }
-
-    async fn search(
-        &self,
-        query: CodeItemSearchQuery,
-    ) -> Result<Vec<InternalCodeItemSearchHit>, DomainError> {
-        // See `InMemoryCodeListRepo::search` for the matching
-        // rationale: case-insensitive substring across the five
-        // text fields, scoped to a single version, ordered by
-        // iteration order (caller can sort by `id` for stability).
-        let needle = query.fragment.to_lowercase();
-        let limit = query.limit as usize;
-        let mut hits = Vec::new();
-        for item in self.state.lock().unwrap().by_id.values() {
-            if item.version_id != query.version_id {
-                continue;
-            }
-            if [
-                item.submission_value.as_str(),
-                item.synonym.as_str(),
-                item.definition.as_str(),
-                item.nci_preferred_term.as_str(),
-            ]
-            .iter()
-            .any(|f| f.to_lowercase().contains(&needle))
-            {
-                hits.push(InternalCodeItemSearchHit { item: item.clone() });
-                if hits.len() >= limit {
-                    break;
-                }
-            }
-        }
-        Ok(hits)
     }
 
     async fn bulk_create(&self, inputs: Vec<CodeItemNew>) -> Result<usize, DomainError> {
@@ -763,15 +743,33 @@ async fn list_code_lists_returns_codelists_owned_by_version() {
         .await
         .unwrap();
 
-    let mut v1_lists = svc.list_code_lists(v1.id).await.unwrap();
-    v1_lists.sort_by_key(|c| c.code.clone());
-    assert_eq!(v1_lists.len(), 2);
-    assert_eq!(v1_lists[0].code, "C1");
-    assert_eq!(v1_lists[1].code, "C2");
+    let mut v1_lists = svc
+        .list_code_lists(apis::terminology::CodeListListQuery {
+            version_id: v1.id,
+            fragment: None,
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .unwrap();
+    v1_lists.items.sort_by_key(|c| c.code.clone());
+    assert_eq!(v1_lists.items.len(), 2);
+    assert_eq!(v1_lists.items[0].code, "C1");
+    assert_eq!(v1_lists.items[1].code, "C2");
+    assert_eq!(v1_lists.next_offset, None);
 
-    let v2_lists = svc.list_code_lists(v2.id).await.unwrap();
-    assert_eq!(v2_lists.len(), 1);
-    assert_eq!(v2_lists[0].code, "C3");
+    let v2_lists = svc
+        .list_code_lists(apis::terminology::CodeListListQuery {
+            version_id: v2.id,
+            fragment: None,
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .unwrap();
+    assert_eq!(v2_lists.items.len(), 1);
+    assert_eq!(v2_lists.items[0].code, "C3");
+    assert_eq!(v2_lists.next_offset, None);
 }
 
 #[tokio::test]
@@ -825,11 +823,27 @@ async fn delete_code_list_removes_the_codelist() {
         .unwrap();
     svc.delete_code_list(created.id).await.unwrap();
     // Re-listing the version returns no codelists.
-    let lists = svc.list_code_lists(v.id).await.unwrap();
-    assert!(lists.is_empty());
+    let lists = svc
+        .list_code_lists(apis::terminology::CodeListListQuery {
+            version_id: v.id,
+            fragment: None,
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .unwrap();
+    assert!(lists.items.is_empty());
     // The orphaned item is also gone from the items path.
-    let items = svc.list_code_items(created.id).await.unwrap();
-    assert!(items.is_empty());
+    let items = svc
+        .list_code_items(apis::terminology::CodeItemListQuery {
+            codelist_id: created.id,
+            fragment: None,
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .unwrap();
+    assert!(items.items.is_empty());
 }
 
 #[tokio::test]
@@ -840,17 +854,70 @@ async fn delete_code_list_returns_not_found_for_unknown_id() {
 }
 
 #[tokio::test]
-async fn search_code_lists_returns_empty_for_in_memory_backend() {
+async fn list_code_lists_with_fragment_returns_matching_codelists() {
     let svc = service();
-    let hits = svc
-        .search_code_lists(apis::terminology::CodeListSearchQuery {
-            version_id: 1,
-            fragment: "age".into(),
-            limit: 10,
+    let v = svc.create_version(create_version_req("v1")).await.unwrap();
+    svc.create_code_list(create_code_list_req(v.id, "C66741")).await.unwrap();
+    let page = svc
+        .list_code_lists(apis::terminology::CodeListListQuery {
+            version_id: v.id,
+            fragment: Some("AGE".into()),
+            offset: 0,
+            limit: 50,
         })
         .await
         .unwrap();
-    assert!(hits.is_empty());
+    assert_eq!(page.items.len(), 1);
+    assert_eq!(page.next_offset, None);
+    assert_eq!(page.items[0].code, "C66741");
+}
+
+#[tokio::test]
+async fn list_code_lists_pagination_signals_next_offset() {
+    let svc = service();
+    let v = svc.create_version(create_version_req("v1")).await.unwrap();
+    // Three codelists under v1.
+    for code in ["C1", "C2", "C3"] {
+        svc.create_code_list(create_code_list_req(v.id, code)).await.unwrap();
+    }
+    let page1 = svc
+        .list_code_lists(apis::terminology::CodeListListQuery {
+            version_id: v.id,
+            fragment: None,
+            offset: 0,
+            limit: 2,
+        })
+        .await
+        .unwrap();
+    assert_eq!(page1.items.len(), 2);
+    assert_eq!(page1.next_offset, Some(2));
+
+    let page2 = svc
+        .list_code_lists(apis::terminology::CodeListListQuery {
+            version_id: v.id,
+            fragment: None,
+            offset: 2,
+            limit: 2,
+        })
+        .await
+        .unwrap();
+    assert_eq!(page2.items.len(), 1);
+    assert_eq!(page2.next_offset, None);
+}
+
+#[tokio::test]
+async fn list_code_lists_rejects_reserved_tsquery_chars() {
+    let svc = service();
+    let err = svc
+        .list_code_lists(apis::terminology::CodeListListQuery {
+            version_id: 1,
+            fragment: Some("a&b".into()),
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(err, TerminologyApiError::Validation(_)));
 }
 
 // ---- CodeItem ----
@@ -924,11 +991,20 @@ async fn list_code_items_returns_items_in_codelist() {
     svc.create_code_item(create_code_item_req(cl.id, v.id, "C2"))
         .await
         .unwrap();
-    let mut items = svc.list_code_items(cl.id).await.unwrap();
-    items.sort_by_key(|i| i.code.clone());
-    assert_eq!(items.len(), 2);
-    assert_eq!(items[0].code, "C1");
-    assert_eq!(items[1].code, "C2");
+    let mut items = svc
+        .list_code_items(apis::terminology::CodeItemListQuery {
+            codelist_id: cl.id,
+            fragment: None,
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .unwrap();
+    items.items.sort_by_key(|i| i.code.clone());
+    assert_eq!(items.items.len(), 2);
+    assert_eq!(items.items[0].code, "C1");
+    assert_eq!(items.items[1].code, "C2");
+    assert_eq!(items.next_offset, None);
 }
 
 #[tokio::test]
@@ -1038,8 +1114,16 @@ async fn delete_code_item_removes_the_item() {
         .await
         .unwrap();
     svc.delete_code_item(created.id).await.unwrap();
-    let listed = svc.list_code_items(cl.id).await.unwrap();
-    assert!(listed.is_empty());
+    let listed = svc
+        .list_code_items(apis::terminology::CodeItemListQuery {
+            codelist_id: cl.id,
+            fragment: None,
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .unwrap();
+    assert!(listed.items.is_empty());
 }
 
 #[tokio::test]
@@ -1050,17 +1134,84 @@ async fn delete_code_item_returns_not_found_for_unknown_id() {
 }
 
 #[tokio::test]
-async fn search_code_items_returns_empty_for_in_memory_backend() {
+async fn list_code_items_with_fragment_returns_matching_items() {
     let svc = service();
-    let hits = svc
-        .search_code_items(apis::terminology::CodeItemSearchQuery {
-            version_id: 1,
-            fragment: "age".into(),
-            limit: 10,
+    let v = svc.create_version(create_version_req("v1")).await.unwrap();
+    let cl = svc
+        .create_code_list(create_code_list_req(v.id, "C66741"))
+        .await
+        .unwrap();
+    svc.create_code_item(create_code_item_req(cl.id, v.id, "Y"))
+        .await
+        .unwrap();
+    svc.create_code_item(create_code_item_req(cl.id, v.id, "N"))
+        .await
+        .unwrap();
+    let page = svc
+        .list_code_items(apis::terminology::CodeItemListQuery {
+            codelist_id: cl.id,
+            fragment: Some("Y".into()),
+            offset: 0,
+            limit: 50,
         })
         .await
         .unwrap();
-    assert!(hits.is_empty());
+    assert_eq!(page.items.len(), 1);
+    assert_eq!(page.items[0].code, "Y");
+    assert_eq!(page.next_offset, None);
+}
+
+#[tokio::test]
+async fn list_code_items_pagination_signals_next_offset() {
+    let svc = service();
+    let v = svc.create_version(create_version_req("v1")).await.unwrap();
+    let cl = svc
+        .create_code_list(create_code_list_req(v.id, "C66741"))
+        .await
+        .unwrap();
+    for code in ["A", "B", "C"] {
+        svc.create_code_item(create_code_item_req(cl.id, v.id, code))
+            .await
+            .unwrap();
+    }
+    let page1 = svc
+        .list_code_items(apis::terminology::CodeItemListQuery {
+            codelist_id: cl.id,
+            fragment: None,
+            offset: 0,
+            limit: 2,
+        })
+        .await
+        .unwrap();
+    assert_eq!(page1.items.len(), 2);
+    assert_eq!(page1.next_offset, Some(2));
+
+    let page2 = svc
+        .list_code_items(apis::terminology::CodeItemListQuery {
+            codelist_id: cl.id,
+            fragment: None,
+            offset: 2,
+            limit: 2,
+        })
+        .await
+        .unwrap();
+    assert_eq!(page2.items.len(), 1);
+    assert_eq!(page2.next_offset, None);
+}
+
+#[tokio::test]
+async fn list_code_items_rejects_reserved_tsquery_chars() {
+    let svc = service();
+    let err = svc
+        .list_code_items(apis::terminology::CodeItemListQuery {
+            codelist_id: 1,
+            fragment: Some("a|b".into()),
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(err, TerminologyApiError::Validation(_)));
 }
 
 // ---- view projection smoke tests ----
@@ -1113,32 +1264,4 @@ async fn code_item_view_projects_internal_fields() {
         .unwrap();
     let _internal: &dyn std::fmt::Debug = &view;
     let _ = (view.id, view.codelist_id, view.version_id, view.code);
-}
-
-#[tokio::test]
-async fn code_list_search_hit_projects_codelist() {
-    let svc = service();
-    let hits: Vec<CodeListSearchHit> = svc
-        .search_code_lists(apis::terminology::CodeListSearchQuery {
-            version_id: 1,
-            fragment: "x".into(),
-            limit: 10,
-        })
-        .await
-        .unwrap();
-    assert!(hits.is_empty());
-}
-
-#[tokio::test]
-async fn code_item_search_hit_projects_item() {
-    let svc = service();
-    let hits: Vec<CodeItemSearchHit> = svc
-        .search_code_items(apis::terminology::CodeItemSearchQuery {
-            version_id: 1,
-            fragment: "x".into(),
-            limit: 10,
-        })
-        .await
-        .unwrap();
-    assert!(hits.is_empty());
 }

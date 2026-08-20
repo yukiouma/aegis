@@ -94,40 +94,37 @@ pub struct CodeItemView {
     pub updated_at: DateTime<Utc>,
 }
 
-// ---- search query / hit ----
+// ---- pagination envelope ----
 
-/// Query for [`TerminologyService::search_code_lists`]. Search is
-/// scoped to a single `version_id` and matches the row's full-text
-/// representation against `fragment`. The backend clamps `limit`
-/// to a documented default + cap.
+/// One page of a paginated result set. Mirrors
+/// `terminology::domain::Page<T>` field-for-field so the two
+/// layers can `From`-convert without ceremony.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Page<T> {
+    pub items: Vec<T>,
+    pub next_offset: Option<u32>,
+}
+
+/// Query for [`TerminologyService::list_code_lists`]. Unified list
+/// + search under a single signature: `fragment = None` is a plain
+/// `ORDER BY id ASC` list; `fragment = Some(_)` is a FTS query with
+/// `ts_rank DESC, id ASC` ordering.
 #[derive(Debug, Clone)]
-pub struct CodeListSearchQuery {
+pub struct CodeListListQuery {
     pub version_id: i64,
-    pub fragment: String,
+    pub fragment: Option<String>,
+    pub offset: u32,
     pub limit: u32,
 }
 
-/// One hit from [`TerminologyService::search_code_lists`].
-/// Order is implementation-defined.
-#[derive(Debug, Clone, PartialEq)]
-pub struct CodeListSearchHit {
-    pub codelist: CodeListView,
-}
-
-/// Query for [`TerminologyService::search_code_items`]. Mirrors
-/// [`CodeListSearchQuery`].
+/// Query for [`TerminologyService::list_code_items`]. Mirrors
+/// [`CodeListListQuery`] but scopes to a `codelist_id`.
 #[derive(Debug, Clone)]
-pub struct CodeItemSearchQuery {
-    pub version_id: i64,
-    pub fragment: String,
+pub struct CodeItemListQuery {
+    pub codelist_id: i64,
+    pub fragment: Option<String>,
+    pub offset: u32,
     pub limit: u32,
-}
-
-/// One hit from [`TerminologyService::search_code_items`].
-/// Order is implementation-defined.
-#[derive(Debug, Clone, PartialEq)]
-pub struct CodeItemSearchHit {
-    pub item: CodeItemView,
 }
 
 // ---- request DTOs ----
@@ -290,12 +287,16 @@ pub trait TerminologyService: Send + Sync {
         id: i64,
     ) -> Result<CodeListView, TerminologyApiError>;
 
-    /// List every codelist owned by the given version. Order is
-    /// backend-defined.
+    /// Unified list+search under a version. Returns one page of
+    /// `CodeListView`s. `query.fragment = None` (or `Some("")`)
+    /// returns the plain list path ordered by `id ASC`;
+    /// `query.fragment = Some(non-empty)` runs the FTS prefix-match
+    /// path with `ts_rank DESC, id ASC`. `query.offset` / `query.limit`
+    /// are clamped by the backend (default 50, max 500).
     async fn list_code_lists(
         &self,
-        version_id: i64,
-    ) -> Result<Vec<CodeListView>, TerminologyApiError>;
+        query: CodeListListQuery,
+    ) -> Result<Page<CodeListView>, TerminologyApiError>;
 
     /// Apply the optional fields on `req` to the codelist
     /// identified by `req.id`. Returns `NotFound` if no such
@@ -308,15 +309,6 @@ pub trait TerminologyService: Send + Sync {
     /// Hard delete the codelist identified by `id`.
     async fn delete_code_list(&self, id: i64) -> Result<(), TerminologyApiError>;
 
-    /// Full-text search against codelists under the version
-    /// identified by `query.version_id`, matching the row's
-    /// full-text representation against `query.fragment`. Returns
-    /// up to `query.limit` hits (clamped by the backend).
-    async fn search_code_lists(
-        &self,
-        q: CodeListSearchQuery,
-    ) -> Result<Vec<CodeListSearchHit>, TerminologyApiError>;
-
     // ---- CodeItem ----
 
     /// Create a new `(codelist_id, code)` item. Returns
@@ -327,12 +319,13 @@ pub trait TerminologyService: Send + Sync {
         req: CreateCodeItemRequest,
     ) -> Result<CodeItemView, TerminologyApiError>;
 
-    /// List every item belonging to the given codelist. Order is
-    /// backend-defined.
+    /// Unified list+search under a codelist. Mirrors
+    /// [`TerminologyService::list_code_lists`] but scoped to
+    /// `query.codelist_id`.
     async fn list_code_items(
         &self,
-        codelist_id: i64,
-    ) -> Result<Vec<CodeItemView>, TerminologyApiError>;
+        query: CodeItemListQuery,
+    ) -> Result<Page<CodeItemView>, TerminologyApiError>;
 
     /// Natural-key lookup on the `code_items` table. Returns every
     /// item whose `version_id` matches and whose `code` matches —
@@ -355,15 +348,6 @@ pub trait TerminologyService: Send + Sync {
 
     /// Hard delete the item identified by `id`.
     async fn delete_code_item(&self, id: i64) -> Result<(), TerminologyApiError>;
-
-    /// Full-text search against items under the version
-    /// identified by `query.version_id`, matching the row's
-    /// full-text representation against `query.fragment`. Returns
-    /// up to `query.limit` hits (clamped by the backend).
-    async fn search_code_items(
-        &self,
-        q: CodeItemSearchQuery,
-    ) -> Result<Vec<CodeItemSearchHit>, TerminologyApiError>;
 
     /// Create several `CodeItem`s in one logical operation. All items
     /// must share `req.codelist_id` and `req.version_id`. If any item

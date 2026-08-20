@@ -13,6 +13,5 @@ pub use commands::{
 pub use error::UsecaseError;
 pub use terminology_usecase::{TerminologyUsecase, TerminologyUsecaseConfig};
 pub use views::{
-    BatchCreateCodeItemsResponse, CodeItemSearchHit, CodeItemView, CodeListSearchHit,
-    CodeListView, TerminologyVersionView,
+    BatchCreateCodeItemsResponse, CodeItemView, CodeListView, TerminologyVersionView,
 };

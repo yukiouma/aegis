@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use sqlx::{FromRow, PgPool};
 
 use crate::domain::{
-    CodeList, CodeListNew, CodeListRepository, CodeListSearchHit, CodeListSearchQuery,
-    CodeListUpdate, DomainError,
+    CodeList, CodeListListQuery, CodeListNew, CodeListRepository, CodeListUpdate, DomainError,
+    Page,
 };
 
 const SQLSTATE_UNIQUE_VIOLATION: &str = "23505";
@@ -104,18 +104,46 @@ impl CodeListRepository for CodeListRepo {
         row.try_into()
     }
 
-    async fn list_by_version(&self, version_id: i64) -> Result<Vec<CodeList>, DomainError> {
-        let rows: Vec<CodeListRow> = sqlx::QueryBuilder::new(
-            "SELECT id, version_id, code, extensible, name, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at \
-             FROM code_lists WHERE version_id = ",
-        )
-        .push_bind(version_id)
-        .push(" ORDER BY id")
-        .build_query_as::<CodeListRow>()
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_db_error_simple)?;
-        rows.into_iter().map(CodeList::try_from).collect()
+    async fn search_or_list(
+        &self,
+        q: CodeListListQuery,
+    ) -> Result<Page<CodeList>, DomainError> {
+        let mut qb: sqlx::QueryBuilder<sqlx::Postgres> = sqlx::QueryBuilder::new(
+            "SELECT id, version_id, code, extensible, name, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at FROM code_lists WHERE version_id = ",
+        );
+        qb.push_bind(q.version_id);
+
+        if let Some(frag) = q.fragment.as_deref().filter(|s| !s.trim().is_empty()) {
+            qb.push(" AND tsv @@ to_tsquery('english', ");
+            qb.push_bind(format!("{frag}:*"));
+            qb.push(") ORDER BY ts_rank(tsv, to_tsquery('english', ");
+            qb.push_bind(format!("{frag}:*"));
+            qb.push(")) DESC, id ASC LIMIT ");
+        } else {
+            qb.push(" ORDER BY id ASC LIMIT ");
+        }
+        // Fetch limit+1 to detect whether another page exists.
+        qb.push_bind((q.limit as i64) + 1);
+        qb.push(" OFFSET ");
+        qb.push_bind(q.offset as i64);
+
+        let mut rows: Vec<CodeListRow> = qb
+            .build_query_as::<CodeListRow>()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(map_db_error_simple)?;
+
+        let next_offset = if rows.len() as u32 > q.limit {
+            rows.pop();
+            Some(q.offset + q.limit)
+        } else {
+            None
+        };
+        let items = rows
+            .into_iter()
+            .map(CodeList::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Page { items, next_offset })
     }
 
     async fn update(&self, input: CodeListUpdate) -> Result<CodeList, DomainError> {
@@ -181,45 +209,6 @@ impl CodeListRepository for CodeListRepo {
             return Err(DomainError::CodeListNotFound(id));
         }
         Ok(())
-    }
-
-    async fn search(
-        &self,
-        query: CodeListSearchQuery,
-    ) -> Result<Vec<CodeListSearchHit>, DomainError> {
-        // Full-text search via the generated `tsv` tsvector +
-        // GIN(tsv) index from migration 0002. `to_tsquery`
-        // parameterises the entire query string, so no SQL
-        // injection surface. The query plan uses the GIN index for
-        // the `@@` predicate; ordering by `ts_rank` (Postgres
-        // computes it lazily over the candidate rows) plus `LIMIT`
-        // keeps the response bounded.
-        let limit = query.limit;
-        let rows: Vec<CodeListRow> = sqlx::QueryBuilder::new(
-            "SELECT id, version_id, code, extensible, name, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at \
-             FROM code_lists \
-             WHERE version_id = ",
-        )
-        .push_bind(query.version_id)
-        .push(" AND tsv @@ to_tsquery('english', ")
-        .push_bind(format!("{}:*", query.fragment))
-        .push(") \
-             ORDER BY ts_rank(tsv, to_tsquery('english', ")
-        .push_bind(format!("{}:*", query.fragment))
-        .push(")) DESC \
-             LIMIT ")
-        .push_bind(limit as i64)
-        .build_query_as::<CodeListRow>()
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_db_error_simple)?;
-        rows.into_iter()
-            .map(|row| {
-                Ok(CodeListSearchHit {
-                    codelist: row.try_into()?,
-                })
-            })
-            .collect()
     }
 }
 
