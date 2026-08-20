@@ -10,10 +10,10 @@ pub mod usecase;
 
 pub use adapter::{CodeItemRepo, CodeListRepo, TerminologyServiceImpl, TerminologyVersionRepo};
 pub use domain::{
-    CodeItem, CodeItemNew, CodeItemRepository, CodeItemSearchHit, CodeItemSearchQuery,
-    CodeItemUpdate, CodeList, CodeListNew, CodeListRepository, CodeListSearchHit,
-    CodeListSearchQuery, CodeListUpdate, DomainError, TerminologyKind, TerminologyVersion,
-    TerminologyVersionNew, TerminologyVersionRepository, TerminologyVersionUpdate,
+    CodeItem, CodeItemListQuery, CodeItemNew, CodeItemRepository, CodeItemUpdate, CodeList,
+    CodeListListQuery, CodeListNew, CodeListRepository, CodeListUpdate, DomainError, Page,
+    TerminologyKind, TerminologyVersion, TerminologyVersionNew, TerminologyVersionRepository,
+    TerminologyVersionUpdate,
 };
 pub use usecase::{
     CodeItemView, CodeListView, CreateCodeItem, CreateCodeList, CreateTerminologyVersion,

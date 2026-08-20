@@ -12,16 +12,14 @@ use async_trait::async_trait;
 use apis::terminology::TerminologyKind as ApiKind;
 use apis::terminology::{
     BatchCreateCodeItemsRequest, BatchCreateCodeItemsResponse as ApiBatchResp,
-    CodeItemSearchHit as ApiCodeItemSearchHit, CodeItemSearchQuery as ApiCodeItemSearchQuery,
-    CodeItemView, CodeListSearchHit as ApiCodeListSearchHit,
-    CodeListSearchQuery as ApiCodeListSearchQuery, CodeListView, CreateCodeItemRequest,
-    CreateCodeListRequest, CreateTerminologyVersionRequest, TerminologyApiError,
-    TerminologyService, TerminologyVersionView, UpdateCodeItemRequest, UpdateCodeListRequest,
-    UpdateTerminologyVersionRequest,
+    CodeItemListQuery as ApiCodeItemListQuery, CodeItemView, CodeListListQuery as ApiCodeListListQuery,
+    CodeListView, CreateCodeItemRequest, CreateCodeListRequest, CreateTerminologyVersionRequest,
+    Page as ApiPage, TerminologyApiError, TerminologyService, TerminologyVersionView,
+    UpdateCodeItemRequest, UpdateCodeListRequest, UpdateTerminologyVersionRequest,
 };
 
 use crate::domain::{
-    CodeItemRepository, CodeItemSearchQuery, CodeListRepository, CodeListSearchQuery, DomainError,
+    CodeItemListQuery, CodeItemRepository, CodeListListQuery, CodeListRepository, DomainError,
     TerminologyKind, TerminologyVersionRepository,
 };
 use crate::usecase::{
@@ -167,7 +165,7 @@ impl From<UsecaseError> for TerminologyApiError {
                 DomainError::Repository(msg) => TerminologyApiError::Repository(msg),
                 DomainError::EmptyCode
                 | DomainError::EmptyName
-                | DomainError::EmptyFragment
+                | DomainError::InvalidFragment
                 | DomainError::InvalidKind(_)
                 | DomainError::FkVersionNotFound(_)
                 | DomainError::FkCodeListNotFound(_)
@@ -269,13 +267,19 @@ where
 
     async fn list_code_lists(
         &self,
-        version_id: i64,
-    ) -> Result<Vec<CodeListView>, TerminologyApiError> {
-        let views = self.usecase.list_code_lists(version_id).await?;
-        Ok(views
-            .into_iter()
-            .map(code_list_view_from_internal)
-            .collect())
+        query: ApiCodeListListQuery,
+    ) -> Result<ApiPage<CodeListView>, TerminologyApiError> {
+        let internal_q = CodeListListQuery {
+            version_id: query.version_id,
+            fragment: query.fragment,
+            offset: query.offset,
+            limit: query.limit,
+        };
+        let page = self.usecase.list_code_lists(internal_q).await?;
+        Ok(ApiPage {
+            items: page.items.into_iter().map(code_list_view_from_internal).collect(),
+            next_offset: page.next_offset,
+        })
     }
 
     async fn update_code_list(
@@ -301,24 +305,6 @@ where
         Ok(())
     }
 
-    async fn search_code_lists(
-        &self,
-        q: ApiCodeListSearchQuery,
-    ) -> Result<Vec<ApiCodeListSearchHit>, TerminologyApiError> {
-        let internal_q = CodeListSearchQuery {
-            version_id: q.version_id,
-            fragment: q.fragment,
-            limit: q.limit,
-        };
-        let hits = self.usecase.search_code_lists(internal_q).await?;
-        Ok(hits
-            .into_iter()
-            .map(|h| ApiCodeListSearchHit {
-                codelist: code_list_view_from_internal(h.codelist.into()),
-            })
-            .collect())
-    }
-
     // ---- CodeItem ----
 
     async fn create_code_item(
@@ -340,13 +326,19 @@ where
 
     async fn list_code_items(
         &self,
-        codelist_id: i64,
-    ) -> Result<Vec<CodeItemView>, TerminologyApiError> {
-        let views = self.usecase.list_code_items(codelist_id).await?;
-        Ok(views
-            .into_iter()
-            .map(code_item_view_from_internal)
-            .collect())
+        query: ApiCodeItemListQuery,
+    ) -> Result<ApiPage<CodeItemView>, TerminologyApiError> {
+        let internal_q = CodeItemListQuery {
+            codelist_id: query.codelist_id,
+            fragment: query.fragment,
+            offset: query.offset,
+            limit: query.limit,
+        };
+        let page = self.usecase.list_code_items(internal_q).await?;
+        Ok(ApiPage {
+            items: page.items.into_iter().map(code_item_view_from_internal).collect(),
+            next_offset: page.next_offset,
+        })
     }
 
     async fn list_code_items_by_version_and_code(
@@ -383,24 +375,6 @@ where
     async fn delete_code_item(&self, id: i64) -> Result<(), TerminologyApiError> {
         self.usecase.delete_code_item(id).await?;
         Ok(())
-    }
-
-    async fn search_code_items(
-        &self,
-        q: ApiCodeItemSearchQuery,
-    ) -> Result<Vec<ApiCodeItemSearchHit>, TerminologyApiError> {
-        let internal_q = CodeItemSearchQuery {
-            version_id: q.version_id,
-            fragment: q.fragment,
-            limit: q.limit,
-        };
-        let hits = self.usecase.search_code_items(internal_q).await?;
-        Ok(hits
-            .into_iter()
-            .map(|h| ApiCodeItemSearchHit {
-                item: code_item_view_from_internal(h.item.into()),
-            })
-            .collect())
     }
 
     async fn batch_create_code_items(
