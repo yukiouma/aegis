@@ -23,7 +23,6 @@ use crate::state::AppState;
 use crate::transport::http::auth::middleware::{AuthClaims, require_admin_or_root};
 use crate::transport::http::dto::{
     self, CodeItemByVersionAndCodeQuery, CodeItemListQuery, CodeListListQuery,
-    TerminologySearchBaseQuery,
 };
 use crate::transport::http::error::ApiError;
 
@@ -208,16 +207,22 @@ pub async fn create_code_list(
     Ok((StatusCode::CREATED, Json(view.into())))
 }
 
-/// `GET /api/terminology/code-lists?version_id=…` — list codelists
-/// owned by a version.
+/// `GET /api/terminology/code-lists?…` — unified list+search for
+/// codelists under a version. `fragment = Some(_)` runs the FTS
+/// prefix-match path; `fragment = None` (or absent) returns a plain
+/// `ORDER BY id ASC` list. `offset` / `limit` paginate the result.
 #[utoipa::path(
     get, path = "/code-lists", tag = "terminology",
     operation_id = "terminology_list_code_lists",
     params(
         ("versionId" = i64, Query, description = "Owning terminology version id"),
+        ("fragment" = Option<String>, Query, description = "Text fragment for FTS prefix-match (omit or empty for plain list)"),
+        ("offset" = Option<u32>, Query, description = "Page offset (0-based, default 0)"),
+        ("limit" = Option<u32>, Query, description = "Page size (0 = server default 50, max 500)"),
     ),
     responses(
-        (status = 200, description = "Codelists list", body = dto::CodeListListResponse),
+        (status = 200, description = "Paged codelists list", body = dto::PagedCodeListListResponse),
+        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
@@ -227,11 +232,23 @@ pub async fn create_code_list(
 pub async fn list_code_lists(
     State(state): State<AppState>,
     _claims: AuthClaims,
-    Query(CodeListListQuery { version_id }): Query<CodeListListQuery>,
-) -> Result<Json<dto::CodeListListResponse>, ApiError> {
-    let views = state.terminology.list_code_lists(version_id).await?;
-    let codelists = views.into_iter().map(Into::into).collect();
-    Ok(Json(dto::CodeListListResponse { codelists }))
+    Query(CodeListListQuery {
+        version_id,
+        fragment,
+        offset,
+        limit,
+    }): Query<CodeListListQuery>,
+) -> Result<Json<dto::PagedCodeListListResponse>, ApiError> {
+    let page = state
+        .terminology
+        .list_code_lists(apis::terminology::CodeListListQuery {
+            version_id,
+            fragment,
+            offset,
+            limit,
+        })
+        .await?;
+    Ok(Json(page.into()))
 }
 
 /// `GET /api/terminology/code-lists/{id}` — fetch a codelist by id.
@@ -327,41 +344,9 @@ pub async fn delete_code_list(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// `GET /api/terminology/code-lists/search?…` — full-text search
-/// against codelists in a single terminology version.
-#[utoipa::path(
-    get, path = "/code-lists/search", tag = "terminology",
-    operation_id = "terminology_search_code_lists",
-    params(
-        ("versionId" = i64, Query, description = "Terminology version id"),
-        ("fragment" = String, Query, description = "Text fragment to match against codelist text fields"),
-        ("limit" = u32, Query, description = "Maximum hits (0 = default)"),
-    ),
-    responses(
-        (status = 200, description = "Codelist hits", body = dto::CodeListSearchHitsResponse),
-        (status = 400, description = "Empty fragment supplied", body = crate::transport::http::error::ErrorBody),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn search_code_lists(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-    Query(q): Query<TerminologySearchBaseQuery>,
-) -> Result<Json<dto::CodeListSearchHitsResponse>, ApiError> {
-    let hits = state
-        .terminology
-        .search_code_lists(apis::terminology::CodeListSearchQuery {
-            version_id: q.version_id,
-            fragment: q.fragment,
-            limit: q.limit,
-        })
-        .await?;
-    Ok(Json(dto::CodeListSearchHitsResponse {
-        hits: hits.into_iter().map(Into::into).collect(),
-    }))
-}
+/// `GET /api/terminology/code-lists/search?…` — removed; unified into
+/// `GET /api/terminology/code-lists` (see [`list_code_lists`]).
+/// This stub is intentionally absent from the router.
 
 // ---- CodeItem ----
 
@@ -448,16 +433,22 @@ pub async fn batch_create_code_items(
     })))
 }
 
-/// `GET /api/terminology/code-items?codelist_id=…` — list items in a
-/// codelist.
+/// `GET /api/terminology/code-items?…` — unified list+search for
+/// code items under a codelist. `fragment = Some(_)` runs the FTS
+/// prefix-match path; `fragment = None` (or absent) returns a plain
+/// `ORDER BY id ASC` list. `offset` / `limit` paginate the result.
 #[utoipa::path(
     get, path = "/code-items", tag = "terminology",
     operation_id = "terminology_list_code_items",
     params(
         ("codelistId" = i64, Query, description = "Owning codelist id"),
+        ("fragment" = Option<String>, Query, description = "Text fragment for FTS prefix-match (omit or empty for plain list)"),
+        ("offset" = Option<u32>, Query, description = "Page offset (0-based, default 0)"),
+        ("limit" = Option<u32>, Query, description = "Page size (0 = server default 50, max 500)"),
     ),
     responses(
-        (status = 200, description = "Code items list", body = dto::CodeItemListResponse),
+        (status = 200, description = "Paged code items list", body = dto::PagedCodeItemListResponse),
+        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
@@ -466,11 +457,23 @@ pub async fn batch_create_code_items(
 pub async fn list_code_items(
     State(state): State<AppState>,
     _claims: AuthClaims,
-    Query(CodeItemListQuery { codelist_id }): Query<CodeItemListQuery>,
-) -> Result<Json<dto::CodeItemListResponse>, ApiError> {
-    let views = state.terminology.list_code_items(codelist_id).await?;
-    let items = views.into_iter().map(Into::into).collect();
-    Ok(Json(dto::CodeItemListResponse { items }))
+    Query(CodeItemListQuery {
+        codelist_id,
+        fragment,
+        offset,
+        limit,
+    }): Query<CodeItemListQuery>,
+) -> Result<Json<dto::PagedCodeItemListResponse>, ApiError> {
+    let page = state
+        .terminology
+        .list_code_items(apis::terminology::CodeItemListQuery {
+            codelist_id,
+            fragment,
+            offset,
+            limit,
+        })
+        .await?;
+    Ok(Json(page.into()))
 }
 
 /// `GET /api/terminology/code-items/by-version-and-code?…` — natural-key
@@ -569,38 +572,5 @@ pub async fn delete_code_item(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// `GET /api/terminology/code-items/search?…` — full-text search
-/// against items in a single terminology version.
-#[utoipa::path(
-    get, path = "/code-items/search", tag = "terminology",
-    operation_id = "terminology_search_code_items",
-    params(
-        ("versionId" = i64, Query, description = "Terminology version id"),
-        ("fragment" = String, Query, description = "Text fragment to match against item text fields"),
-        ("limit" = u32, Query, description = "Maximum hits (0 = default)"),
-    ),
-    responses(
-        (status = 200, description = "Code item hits", body = dto::CodeItemSearchHitsResponse),
-        (status = 400, description = "Empty fragment supplied", body = crate::transport::http::error::ErrorBody),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn search_code_items(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-    Query(q): Query<TerminologySearchBaseQuery>,
-) -> Result<Json<dto::CodeItemSearchHitsResponse>, ApiError> {
-    let hits = state
-        .terminology
-        .search_code_items(apis::terminology::CodeItemSearchQuery {
-            version_id: q.version_id,
-            fragment: q.fragment,
-            limit: q.limit,
-        })
-        .await?;
-    Ok(Json(dto::CodeItemSearchHitsResponse {
-        hits: hits.into_iter().map(Into::into).collect(),
-    }))
-}
+/// `GET /api/terminology/code-items/search?…` — removed; unified into
+/// `GET /api/terminology/code-items` (see [`list_code_items`]).
