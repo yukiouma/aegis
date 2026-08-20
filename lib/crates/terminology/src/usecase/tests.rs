@@ -9,10 +9,10 @@ use async_trait::async_trait;
 use chrono::{TimeZone, Utc};
 
 use crate::domain::{
-    CodeItem, CodeItemNew, CodeItemRepository, CodeItemSearchHit, CodeItemSearchQuery,
-    CodeItemUpdate, CodeList, CodeListNew, CodeListRepository, CodeListSearchHit,
-    CodeListSearchQuery, CodeListUpdate, DomainError, TerminologyKind, TerminologyVersion,
-    TerminologyVersionNew, TerminologyVersionRepository, TerminologyVersionUpdate,
+    CodeItem, CodeItemListQuery, CodeItemNew, CodeItemRepository, CodeItemUpdate, CodeList,
+    CodeListListQuery, CodeListNew, CodeListRepository, CodeListUpdate, DomainError, Page,
+    TerminologyKind, TerminologyVersion, TerminologyVersionNew, TerminologyVersionRepository,
+    TerminologyVersionUpdate,
 };
 use crate::usecase::commands::{
     CreateCodeItem, CreateCodeList, CreateTerminologyVersion, UpdateCodeList,
@@ -180,16 +180,42 @@ impl CodeListRepository for FakeCodeListRepo {
             .cloned()
             .ok_or(DomainError::CodeListNotFound(id))
     }
-    async fn list_by_version(&self, version_id: i64) -> Result<Vec<CodeList>, DomainError> {
-        Ok(self
+    async fn search_or_list(
+        &self,
+        q: CodeListListQuery,
+    ) -> Result<Page<CodeList>, DomainError> {
+        let mut all: Vec<CodeList> = self
             .state
             .lock()
             .unwrap()
             .by_id
             .values()
-            .filter(|c| c.version_id == version_id)
+            .filter(|c| c.version_id == q.version_id)
             .cloned()
-            .collect())
+            .collect();
+
+        if let Some(frag) = q.fragment.as_deref().filter(|s| !s.trim().is_empty()) {
+            let needle = frag.to_lowercase();
+            all.retain(|cl| {
+                cl.name.to_lowercase().contains(&needle)
+                    || cl.submission_value.to_lowercase().contains(&needle)
+                    || cl.synonym.to_lowercase().contains(&needle)
+                    || cl.definition.to_lowercase().contains(&needle)
+                    || cl.nci_preferred_term.to_lowercase().contains(&needle)
+            });
+        }
+
+        all.sort_by_key(|cl| cl.id);
+        let limit = q.limit as usize;
+        let offset = q.offset as usize;
+        let mut items: Vec<CodeList> = all.into_iter().skip(offset).take(limit + 1).collect();
+        let next_offset = if items.len() > limit {
+            items.pop();
+            Some(q.offset + q.limit)
+        } else {
+            None
+        };
+        Ok(Page { items, next_offset })
     }
     async fn update(&self, input: CodeListUpdate) -> Result<CodeList, DomainError> {
         let mut s = self.state.lock().unwrap();
@@ -227,15 +253,6 @@ impl CodeListRepository for FakeCodeListRepo {
             return Err(DomainError::CodeListNotFound(id));
         }
         Ok(())
-    }
-    async fn search(
-        &self,
-        _query: CodeListSearchQuery,
-    ) -> Result<Vec<CodeListSearchHit>, DomainError> {
-        // The fake returns empty so usecase tests focus on shape
-        // rather than ranking. The Postgres adapter asserts real
-        // hits in tests/integration_persistence.rs.
-        Ok(vec![])
     }
 }
 
@@ -297,16 +314,42 @@ impl CodeItemRepository for FakeCodeItemRepo {
             .cloned()
             .ok_or(DomainError::CodeItemNotFound(id))
     }
-    async fn list_by_codelist(&self, codelist_id: i64) -> Result<Vec<CodeItem>, DomainError> {
-        Ok(self
+    async fn search_or_list(
+        &self,
+        q: CodeItemListQuery,
+    ) -> Result<Page<CodeItem>, DomainError> {
+        let mut all: Vec<CodeItem> = self
             .state
             .lock()
             .unwrap()
             .by_id
             .values()
-            .filter(|i| i.codelist_id == codelist_id)
+            .filter(|i| i.codelist_id == q.codelist_id)
             .cloned()
-            .collect())
+            .collect();
+
+        if let Some(frag) = q.fragment.as_deref().filter(|s| !s.trim().is_empty()) {
+            let needle = frag.to_lowercase();
+            all.retain(|item| {
+                item.submission_value.to_lowercase().contains(&needle)
+                    || item.synonym.to_lowercase().contains(&needle)
+                    || item.definition.to_lowercase().contains(&needle)
+                    || item.nci_preferred_term.to_lowercase().contains(&needle)
+                    || item.code.to_lowercase().contains(&needle)
+            });
+        }
+
+        all.sort_by_key(|i| i.id);
+        let limit = q.limit as usize;
+        let offset = q.offset as usize;
+        let mut items: Vec<CodeItem> = all.into_iter().skip(offset).take(limit + 1).collect();
+        let next_offset = if items.len() > limit {
+            items.pop();
+            Some(q.offset + q.limit)
+        } else {
+            None
+        };
+        Ok(Page { items, next_offset })
     }
     async fn list_by_version_and_code(
         &self,
@@ -353,12 +396,6 @@ impl CodeItemRepository for FakeCodeItemRepo {
             return Err(DomainError::CodeItemNotFound(id));
         }
         Ok(())
-    }
-    async fn search(
-        &self,
-        _query: CodeItemSearchQuery,
-    ) -> Result<Vec<CodeItemSearchHit>, DomainError> {
-        Ok(vec![])
     }
     async fn bulk_create(&self, inputs: Vec<CodeItemNew>) -> Result<usize, DomainError> {
         let mut s = self.state.lock().unwrap();

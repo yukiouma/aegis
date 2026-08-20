@@ -14,18 +14,17 @@ use chrono::{TimeZone, Utc};
 
 use apis::terminology::TerminologyKind as ApiKind;
 use apis::terminology::{
-    CodeItemSearchHit, CodeItemView, CodeListSearchHit, CodeListView, CreateCodeItemRequest,
-    CreateCodeListRequest, CreateTerminologyVersionRequest, TerminologyApiError,
-    TerminologyService, TerminologyVersionView, UpdateCodeItemRequest, UpdateCodeListRequest,
+    CodeItemView, CodeListView, CreateCodeItemRequest, CreateCodeListRequest,
+    CreateTerminologyVersionRequest, TerminologyApiError, TerminologyService,
+    TerminologyVersionView, UpdateCodeItemRequest, UpdateCodeListRequest,
     UpdateTerminologyVersionRequest,
 };
 
 use crate::domain::{
-    CodeItem, CodeItemNew, CodeItemRepository, CodeItemSearchHit as InternalCodeItemSearchHit,
-    CodeItemSearchQuery, CodeItemUpdate, CodeList, CodeListNew, CodeListRepository,
-    CodeListSearchHit as InternalCodeListSearchHit, CodeListSearchQuery, CodeListUpdate,
-    DomainError, TerminologyKind, TerminologyVersion, TerminologyVersionNew,
-    TerminologyVersionRepository, TerminologyVersionUpdate,
+    CodeItem, CodeItemListQuery, CodeItemNew, CodeItemRepository, CodeItemUpdate, CodeList,
+    CodeListListQuery, CodeListNew, CodeListRepository, CodeListUpdate, DomainError, Page,
+    TerminologyKind, TerminologyVersion, TerminologyVersionNew, TerminologyVersionRepository,
+    TerminologyVersionUpdate,
 };
 use crate::usecase::TerminologyUsecase;
 
@@ -202,16 +201,42 @@ impl CodeListRepository for InMemoryCodeListRepo {
             .ok_or(DomainError::CodeListNotFound(id))
     }
 
-    async fn list_by_version(&self, version_id: i64) -> Result<Vec<CodeList>, DomainError> {
-        Ok(self
+    async fn search_or_list(
+        &self,
+        q: CodeListListQuery,
+    ) -> Result<Page<CodeList>, DomainError> {
+        let mut all: Vec<CodeList> = self
             .state
             .lock()
             .unwrap()
             .by_id
             .values()
-            .filter(|c| c.version_id == version_id)
+            .filter(|c| c.version_id == q.version_id)
             .cloned()
-            .collect())
+            .collect();
+
+        if let Some(frag) = q.fragment.as_deref().filter(|s| !s.trim().is_empty()) {
+            let needle = frag.to_lowercase();
+            all.retain(|cl| {
+                cl.name.to_lowercase().contains(&needle)
+                    || cl.submission_value.to_lowercase().contains(&needle)
+                    || cl.synonym.to_lowercase().contains(&needle)
+                    || cl.definition.to_lowercase().contains(&needle)
+                    || cl.nci_preferred_term.to_lowercase().contains(&needle)
+            });
+        }
+
+        all.sort_by_key(|cl| cl.id);
+        let limit = q.limit as usize;
+        let offset = q.offset as usize;
+        let mut items: Vec<CodeList> = all.into_iter().skip(offset).take(limit + 1).collect();
+        let next_offset = if items.len() > limit {
+            items.pop();
+            Some(q.offset + q.limit)
+        } else {
+            None
+        };
+        Ok(Page { items, next_offset })
     }
 
     async fn update(&self, input: CodeListUpdate) -> Result<CodeList, DomainError> {
@@ -256,44 +281,6 @@ impl CodeListRepository for InMemoryCodeListRepo {
             items.by_id.retain(|_, i| i.codelist_id != id);
         }
         Ok(())
-    }
-
-    async fn search(
-        &self,
-        query: CodeListSearchQuery,
-    ) -> Result<Vec<InternalCodeListSearchHit>, DomainError> {
-        // The in-memory backend mirrors the Postgres semantics on a
-        // best-effort basis: case-insensitive substring match
-        // against the same five text fields the generated `tsv`
-        // column covers. The order is the natural iteration order
-        // of the underlying map; callers that need a stable order
-        // should sort by `id`.
-        let needle = query.fragment.to_lowercase();
-        let limit = query.limit as usize;
-        let mut hits = Vec::new();
-        for cl in self.state.lock().unwrap().by_id.values() {
-            if cl.version_id != query.version_id {
-                continue;
-            }
-            if [
-                cl.name.as_str(),
-                cl.submission_value.as_str(),
-                cl.synonym.as_str(),
-                cl.definition.as_str(),
-                cl.nci_preferred_term.as_str(),
-            ]
-            .iter()
-            .any(|f| f.to_lowercase().contains(&needle))
-            {
-                hits.push(InternalCodeListSearchHit {
-                    codelist: cl.clone(),
-                });
-                if hits.len() >= limit {
-                    break;
-                }
-            }
-        }
-        Ok(hits)
     }
 }
 
@@ -362,16 +349,42 @@ impl CodeItemRepository for InMemoryCodeItemRepo {
             .ok_or(DomainError::CodeItemNotFound(id))
     }
 
-    async fn list_by_codelist(&self, codelist_id: i64) -> Result<Vec<CodeItem>, DomainError> {
-        Ok(self
+    async fn search_or_list(
+        &self,
+        q: CodeItemListQuery,
+    ) -> Result<Page<CodeItem>, DomainError> {
+        let mut all: Vec<CodeItem> = self
             .state
             .lock()
             .unwrap()
             .by_id
             .values()
-            .filter(|i| i.codelist_id == codelist_id)
+            .filter(|i| i.codelist_id == q.codelist_id)
             .cloned()
-            .collect())
+            .collect();
+
+        if let Some(frag) = q.fragment.as_deref().filter(|s| !s.trim().is_empty()) {
+            let needle = frag.to_lowercase();
+            all.retain(|item| {
+                item.submission_value.to_lowercase().contains(&needle)
+                    || item.synonym.to_lowercase().contains(&needle)
+                    || item.definition.to_lowercase().contains(&needle)
+                    || item.nci_preferred_term.to_lowercase().contains(&needle)
+                    || item.code.to_lowercase().contains(&needle)
+            });
+        }
+
+        all.sort_by_key(|i| i.id);
+        let limit = q.limit as usize;
+        let offset = q.offset as usize;
+        let mut items: Vec<CodeItem> = all.into_iter().skip(offset).take(limit + 1).collect();
+        let next_offset = if items.len() > limit {
+            items.pop();
+            Some(q.offset + q.limit)
+        } else {
+            None
+        };
+        Ok(Page { items, next_offset })
     }
 
     async fn list_by_version_and_code(
@@ -420,39 +433,6 @@ impl CodeItemRepository for InMemoryCodeItemRepo {
             return Err(DomainError::CodeItemNotFound(id));
         }
         Ok(())
-    }
-
-    async fn search(
-        &self,
-        query: CodeItemSearchQuery,
-    ) -> Result<Vec<InternalCodeItemSearchHit>, DomainError> {
-        // See `InMemoryCodeListRepo::search` for the matching
-        // rationale: case-insensitive substring across the five
-        // text fields, scoped to a single version, ordered by
-        // iteration order (caller can sort by `id` for stability).
-        let needle = query.fragment.to_lowercase();
-        let limit = query.limit as usize;
-        let mut hits = Vec::new();
-        for item in self.state.lock().unwrap().by_id.values() {
-            if item.version_id != query.version_id {
-                continue;
-            }
-            if [
-                item.submission_value.as_str(),
-                item.synonym.as_str(),
-                item.definition.as_str(),
-                item.nci_preferred_term.as_str(),
-            ]
-            .iter()
-            .any(|f| f.to_lowercase().contains(&needle))
-            {
-                hits.push(InternalCodeItemSearchHit { item: item.clone() });
-                if hits.len() >= limit {
-                    break;
-                }
-            }
-        }
-        Ok(hits)
     }
 
     async fn bulk_create(&self, inputs: Vec<CodeItemNew>) -> Result<usize, DomainError> {
