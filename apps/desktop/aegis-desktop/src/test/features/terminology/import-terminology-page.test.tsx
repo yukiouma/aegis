@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   createMemoryHistory,
@@ -19,11 +19,36 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
   open: vi.fn(),
 }));
 
+// Tauri v2 intercepts file drops at the OS level, so the DOM `drop` event
+// never fires inside the webview. The page subscribes to
+// `getCurrentWebview().onDragDropEvent`; we capture that handler here so
+// the tests can simulate a drop by invoking it directly.
+let dragDropHandler:
+  | ((event: { payload: { type: string; paths: string[] } }) => void)
+  | undefined;
+const dragDropUnlisten = vi.fn();
+vi.mock("@tauri-apps/api/webview", () => ({
+  getCurrentWebview: () => ({
+    onDragDropEvent: (
+      handler: (event: { payload: { type: string; paths: string[] } }) => void,
+    ) => {
+      dragDropHandler = handler;
+      return Promise.resolve(dragDropUnlisten);
+    },
+  }),
+}));
+
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { ImportTerminologyPage } from
   "../../../features/terminology/pages/ImportTerminologyPage";
 import { mockCommands } from "../../helpers/tauri-mock";
+
+function simulateDrop(paths: string[]) {
+  act(() => {
+    dragDropHandler?.({ payload: { type: "drop", paths } });
+  });
+}
 
 const versionView = {
   id: 42,
@@ -36,6 +61,8 @@ const versionView = {
 beforeEach(() => {
   (invoke as unknown as ReturnType<typeof vi.fn>).mockReset();
   (open as unknown as ReturnType<typeof vi.fn>).mockReset();
+  dragDropHandler = undefined;
+  dragDropUnlisten.mockReset();
 });
 afterEach(() => cleanup());
 
@@ -125,9 +152,7 @@ describe("ImportTerminologyPage — file picker", () => {
 describe("ImportTerminologyPage — drop validation", () => {
   it("rejects a .pdf drop with a flash hint and no state change", async () => {
     await renderPage({ initialEntries: ["/terminology/import?kind=sdtm"] });
-    const zone = screen.getByText(/drop an \.xls or \.xlsx file here/i);
-    const file = new File(["pdf"], "report.pdf", { type: "application/pdf" });
-    fireEvent.drop(zone, { dataTransfer: { files: [file] } });
+    simulateDrop(["/Users/me/Downloads/report.pdf"]);
     await waitFor(() => {
       expect(screen.getByText(/only \.xls or \.xlsx files are supported/i)).toBeInTheDocument();
     });
@@ -137,9 +162,7 @@ describe("ImportTerminologyPage — drop validation", () => {
 
   it("accepts a .xlsx drop and shows the basename", async () => {
     await renderPage({ initialEntries: ["/terminology/import?kind=sdtm"] });
-    const zone = screen.getByText(/drop an \.xls or \.xlsx file here/i);
-    const file = new File(["x"], "sdtm.xlsx", { type: "" });
-    fireEvent.drop(zone, { dataTransfer: { files: [file] } });
+    simulateDrop(["/Users/me/Downloads/sdtm.xlsx"]);
     await waitFor(() => {
       expect(screen.getByText("sdtm.xlsx")).toBeInTheDocument();
     });
