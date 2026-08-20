@@ -98,7 +98,7 @@ describe("TerminologyPage pagination", () => {
         const offset = Number(args?.offset ?? 0);
         const rows = Array.from({ length: 20 }, (_, i) => makeRow(offset + i + 1));
         const nextOffset = offset + 20 < 40 ? offset + 20 : undefined;
-        return { codelists: rows, nextOffset };
+        return { items: rows, nextOffset };
       },
     });
 
@@ -117,6 +117,10 @@ describe("TerminologyPage pagination", () => {
     );
 
     await waitFor(() => expect(screen.getByText("C21")).toBeInTheDocument());
+    // Both pages must remain in the DOM — pagination is append-only.
+    expect(screen.getByText("C1")).toBeInTheDocument();
+    expect(screen.getByText("C20")).toBeInTheDocument();
+    expect(screen.getByText("C40")).toBeInTheDocument();
     expect(mockInvoke).toHaveBeenCalledWith(
       "list_code_lists",
       expect.objectContaining({ offset: 20, limit: 20 }),
@@ -156,7 +160,7 @@ describe("TerminologyPage debounce", () => {
         updatedAt: "2026-01-01T00:00:00Z",
       }),
       list_terminology_versions: () => versions,
-      list_code_lists: () => ({ codelists: [], nextOffset: undefined }),
+      list_code_lists: () => ({ items: [], nextOffset: undefined }),
     });
 
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -197,7 +201,7 @@ describe("TerminologyPage debounce", () => {
         const rows = fragment
           ? [makeRow(101)]
           : Array.from({ length: 20 }, (_, i) => makeRow(offset + i + 1));
-        return { codelists: rows, nextOffset: undefined };
+        return { items: rows, nextOffset: undefined };
       },
     });
 

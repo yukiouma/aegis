@@ -16,7 +16,6 @@ import { InfiniteScrollSentinel } from "../../../shared/components/InfiniteScrol
 import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
 import { useCurrentUser } from "../../auth";
 import {
-  PAGE_SIZE,
   useCreateCodeList,
   useDeleteCodeList,
   useListCodeLists,
@@ -54,7 +53,6 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
   const urlVersionId = routeSearch.versionId;
 
   const [search, setSearch] = useState("");
-  const [offset, setOffset] = useState(0);
   const [drawer, setDrawer] = useState<DrawerState>(null);
   const [confirmDelete, setConfirmDelete] = useState<CodeListView | null>(null);
 
@@ -102,14 +100,12 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
     maxWaitMs: 1000,
   });
 
-  // Reset pagination whenever the parent (version) or the debounced fragment changes.
-  useEffect(() => {
-    setOffset(0);
-  }, [selectedVersionId, debouncedFragment]);
+  // Pagination state lives inside `useInfiniteQuery`; the (version, fragment)
+  // tuple is the cache key, so a change either way starts a fresh series
+  // and discards the previously fetched pages.
 
   const codeListsQuery = useListCodeLists(selectedVersionId, {
     fragment: debouncedFragment,
-    offset,
   });
 
   const createCodeList = useCreateCodeList();
@@ -119,8 +115,11 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
   const role = currentUser.data?.role;
   const canMutate = role === "admin" || role === "root";
 
-  const rows = codeListsQuery.data?.items ?? [];
-  const hasMore = codeListsQuery.data?.nextOffset != null;
+  const rows = useMemo(
+    () => codeListsQuery.data?.pages.flatMap((p) => p.items) ?? [],
+    [codeListsQuery.data],
+  );
+  const hasMore = codeListsQuery.hasNextPage ?? false;
   const trimmedQuery = debouncedFragment.trim();
 
   const mutationLoading =
@@ -178,9 +177,9 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
       />
 
       <InfiniteScrollSentinel
-        onIntersect={() => setOffset((o) => o + PAGE_SIZE)}
+        onIntersect={() => void codeListsQuery.fetchNextPage()}
         hasMore={hasMore}
-        loading={codeListsQuery.isFetching}
+        loading={codeListsQuery.isFetchingNextPage}
       />
 
       <CodeListDrawer

@@ -1,4 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+  type QueryKey,
+} from "@tanstack/react-query";
 
 import {
   api,
@@ -71,28 +78,30 @@ export function useDeleteTerminologyVersion() {
 
 export interface ListPagedOptions {
   fragment?: string;
-  offset?: number;
 }
 
 /**
- * Codelists for a given terminology version. Paged: returns
- * `{ codelists, nextOffset? }`. `fragment = ""` (or whitespace) is treated
- * as "no filter" by stripping it before sending.
+ * Codelists for a given terminology version. Uses `useInfiniteQuery` so the
+ * caller can `fetchNextPage()` to append more rows without losing the
+ * previously-fetched ones. Each page is a `PagedCodeListListResponse`; the
+ * next page's offset is read from `lastPage.nextOffset`. `fragment = ""`
+ * (or whitespace) is treated as "no filter" by stripping it before sending.
  */
 export function useListCodeLists(
   versionId: number | null,
   options: ListPagedOptions = {},
 ) {
   const fragment = options.fragment ?? "";
-  const offset = options.offset ?? 0;
-  return useQuery<PagedCodeListListResponse, ApiError>({
-    queryKey: queryKeys.terminology.codeLists(versionId ?? 0, fragment, offset),
-    queryFn: () =>
+  return useInfiniteQuery<PagedCodeListListResponse, ApiError, InfiniteData<PagedCodeListListResponse>, QueryKey, number>({
+    queryKey: queryKeys.terminology.codeLists(versionId ?? 0, fragment),
+    queryFn: ({ pageParam }) =>
       api.listCodeLists(versionId!, {
         fragment: fragment.trim() === "" ? undefined : fragment,
-        offset,
+        offset: pageParam,
         limit: PAGE_SIZE,
       }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextOffset,
     enabled: versionId != null && versionId > 0,
   });
 }
@@ -159,15 +168,16 @@ export function useListCodeItems(
   options: ListPagedOptions = {},
 ) {
   const fragment = options.fragment ?? "";
-  const offset = options.offset ?? 0;
-  return useQuery<PagedCodeItemListResponse, ApiError>({
-    queryKey: queryKeys.terminology.codeItems(codelistId ?? 0, fragment, offset),
-    queryFn: () =>
+  return useInfiniteQuery<PagedCodeItemListResponse, ApiError, InfiniteData<PagedCodeItemListResponse>, QueryKey, number>({
+    queryKey: queryKeys.terminology.codeItems(codelistId ?? 0, fragment),
+    queryFn: ({ pageParam }) =>
       api.listCodeItems(codelistId!, {
         fragment: fragment.trim() === "" ? undefined : fragment,
-        offset,
+        offset: pageParam,
         limit: PAGE_SIZE,
       }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextOffset,
     enabled: codelistId != null && codelistId > 0,
   });
 }

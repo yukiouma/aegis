@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   getRouteApi,
   useNavigate,
@@ -34,7 +34,6 @@ import { InfiniteScrollSentinel } from "../../../shared/components/InfiniteScrol
 import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
 import { useCurrentUser } from "../../auth";
 import {
-  PAGE_SIZE,
   useCreateCodeItem,
   useDeleteCodeItem,
   useGetCodeList,
@@ -89,7 +88,6 @@ export function CodeListDetailPage() {
     : undefined;
 
   const [search2, setSearch2] = useState("");
-  const [offset, setOffset] = useState(0);
   const [editCodelistDrawerOpen, setEditCodelistDrawerOpen] = useState(false);
   const [itemDrawer, setItemDrawer] = useState<ItemDrawerState>(null);
   const [confirmDelete, setConfirmDelete] = useState<CodeItemView | null>(null);
@@ -99,13 +97,12 @@ export function CodeListDetailPage() {
     maxWaitMs: 1000,
   });
 
-  useEffect(() => {
-    setOffset(0);
-  }, [codelistId, debouncedFragment]);
+  // Pagination state lives inside `useInfiniteQuery`; the (codelistId, fragment)
+  // tuple is the cache key, so a change either way starts a fresh series
+  // and discards the previously fetched pages.
 
   const itemsQuery = useListCodeItems(codelistId, {
     fragment: debouncedFragment,
-    offset,
   });
 
   const updateCodelist = useUpdateCodeList();
@@ -113,8 +110,11 @@ export function CodeListDetailPage() {
   const updateItem = useUpdateCodeItem();
   const deleteItem = useDeleteCodeItem();
 
-  const rows = itemsQuery.data?.items ?? [];
-  const hasMore = itemsQuery.data?.nextOffset != null;
+  const rows = useMemo(
+    () => itemsQuery.data?.pages.flatMap((p) => p.items) ?? [],
+    [itemsQuery.data],
+  );
+  const hasMore = itemsQuery.hasNextPage ?? false;
   const trimmedQuery = debouncedFragment.trim();
 
   const mutationLoading =
@@ -228,9 +228,9 @@ export function CodeListDetailPage() {
       />
 
       <InfiniteScrollSentinel
-        onIntersect={() => setOffset((o) => o + PAGE_SIZE)}
+        onIntersect={() => void itemsQuery.fetchNextPage()}
         hasMore={hasMore}
-        loading={itemsQuery.isFetching}
+        loading={itemsQuery.isFetchingNextPage}
       />
 
       {codelist && (

@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { InfiniteScrollSentinel } from "./InfiniteScrollSentinel";
+import { InfiniteScrollSentinel } from "../../../shared/components/InfiniteScrollSentinel";
 
 let observers: Array<{
   cb: IntersectionObserverCallback;
