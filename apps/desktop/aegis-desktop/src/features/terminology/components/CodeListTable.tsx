@@ -88,9 +88,7 @@ export function CodeListTable(props: CodeListTableProps) {
               </TableCell>
               <TableCell sx={{ width: 110 }} align="right">
                 {props.canMutate ? (
-                  <Tooltip
-                    title={t("terminology.codelist.create.title")}
-                  >
+                  <Tooltip title={t("terminology.codelist.create.title")}>
                     <IconButton
                       size="small"
                       aria-label={t("terminology.codelist.create.title")}
@@ -136,25 +134,19 @@ export function CodeListTable(props: CodeListTableProps) {
                         justifyContent: "flex-end",
                       }}
                     >
-                      {props.canMutate && (
-                        <Tooltip
-                          title={t("terminology.codelist.field.code")}
+                      <Tooltip title={t("terminology.codelist.field.code")}>
+                        <IconButton
+                          size="small"
+                          aria-label={`open ${row.code}`}
+                          onClick={() => props.onOpen(row)}
+                          disabled={disabled}
                         >
-                          <IconButton
-                            size="small"
-                            aria-label={`open ${row.code}`}
-                            onClick={() => props.onOpen(row)}
-                            disabled={disabled}
-                          >
-                            <LaunchIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
+                          <LaunchIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                       {props.canMutate && (
                         <Tooltip
-                          title={t(
-                            "terminology.action.delete.confirmTitle",
-                          )}
+                          title={t("terminology.action.delete.confirmTitle")}
                         >
                           <IconButton
                             size="small"
