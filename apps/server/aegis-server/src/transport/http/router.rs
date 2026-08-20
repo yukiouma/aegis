@@ -947,9 +947,11 @@ mod tests {
         }
         async fn list_code_lists(
             &self,
-            _version_id: i64,
-        ) -> Result<Vec<apis::terminology::CodeListView>, apis::terminology::TerminologyApiError>
-        {
+            _query: apis::terminology::CodeListListQuery,
+        ) -> Result<
+            apis::terminology::Page<apis::terminology::CodeListView>,
+            apis::terminology::TerminologyApiError,
+        > {
             unimplemented!()
         }
         async fn get_code_list_by_id(
@@ -972,13 +974,6 @@ mod tests {
         ) -> Result<(), apis::terminology::TerminologyApiError> {
             unimplemented!()
         }
-        async fn search_code_lists(
-            &self,
-            _query: apis::terminology::CodeListSearchQuery,
-        ) -> Result<Vec<apis::terminology::CodeListSearchHit>, apis::terminology::TerminologyApiError>
-        {
-            unimplemented!()
-        }
         async fn create_code_item(
             &self,
             _req: apis::terminology::CreateCodeItemRequest,
@@ -988,9 +983,11 @@ mod tests {
         }
         async fn list_code_items(
             &self,
-            _codelist_id: i64,
-        ) -> Result<Vec<apis::terminology::CodeItemView>, apis::terminology::TerminologyApiError>
-        {
+            _query: apis::terminology::CodeItemListQuery,
+        ) -> Result<
+            apis::terminology::Page<apis::terminology::CodeItemView>,
+            apis::terminology::TerminologyApiError,
+        > {
             unimplemented!()
         }
         async fn list_code_items_by_version_and_code(
@@ -1012,13 +1009,6 @@ mod tests {
             &self,
             _id: i64,
         ) -> Result<(), apis::terminology::TerminologyApiError> {
-            unimplemented!()
-        }
-        async fn search_code_items(
-            &self,
-            _query: apis::terminology::CodeItemSearchQuery,
-        ) -> Result<Vec<apis::terminology::CodeItemSearchHit>, apis::terminology::TerminologyApiError>
-        {
             unimplemented!()
         }
         async fn batch_create_code_items(
