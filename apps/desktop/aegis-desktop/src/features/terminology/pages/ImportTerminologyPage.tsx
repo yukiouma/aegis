@@ -1,8 +1,8 @@
-import { useState } from "react";
-import type { DragEvent } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { open } from "@tauri-apps/plugin-dialog";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import {
   Alert,
   Box,
@@ -91,23 +91,35 @@ export function ImportTerminologyPage() {
     if (typeof path === "string") setFilepath(path);
   }
 
-  function onDrop(e: DragEvent<HTMLDivElement>) {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    const lower = file.name.toLowerCase();
-    if (!lower.endsWith(".xls") && !lower.endsWith(".xlsx")) {
-      setDropError(true);
-      window.setTimeout(() => setDropError(false), 1500);
-      return;
-    }
-    // Tauri's webview populates File.path with the absolute filesystem path
-    // for drag-dropped files. In browser/jsdom test environments the field
-    // is absent, so fall back to the basename.
-    const filePath =
-      (file as unknown as { path?: string }).path ?? file.name;
-    setFilepath(filePath);
-  }
+  // Tauri v2 intercepts file drops at the OS level, so the DOM `drop` event
+  // never fires inside the webview. Subscribe to the webview's drag-drop
+  // event stream instead — its `drop` payload contains absolute filesystem
+  // paths that the Rust `import_terminology` command can read directly.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+    getCurrentWebview()
+      .onDragDropEvent((event) => {
+        if (event.payload.type !== "drop") return;
+        const path = event.payload.paths[0];
+        if (!path) return;
+        const lower = path.toLowerCase();
+        if (!lower.endsWith(".xls") && !lower.endsWith(".xlsx")) {
+          setDropError(true);
+          window.setTimeout(() => setDropError(false), 1500);
+          return;
+        }
+        setFilepath(path);
+      })
+      .then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
 
   const canSubmit =
     kind !== null && filepath !== null && !importMutation.isPending;
@@ -160,8 +172,6 @@ export function ImportTerminologyPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" || e.key === " ") pickFile();
               }}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={onDrop}
               sx={(theme) => ({
                 p: 4,
                 border: "2px dashed",
