@@ -116,6 +116,10 @@ describe("CodeListDetailPage pagination", () => {
     );
 
     await waitFor(() => expect(screen.getByText("I21")).toBeInTheDocument());
+    // Both pages must remain in the DOM — pagination is append-only.
+    expect(screen.getByText("I1")).toBeInTheDocument();
+    expect(screen.getByText("I20")).toBeInTheDocument();
+    expect(screen.getByText("I40")).toBeInTheDocument();
     expect(mockInvoke).toHaveBeenCalledWith(
       "list_code_items",
       expect.objectContaining({ offset: 20, limit: 20 }),
