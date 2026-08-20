@@ -2,6 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
 
@@ -36,6 +37,7 @@ function renderTable(props: {
   onOpen?: ReturnType<typeof vi.fn>;
   onDelete?: ReturnType<typeof vi.fn>;
   onCreate?: ReturnType<typeof vi.fn>;
+  bottomSlot?: (scrollEl: HTMLElement | null) => ReactNode;
 }) {
   return render(
     <AegisThemeProvider>
@@ -51,6 +53,7 @@ function renderTable(props: {
           onCreate={props.onCreate ?? (() => {})}
           onDelete={props.onDelete ?? (() => {})}
           onOpen={props.onOpen ?? (() => {})}
+          bottomSlot={props.bottomSlot}
         />
       </AegisI18nProvider>
     </AegisThemeProvider>,
@@ -108,5 +111,38 @@ describe("CodeListTable — action gating", () => {
 
     expect(onDelete).toHaveBeenCalledTimes(1);
     expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ code: "AE" }));
+  });
+});
+
+describe("CodeListTable — bottomSlot", () => {
+  it("renders bottomSlot's output inside the scroll container", () => {
+    renderTable({
+      rows: [],
+      canMutate: false,
+      bottomSlot: () => <div data-testid="codelist-slot">sentinel here</div>,
+    });
+
+    const slot = screen.getByTestId("codelist-slot");
+    // The Paper component is what TableContainer renders as; the slot must be a descendant.
+    const paper = slot.closest(".MuiPaper-root");
+    expect(paper).not.toBeNull();
+    expect(paper).toContainElement(slot);
+  });
+
+  it("passes the scroll container element to bottomSlot", () => {
+    const captured: Array<HTMLElement | null> = [];
+    renderTable({
+      rows: [],
+      canMutate: false,
+      bottomSlot: (el) => {
+        captured.push(el);
+        return <div data-testid="codelist-slot" />;
+      },
+    });
+
+    // At least one call must receive a non-null element (post-mount).
+    const nonNull = captured.find((el) => el !== null);
+    expect(nonNull).toBeDefined();
+    expect(nonNull!.classList.contains("MuiPaper-root")).toBe(true);
   });
 });

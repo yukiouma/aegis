@@ -21,6 +21,7 @@ import {
   Launch as LaunchIcon,
 } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
+import { useCallback, useState, type ReactNode } from "react";
 
 import { errorMessage } from "../../../shared/api/error";
 import type { ApiError, CodeListView } from "../../../shared/api";
@@ -44,12 +45,24 @@ export type CodeListTableProps = {
   onDelete: (row: CodeListView) => void;
   onOpen: (row: CodeListView) => void;
   emptyMessage?: string;
+  /** Rendered inside the scroll container, after the Table. Receives the
+   *  scroll container element so callers can wire IntersectionObserver
+   *  roots that observe scroll-within-table. */
+  bottomSlot?: (scrollEl: HTMLElement | null) => ReactNode;
 };
 
 export function CodeListTable(props: CodeListTableProps) {
   const { t } = useI18n();
   const showSpinner = props.loading && props.rows.length === 0;
   const emptyMessage = props.emptyMessage ?? t("terminology.codelist.empty");
+
+  // Capture the TableContainer's DOM element via a callback ref so we can
+  // hand it to `bottomSlot`. The state update forces a re-render when the
+  // element is committed, after which `bottomSlot` receives a non-null value.
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+  const containerRefCallback = useCallback((node: HTMLDivElement | null) => {
+    setScrollEl(node);
+  }, []);
 
   if (props.error && props.rows.length === 0) {
     return (
@@ -74,8 +87,12 @@ export function CodeListTable(props: CodeListTableProps) {
         </Box>
       )}
 
-      <TableContainer component={Paper}>
-        <Table size="small">
+      <TableContainer
+        component={Paper}
+        ref={containerRefCallback}
+        sx={{ maxHeight: "calc(100vh - 240px)" }}
+      >
+        <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
               <TableCell>{t("terminology.codelist.field.code")}</TableCell>
@@ -171,6 +188,7 @@ export function CodeListTable(props: CodeListTableProps) {
             <Typography color="textSecondary">{emptyMessage}</Typography>
           </Box>
         )}
+        {props.bottomSlot?.(scrollEl)}
       </TableContainer>
     </Box>
   );
