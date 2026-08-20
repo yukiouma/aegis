@@ -1,7 +1,7 @@
 use crate::domain::{
-    CodeItemNew, CodeItemRepository, CodeItemSearchHit, CodeItemSearchQuery, CodeItemUpdate,
-    CodeListNew, CodeListRepository, CodeListSearchHit, CodeListSearchQuery, CodeListUpdate,
-    DomainError, TerminologyVersionNew, TerminologyVersionRepository, TerminologyVersionUpdate,
+    CodeItemListQuery, CodeItemNew, CodeItemRepository, CodeItemUpdate, CodeListListQuery,
+    CodeListNew, CodeListRepository, CodeListUpdate, DomainError, Page,
+    TerminologyVersionNew, TerminologyVersionRepository, TerminologyVersionUpdate,
 };
 
 use super::commands::{
@@ -131,10 +131,21 @@ where
 
     pub async fn list_code_lists(
         &self,
-        version_id: i64,
-    ) -> Result<Vec<CodeListView>, UsecaseError> {
-        let lists = self.code_list_repo.list_by_version(version_id).await?;
-        Ok(lists.into_iter().map(Into::into).collect())
+        query: CodeListListQuery,
+    ) -> Result<Page<CodeListView>, UsecaseError> {
+        let limit = clamp_limit(query.limit);
+        let fragment = normalize_fragment(query.fragment.as_deref())?;
+        let q = CodeListListQuery {
+            fragment,
+            offset: query.offset,
+            limit,
+            ..query
+        };
+        let page = self.code_list_repo.search_or_list(q).await?;
+        Ok(Page {
+            items: page.items.into_iter().map(Into::into).collect(),
+            next_offset: page.next_offset,
+        })
     }
 
     pub async fn update_code_list(
@@ -163,21 +174,6 @@ where
         Ok(())
     }
 
-    pub async fn search_code_lists(
-        &self,
-        q: CodeListSearchQuery,
-    ) -> Result<Vec<CodeListSearchHit>, UsecaseError> {
-        validate_fragment(&q.fragment)?;
-        let hits = self
-            .code_list_repo
-            .search(CodeListSearchQuery {
-                limit: clamp_limit(q.limit),
-                ..q
-            })
-            .await?;
-        Ok(hits)
-    }
-
     // ---- CodeItem ----
 
     pub async fn create_code_item(
@@ -202,10 +198,21 @@ where
 
     pub async fn list_code_items(
         &self,
-        codelist_id: i64,
-    ) -> Result<Vec<CodeItemView>, UsecaseError> {
-        let items = self.code_item_repo.list_by_codelist(codelist_id).await?;
-        Ok(items.into_iter().map(Into::into).collect())
+        query: CodeItemListQuery,
+    ) -> Result<Page<CodeItemView>, UsecaseError> {
+        let limit = clamp_limit(query.limit);
+        let fragment = normalize_fragment(query.fragment.as_deref())?;
+        let q = CodeItemListQuery {
+            fragment,
+            offset: query.offset,
+            limit,
+            ..query
+        };
+        let page = self.code_item_repo.search_or_list(q).await?;
+        Ok(Page {
+            items: page.items.into_iter().map(Into::into).collect(),
+            next_offset: page.next_offset,
+        })
     }
 
     /// Natural-key lookup on the `code_items` table. Returns every
@@ -251,21 +258,6 @@ where
     pub async fn delete_code_item(&self, id: i64) -> Result<(), UsecaseError> {
         self.code_item_repo.delete(id).await?;
         Ok(())
-    }
-
-    pub async fn search_code_items(
-        &self,
-        q: CodeItemSearchQuery,
-    ) -> Result<Vec<CodeItemSearchHit>, UsecaseError> {
-        validate_fragment(&q.fragment)?;
-        let hits = self
-            .code_item_repo
-            .search(CodeItemSearchQuery {
-                limit: clamp_limit(q.limit),
-                ..q
-            })
-            .await?;
-        Ok(hits)
     }
 
     pub async fn batch_create_code_items(
@@ -361,18 +353,31 @@ fn validate_batch_code_items(cmd: &BatchCreateCodeItems) -> Result<(), UsecaseEr
 
 // ---- search-query sanitation ----
 
-/// Reject an empty / whitespace-only fragment. Both Postgres
-/// (`plainto_tsquery`) and the in-memory backend would otherwise
-/// return every row in the version, which is almost certainly
-/// not what the caller asked for.
-fn validate_fragment(fragment: &str) -> Result<(), UsecaseError> {
-    if fragment.trim().is_empty() {
-        return Err(UsecaseError::Validation(DomainError::EmptyFragment));
+/// Normalise a fragment for the list+search path:
+/// - `None` or `Some("")` (whitespace-only after trim) → `None`
+///   (treat as "no fragment", plain list path).
+/// - `Some(non-empty)` → run `validate_tsquery_fragment` and pass
+///   the trimmed fragment to the repo.
+fn normalize_fragment(fragment: Option<&str>) -> Result<Option<String>, UsecaseError> {
+    match fragment {
+        None => Ok(None),
+        Some(s) if s.trim().is_empty() => Ok(None),
+        Some(s) => Ok(Some(validate_tsquery_fragment(s)?.to_owned())),
     }
-    Ok(())
 }
 
-/// Apply the default + hard cap to the `limit` field of a search
+/// Reject any fragment containing characters reserved by Postgres
+/// `to_tsquery` (`& | ! ( ) :`). The usecase passes `fragment = None`
+/// (or `Some("")`) when the caller wants the plain list path, so
+/// empty / whitespace-only fragments never reach this helper.
+fn validate_tsquery_fragment(s: &str) -> Result<&str, UsecaseError> {
+    if s.chars().any(|c| matches!(c, '&' | '|' | '!' | '(' | ')' | ':')) {
+        return Err(UsecaseError::Validation(DomainError::InvalidFragment));
+    }
+    Ok(s)
+}
+
+/// Apply the default + hard cap to the `limit` field of a list+search
 /// query. The Postgres implementation reads the clamped value, so
 /// the cap is enforced even when tests pass an unbounded `u32::MAX`.
 fn clamp_limit(limit: u32) -> u32 {
