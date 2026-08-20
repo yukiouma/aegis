@@ -2,19 +2,19 @@
 
 **Date:** 2026-08-20
 **Status:** Approved (pending spec review)
-**Scope:** Collapse the four list/search endpoints on codelists and items (`GET /code-lists`, `GET /code-lists/search`, `GET /code-items`, `GET /code-items/search`) into two unified list+search endpoints with optional full-text `fragment` and offset/limit pagination. Keep `GET /code-items/by-version-and-code` unchanged — its cross-codelist natural-key semantics are different from a list-with-filter. Touches every layer (domain, usecase, apis, service, http, tauri).
+**Scope:** Collapse the four list/search endpoints on codelists and items (`GET /code-lists`, `GET /code-lists/search`, `GET /code-items`, `GET /code-items/search`) into two unified list+search endpoints with optional full-text `fragment` and offset/limit pagination. Keep `GET /code-items/by-version-and-code` unchanged — its cross-codelist natural-key semantics are different from a list-with-filter. Server-side only: touches every layer from the domain up through the HTTP router. The Tauri desktop client is explicitly out of scope (see section 9).
 
 ---
 
 ## 1. Goals
 
-1. Replace `list_code_lists` + `search_code_lists` on the usecase / apis trait / http / tauri with one method `list_code_lists(CodeListListQuery)` that takes `(version_id, fragment?, offset, limit)` and returns a `Page<CodeListView>`.
+1. Replace `list_code_lists` + `search_code_lists` on the usecase / apis trait / http with one method `list_code_lists(CodeListListQuery)` that takes `(version_id, fragment?, offset, limit)` and returns a `Page<CodeListView>`.
 2. Replace `list_code_items` + `search_code_items` on the same layers with one method `list_code_items(CodeItemListQuery)` that takes `(codelist_id, fragment?, offset, limit)` and returns a `Page<CodeItemView>`.
 3. Add offset/limit pagination to both. `next_offset` in the response is the cursor for the next page; absent when the page was the last.
 4. Keep the existing FTS prefix-match semantics (`to_tsquery(fragment || ':*')`, ranked by `ts_rank DESC`, with `id ASC` as tiebreaker).
 5. Defend against tsquery syntax errors (fragments containing `& | ! ( ) :`) by rejecting them at the usecase with a new `DomainError::InvalidFragment` → 400.
 6. Keep `list_code_items_by_version_and_code` and `GET /code-items/by-version-and-code` exactly as-is.
-7. Out of scope: cursor-based pagination, total count, fuzzy / substring search, configurable sort order, additional full-text fields, deprecation period (old endpoints are removed in the same change since the Tauri TS layer doesn't use them).
+7. Out of scope: cursor-based pagination, total count, fuzzy / substring search, configurable sort order, additional full-text fields, deprecation period (the old search endpoints are removed in the same change; the Tauri `search_*` commands that called them are dormant and are non-blocking to remove in a follow-up — see section 9).
 
 ---
 
@@ -423,21 +423,19 @@ pub fn router() -> OpenApiRouter<AppState> {
 
 ---
 
-## 9. Tauri desktop client
+## 9. Out of scope: Tauri desktop client
 
-| File | Change |
-| --- | --- |
-| `apps/desktop/aegis-desktop/src-tauri/src/commands/terminology/code_list.rs` | `search_code_lists` command removed; `list_code_lists` gains optional `fragment`, `offset`, `limit` params and returns the `PagedCodeListsResponse` shape. |
-| `apps/desktop/aegis-desktop/src-tauri/src/commands/terminology/code_item.rs` | Same: drop `search_code_items`, extend `list_code_items` with pagination + fragment. |
-| `apps/desktop/aegis-desktop/src-tauri/src/http/terminology/code_list.rs` | `list` builds `?versionId=&fragment=&offset=&limit=` and parses `{ codelists, nextOffset? }`; `search` removed; mirror DTOs updated. |
-| `apps/desktop/aegis-desktop/src-tauri/src/http/terminology/code_item.rs` | Same. |
-| `apps/desktop/aegis-desktop/src-tauri/src/http/terminology/code_list.rs::tests` / `code_item.rs::tests` | Update wiremock expectations to the new response shape (add `nextOffset` to the paged fixtures, drop the search fixture). |
-| `apps/desktop/aegis-desktop/src/shared/api/types.ts` | `CodeListListResponse` and `CodeItemListResponse` get an optional `nextOffset` field; `CodeListSearchQueryRequest` / `CodeItemSearchQueryRequest` and the `*SearchHitResponse` types removed. |
-| `apps/desktop/aegis-desktop/src/shared/api/index.ts` | `listCodeLists` / `listCodeItems` signatures extended; `searchCodeLists` / `searchCodeItems` removed. |
-| `apps/desktop/aegis-desktop/src/shared/query/keys.ts` | The unused `searchCodeLists` / `searchCodeItems` keys are removed. |
-| `apps/desktop/aegis-desktop/src/features/terminology/data/list.ts` | `useListCodeLists(versionId, { fragment?, offset?, limit? })` and `useListCodeItems(codelistId, …)` accept the new options; pages are stitched together via `nextOffset`. |
+This refactor is server-side only. **No files under `apps/desktop/aegis-desktop/` are touched.**
 
-The two `useMemo` client-side filters in `TerminologyPage.tsx` and `CodeListDetailPage.tsx` are replaced with server-side searches: as the user types in the search box, the page resets `offset` to 0 and triggers a new fetch.
+The wire shape is backwards-compatible by design:
+- The list endpoints keep the same path (`GET /code-lists`, `GET /code-items`) and the same required query param (`versionId`, `codelistId`). New params are all optional.
+- The response envelope keeps the same JSON field names (`codelists`, `items`). The new `nextOffset` field is an optional, additive field that the existing Tauri HTTP client (`http/terminology/code_list.rs::list`, `http/terminology/code_item.rs::list`) ignores when it unwraps `resp.codelists` / `resp.items` to a `Vec`.
+- The existing Tauri commands (`list_code_lists(versionId) -> Vec<CodeListView>`, `list_code_items(codelistId) -> Vec<CodeItemView>`) keep their signatures and continue to call the HTTP endpoints with only the required param.
+- The two `useMemo` client-side filters in `TerminologyPage.tsx` and `CodeListDetailPage.tsx` are unchanged; they continue to filter the full loaded list in memory.
+
+The Tauri search commands (`search_code_lists`, `search_code_items`) are already unreferenced from the TS layer but stay in the Rust command surface until a follow-up issue removes them. They hit the now-removed `/code-lists/search` and `/code-items/search` server endpoints, so calling them returns 404; this matches their existing dormant state.
+
+Future work (out of scope here): remove the Tauri search commands and switch the frontend's `useMemo` filters to server-side searches using the new `fragment` query param.
 
 ---
 
@@ -502,18 +500,7 @@ The two `useMemo` client-side filters in `TerminologyPage.tsx` and `CodeListDeta
 - Add: `list_code_lists_paginates_across_multiple_pages`, `list_code_lists_with_fragment_returns_ranked_matches`, `list_code_lists_with_empty_fragment_returns_plain_list`, `list_code_lists_rejects_invalid_fragment`, plus the same four for items.
 - Remove: existing search-method integration checks (search moves into the unified method).
 
-**Tauri (`apps/desktop/aegis-desktop/src-tauri/`)**
-- `commands/terminology/code_list.rs`, `commands/terminology/code_item.rs`
-- `http/terminology/code_list.rs`, `http/terminology/code_item.rs`
-- `http/terminology/code_list.rs::tests`, `http/terminology/code_item.rs::tests`
-
-**Desktop frontend (`apps/desktop/aegis-desktop/src/`)**
-- `shared/api/types.ts`
-- `shared/api/index.ts`
-- `shared/query/keys.ts`
-- `features/terminology/data/list.ts`
-- `features/terminology/TerminologyPage.tsx` (drop useMemo, use server search)
-- `features/terminology/CodeListDetailPage.tsx` (drop useMemo, use server search)
+**No files under `apps/desktop/aegis-desktop/` are touched by this refactor.** See section 9.
 
 ---
 
@@ -559,9 +546,9 @@ Run with `cargo test -p terminology --test integration_persistence -- --ignored`
 - Drop the existing `search_*_handler_*` tests.
 - Add `list_code_lists_returns_first_page_with_next_offset`, `list_code_lists_returns_empty_page_when_no_codelists`, `list_code_lists_with_fragment_filters`, `list_code_lists_with_invalid_fragment_returns_400`, `list_code_lists_paginates` — and the matching five for items.
 
-### 12.4 Tauri wiremock
+### 12.4 Tauri coverage
 
-`apps/desktop/aegis-desktop/src-tauri/src/http/terminology/code_list.rs::tests` and `code_item.rs::tests` — update fixtures to the new paged shape (add `nextOffset`, drop `hits`).
+No Tauri (`apps/desktop/aegis-desktop/`) test fixtures are updated by this refactor. The existing Tauri wiremock tests for the list endpoints keep their un-paged JSON fixtures and still pass because the wire shape is backwards-compatible (the client unwraps `codelists` / `items` to a `Vec` and ignores `nextOffset`).
 
 ---
 
@@ -571,7 +558,7 @@ Run with `cargo test -p terminology --test integration_persistence -- --ignored`
 - `cargo test -p terminology --lib` (60 tests today → grows by ~14 new tests)
 - `cargo test -p aegis-server --lib transport::http::terminology`
 - `cargo test -p terminology --test integration_persistence -- --ignored` against live Postgres
-- `cargo test -p aegis-desktop --lib` (Tauri commands / http client)
+- `cargo test -p aegis-desktop --lib` (sanity check — must remain green; no fixtures are modified)
 
 ## 14. Out of scope
 
@@ -580,4 +567,5 @@ Run with `cargo test -p terminology --test integration_persistence -- --ignored`
 - Substring / ILIKE search (FTS only)
 - Configurable sort order
 - New tsv columns
-- A deprecation period for the search endpoints (the TS layer doesn't reference them)
+- Touching any file under `apps/desktop/aegis-desktop/` (see section 9)
+- Replacing the Tauri `search_code_lists` / `search_code_items` commands with server-side search wiring
