@@ -178,7 +178,7 @@ export interface CodeListListResponse {
 }
 
 export interface PagedCodeListListResponse {
-  codelists: CodeListView[];
+  items: CodeListView[];
   nextOffset?: number;
 }
 

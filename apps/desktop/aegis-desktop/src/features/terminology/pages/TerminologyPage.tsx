@@ -119,7 +119,7 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
   const role = currentUser.data?.role;
   const canMutate = role === "admin" || role === "root";
 
-  const rows = codeListsQuery.data?.codelists ?? [];
+  const rows = codeListsQuery.data?.items ?? [];
   const hasMore = codeListsQuery.data?.nextOffset != null;
   const trimmedQuery = debouncedFragment.trim();
 

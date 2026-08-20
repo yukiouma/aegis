@@ -25,7 +25,7 @@ pub struct CodeListViewResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CodeListPagedResponse {
-    pub codelists: Vec<CodeListViewResponse>,
+    pub items: Vec<CodeListViewResponse>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next_offset: Option<u32>,
 }
@@ -74,8 +74,9 @@ fn percent_encode_fragment(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for b in input.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9'
-            | b'-' | b'.' | b'_' | b'~' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(b as char)
+            }
             b' ' => out.push('+'),
             _ => out.push_str(&format!("%{b:02X}")),
         }
@@ -110,10 +111,7 @@ pub async fn list_paged(
     c.request(reqwest::Method::GET, &path, None::<&()>).await
 }
 
-pub async fn get_by_id(
-    c: &HttpClient,
-    id: i64,
-) -> Result<CodeListViewResponse, ApiError> {
+pub async fn get_by_id(c: &HttpClient, id: i64) -> Result<CodeListViewResponse, ApiError> {
     c.request(
         reqwest::Method::GET,
         &format!("/api/terminology/code-lists/{id}"),
@@ -187,12 +185,17 @@ mod tests {
             .await;
         let page = list_paged(
             &client(&server),
-            CodeListListQuery { version_id: 7, fragment: None, offset: 0, limit: 20 },
+            CodeListListQuery {
+                version_id: 7,
+                fragment: None,
+                offset: 0,
+                limit: 20,
+            },
         )
         .await
         .unwrap();
-        assert_eq!(page.codelists.len(), 2);
-        assert_eq!(page.codelists[0].code, "C1");
+        assert_eq!(page.items.len(), 2);
+        assert_eq!(page.items[0].code, "C1");
         assert_eq!(page.next_offset, Some(20));
     }
 
@@ -209,11 +212,16 @@ mod tests {
             .await;
         let page = list_paged(
             &client(&server),
-            CodeListListQuery { version_id: 7, fragment: None, offset: 40, limit: 20 },
+            CodeListListQuery {
+                version_id: 7,
+                fragment: None,
+                offset: 40,
+                limit: 20,
+            },
         )
         .await
         .unwrap();
-        assert_eq!(page.codelists.len(), 1);
+        assert_eq!(page.items.len(), 1);
         assert!(page.next_offset.is_none());
     }
 
@@ -239,7 +247,7 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(page.codelists[0].code, "AE");
+        assert_eq!(page.items[0].code, "AE");
     }
 
     #[tokio::test]
@@ -248,7 +256,7 @@ mod tests {
         Mock::given(method("GET"))
             .and(path("/api/terminology/code-lists"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "codelists": []
+                "items": []
             })))
             .mount(&server)
             .await;
@@ -263,7 +271,7 @@ mod tests {
         )
         .await
         .unwrap();
-        assert!(page.codelists.is_empty());
+        assert!(page.items.is_empty());
     }
 
     #[tokio::test]
@@ -281,7 +289,12 @@ mod tests {
             .await;
         let page = list_paged(
             &client(&server),
-            CodeListListQuery { version_id: 7, fragment: None, offset: 0, limit: 20 },
+            CodeListListQuery {
+                version_id: 7,
+                fragment: None,
+                offset: 0,
+                limit: 20,
+            },
         )
         .await
         .unwrap();
