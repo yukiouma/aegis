@@ -177,6 +177,17 @@ export interface CodeListListResponse {
   codelists: CodeListView[];
 }
 
+export interface PagedCodeListListResponse {
+  codelists: CodeListView[];
+  nextOffset?: number;
+}
+
+export interface CodeListListQuery {
+  fragment?: string;
+  offset?: number;
+  limit?: number;
+}
+
 export interface CreateCodeListInput {
   versionId: number;
   code: string;
@@ -215,6 +226,17 @@ export interface CodeItemListResponse {
   items: CodeItemView[];
 }
 
+export interface PagedCodeItemListResponse {
+  items: CodeItemView[];
+  nextOffset?: number;
+}
+
+export interface CodeItemListQuery {
+  fragment?: string;
+  offset?: number;
+  limit?: number;
+}
+
 export interface CreateCodeItemInput {
   codelistId: number;
   versionId: number;
@@ -251,10 +273,4 @@ export interface BatchCreateCodeItemsResponse {
   count: number;
   codelistId: number;
   versionId: number;
-}
-
-export interface SearchTerminologyQuery {
-  versionId: number;
-  fragment: string;
-  limit?: number;
 }
