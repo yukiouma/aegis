@@ -1476,9 +1476,13 @@ mod tests {
         assert!(q.fragment.is_none());
         assert_eq!(q.offset, 0);
         assert_eq!(q.limit, 0);
-        // Optional fragment must be omitted from serialized form so
-        // `?versionId=1` keeps the wire shape minimal.
-        assert_eq!(serde_json::to_string(&q).unwrap(), json);
+        // Optional fragment is omitted from the serialized form so
+        // `?versionId=1` stays minimal; numeric `offset`/`limit`
+        // serialize as `0` rather than being skipped.
+        assert_eq!(
+            serde_json::to_string(&q).unwrap(),
+            r#"{"versionId":1,"offset":0,"limit":0}"#
+        );
     }
 
     #[test]
