@@ -10,22 +10,37 @@ export interface InfiniteScrollSentinelProps {
   loading: boolean;
   /** Pixel margin before the viewport edge at which the observer fires. */
   rootMargin?: string;
+  /** IntersectionObserver root. When set, the observer fires based on this
+   *  element's visibility instead of the viewport. Use when the sentinel
+   *  lives inside a scroll container that scrolls independently of the
+   *  page (e.g. a scrollable MUI TableContainer). */
+  root?: Element | null;
 }
 
 /**
  * Single-pixel-high sentinel that calls `onIntersect` when it scrolls into
  * view. The parent owns `offset` and `hasMore`; this component is pure.
+ *
+ * When `root` is omitted, the observer uses the viewport. When `root` is an
+ * `Element`, the observer fires based on visibility inside that element's
+ * scroll box — pair with the sentinel being rendered *inside* the scroll
+ * container. When `root` is `null`, no observer is created (handles the
+ * first render before a parent's callback ref resolves).
  */
 export function InfiniteScrollSentinel({
   onIntersect,
   hasMore,
   loading,
   rootMargin = "0px 0px 200px 0px",
+  root,
 }: InfiniteScrollSentinelProps) {
   const ref = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!hasMore) return;
+    // Distinguish `root === undefined` (default: viewport) from `root === null`
+    // (explicitly null: parent callback ref hasn't resolved yet — wait).
+    if (root === null) return;
     const el = ref.current;
     if (el == null) return;
 
@@ -38,11 +53,12 @@ export function InfiniteScrollSentinel({
           }
         }
       },
-      { rootMargin },
+      // `undefined` here is fine: IntersectionObserver defaults to viewport.
+      { root, rootMargin },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [hasMore, loading, onIntersect, rootMargin]);
+  }, [hasMore, loading, onIntersect, rootMargin, root]);
 
   if (!hasMore) return null;
 

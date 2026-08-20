@@ -168,12 +168,14 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
             ? t("terminology.codelist.noMatches")
             : t("terminology.codelist.empty")
         }
-      />
-
-      <InfiniteScrollSentinel
-        onIntersect={() => void codeListsQuery.fetchNextPage()}
-        hasMore={hasMore}
-        loading={codeListsQuery.isFetchingNextPage}
+        bottomSlot={(scrollEl) => (
+          <InfiniteScrollSentinel
+            root={scrollEl}
+            onIntersect={() => void codeListsQuery.fetchNextPage()}
+            hasMore={hasMore}
+            loading={codeListsQuery.isFetchingNextPage}
+          />
+        )}
       />
 
       <CodeListDrawer

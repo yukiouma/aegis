@@ -6,22 +6,21 @@ import type { ReactNode } from "react";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
 
-import { CodeListTable } from
-  "../../../features/terminology/components/CodeListTable";
-import type { CodeListView } from "../../../shared/api";
+import { CodeItemTable } from
+  "../../../features/terminology/components/CodeItemTable";
+import type { CodeItemView } from "../../../shared/api";
 
 afterEach(() => {
   cleanup();
 });
 
-function makeRow(overrides: Partial<CodeListView> = {}): CodeListView {
+function makeRow(overrides: Partial<CodeItemView> = {}): CodeItemView {
   return {
     id: 1,
+    codelistId: 1,
     versionId: 1,
-    code: "AE",
-    extensible: false,
-    name: "Adverse Events",
-    submissionValue: "AE",
+    code: "AE01",
+    submissionValue: "AE01",
     synonym: "",
     definition: "",
     nciPreferredTerm: "",
@@ -32,9 +31,9 @@ function makeRow(overrides: Partial<CodeListView> = {}): CodeListView {
 }
 
 function renderTable(props: {
-  rows: CodeListView[];
+  rows: CodeItemView[];
   canMutate: boolean;
-  onOpen?: ReturnType<typeof vi.fn>;
+  onEdit?: ReturnType<typeof vi.fn>;
   onDelete?: ReturnType<typeof vi.fn>;
   onCreate?: ReturnType<typeof vi.fn>;
   bottomSlot?: (scrollEl: HTMLElement | null) => ReactNode;
@@ -42,8 +41,7 @@ function renderTable(props: {
   return render(
     <AegisThemeProvider>
       <AegisI18nProvider>
-        <CodeListTable
-          mode="list"
+        <CodeItemTable
           rows={props.rows}
           loading={false}
           mutationLoading={false}
@@ -51,8 +49,8 @@ function renderTable(props: {
           canMutate={props.canMutate}
           onRetry={() => {}}
           onCreate={props.onCreate ?? (() => {})}
+          onEdit={props.onEdit ?? (() => {})}
           onDelete={props.onDelete ?? (() => {})}
-          onOpen={props.onOpen ?? (() => {})}
           bottomSlot={props.bottomSlot}
         />
       </AegisI18nProvider>
@@ -60,15 +58,15 @@ function renderTable(props: {
   );
 }
 
-describe("CodeListTable — action gating", () => {
-  it("shows both launch (open) and delete icons for users who can mutate", () => {
+describe("CodeItemTable — action gating", () => {
+  it("shows both edit and delete icons for users who can mutate", () => {
     renderTable({ rows: [makeRow()], canMutate: true });
 
     expect(
-      screen.getByRole("button", { name: /open AE/i }),
+      screen.getByRole("button", { name: /edit code item/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /delete AE/i }),
+      screen.getByRole("button", { name: /delete AE01/i }),
     ).toBeInTheDocument();
   });
 
@@ -76,54 +74,51 @@ describe("CodeListTable — action gating", () => {
     renderTable({ rows: [makeRow()], canMutate: false });
 
     expect(
-      screen.queryByRole("button", { name: /create code list/i }),
+      screen.queryByRole("button", { name: /create code item/i }),
     ).not.toBeInTheDocument();
   });
 
-  it("shows the launch (open) icon but hides delete for users who cannot mutate", () => {
+  it("hides edit and delete for users who cannot mutate", () => {
     renderTable({ rows: [makeRow()], canMutate: false });
 
-    // Open is no longer gated — viewers can drill into a code list.
     expect(
-      screen.getByRole("button", { name: /open AE/i }),
-    ).toBeInTheDocument();
-    // Delete stays gated behind canMutate.
+      screen.queryByRole("button", { name: /edit code item/i }),
+    ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /delete AE/i }),
+      screen.queryByRole("button", { name: /delete AE01/i }),
     ).not.toBeInTheDocument();
   });
 
-  it("invokes onOpen when the launch icon is clicked (viewer role)", async () => {
-    const onOpen = vi.fn();
-    renderTable({ rows: [makeRow()], canMutate: false, onOpen });
+  it("invokes onEdit when the edit icon is clicked", async () => {
+    const onEdit = vi.fn();
+    renderTable({ rows: [makeRow()], canMutate: true, onEdit });
 
-    await userEvent.click(screen.getByRole("button", { name: /open AE/i }));
+    await userEvent.click(screen.getByRole("button", { name: /edit code item/i }));
 
-    expect(onOpen).toHaveBeenCalledTimes(1);
-    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ code: "AE" }));
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(onEdit).toHaveBeenCalledWith(expect.objectContaining({ code: "AE01" }));
   });
 
-  it("invokes onDelete when the delete icon is clicked (manager role)", async () => {
+  it("invokes onDelete when the delete icon is clicked", async () => {
     const onDelete = vi.fn();
     renderTable({ rows: [makeRow()], canMutate: true, onDelete });
 
-    await userEvent.click(screen.getByRole("button", { name: /delete AE/i }));
+    await userEvent.click(screen.getByRole("button", { name: /delete AE01/i }));
 
     expect(onDelete).toHaveBeenCalledTimes(1);
-    expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ code: "AE" }));
+    expect(onDelete).toHaveBeenCalledWith(expect.objectContaining({ code: "AE01" }));
   });
 });
 
-describe("CodeListTable — bottomSlot", () => {
+describe("CodeItemTable — bottomSlot", () => {
   it("renders bottomSlot's output inside the scroll container", () => {
     renderTable({
       rows: [],
       canMutate: false,
-      bottomSlot: () => <div data-testid="codelist-slot">sentinel here</div>,
+      bottomSlot: () => <div data-testid="codeitem-slot">sentinel here</div>,
     });
 
-    const slot = screen.getByTestId("codelist-slot");
-    // The Paper component is what TableContainer renders as; the slot must be a descendant.
+    const slot = screen.getByTestId("codeitem-slot");
     const paper = slot.closest(".MuiPaper-root");
     expect(paper).not.toBeNull();
     expect(paper).toContainElement(slot);
@@ -136,11 +131,10 @@ describe("CodeListTable — bottomSlot", () => {
       canMutate: false,
       bottomSlot: (el) => {
         captured.push(el);
-        return <div data-testid="codelist-slot" />;
+        return <div data-testid="codeitem-slot" />;
       },
     });
 
-    // At least one call must receive a non-null element (post-mount).
     const nonNull = captured.find((el) => el !== null);
     expect(nonNull).toBeDefined();
     expect(nonNull!.classList.contains("MuiPaper-root")).toBe(true);
