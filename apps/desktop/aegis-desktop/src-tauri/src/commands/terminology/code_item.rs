@@ -5,8 +5,8 @@ use tauri::State;
 use crate::http::client::HttpClient;
 use crate::http::dto::ApiError;
 use crate::http::terminology::code_item::{
-    self, CodeItemSearchQuery, CodeItemViewResponse, CreateCodeItemRequest,
-    UpdateCodeItemRequest,
+    self, CodeItemListQuery, CodeItemPagedResponse, CodeItemViewResponse,
+    CreateCodeItemRequest, UpdateCodeItemRequest,
 };
 
 #[tauri::command]
@@ -39,8 +39,15 @@ pub async fn create_code_item(
 pub async fn list_code_items(
     client: State<'_, HttpClient>,
     codelist_id: i64,
-) -> Result<Vec<CodeItemViewResponse>, ApiError> {
-    code_item::list(&client, codelist_id).await
+    fragment: Option<String>,
+    offset: u32,
+    limit: u32,
+) -> Result<CodeItemPagedResponse, ApiError> {
+    code_item::list_paged(
+        &client,
+        CodeItemListQuery { codelist_id, fragment, offset, limit },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -58,22 +65,4 @@ pub async fn delete_code_item(
     id: i64,
 ) -> Result<(), ApiError> {
     code_item::delete(&client, id).await
-}
-
-#[tauri::command]
-pub async fn search_code_items(
-    client: State<'_, HttpClient>,
-    version_id: i64,
-    fragment: String,
-    limit: u32,
-) -> Result<Vec<code_item::CodeItemSearchHitResponse>, ApiError> {
-    code_item::search(
-        &client,
-        CodeItemSearchQuery {
-            version_id,
-            fragment,
-            limit,
-        },
-    )
-    .await
 }
