@@ -3,8 +3,8 @@ import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactNode } from "react";
 
-import { TestQueryProvider } from "../../../test/helpers/test-query-provider";
-import { useListCodeLists, useListCodeItems } from "./list";
+import { TestQueryProvider } from "../../../helpers/test-query-provider";
+import { useListCodeLists, useListCodeItems } from "../../../../features/terminology/data/list";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
