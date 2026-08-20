@@ -1,7 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import {
   cleanup,
-  fireEvent,
   screen,
   waitFor,
 } from "@testing-library/react";
@@ -212,9 +211,8 @@ describe("TerminologyPage debounce", () => {
     await vi.advanceTimersByTimeAsync(400);
 
     await waitFor(() => {
-      const lastCall = mockInvoke.mock.calls
-        .filter((c) => c[0] === "list_code_lists")
-        .at(-1)!;
+      const calls = mockInvoke.mock.calls.filter((c) => c[0] === "list_code_lists");
+      const lastCall = calls[calls.length - 1]!;
       expect(lastCall[1]).toMatchObject({ fragment: "AE", offset: 0, limit: 20 });
     });
   });

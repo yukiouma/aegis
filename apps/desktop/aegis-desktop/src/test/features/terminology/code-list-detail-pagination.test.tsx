@@ -144,7 +144,7 @@ describe("CodeListDetailPage debounce", () => {
     // can complete and the placeholder element lands in the DOM.
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     await renderPage(["/terminology/sdtm/codelists/100?versionId=1"]);
-    const input = await screen.findByPlaceholderText(
+    await screen.findByPlaceholderText(
       /search by code, submission value/i,
     );
 
