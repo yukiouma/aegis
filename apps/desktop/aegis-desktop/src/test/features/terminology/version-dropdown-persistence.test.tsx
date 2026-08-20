@@ -105,11 +105,13 @@ function setupMocks() {
     list_terminology_versions: () => [sdtmV1, sdtmV2],
     list_code_lists: (args) => {
       // versionId=2 is the one with a codelist in this fixture
-      if (args && args.versionId === 2) return [sdtmCodelist];
-      return [];
+      if (args && args.versionId === 2) {
+        return { codelists: [sdtmCodelist], nextOffset: undefined };
+      }
+      return { codelists: [], nextOffset: undefined };
     },
     get_code_list_by_id: () => sdtmCodelist,
-    list_code_items: () => [],
+    list_code_items: () => ({ items: [], nextOffset: undefined }),
   });
 }
 
