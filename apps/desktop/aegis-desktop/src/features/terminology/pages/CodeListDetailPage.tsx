@@ -84,7 +84,15 @@ export function CodeListDetailPage() {
   const codelist = codelistQuery.data;
 
   const versionId = codelist?.versionId ?? versionIdFromUrl ?? 0;
+  // The list page reads `versionId` from the URL so its VersionDropdown
+  // survives the round-trip. Forward the value we read here; if it
+  // isn't present (the codelist row's own versionId will populate the
+  // query string) the destination route's `validateSearch` falls back
+  // to the first version automatically.
   const backLink = `/terminology/${kind}`;
+  const backSearch = versionIdFromUrl != null
+    ? { versionId: versionIdFromUrl }
+    : undefined;
 
   const [search2, setSearch2] = useState("");
   const [editCodelistDrawerOpen, setEditCodelistDrawerOpen] = useState(false);
@@ -128,7 +136,9 @@ export function CodeListDetailPage() {
                 <Tooltip title={t("common.back")}>
                   <span>
                     <IconButton
-                      onClick={() => navigate({ to: backLink })}
+                      onClick={() =>
+                        navigate({ to: backLink, search: backSearch })
+                      }
                       disabled={!backLink}
                       aria-label={t("common.back")}
                     >
@@ -145,7 +155,7 @@ export function CodeListDetailPage() {
                     })}
                   </Alert>
                   <Box sx={{ mt: 1 }}>
-                    <Button onClick={() => navigate({ to: backLink })}>
+                    <Button onClick={() => navigate({ to: backLink, search: backSearch })}>
                       {t("common.back")}
                     </Button>
                   </Box>

@@ -20,9 +20,13 @@ export const Route = createFileRoute(
   }),
   validateSearch: (raw): { versionId?: number } => ({
     versionId:
-      typeof raw.versionId === "string" && raw.versionId !== ""
-        ? Number(raw.versionId)
-        : undefined,
+      typeof raw.versionId === "string"
+        ? raw.versionId === ""
+          ? undefined
+          : Number(raw.versionId)
+        : typeof raw.versionId === "number"
+          ? raw.versionId
+          : undefined,
   }),
   component: CodeListDetailPage,
 });

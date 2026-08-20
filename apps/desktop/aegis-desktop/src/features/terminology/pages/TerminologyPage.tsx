@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import {
   Box,
   Button,
@@ -46,9 +46,16 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
   const versionsQuery = useListTerminologyVersions();
-  const [selectedVersionId, setSelectedVersionId] = useState<number | null>(
-    null,
-  );
+
+  // The selected version lives in the URL (`?versionId=…`) so it
+  // survives drilling into a code list and clicking the back arrow.
+  // Both `/_authed/_layout/terminology/sdtm` and the `adam` sibling
+  // declare the same `versionId` search schema. `strict: false`
+  // mirrors `ImportTerminologyPage` and keeps the page renderable in
+  // tests that don't register the route.
+  const routeSearch = useSearch({ strict: false }) as { versionId?: number };
+  const urlVersionId = routeSearch.versionId;
+
   const [search, setSearch] = useState("");
   const [drawer, setDrawer] = useState<DrawerState>(null);
   const [confirmDelete, setConfirmDelete] = useState<CodeListView | null>(null);
@@ -56,20 +63,50 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
   const versions = versionsQuery.data ?? [];
   const versionsForKind = versions.filter((v) => v.kind === kind);
 
-  // Initialise the selected version whenever the matching list
-  // transitions from empty to non-empty (or when the kind changes).
-  useEffect(() => {
-    if (selectedVersionId == null && versionsForKind.length > 0) {
-      setSelectedVersionId(versionsForKind[0].id);
-    } else if (
-      selectedVersionId != null &&
-      !versionsForKind.some((v) => v.id === selectedVersionId)
+  // Effective selection: trust the URL when it points to a known
+  // version, otherwise fall back to the first version for this kind.
+  // Keeping this derived (instead of mirrored in local state) means
+  // the dropdown is automatically correct on remount.
+  const selectedVersionId = useMemo<number | null>(() => {
+    if (
+      urlVersionId != null &&
+      versionsForKind.some((v) => v.id === urlVersionId)
     ) {
-      // The previously-selected version is no longer in the list
-      // (e.g. kind changed). Fall back to the first match.
-      setSelectedVersionId(versionsForKind[0]?.id ?? null);
+      return urlVersionId;
     }
-  }, [versionsForKind, selectedVersionId]);
+    return versionsForKind[0]?.id ?? null;
+  }, [urlVersionId, versionsForKind]);
+
+  // Hydrate the URL whenever the effective selection and the URL
+  // disagree: this covers the very first visit (no `versionId` in the
+  // URL yet) and the stale-version case (the version was deleted or
+  // doesn't belong to this kind). `replace: true` keeps the back stack
+  // clean — this is just a hydration step, not a user-driven change.
+  useEffect(() => {
+    if (versionsForKind.length === 0) return;
+    const urlIsValid =
+      urlVersionId != null &&
+      versionsForKind.some((v) => v.id === urlVersionId);
+    if (urlIsValid) return;
+    const fallback = versionsForKind[0].id;
+    const to =
+      kind === "sdtm"
+        ? "/terminology/sdtm"
+        : "/terminology/adam";
+    void navigate({
+      to,
+      replace: true,
+      search: { versionId: fallback },
+    });
+  }, [urlVersionId, versionsForKind, kind, navigate]);
+
+  const setSelectedVersionId = (id: number | null) => {
+    const to =
+      kind === "sdtm"
+        ? "/terminology/sdtm"
+        : "/terminology/adam";
+    void navigate({ to, search: { versionId: id ?? undefined } });
+  };
 
   const codeListsQuery = useListCodeLists(selectedVersionId);
   const createCodeList = useCreateCodeList();
@@ -133,9 +170,17 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
         onCreate={() => setDrawer({ mode: "create" })}
         onDelete={(row) => setConfirmDelete(row)}
         onOpen={(row) => {
+          // Forward `versionId` so the detail page's back arrow has it
+          // to send the user back to. Without this the URL becomes
+          // `/terminology/$kind/codelists/$id` (no search) and the
+          // detail page can't preserve the selection on the way back.
           void navigate({
             to: "/terminology/$kind/codelists/$codelistId",
             params: { kind, codelistId: row.id },
+            search:
+              selectedVersionId != null
+                ? { versionId: selectedVersionId }
+                : undefined,
           });
         }}
         emptyMessage={
