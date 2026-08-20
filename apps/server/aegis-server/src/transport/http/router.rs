@@ -557,10 +557,8 @@ mod tests {
             ("get", "/api/terminology/versions"),
             ("get", "/api/terminology/versions/{id}"),
             ("get", "/api/terminology/code-lists"),
-            ("get", "/api/terminology/code-lists/search"),
             ("get", "/api/terminology/code-items"),
             ("get", "/api/terminology/code-items/by-version-and-code"),
-            ("get", "/api/terminology/code-items/search"),
         ];
         let terminology_writes = [
             ("post", "/api/terminology/versions"),
@@ -947,12 +945,18 @@ mod tests {
         }
         async fn list_code_lists(
             &self,
-            _query: apis::terminology::CodeListListQuery,
+            query: apis::terminology::CodeListListQuery,
         ) -> Result<
             apis::terminology::Page<apis::terminology::CodeListView>,
             apis::terminology::TerminologyApiError,
         > {
-            unimplemented!()
+            // Echo the offset back as a single-item page so tests
+            // can observe that the query reaches the service.
+            let id = query.offset as i64 + 1;
+            Ok(apis::terminology::Page {
+                items: vec![sample_code_list_view(id)],
+                next_offset: None,
+            })
         }
         async fn get_code_list_by_id(
             &self,
@@ -983,12 +987,31 @@ mod tests {
         }
         async fn list_code_items(
             &self,
-            _query: apis::terminology::CodeItemListQuery,
+            query: apis::terminology::CodeItemListQuery,
         ) -> Result<
             apis::terminology::Page<apis::terminology::CodeItemView>,
             apis::terminology::TerminologyApiError,
         > {
-            unimplemented!()
+            let id = query.offset as i64 + 1;
+            Ok(apis::terminology::Page {
+                items: vec![apis::terminology::CodeItemView {
+                    id,
+                    codelist_id: query.codelist_id,
+                    version_id: 1,
+                    code: format!("CI{id}"),
+                    submission_value: String::new(),
+                    synonym: String::new(),
+                    definition: String::new(),
+                    nci_preferred_term: String::new(),
+                    created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                        .unwrap()
+                        .with_timezone(&chrono::Utc),
+                    updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                        .unwrap()
+                        .with_timezone(&chrono::Utc),
+                }],
+                next_offset: None,
+            })
         }
         async fn list_code_items_by_version_and_code(
             &self,
@@ -1079,4 +1102,66 @@ mod tests {
             .unwrap();
         assert_eq!(response.status(), AxStatus::UNAUTHORIZED);
     }
+
+    /// `GET /api/terminology/code-lists` returns the unified paged
+    /// body. The stub echoes `offset` as the row id so we can
+    /// verify the offset query reached the service.
+    #[tokio::test]
+    async fn terminology_list_code_lists_route_is_wired() {
+        let app = router(test_state_with_terminology());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/terminology/code-lists?versionId=1&offset=5&limit=10&fragment=AGE")
+                    .header("authorization", "Bearer good")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::OK);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let items = value["items"].as_array().expect("items array");
+        assert_eq!(items.len(), 1);
+        // offset=5 → stub returns id 6.
+        assert_eq!(items[0]["id"], 6);
+        assert!(value.get("nextOffset").is_none() || value["nextOffset"].is_null());
+    }
+
+    /// `GET /api/terminology/code-items` returns the unified paged
+    /// body. Same echo trick as the codelists test.
+    #[tokio::test]
+    async fn terminology_list_code_items_route_is_wired() {
+        let app = router(test_state_with_terminology());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/terminology/code-items?codelistId=11&offset=3&limit=4")
+                    .header("authorization", "Bearer good")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::OK);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let items = value["items"].as_array().expect("items array");
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0]["codelistId"], 11);
+        assert_eq!(items[0]["id"], 4);
+    }
+
+    // Note: validation of reserved `tsquery` characters in `fragment`
+// is exercised at the usecase layer (see
+// `terminology::usecase::tests::list_code_lists_rejects_fragment_with_reserved_tsquery_chars`).
+// The router-level `StubTerminologyService` skips the usecase so the
+// handler cannot observe validation here.
 }
