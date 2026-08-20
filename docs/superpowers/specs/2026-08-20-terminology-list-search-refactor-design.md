@@ -414,7 +414,6 @@ pub fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(handlers::create_code_item))
         .routes(routes!(handlers::list_code_items))
         .routes(routes!(handlers::list_code_items_by_version_and_code))
-        .routes(routes!(handlers::get_code_item_by_id))    // unchanged
         .routes(routes!(handlers::update_code_item))
         .routes(routes!(handlers::delete_code_item))
 }
@@ -470,7 +469,7 @@ The two `useMemo` client-side filters in `TerminologyPage.tsx` and `CodeListDeta
 
 **Usecase (`lib/crates/terminology/src/usecase/`)**
 - `terminology_usecase.rs` — replace `list_code_lists` / `search_code_lists` with one method, same for items; drop `validate_fragment`, add `validate_tsquery_fragment`; drop `DomainError::EmptyFragment` reference
-- `views.rs` — drop `*SearchHitView` projections (none currently exist; check)
+- `views.rs` — drop the `pub use crate::domain::{CodeItemSearchHit, CodeListSearchHit};` re-export at the bottom of the file (these types no longer exist)
 - `commands.rs` — no change
 
 **API (`lib/crates/apis/src/terminology.rs`)**
