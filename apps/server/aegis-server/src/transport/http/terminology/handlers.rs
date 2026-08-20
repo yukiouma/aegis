@@ -344,9 +344,9 @@ pub async fn delete_code_list(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// `GET /api/terminology/code-lists/search?…` — removed; unified into
-/// `GET /api/terminology/code-lists` (see [`list_code_lists`]).
-/// This stub is intentionally absent from the router.
+// `GET /api/terminology/code-lists/search?…` — removed; unified into
+// `GET /api/terminology/code-lists` (see [`list_code_lists`]).
+// This stub is intentionally absent from the router.
 
 // ---- CodeItem ----
 
@@ -572,5 +572,5 @@ pub async fn delete_code_item(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// `GET /api/terminology/code-items/search?…` — removed; unified into
-/// `GET /api/terminology/code-items` (see [`list_code_items`]).
+// `GET /api/terminology/code-items/search?…` — removed; unified into
+// `GET /api/terminology/code-items` (see [`list_code_items`]).

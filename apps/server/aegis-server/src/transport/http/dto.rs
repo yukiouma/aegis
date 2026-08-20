@@ -614,6 +614,16 @@ impl From<apis::terminology::Page<apis::terminology::CodeItemView>> for PagedCod
     }
 }
 
+/// Non-paginated list wrapper used by natural-key lookups
+/// (`GET /api/terminology/code-items/by-version-and-code`) where
+/// pagination makes no sense — every row that matches the natural
+/// key is returned in one shot.
+#[derive(Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeItemListResponse {
+    pub items: Vec<CodeItemViewResponse>,
+}
+
 // -- terminology request DTOs -----------------------------------------------
 
 /// Wire-level request body for `POST /api/terminology/versions`.
