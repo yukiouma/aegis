@@ -47,7 +47,7 @@ export function AppLayout() {
   ];
 
   const managementEntry: MenuItem = {
-    link: "#",
+    link: "#management",
     title: t("nav.management"),
     icon: ManagementMenuIcon,
     subMenu: [
@@ -60,7 +60,7 @@ export function AppLayout() {
   };
 
   const terminologyEntry: MenuItem = {
-    link: "#",
+    link: "#terminology",
     title: t("nav.terminology"),
     icon: TerminologyMenuIcon,
     subMenu: [
