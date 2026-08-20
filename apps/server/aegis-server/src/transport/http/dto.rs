@@ -541,11 +541,25 @@ impl From<apis::terminology::CodeListView> for CodeListViewResponse {
     }
 }
 
-/// Wire-level wrapper for `GET /api/terminology/code-lists`.
+/// Paged envelope for `GET /api/terminology/code-lists`. `items`
+/// carries the page's rows; `nextOffset = Some(n)` tells the client
+/// the next call should pass `offset = n`; `nextOffset = None` means
+/// the caller has reached the end of the result set.
 #[derive(Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct CodeListListResponse {
-    pub codelists: Vec<CodeListViewResponse>,
+pub struct PagedCodeListListResponse {
+    pub items: Vec<CodeListViewResponse>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_offset: Option<u32>,
+}
+
+impl From<apis::terminology::Page<apis::terminology::CodeListView>> for PagedCodeListListResponse {
+    fn from(page: apis::terminology::Page<apis::terminology::CodeListView>) -> Self {
+        Self {
+            items: page.items.into_iter().map(Into::into).collect(),
+            next_offset: page.next_offset,
+        }
+    }
 }
 
 /// Wire-level projection of a `CodeItem`.
@@ -581,61 +595,23 @@ impl From<apis::terminology::CodeItemView> for CodeItemViewResponse {
     }
 }
 
-/// Wire-level wrapper for `GET /api/terminology/code-items`.
+/// Paged envelope for `GET /api/terminology/code-items`. Mirrors
+/// [`PagedCodeListListResponse`] but scopes to a codelist.
 #[derive(Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct CodeItemListResponse {
+pub struct PagedCodeItemListResponse {
     pub items: Vec<CodeItemViewResponse>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_offset: Option<u32>,
 }
 
-/// Wire-level projection of one codelist search hit.
-#[derive(Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct CodeListSearchHitResponse {
-    pub codelist: CodeListViewResponse,
-}
-
-impl From<apis::terminology::CodeListSearchHit> for CodeListSearchHitResponse {
-    fn from(hit: apis::terminology::CodeListSearchHit) -> Self {
+impl From<apis::terminology::Page<apis::terminology::CodeItemView>> for PagedCodeItemListResponse {
+    fn from(page: apis::terminology::Page<apis::terminology::CodeItemView>) -> Self {
         Self {
-            codelist: hit.codelist.into(),
+            items: page.items.into_iter().map(Into::into).collect(),
+            next_offset: page.next_offset,
         }
     }
-}
-
-/// Wire-level projection of one code-item search hit.
-#[derive(Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct CodeItemSearchHitResponse {
-    pub item: CodeItemViewResponse,
-}
-
-impl From<apis::terminology::CodeItemSearchHit> for CodeItemSearchHitResponse {
-    fn from(hit: apis::terminology::CodeItemSearchHit) -> Self {
-        Self {
-            item: hit.item.into(),
-        }
-    }
-}
-
-/// Wire-level wrapper for `GET /api/terminology/code-lists/search`.
-/// Wrapping the hit list in a struct leaves room for future
-/// pagination metadata (`total`, `next_cursor`, …) without
-/// breaking the response shape.
-#[derive(Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct CodeListSearchHitsResponse {
-    pub hits: Vec<CodeListSearchHitResponse>,
-}
-
-/// Wire-level wrapper for `GET /api/terminology/code-items/search`.
-/// Wrapping the hit list in a struct leaves room for future
-/// pagination metadata (`total`, `next_cursor`, …) without
-/// breaking the response shape.
-#[derive(Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct CodeItemSearchHitsResponse {
-    pub hits: Vec<CodeItemSearchHitResponse>,
 }
 
 // -- terminology request DTOs -----------------------------------------------
@@ -762,46 +738,38 @@ pub struct BatchCreateCodeItemsResponse {
     pub version_id: i64,
 }
 
-// -- terminology search query DTOs ------------------------------------------
+// -- terminology list / search query DTOs -----------------------------------
 
-/// Query string for `GET /api/terminology/code-lists/search` and the
-/// item search route. Scoped to a single `versionId`; `fragment` is
-/// matched against the row's text columns via Postgres FTS
-/// (`tsv @@ plainto_tsquery`). `limit = 0` lets the usecase apply
-/// its default.
-#[derive(Serialize, Deserialize, ToSchema, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct TerminologySearchBaseQuery {
-    pub version_id: i64,
-    pub fragment: String,
-    #[serde(default)]
-    pub limit: u32,
-}
-
-/// Query string for `GET /api/terminology/code-lists/search` —
-/// searches within a single terminology version for codelists
-/// matching `fragment`.
-pub type CodeListSearchQueryRequest = TerminologySearchBaseQuery;
-
-/// Query string for `GET /api/terminology/code-items/search` —
-/// searches within a single terminology version for items matching
-/// `fragment`.
-pub type CodeItemSearchQueryRequest = TerminologySearchBaseQuery;
-
-/// Query string for `GET /api/terminology/code-lists` (list by
-/// version).
+/// Query string for `GET /api/terminology/code-lists`. Unified list
+/// + search: `fragment = None` (or empty) yields a plain
+/// `ORDER BY id ASC` list; `fragment = Some(_)` runs the FTS
+/// prefix-match path with `ts_rank DESC, id ASC` ordering.
+/// `offset` / `limit` are clamped by the backend (default 50,
+/// max 500).
 #[derive(Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CodeListListQuery {
     pub version_id: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fragment: Option<String>,
+    #[serde(default)]
+    pub offset: u32,
+    #[serde(default)]
+    pub limit: u32,
 }
 
-/// Query string for `GET /api/terminology/code-items` (list by
-/// codelist).
+/// Query string for `GET /api/terminology/code-items`. Mirrors
+/// [`CodeListListQuery`] but scoped to a `codelistId`.
 #[derive(Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CodeItemListQuery {
     pub codelist_id: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fragment: Option<String>,
+    #[serde(default)]
+    pub offset: u32,
+    #[serde(default)]
+    pub limit: u32,
 }
 
 /// Query string for `GET /api/terminology/code-items/by-version-and-code`.
@@ -1033,6 +1001,33 @@ mod tests {
         assert_eq!(resp.user_code, "u7");
         assert_eq!(resp.password_hash, "argon2id$...");
         assert_eq!(resp.token_version, 5);
+    }
+
+    #[test]
+    fn register_user_request_roundtrip() {
+        let json = r#"{"user_code":"u1","user_name":"Alice","domain_name":"d","hostname":"h","sid":"s","password":"p"}"#;
+        let req: RegisterUserRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.user_code, "u1");
+        assert_eq!(req.password, "p");
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn register_user_response_from_apis_view() {
+        let apis_view = apis::auth::RegisterUserResponse {
+            user_code: "u1".into(),
+            user_name: "Alice".into(),
+            role: apis::user::Role::Admin,
+            active: true,
+            domain_name: "d".into(),
+            hostname: "h".into(),
+            sid: "s".into(),
+        };
+        let resp: RegisterUserResponse = apis_view.into();
+        assert_eq!(resp.user_code, "u1");
+        assert!(matches!(resp.role, Role::Admin));
+        assert!(resp.active);
+        assert_eq!(resp.domain_name, "d");
     }
 
     // ---- project DTO round-trips -----
@@ -1335,11 +1330,32 @@ mod tests {
     }
 
     #[test]
-    fn code_list_list_response_roundtrip() {
-        let json = r#"{"codelists":[]}"#;
-        let resp: CodeListListResponse = serde_json::from_str(json).unwrap();
-        assert!(resp.codelists.is_empty());
+    fn paged_code_list_list_response_roundtrip() {
+        let json = r#"{"items":[]}"#;
+        let resp: PagedCodeListListResponse = serde_json::from_str(json).unwrap();
+        assert!(resp.items.is_empty());
+        assert_eq!(resp.next_offset, None);
         assert_eq!(serde_json::to_string(&resp).unwrap(), json);
+    }
+
+    #[test]
+    fn paged_code_list_list_response_with_next_offset_roundtrip() {
+        let json = r#"{"items":[],"nextOffset":50}"#;
+        let resp: PagedCodeListListResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.next_offset, Some(50));
+        assert_eq!(serde_json::to_string(&resp).unwrap(), json);
+    }
+
+    #[test]
+    fn paged_code_list_list_response_from_apis_page() {
+        let page = apis::terminology::Page {
+            items: vec![sample_code_list_view()],
+            next_offset: Some(2),
+        };
+        let resp: PagedCodeListListResponse = page.into();
+        assert_eq!(resp.items.len(), 1);
+        assert_eq!(resp.items[0].code, "C66741");
+        assert_eq!(resp.next_offset, Some(2));
     }
 
     #[test]
@@ -1353,30 +1369,24 @@ mod tests {
     }
 
     #[test]
-    fn code_item_list_response_roundtrip() {
+    fn paged_code_item_list_response_roundtrip() {
         let json = r#"{"items":[]}"#;
-        let resp: CodeItemListResponse = serde_json::from_str(json).unwrap();
+        let resp: PagedCodeItemListResponse = serde_json::from_str(json).unwrap();
         assert!(resp.items.is_empty());
+        assert_eq!(resp.next_offset, None);
         assert_eq!(serde_json::to_string(&resp).unwrap(), json);
     }
 
     #[test]
-    fn code_list_search_hit_response_from_apis_hit() {
-        let hit = apis::terminology::CodeListSearchHit {
-            codelist: sample_code_list_view(),
+    fn paged_code_item_list_response_from_apis_page() {
+        let page = apis::terminology::Page {
+            items: vec![sample_code_item_view()],
+            next_offset: None,
         };
-        let resp: CodeListSearchHitResponse = hit.into();
-        assert_eq!(resp.codelist.code, "C66741");
-    }
-
-    #[test]
-    fn code_item_search_hit_response_from_apis_hit() {
-        let hit = apis::terminology::CodeItemSearchHit {
-            item: sample_code_item_view(),
-        };
-        let resp: CodeItemSearchHitResponse = hit.into();
-        assert_eq!(resp.item.code, "C1");
-        assert_eq!(resp.item.codelist_id, 11);
+        let resp: PagedCodeItemListResponse = page.into();
+        assert_eq!(resp.items.len(), 1);
+        assert_eq!(resp.items[0].code, "C1");
+        assert_eq!(resp.next_offset, None);
     }
 
     #[test]
@@ -1438,38 +1448,37 @@ mod tests {
     }
 
     #[test]
-    fn code_list_search_query_request_roundtrip() {
-        let json = r#"{"versionId":1,"fragment":"age","limit":10}"#;
-        let req: CodeListSearchQueryRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.version_id, 1);
-        assert_eq!(req.fragment, "age");
-        assert_eq!(req.limit, 10);
-        assert_eq!(serde_json::to_string(&req).unwrap(), json);
-    }
-
-    #[test]
-    fn code_item_search_query_request_roundtrip() {
-        let json = r#"{"versionId":7,"fragment":"x","limit":50}"#;
-        let req: CodeItemSearchQueryRequest = serde_json::from_str(json).unwrap();
-        assert_eq!(req.version_id, 7);
-        assert_eq!(req.fragment, "x");
-        assert_eq!(req.limit, 50);
-        assert_eq!(serde_json::to_string(&req).unwrap(), json);
-    }
-
-    #[test]
-    fn code_list_list_query_roundtrip() {
-        let json = r#"{"versionId":1}"#;
+    fn code_list_list_query_with_fragment_roundtrip() {
+        let json = r#"{"versionId":1,"fragment":"age","offset":0,"limit":50}"#;
         let q: CodeListListQuery = serde_json::from_str(json).unwrap();
         assert_eq!(q.version_id, 1);
+        assert_eq!(q.fragment.as_deref(), Some("age"));
+        assert_eq!(q.offset, 0);
+        assert_eq!(q.limit, 50);
         assert_eq!(serde_json::to_string(&q).unwrap(), json);
     }
 
     #[test]
-    fn code_item_list_query_roundtrip() {
-        let json = r#"{"codelistId":11}"#;
+    fn code_list_list_query_minimal_roundtrip() {
+        let json = r#"{"versionId":1}"#;
+        let q: CodeListListQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(q.version_id, 1);
+        assert!(q.fragment.is_none());
+        assert_eq!(q.offset, 0);
+        assert_eq!(q.limit, 0);
+        // Optional fragment must be omitted from serialized form so
+        // `?versionId=1` keeps the wire shape minimal.
+        assert_eq!(serde_json::to_string(&q).unwrap(), json);
+    }
+
+    #[test]
+    fn code_item_list_query_with_fragment_roundtrip() {
+        let json = r#"{"codelistId":11,"fragment":"yes","offset":50,"limit":25}"#;
         let q: CodeItemListQuery = serde_json::from_str(json).unwrap();
         assert_eq!(q.codelist_id, 11);
+        assert_eq!(q.fragment.as_deref(), Some("yes"));
+        assert_eq!(q.offset, 50);
+        assert_eq!(q.limit, 25);
         assert_eq!(serde_json::to_string(&q).unwrap(), json);
     }
 
