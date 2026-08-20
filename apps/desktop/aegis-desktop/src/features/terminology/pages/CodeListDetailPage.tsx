@@ -225,12 +225,14 @@ export function CodeListDetailPage() {
             ? t("terminology.codeitem.noMatches")
             : t("terminology.codeitem.empty")
         }
-      />
-
-      <InfiniteScrollSentinel
-        onIntersect={() => void itemsQuery.fetchNextPage()}
-        hasMore={hasMore}
-        loading={itemsQuery.isFetchingNextPage}
+        bottomSlot={(scrollEl) => (
+          <InfiniteScrollSentinel
+            root={scrollEl}
+            onIntersect={() => void itemsQuery.fetchNextPage()}
+            hasMore={hasMore}
+            loading={itemsQuery.isFetchingNextPage}
+          />
+        )}
       />
 
       {codelist && (

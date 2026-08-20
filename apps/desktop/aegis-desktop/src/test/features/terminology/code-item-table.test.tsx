@@ -18,6 +18,7 @@ function makeRow(overrides: Partial<CodeItemView> = {}): CodeItemView {
   return {
     id: 1,
     codelistId: 1,
+    versionId: 1,
     code: "AE01",
     submissionValue: "AE01",
     synonym: "",
