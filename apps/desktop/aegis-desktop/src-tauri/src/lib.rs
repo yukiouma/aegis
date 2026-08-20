@@ -53,12 +53,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::terminology::code_list::get_code_list_by_id,
             commands::terminology::code_list::update_code_list,
             commands::terminology::code_list::delete_code_list,
-            commands::terminology::code_list::search_code_lists,
             commands::terminology::code_item::create_code_item,
             commands::terminology::code_item::list_code_items,
             commands::terminology::code_item::update_code_item,
             commands::terminology::code_item::delete_code_item,
-            commands::terminology::code_item::search_code_items,
             commands::terminology::import::import_terminology,
             // health
             commands::healthz::healthz,

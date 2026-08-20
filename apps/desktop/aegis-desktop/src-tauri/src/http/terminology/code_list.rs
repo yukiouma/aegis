@@ -24,20 +24,18 @@ pub struct CodeListViewResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct CodeListListResponse {
-    pub codelists: Vec<CodeListViewResponse>,
+pub struct CodeListPagedResponse {
+    pub items: Vec<CodeListViewResponse>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_offset: Option<u32>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CodeListSearchHitsResponse {
-    pub hits: Vec<CodeListSearchHitResponse>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CodeListSearchHitResponse {
-    pub codelist: CodeListViewResponse,
+#[derive(Debug, Clone)]
+pub struct CodeListListQuery {
+    pub version_id: i64,
+    pub fragment: Option<String>,
+    pub offset: u32,
+    pub limit: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,23 +70,13 @@ pub struct UpdateCodeListRequest {
     pub nci_preferred_term: Option<String>,
 }
 
-#[derive(Debug, Clone)]
-pub struct CodeListSearchQuery {
-    pub version_id: i64,
-    pub fragment: String,
-    pub limit: u32,
-}
-
-/// Minimal URL fragment encoding for query-string `fragment=`. The
-/// server-side parser uses `axum::extract::Query` which already
-/// decodes percent-encoded values, so we only need to escape the
-/// bytes that would otherwise confuse the URL parser itself.
 fn percent_encode_fragment(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for b in input.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9'
-            | b'-' | b'.' | b'_' | b'~' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(b as char)
+            }
             b' ' => out.push('+'),
             _ => out.push_str(&format!("%{b:02X}")),
         }
@@ -108,19 +96,22 @@ pub async fn create(
     .await
 }
 
-pub async fn list(
+pub async fn list_paged(
     c: &HttpClient,
-    version_id: i64,
-) -> Result<Vec<CodeListViewResponse>, ApiError> {
-    let path = format!("/api/terminology/code-lists?versionId={version_id}");
-    let resp: CodeListListResponse = c.request(reqwest::Method::GET, &path, None::<&()>).await?;
-    Ok(resp.codelists)
+    q: CodeListListQuery,
+) -> Result<CodeListPagedResponse, ApiError> {
+    let mut path = format!(
+        "/api/terminology/code-lists?versionId={}&offset={}&limit={}",
+        q.version_id, q.offset, q.limit
+    );
+    if let Some(f) = q.fragment.as_deref().filter(|s| !s.trim().is_empty()) {
+        path.push_str("&fragment=");
+        path.push_str(&percent_encode_fragment(f));
+    }
+    c.request(reqwest::Method::GET, &path, None::<&()>).await
 }
 
-pub async fn get_by_id(
-    c: &HttpClient,
-    id: i64,
-) -> Result<CodeListViewResponse, ApiError> {
+pub async fn get_by_id(c: &HttpClient, id: i64) -> Result<CodeListViewResponse, ApiError> {
     c.request(
         reqwest::Method::GET,
         &format!("/api/terminology/code-lists/{id}"),
@@ -153,27 +144,6 @@ pub async fn delete(c: &HttpClient, id: i64) -> Result<(), ApiError> {
     Ok(())
 }
 
-pub async fn search(
-    c: &HttpClient,
-    query: CodeListSearchQuery,
-) -> Result<Vec<CodeListSearchHitResponse>, ApiError> {
-    if query.fragment.trim().is_empty() {
-        return Err(ApiError::Http {
-            status: 400,
-            code: "validation_failed".into(),
-            message: "search fragment must not be empty".into(),
-        });
-    }
-    let fragment_encoded = percent_encode_fragment(&query.fragment);
-    let path = format!(
-        "/api/terminology/code-lists/search?versionId={}&fragment={}&limit={}",
-        query.version_id, fragment_encoded, query.limit
-    );
-    let resp: CodeListSearchHitsResponse =
-        c.request(reqwest::Method::GET, &path, None::<&()>).await?;
-    Ok(resp.hits)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,20 +170,135 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_returns_codelists() {
+    async fn list_paged_returns_first_page_with_next_offset() {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
             .and(path("/api/terminology/code-lists"))
             .and(query_param("versionId", "7"))
+            .and(query_param("offset", "0"))
+            .and(query_param("limit", "20"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "codelists": [codelist_json(1, "C1"), codelist_json(2, "C2")]
+                "codelists": [codelist_json(1, "C1"), codelist_json(2, "C2")],
+                "nextOffset": 20
             })))
             .mount(&server)
             .await;
-        let lists = list(&client(&server), 7).await.unwrap();
-        assert_eq!(lists.len(), 2);
-        assert_eq!(lists[0].code, "C1");
-        assert!(lists[1].extensible);
+        let page = list_paged(
+            &client(&server),
+            CodeListListQuery {
+                version_id: 7,
+                fragment: None,
+                offset: 0,
+                limit: 20,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(page.items.len(), 2);
+        assert_eq!(page.items[0].code, "C1");
+        assert_eq!(page.next_offset, Some(20));
+    }
+
+    #[tokio::test]
+    async fn list_paged_returns_no_next_offset_on_last_page() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/terminology/code-lists"))
+            .and(query_param("offset", "40"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "codelists": [codelist_json(41, "C41")]
+            })))
+            .mount(&server)
+            .await;
+        let page = list_paged(
+            &client(&server),
+            CodeListListQuery {
+                version_id: 7,
+                fragment: None,
+                offset: 40,
+                limit: 20,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(page.items.len(), 1);
+        assert!(page.next_offset.is_none());
+    }
+
+    #[tokio::test]
+    async fn list_paged_with_fragment_includes_fragment_query_param() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/terminology/code-lists"))
+            .and(query_param("fragment", "AE"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "codelists": [codelist_json(1, "AE")]
+            })))
+            .mount(&server)
+            .await;
+        let page = list_paged(
+            &client(&server),
+            CodeListListQuery {
+                version_id: 7,
+                fragment: Some("AE".into()),
+                offset: 0,
+                limit: 20,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(page.items[0].code, "AE");
+    }
+
+    #[tokio::test]
+    async fn list_paged_with_whitespace_fragment_omits_query_param() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/terminology/code-lists"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": []
+            })))
+            .mount(&server)
+            .await;
+        let page = list_paged(
+            &client(&server),
+            CodeListListQuery {
+                version_id: 7,
+                fragment: Some("   ".into()),
+                offset: 0,
+                limit: 20,
+            },
+        )
+        .await
+        .unwrap();
+        assert!(page.items.is_empty());
+    }
+
+    #[tokio::test]
+    async fn list_paged_round_trips_camel_case_next_offset() {
+        // Wire is camelCase (`nextOffset`); `serde(rename_all = "camelCase")`
+        // decodes the snake_case Rust field from the camelCase JSON key.
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/terminology/code-lists"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "codelists": [],
+                "nextOffset": 100
+            })))
+            .mount(&server)
+            .await;
+        let page = list_paged(
+            &client(&server),
+            CodeListListQuery {
+                version_id: 7,
+                fragment: None,
+                offset: 0,
+                limit: 20,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(page.next_offset, Some(100));
     }
 
     #[tokio::test]
@@ -286,48 +371,6 @@ mod tests {
             .mount(&server)
             .await;
         delete(&client(&server), 3).await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn search_returns_hits() {
-        let server = MockServer::start().await;
-        Mock::given(method("GET"))
-            .and(path("/api/terminology/code-lists/search"))
-            .and(query_param("versionId", "7"))
-            .and(query_param("fragment", "alzheimer"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "hits": [{ "codelist": codelist_json(11, "C11") }]
-            })))
-            .mount(&server)
-            .await;
-        let hits = search(
-            &client(&server),
-            CodeListSearchQuery {
-                version_id: 7,
-                fragment: "alzheimer".into(),
-                limit: 50,
-            },
-        )
-        .await
-        .unwrap();
-        assert_eq!(hits.len(), 1);
-        assert_eq!(hits[0].codelist.code, "C11");
-    }
-
-    #[tokio::test]
-    async fn search_rejects_empty_fragment() {
-        let server = MockServer::start().await;
-        let c = client(&server);
-        let res = search(
-            &c,
-            CodeListSearchQuery {
-                version_id: 7,
-                fragment: "   ".into(),
-                limit: 50,
-            },
-        )
-        .await;
-        assert!(matches!(res, Err(ApiError::Http { status: 400, .. })));
     }
 
     #[test]

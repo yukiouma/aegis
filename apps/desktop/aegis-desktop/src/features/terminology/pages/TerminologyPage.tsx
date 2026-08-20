@@ -12,8 +12,11 @@ import {
 import { useI18n } from "@aegis/ui/i18n";
 
 import { errorMessage } from "../../../shared/api/error";
+import { InfiniteScrollSentinel } from "../../../shared/components/InfiniteScrollSentinel";
+import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
 import { useCurrentUser } from "../../auth";
 import {
+  PAGE_SIZE,
   useCreateCodeList,
   useDeleteCodeList,
   useListCodeLists,
@@ -47,26 +50,17 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
   const currentUser = useCurrentUser();
   const versionsQuery = useListTerminologyVersions();
 
-  // The selected version lives in the URL (`?versionId=…`) so it
-  // survives drilling into a code list and clicking the back arrow.
-  // Both `/_authed/_layout/terminology/sdtm` and the `adam` sibling
-  // declare the same `versionId` search schema. `strict: false`
-  // mirrors `ImportTerminologyPage` and keeps the page renderable in
-  // tests that don't register the route.
   const routeSearch = useSearch({ strict: false }) as { versionId?: number };
   const urlVersionId = routeSearch.versionId;
 
   const [search, setSearch] = useState("");
+  const [offset, setOffset] = useState(0);
   const [drawer, setDrawer] = useState<DrawerState>(null);
   const [confirmDelete, setConfirmDelete] = useState<CodeListView | null>(null);
 
   const versions = versionsQuery.data ?? [];
   const versionsForKind = versions.filter((v) => v.kind === kind);
 
-  // Effective selection: trust the URL when it points to a known
-  // version, otherwise fall back to the first version for this kind.
-  // Keeping this derived (instead of mirrored in local state) means
-  // the dropdown is automatically correct on remount.
   const selectedVersionId = useMemo<number | null>(() => {
     if (
       urlVersionId != null &&
@@ -77,11 +71,6 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
     return versionsForKind[0]?.id ?? null;
   }, [urlVersionId, versionsForKind]);
 
-  // Hydrate the URL whenever the effective selection and the URL
-  // disagree: this covers the very first visit (no `versionId` in the
-  // URL yet) and the stale-version case (the version was deleted or
-  // doesn't belong to this kind). `replace: true` keeps the back stack
-  // clean — this is just a hydration step, not a user-driven change.
   useEffect(() => {
     if (versionsForKind.length === 0) return;
     const urlIsValid =
@@ -108,7 +97,21 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
     void navigate({ to, search: { versionId: id ?? undefined } });
   };
 
-  const codeListsQuery = useListCodeLists(selectedVersionId);
+  const debouncedFragment = useDebouncedValue(search, {
+    delayMs: 300,
+    maxWaitMs: 1000,
+  });
+
+  // Reset pagination whenever the parent (version) or the debounced fragment changes.
+  useEffect(() => {
+    setOffset(0);
+  }, [selectedVersionId, debouncedFragment]);
+
+  const codeListsQuery = useListCodeLists(selectedVersionId, {
+    fragment: debouncedFragment,
+    offset,
+  });
+
   const createCodeList = useCreateCodeList();
   const updateCodeList = useUpdateCodeList();
   const deleteCodeList = useDeleteCodeList();
@@ -116,21 +119,9 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
   const role = currentUser.data?.role;
   const canMutate = role === "admin" || role === "root";
 
-  const rows = codeListsQuery.data ?? [];
-
-  const trimmedQuery = search.trim().toLowerCase();
-  const filteredRows = useMemo<CodeListView[]>(() => {
-    if (!trimmedQuery) return rows;
-    return rows.filter(
-      (r) =>
-        r.code.toLowerCase().includes(trimmedQuery) ||
-        r.name.toLowerCase().includes(trimmedQuery) ||
-        r.submissionValue.toLowerCase().includes(trimmedQuery) ||
-        r.synonym.toLowerCase().includes(trimmedQuery) ||
-        r.definition.toLowerCase().includes(trimmedQuery) ||
-        r.nciPreferredTerm.toLowerCase().includes(trimmedQuery),
-    );
-  }, [rows, trimmedQuery]);
+  const rows = codeListsQuery.data?.items ?? [];
+  const hasMore = codeListsQuery.data?.nextOffset != null;
+  const trimmedQuery = debouncedFragment.trim();
 
   const mutationLoading =
     createCodeList.isPending ||
@@ -161,7 +152,7 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
 
       <CodeListTable
         mode="list"
-        rows={filteredRows}
+        rows={rows}
         loading={codeListsQuery.isLoading}
         mutationLoading={mutationLoading}
         error={error}
@@ -170,10 +161,6 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
         onCreate={() => setDrawer({ mode: "create" })}
         onDelete={(row) => setConfirmDelete(row)}
         onOpen={(row) => {
-          // Forward `versionId` so the detail page's back arrow has it
-          // to send the user back to. Without this the URL becomes
-          // `/terminology/$kind/codelists/$id` (no search) and the
-          // detail page can't preserve the selection on the way back.
           void navigate({
             to: "/terminology/$kind/codelists/$codelistId",
             params: { kind, codelistId: row.id },
@@ -188,6 +175,12 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
             ? t("terminology.codelist.noMatches")
             : t("terminology.codelist.empty")
         }
+      />
+
+      <InfiniteScrollSentinel
+        onIntersect={() => setOffset((o) => o + PAGE_SIZE)}
+        hasMore={hasMore}
+        loading={codeListsQuery.isFetching}
       />
 
       <CodeListDrawer

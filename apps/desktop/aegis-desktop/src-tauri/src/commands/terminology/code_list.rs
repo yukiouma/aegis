@@ -5,8 +5,8 @@ use tauri::State;
 use crate::http::client::HttpClient;
 use crate::http::dto::ApiError;
 use crate::http::terminology::code_list::{
-    self, CodeListSearchQuery, CodeListViewResponse, CreateCodeListRequest,
-    UpdateCodeListRequest,
+    self, CodeListListQuery, CodeListPagedResponse, CodeListViewResponse,
+    CreateCodeListRequest, UpdateCodeListRequest,
 };
 
 #[tauri::command]
@@ -41,8 +41,15 @@ pub async fn create_code_list(
 pub async fn list_code_lists(
     client: State<'_, HttpClient>,
     version_id: i64,
-) -> Result<Vec<CodeListViewResponse>, ApiError> {
-    code_list::list(&client, version_id).await
+    fragment: Option<String>,
+    offset: u32,
+    limit: u32,
+) -> Result<CodeListPagedResponse, ApiError> {
+    code_list::list_paged(
+        &client,
+        CodeListListQuery { version_id, fragment, offset, limit },
+    )
+    .await
 }
 
 #[tauri::command]
@@ -68,22 +75,4 @@ pub async fn delete_code_list(
     id: i64,
 ) -> Result<(), ApiError> {
     code_list::delete(&client, id).await
-}
-
-#[tauri::command]
-pub async fn search_code_lists(
-    client: State<'_, HttpClient>,
-    version_id: i64,
-    fragment: String,
-    limit: u32,
-) -> Result<Vec<code_list::CodeListSearchHitResponse>, ApiError> {
-    code_list::search(
-        &client,
-        CodeListSearchQuery {
-            version_id,
-            fragment,
-            limit,
-        },
-    )
-    .await
 }

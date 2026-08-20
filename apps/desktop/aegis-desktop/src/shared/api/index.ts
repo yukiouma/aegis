@@ -2,7 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 import type {
+  CodeItemListQuery,
   CodeItemView,
+  CodeListListQuery,
   CodeListView,
   CreateCodeItemInput,
   CreateCodeListInput,
@@ -10,6 +12,8 @@ import type {
   CreateTerminologyVersionInput,
   CreateUserInput,
   Identity,
+  PagedCodeItemListResponse,
+  PagedCodeListListResponse,
   ProjectView,
   RegisterUserInput,
   RegisterUserResponse,
@@ -123,8 +127,16 @@ export const api = {
   deleteTerminologyVersion: (id: number): Promise<void> =>
     call<void>("delete_terminology_version", { id }),
 
-  listCodeLists: (versionId: number): Promise<CodeListView[]> =>
-    call<CodeListView[]>("list_code_lists", { versionId }),
+  listCodeLists: (
+    versionId: number,
+    options: CodeListListQuery = {},
+  ): Promise<PagedCodeListListResponse> =>
+    call<PagedCodeListListResponse>("list_code_lists", {
+      versionId,
+      fragment: options.fragment,
+      offset: options.offset,
+      limit: options.limit,
+    }),
   getCodeListById: (id: number): Promise<CodeListView> =>
     call<CodeListView>("get_code_list_by_id", { id }),
   createCodeList: (input: CreateCodeListInput): Promise<CodeListView> =>
@@ -137,8 +149,16 @@ export const api = {
   deleteCodeList: (id: number): Promise<void> =>
     call<void>("delete_code_list", { id }),
 
-  listCodeItems: (codelistId: number): Promise<CodeItemView[]> =>
-    call<CodeItemView[]>("list_code_items", { codelistId }),
+  listCodeItems: (
+    codelistId: number,
+    options: CodeItemListQuery = {},
+  ): Promise<PagedCodeItemListResponse> =>
+    call<PagedCodeItemListResponse>("list_code_items", {
+      codelistId,
+      fragment: options.fragment,
+      offset: options.offset,
+      limit: options.limit,
+    }),
   createCodeItem: (input: CreateCodeItemInput): Promise<CodeItemView> =>
     call<CodeItemView>("create_code_item", { ...input }),
   updateCodeItem: (
@@ -158,8 +178,10 @@ export const api = {
 
 export type { ApiError } from "./types";
 export type {
+  CodeItemListQuery,
   CodeItemListResponse,
   CodeItemView,
+  CodeListListQuery,
   CodeListListResponse,
   CodeListView,
   CreateCodeItemInput,
@@ -168,13 +190,14 @@ export type {
   CreateTerminologyVersionInput,
   CreateUserInput,
   Identity,
+  PagedCodeItemListResponse,
+  PagedCodeListListResponse,
   ProjectMembers,
   ProjectMembersView,
   ProjectView,
   Role,
   RegisterUserInput,
   RegisterUserResponse,
-  SearchTerminologyQuery,
   Tag,
   TerminologyKind,
   TerminologyVersionListResponse,

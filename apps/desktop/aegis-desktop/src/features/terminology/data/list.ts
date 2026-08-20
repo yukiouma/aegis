@@ -8,6 +8,8 @@ import {
   type CreateCodeItemInput,
   type CreateCodeListInput,
   type CreateTerminologyVersionInput,
+  type PagedCodeItemListResponse,
+  type PagedCodeListListResponse,
   type TerminologyVersionView,
   type UpdateCodeItemInput,
   type UpdateCodeListInput,
@@ -15,13 +17,11 @@ import {
 } from "../../../shared/api";
 import { queryKeys } from "../../../shared/query";
 
+/** Page size used by both code-list and code-item tables. */
+export const PAGE_SIZE = 20;
+
 // ---- Versions ----
 
-/**
- * All terminology versions. Consumed by the version dropdown on every
- * terminology page; always enabled since the dropdown renders for
- * every authenticated user.
- */
 export function useListTerminologyVersions() {
   return useQuery<TerminologyVersionView[], ApiError>({
     queryKey: queryKeys.terminology.versions(),
@@ -69,23 +69,34 @@ export function useDeleteTerminologyVersion() {
 
 // ---- Code lists ----
 
+export interface ListPagedOptions {
+  fragment?: string;
+  offset?: number;
+}
+
 /**
- * Codelists for a given terminology version. `versionId === null` (or 0)
- * disables the query — the dropdown on the page starts unselected until
- * the user picks a version.
+ * Codelists for a given terminology version. Paged: returns
+ * `{ codelists, nextOffset? }`. `fragment = ""` (or whitespace) is treated
+ * as "no filter" by stripping it before sending.
  */
-export function useListCodeLists(versionId: number | null) {
-  return useQuery<CodeListView[], ApiError>({
-    queryKey: queryKeys.terminology.codeLists(versionId ?? 0),
-    queryFn: () => api.listCodeLists(versionId!),
+export function useListCodeLists(
+  versionId: number | null,
+  options: ListPagedOptions = {},
+) {
+  const fragment = options.fragment ?? "";
+  const offset = options.offset ?? 0;
+  return useQuery<PagedCodeListListResponse, ApiError>({
+    queryKey: queryKeys.terminology.codeLists(versionId ?? 0, fragment, offset),
+    queryFn: () =>
+      api.listCodeLists(versionId!, {
+        fragment: fragment.trim() === "" ? undefined : fragment,
+        offset,
+        limit: PAGE_SIZE,
+      }),
     enabled: versionId != null && versionId > 0,
   });
 }
 
-/**
- * Single codelist by id. `id === null` disables the query — the page
- * starts disabled until the route provides the id.
- */
 export function useGetCodeList(id: number | null) {
   return useQuery<CodeListView, ApiError>({
     queryKey: queryKeys.terminology.codeList(id ?? 0),
@@ -100,7 +111,7 @@ export function useCreateCodeList() {
     mutationFn: api.createCodeList,
     onSuccess: (created) => {
       qc.invalidateQueries({
-        queryKey: queryKeys.terminology.codeLists(created.versionId),
+        queryKey: ["terminology", "codeLists", created.versionId],
       });
     },
   });
@@ -116,7 +127,7 @@ export function useUpdateCodeList() {
     mutationFn: ({ id, body }) => api.updateCodeList(id, body),
     onSuccess: (updated) => {
       qc.invalidateQueries({
-        queryKey: queryKeys.terminology.codeLists(updated.versionId),
+        queryKey: ["terminology", "codeLists", updated.versionId],
       });
       qc.invalidateQueries({
         queryKey: queryKeys.terminology.codeList(updated.id),
@@ -135,7 +146,7 @@ export function useDeleteCodeList() {
     mutationFn: ({ id }) => api.deleteCodeList(id),
     onSuccess: (_void, vars) => {
       qc.invalidateQueries({
-        queryKey: queryKeys.terminology.codeLists(vars.versionId),
+        queryKey: ["terminology", "codeLists", vars.versionId],
       });
     },
   });
@@ -143,14 +154,20 @@ export function useDeleteCodeList() {
 
 // ---- Code items ----
 
-/**
- * Code items for a given codelist. `codelistId === null` (or 0) disables
- * the query until the page knows which codelist to load.
- */
-export function useListCodeItems(codelistId: number | null) {
-  return useQuery<CodeItemView[], ApiError>({
-    queryKey: queryKeys.terminology.codeItems(codelistId ?? 0),
-    queryFn: () => api.listCodeItems(codelistId!),
+export function useListCodeItems(
+  codelistId: number | null,
+  options: ListPagedOptions = {},
+) {
+  const fragment = options.fragment ?? "";
+  const offset = options.offset ?? 0;
+  return useQuery<PagedCodeItemListResponse, ApiError>({
+    queryKey: queryKeys.terminology.codeItems(codelistId ?? 0, fragment, offset),
+    queryFn: () =>
+      api.listCodeItems(codelistId!, {
+        fragment: fragment.trim() === "" ? undefined : fragment,
+        offset,
+        limit: PAGE_SIZE,
+      }),
     enabled: codelistId != null && codelistId > 0,
   });
 }
@@ -161,7 +178,7 @@ export function useCreateCodeItem() {
     mutationFn: api.createCodeItem,
     onSuccess: (created) => {
       qc.invalidateQueries({
-        queryKey: queryKeys.terminology.codeItems(created.codelistId),
+        queryKey: ["terminology", "codeItems", created.codelistId],
       });
     },
   });
@@ -177,7 +194,7 @@ export function useUpdateCodeItem() {
     mutationFn: ({ id, body }) => api.updateCodeItem(id, body),
     onSuccess: (updated) => {
       qc.invalidateQueries({
-        queryKey: queryKeys.terminology.codeItems(updated.codelistId),
+        queryKey: ["terminology", "codeItems", updated.codelistId],
       });
     },
   });
@@ -193,7 +210,7 @@ export function useDeleteCodeItem() {
     mutationFn: ({ id }) => api.deleteCodeItem(id),
     onSuccess: (_void, vars) => {
       qc.invalidateQueries({
-        queryKey: queryKeys.terminology.codeItems(vars.codelistId),
+        queryKey: ["terminology", "codeItems", vars.codelistId],
       });
     },
   });
