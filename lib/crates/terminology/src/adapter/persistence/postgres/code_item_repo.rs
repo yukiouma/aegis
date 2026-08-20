@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use sqlx::{FromRow, PgPool};
 
 use crate::domain::{
-    CodeItem, CodeItemNew, CodeItemRepository, CodeItemSearchHit, CodeItemSearchQuery,
-    CodeItemUpdate, DomainError,
+    CodeItem, CodeItemListQuery, CodeItemNew, CodeItemRepository, CodeItemUpdate, DomainError,
+    Page,
 };
 
 const SQLSTATE_UNIQUE_VIOLATION: &str = "23505";
@@ -100,18 +100,45 @@ impl CodeItemRepository for CodeItemRepo {
         row.try_into()
     }
 
-    async fn list_by_codelist(&self, codelist_id: i64) -> Result<Vec<CodeItem>, DomainError> {
-        let rows: Vec<CodeItemRow> = sqlx::QueryBuilder::new(
-            "SELECT id, codelist_id, version_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at \
-             FROM code_items WHERE codelist_id = ",
-        )
-        .push_bind(codelist_id)
-        .push(" ORDER BY id")
-        .build_query_as::<CodeItemRow>()
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_db_error_simple)?;
-        rows.into_iter().map(CodeItem::try_from).collect()
+    async fn search_or_list(
+        &self,
+        q: CodeItemListQuery,
+    ) -> Result<Page<CodeItem>, DomainError> {
+        let mut qb: sqlx::QueryBuilder<sqlx::Postgres> = sqlx::QueryBuilder::new(
+            "SELECT id, codelist_id, version_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at FROM code_items WHERE codelist_id = ",
+        );
+        qb.push_bind(q.codelist_id);
+
+        if let Some(frag) = q.fragment.as_deref().filter(|s| !s.trim().is_empty()) {
+            qb.push(" AND tsv @@ to_tsquery('english', ");
+            qb.push_bind(format!("{frag}:*"));
+            qb.push(") ORDER BY ts_rank(tsv, to_tsquery('english', ");
+            qb.push_bind(format!("{frag}:*"));
+            qb.push(")) DESC, id ASC LIMIT ");
+        } else {
+            qb.push(" ORDER BY id ASC LIMIT ");
+        }
+        qb.push_bind((q.limit as i64) + 1);
+        qb.push(" OFFSET ");
+        qb.push_bind(q.offset as i64);
+
+        let mut rows: Vec<CodeItemRow> = qb
+            .build_query_as::<CodeItemRow>()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(map_db_error_simple)?;
+
+        let next_offset = if rows.len() as u32 > q.limit {
+            rows.pop();
+            Some(q.offset + q.limit)
+        } else {
+            None
+        };
+        let items = rows
+            .into_iter()
+            .map(CodeItem::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Page { items, next_offset })
     }
 
     async fn list_by_version_and_code(
@@ -191,45 +218,6 @@ impl CodeItemRepository for CodeItemRepo {
             return Err(DomainError::CodeItemNotFound(id));
         }
         Ok(())
-    }
-
-    async fn search(
-        &self,
-        query: CodeItemSearchQuery,
-    ) -> Result<Vec<CodeItemSearchHit>, DomainError> {
-        // FTS via the generated `tsv` tsvector + GIN(tsv) index
-        // from migration 0003. Same pattern as
-        // `CodeListRepo::search`: `to_tsquery` parameterises
-        // the entire fragment so there is no SQL injection
-        // surface; the GIN index serves the `@@` predicate;
-        // `ts_rank` provides an ordering that the cap to `LIMIT`
-        // can push down.
-        let limit = query.limit;
-        let rows: Vec<CodeItemRow> = sqlx::QueryBuilder::new(
-            "SELECT id, codelist_id, version_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at \
-             FROM code_items \
-             WHERE version_id = ",
-        )
-        .push_bind(query.version_id)
-        .push(" AND tsv @@ to_tsquery('english', ")
-        .push_bind(format!("{}:*", query.fragment))
-        .push(") \
-             ORDER BY ts_rank(tsv, to_tsquery('english', ")
-        .push_bind(format!("{}:*", query.fragment))
-        .push(")) DESC \
-             LIMIT ")
-        .push_bind(limit as i64)
-        .build_query_as::<CodeItemRow>()
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_db_error_simple)?;
-        rows.into_iter()
-            .map(|row| {
-                Ok(CodeItemSearchHit {
-                    item: row.try_into()?,
-                })
-            })
-            .collect()
     }
 
     async fn bulk_create(&self, inputs: Vec<CodeItemNew>) -> Result<usize, DomainError> {
