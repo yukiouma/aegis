@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   getRouteApi,
   useNavigate,
@@ -30,8 +30,11 @@ import {
 import { useI18n } from "@aegis/ui/i18n";
 
 import { errorMessage } from "../../../shared/api/error";
+import { InfiniteScrollSentinel } from "../../../shared/components/InfiniteScrollSentinel";
+import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
 import { useCurrentUser } from "../../auth";
 import {
+  PAGE_SIZE,
   useCreateCodeItem,
   useDeleteCodeItem,
   useGetCodeList,
@@ -52,9 +55,6 @@ import { CodeItemTable } from "../components/CodeItemTable";
 import { CodeListDrawer } from "../components/CodeListDrawer";
 import { TermFilterBar } from "../components/TermFilterBar";
 
-// Single route under `/_authed/_layout/terminology/$kind/...`
-// services both SDTM and ADaM; the `$kind` param tells the page
-// which terminology it belongs to.
 const routeApi = getRouteApi(
   "/_authed/_layout/terminology/$kind/codelists/$codelistId",
 );
@@ -76,7 +76,6 @@ export function CodeListDetailPage() {
   const currentUser = useCurrentUser();
   const versionsQuery = useListTerminologyVersions();
   const codelistQuery = useGetCodeList(codelistId);
-  const itemsQuery = useListCodeItems(codelistId);
 
   const role = currentUser.data?.role;
   const canMutate = role === "admin" || role === "root";
@@ -84,39 +83,39 @@ export function CodeListDetailPage() {
   const codelist = codelistQuery.data;
 
   const versionId = codelist?.versionId ?? versionIdFromUrl ?? 0;
-  // The list page reads `versionId` from the URL so its VersionDropdown
-  // survives the round-trip. Forward the value we read here; if it
-  // isn't present (the codelist row's own versionId will populate the
-  // query string) the destination route's `validateSearch` falls back
-  // to the first version automatically.
   const backLink = `/terminology/${kind}`;
   const backSearch = versionIdFromUrl != null
     ? { versionId: versionIdFromUrl }
     : undefined;
 
   const [search2, setSearch2] = useState("");
+  const [offset, setOffset] = useState(0);
   const [editCodelistDrawerOpen, setEditCodelistDrawerOpen] = useState(false);
   const [itemDrawer, setItemDrawer] = useState<ItemDrawerState>(null);
   const [confirmDelete, setConfirmDelete] = useState<CodeItemView | null>(null);
+
+  const debouncedFragment = useDebouncedValue(search2, {
+    delayMs: 300,
+    maxWaitMs: 1000,
+  });
+
+  useEffect(() => {
+    setOffset(0);
+  }, [codelistId, debouncedFragment]);
+
+  const itemsQuery = useListCodeItems(codelistId, {
+    fragment: debouncedFragment,
+    offset,
+  });
 
   const updateCodelist = useUpdateCodeList();
   const createItem = useCreateCodeItem();
   const updateItem = useUpdateCodeItem();
   const deleteItem = useDeleteCodeItem();
 
-  const items = itemsQuery.data ?? [];
-  const trimmedQuery = search2.trim().toLowerCase();
-  const filteredItems = useMemo<CodeItemView[]>(() => {
-    if (!trimmedQuery) return items;
-    return items.filter(
-      (it) =>
-        it.code.toLowerCase().includes(trimmedQuery) ||
-        it.submissionValue.toLowerCase().includes(trimmedQuery) ||
-        it.synonym.toLowerCase().includes(trimmedQuery) ||
-        it.definition.toLowerCase().includes(trimmedQuery) ||
-        it.nciPreferredTerm.toLowerCase().includes(trimmedQuery),
-    );
-  }, [items, trimmedQuery]);
+  const rows = itemsQuery.data?.items ?? [];
+  const hasMore = itemsQuery.data?.nextOffset != null;
+  const trimmedQuery = debouncedFragment.trim();
 
   const mutationLoading =
     updateCodelist.isPending ||
@@ -205,7 +204,6 @@ export function CodeListDetailPage() {
         </Table>
       </TableContainer>
 
-
       <TermFilterBar
         query={search2}
         onQueryChange={setSearch2}
@@ -213,7 +211,7 @@ export function CodeListDetailPage() {
       />
 
       <CodeItemTable
-        rows={filteredItems}
+        rows={rows}
         loading={itemsQuery.isLoading}
         mutationLoading={mutationLoading}
         error={itemsQuery.error}
@@ -227,6 +225,12 @@ export function CodeListDetailPage() {
             ? t("terminology.codeitem.noMatches")
             : t("terminology.codeitem.empty")
         }
+      />
+
+      <InfiniteScrollSentinel
+        onIntersect={() => setOffset((o) => o + PAGE_SIZE)}
+        hasMore={hasMore}
+        loading={itemsQuery.isFetching}
       />
 
       {codelist && (
