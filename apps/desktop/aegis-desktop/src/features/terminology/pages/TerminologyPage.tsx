@@ -76,10 +76,7 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
       versionsForKind.some((v) => v.id === urlVersionId);
     if (urlIsValid) return;
     const fallback = versionsForKind[0].id;
-    const to =
-      kind === "sdtm"
-        ? "/terminology/sdtm"
-        : "/terminology/adam";
+    const to = kind === "sdtm" ? "/terminology/sdtm" : "/terminology/adam";
     void navigate({
       to,
       replace: true,
@@ -88,10 +85,7 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
   }, [urlVersionId, versionsForKind, kind, navigate]);
 
   const setSelectedVersionId = (id: number | null) => {
-    const to =
-      kind === "sdtm"
-        ? "/terminology/sdtm"
-        : "/terminology/adam";
+    const to = kind === "sdtm" ? "/terminology/sdtm" : "/terminology/adam";
     void navigate({ to, search: { versionId: id ?? undefined } });
   };
 
@@ -146,7 +140,7 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
           value={selectedVersionId}
           onChange={setSelectedVersionId}
         />
-        <ImportButton kind={kind} />
+        {canMutate && <ImportButton kind={kind} />}
       </Box>
 
       <CodeListTable
@@ -209,9 +203,7 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
         open={confirmDelete !== null}
         onClose={() => setConfirmDelete(null)}
       >
-        <DialogTitle>
-          {t("terminology.action.delete.confirmTitle")}
-        </DialogTitle>
+        <DialogTitle>{t("terminology.action.delete.confirmTitle")}</DialogTitle>
         <DialogContent>
           <DialogContentText>
             {t("terminology.action.delete.confirmMessage")}
@@ -223,7 +215,10 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirmDelete(null)} disabled={deleteCodeList.isPending}>
+          <Button
+            onClick={() => setConfirmDelete(null)}
+            disabled={deleteCodeList.isPending}
+          >
             {t("common.cancel")}
           </Button>
           <Button

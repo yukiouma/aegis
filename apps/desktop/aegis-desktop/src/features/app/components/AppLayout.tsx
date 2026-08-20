@@ -40,12 +40,6 @@ export function AppLayout() {
   const role = currentUser.data?.role;
   const canManage = role === "root" || role === "admin";
 
-  const baseMenu: MenuItem[] = [
-    { link: "/", title: t("nav.home"), icon: HomeMenuIcon },
-    { link: "/projects", title: t("nav.projects"), icon: ProjectsMenuIcon },
-    { link: "/settings", title: t("nav.settings"), icon: SettingsMenuIcon },
-  ];
-
   const managementEntry: MenuItem = {
     link: "#management",
     title: t("nav.management"),
@@ -77,12 +71,18 @@ export function AppLayout() {
     ],
   };
 
+  const baseMenu: MenuItem[] = [
+    { link: "/", title: t("nav.home"), icon: HomeMenuIcon },
+    { link: "/projects", title: t("nav.projects"), icon: ProjectsMenuIcon },
+    terminologyEntry, // Terminology (submenu: SDTM, ADaM)
+    { link: "/settings", title: t("nav.settings"), icon: SettingsMenuIcon },
+  ];
+
   const menu: MenuItem[] = canManage
     ? [
-        ...baseMenu.slice(0, 2),     // Home, Projects
-        terminologyEntry,            // Terminology (submenu: SDTM, ADaM)
-        managementEntry,             // Management (submenu: Users)
-        ...baseMenu.slice(2),        // Settings
+        ...baseMenu.slice(0, 3), // Home, Projects
+        managementEntry, // Management (submenu: Users)
+        ...baseMenu.slice(3), // Settings
       ]
     : baseMenu;
 

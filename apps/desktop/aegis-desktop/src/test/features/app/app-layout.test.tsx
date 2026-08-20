@@ -96,6 +96,61 @@ describe("AppLayout (authenticated)", () => {
   });
 });
 
+describe("AppLayout (role-based menu visibility)", () => {
+  function mockUser(role: "root" | "admin" | "general") {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => ({
+        id: 1,
+        code: "alice",
+        name: "Alice",
+        role,
+        active: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      }),
+    });
+  }
+
+  it("shows the Terminology entry for a general (non-manager) user", async () => {
+    mockUser("general");
+    await renderRoot(["/"]);
+
+    // Use findBy* to wait for the current_user query to settle, since
+    // the menu is recomputed from `role` once the query resolves.
+    expect(await screen.findByText("Terminology")).toBeInTheDocument();
+    // Management is gated behind admin/root — must not be present.
+    expect(screen.queryByText("Management")).not.toBeInTheDocument();
+  });
+
+  it("shows the Terminology entry for an admin user", async () => {
+    mockUser("admin");
+    await renderRoot(["/"]);
+
+    expect(await screen.findByText("Terminology")).toBeInTheDocument();
+    expect(await screen.findByText("Management")).toBeInTheDocument();
+  });
+
+  it("shows the Terminology entry for a root user", async () => {
+    mockUser("root");
+    await renderRoot(["/"]);
+
+    expect(await screen.findByText("Terminology")).toBeInTheDocument();
+    expect(await screen.findByText("Management")).toBeInTheDocument();
+  });
+
+  it("still surfaces Terminology when current_user has not yet resolved", async () => {
+    // Without mocking current_user the query errors out, so role is
+    // undefined. The menu falls into the non-manager branch, which now
+    // includes Terminology for everyone.
+    mockCommands({ is_logged_in: () => true });
+    await renderRoot(["/"]);
+
+    expect(screen.getByText("Terminology")).toBeInTheDocument();
+    expect(screen.queryByText("Management")).not.toBeInTheDocument();
+  });
+});
+
 describe("AppLayout (unauthenticated)", () => {
   it("redirects / to /login when not logged in", async () => {
     mockCommands({ is_logged_in: () => false });

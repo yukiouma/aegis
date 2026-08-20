@@ -221,3 +221,60 @@ describe("TerminologyPage debounce", () => {
     });
   });
 });
+
+describe("TerminologyPage import gating", () => {
+  it("hides the Import button when the user cannot mutate", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => ({
+        id: 1,
+        code: "alice",
+        name: "Alice",
+        // Non-mutator: viewer/general users must not see the import affordance.
+        role: "general",
+        active: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      }),
+      list_terminology_versions: () => versions,
+      list_code_lists: () => ({
+        items: [makeRow(1)],
+        nextOffset: undefined,
+      }),
+    });
+
+    await renderPage(["/terminology/sdtm?versionId=1"]);
+
+    await screen.findByText("C1");
+    expect(
+      screen.queryByRole("button", { name: /import terminology/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the Import button for an admin user", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => ({
+        id: 1,
+        code: "alice",
+        name: "Alice",
+        role: "admin",
+        active: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      }),
+      list_terminology_versions: () => versions,
+      list_code_lists: () => ({
+        items: [makeRow(1)],
+        nextOffset: undefined,
+      }),
+    });
+
+    await renderPage(["/terminology/sdtm?versionId=1"]);
+
+    await screen.findByText("C1");
+    expect(
+      screen.getByRole("button", { name: /import terminology/i }),
+    ).toBeInTheDocument();
+  });
+});
