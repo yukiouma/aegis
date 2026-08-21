@@ -836,6 +836,7 @@ async fn delete_code_list_removes_the_codelist() {
     // The orphaned item is also gone from the items path.
     let items = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
+            version_id: None,
             codelist_id: Some(created.id),
             fragment: None,
             offset: 0,
@@ -993,6 +994,7 @@ async fn list_code_items_returns_items_in_codelist() {
         .unwrap();
     let mut items = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
+            version_id: None,
             codelist_id: Some(cl.id),
             fragment: None,
             offset: 0,
@@ -1116,6 +1118,7 @@ async fn delete_code_item_removes_the_item() {
     svc.delete_code_item(created.id).await.unwrap();
     let listed = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
+            version_id: None,
             codelist_id: Some(cl.id),
             fragment: None,
             offset: 0,
@@ -1149,6 +1152,7 @@ async fn list_code_items_with_fragment_returns_matching_items() {
         .unwrap();
     let page = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
+            version_id: None,
             codelist_id: Some(cl.id),
             fragment: Some("Y".into()),
             offset: 0,
@@ -1176,6 +1180,7 @@ async fn list_code_items_pagination_signals_next_offset() {
     }
     let page1 = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
+            version_id: None,
             codelist_id: Some(cl.id),
             fragment: None,
             offset: 0,
@@ -1188,6 +1193,7 @@ async fn list_code_items_pagination_signals_next_offset() {
 
     let page2 = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
+            version_id: None,
             codelist_id: Some(cl.id),
             fragment: None,
             offset: 2,
@@ -1204,6 +1210,7 @@ async fn list_code_items_rejects_reserved_tsquery_chars() {
     let svc = service();
     let err = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
+            version_id: None,
             codelist_id: Some(1),
             fragment: Some("a|b".into()),
             offset: 0,
@@ -1239,6 +1246,7 @@ async fn list_code_items_without_codelist_id_returns_all_codelists() {
 
     let page = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
+            version_id: None,
             codelist_id: None,
             fragment: None,
             offset: 0,

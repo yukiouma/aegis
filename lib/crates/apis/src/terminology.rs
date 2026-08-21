@@ -118,12 +118,17 @@ pub struct CodeListListQuery {
 }
 
 /// Query for [`TerminologyService::list_code_items`]. Mirrors
-/// [`CodeListListQuery`] but scopes to a `codelist_id`. The
-/// `codelist_id` is optional: `Some(_)` restricts to one codelist
-/// (the typical per-codelist browse path); `None` lists every
-/// code item known to the backend.
+/// [`CodeListListQuery`] but scopes to a `codelist_id`. Both
+/// `version_id` and `codelist_id` are optional: `Some(_)`
+/// restricts to a single owning version / codelist, `None`
+/// lists every code item known to the backend.
 #[derive(Debug, Clone)]
 pub struct CodeItemListQuery {
+    /// Optional owning version id. `Some(_)` restricts the
+    /// result set to code items whose `version_id` matches;
+    /// `None` lists every code item the backend knows about
+    /// (optionally further narrowed by `codelist_id`).
+    pub version_id: Option<i64>,
     pub codelist_id: Option<i64>,
     pub fragment: Option<String>,
     pub offset: u32,

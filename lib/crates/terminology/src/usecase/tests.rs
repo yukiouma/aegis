@@ -833,6 +833,7 @@ async fn create_code_item_round_trip_then_list_by_codelist() {
         .expect("create");
     let page = usecase
         .list_code_items(CodeItemListQuery {
+            version_id: None,
             codelist_id: Some(9),
             fragment: None,
             offset: 0,

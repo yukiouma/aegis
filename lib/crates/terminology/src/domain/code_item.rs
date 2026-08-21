@@ -106,14 +106,20 @@ pub struct CodeItemUpdate {
 }
 
 /// Query for `CodeItemRepository::search_or_list`. Mirrors
-/// [`CodeListListQuery`](super::code_list::CodeListListQuery) but
-/// scopes to a `codelist_id` instead of a version. `codelist_id`
-/// is optional: `Some(_)` restricts the result set to a single
-/// codelist (the typical per-codelist browse path), while `None`
-/// returns every code item across every codelist known to the
-/// backend.
+/// [`CodeListListQuery`](super::code_list::CodeListListQuery)
+/// but scopes to a `codelist_id` instead of a version. Both
+/// `version_id` and `codelist_id` are optional: `Some(_)`
+/// restricts to a single owning version / codelist (the
+/// typical per-version or per-codelist browse path); `None`
+/// returns every code item across every codelist known to
+/// the backend.
 #[derive(Debug, Clone)]
 pub struct CodeItemListQuery {
+    /// Optional owning version id. `Some(_)` restricts the
+    /// result set to code items whose `version_id` matches;
+    /// `None` lists every code item (optionally further
+    /// narrowed by `codelist_id`).
+    pub version_id: Option<i64>,
     pub codelist_id: Option<i64>,
     pub fragment: Option<String>,
     pub offset: u32,
