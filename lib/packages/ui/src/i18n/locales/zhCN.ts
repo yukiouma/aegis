@@ -159,6 +159,13 @@ export const zhCN = {
   'terminology.import.success': '已导入术语版本 {name}',
   'terminology.import.failure': '导入失败：{message}',
 
+  'terminology.search.open': '跨版本搜索',
+  'terminology.search.backTooltip': '返回术语',
+  'terminology.search.placeholder': '搜索代码列表与代码项',
+  'terminology.search.tab.codelists': '代码列表',
+  'terminology.search.tab.codeitems': '代码项',
+  'terminology.search.emptyInput': '请输入搜索关键字以查找代码列表或代码项',
+
   'terminology.codelist.search.placeholder': '按代码、名称、提交值或描述搜索',
   'terminology.codelist.field.code': '代码',
   'terminology.codelist.field.name': '名称',
@@ -184,9 +191,11 @@ export const zhCN = {
   'terminology.codeitem.field.synonym': '同义词',
   'terminology.codeitem.field.definition': '定义',
   'terminology.codeitem.field.nciPreferredTerm': 'NCI 首选术语',
+  'terminology.codeitem.field.codelist': '代码列表',
   'terminology.codeitem.empty': '该代码列表下暂无代码项',
   'terminology.codeitem.noMatches': '未找到匹配的代码项',
   'terminology.codeitem.loadFailed': '加载代码项失败：{message}',
+  'terminology.codeitem.loadFailed.search': '加载代码项失败：{message}',
   'terminology.codeitem.create.title': '创建代码项',
   'terminology.codeitem.edit.title': '编辑代码项',
   'terminology.codeitem.action.create': '创建',
@@ -206,4 +215,5 @@ export const zhCN = {
   'common.back': '返回',
   'common.submit': '提交',
   'common.close': '关闭',
+  'common.open': '打开',
 } satisfies Record<keyof typeof en, string>;

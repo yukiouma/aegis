@@ -161,6 +161,14 @@ export const en = {
   'terminology.import.success': 'Imported terminology version {name}',
   'terminology.import.failure': 'Import failed: {message}',
 
+  'terminology.search.open': 'Search across this version',
+  'terminology.search.backTooltip': 'Back to terminology',
+  'terminology.search.placeholder': 'Search code lists and code items',
+  'terminology.search.tab.codelists': 'Code Lists',
+  'terminology.search.tab.codeitems': 'Code Items',
+  'terminology.search.emptyInput':
+    'Type a search term to find code lists or code items',
+
   'terminology.codelist.search.placeholder':
     'Search by code, name, submission value, or description',
   'terminology.codelist.field.code': 'Code',
@@ -188,9 +196,12 @@ export const en = {
   'terminology.codeitem.field.synonym': 'Synonym',
   'terminology.codeitem.field.definition': 'Definition',
   'terminology.codeitem.field.nciPreferredTerm': 'NCI preferred term',
+  'terminology.codeitem.field.codelist': 'Codelist',
   'terminology.codeitem.empty': 'No code items in this code list',
   'terminology.codeitem.noMatches': 'No matching code items',
   'terminology.codeitem.loadFailed': 'Failed to load code items: {message}',
+  'terminology.codeitem.loadFailed.search':
+    'Failed to load code items: {message}',
   'terminology.codeitem.create.title': 'Create code item',
   'terminology.codeitem.edit.title': 'Edit code item',
   'terminology.codeitem.action.create': 'Create',
@@ -213,4 +224,5 @@ export const en = {
   'common.back': 'Back',
   'common.submit': 'Submit',
   'common.close': 'Close',
+  'common.open': 'Open',
 } as const;

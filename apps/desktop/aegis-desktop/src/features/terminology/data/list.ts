@@ -184,6 +184,57 @@ export function useListCodeItems(
   });
 }
 
+/**
+ * Version-scoped code-list search for the global term search page.
+ * Shares the `codeLists` query key with `useListCodeLists`, so a search
+ * query caches identically to a list query.
+ */
+export function useSearchCodeLists(
+  versionId: number | null,
+  options: ListPagedOptions = {},
+) {
+  const fragment = options.fragment ?? "";
+  return useInfiniteQuery<PagedCodeListListResponse, ApiError, InfiniteData<PagedCodeListListResponse>, QueryKey, number>({
+    queryKey: queryKeys.terminology.codeLists(versionId ?? 0, fragment),
+    queryFn: ({ pageParam }) =>
+      api.listCodeLists(versionId!, {
+        fragment: fragment.trim() === "" ? undefined : fragment,
+        offset: pageParam,
+        limit: PAGE_SIZE,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextOffset,
+    enabled: versionId != null && versionId > 0,
+  });
+}
+
+/**
+ * Cross-codelist code-item search scoped to a single version for the
+ * global term search page. Uses a dedicated `codeItemsGlobal` key to avoid
+ * collisions with the per-codelist `codeItems` cache. `versionId` is sent
+ * to the server; `codelistId` is omitted (null) so the server applies
+ * only the version filter.
+ */
+export function useSearchCodeItems(
+  versionId: number | null,
+  options: ListPagedOptions = {},
+) {
+  const fragment = options.fragment ?? "";
+  return useInfiniteQuery<PagedCodeItemListResponse, ApiError, InfiniteData<PagedCodeItemListResponse>, QueryKey, number>({
+    queryKey: queryKeys.terminology.codeItemsGlobal(versionId ?? 0, fragment),
+    queryFn: ({ pageParam }) =>
+      api.listCodeItems(null, {
+        versionId,
+        fragment: fragment.trim() === "" ? undefined : fragment,
+        offset: pageParam,
+        limit: PAGE_SIZE,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextOffset,
+    enabled: versionId != null && versionId > 0,
+  });
+}
+
 export function useCreateCodeItem() {
   const qc = useQueryClient();
   return useMutation<CodeItemView, ApiError, CreateCodeItemInput>({

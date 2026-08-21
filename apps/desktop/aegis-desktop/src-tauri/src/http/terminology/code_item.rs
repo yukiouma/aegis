@@ -37,7 +37,8 @@ pub struct CodeItemListResponse {
 
 #[derive(Debug, Clone)]
 pub struct CodeItemListQuery {
-    pub codelist_id: i64,
+    pub codelist_id: Option<i64>,
+    pub version_id: Option<i64>,
     pub fragment: Option<String>,
     pub offset: u32,
     pub limit: u32,
@@ -137,10 +138,18 @@ pub async fn list_paged(
     c: &HttpClient,
     q: CodeItemListQuery,
 ) -> Result<CodeItemPagedResponse, ApiError> {
-    let mut path = format!(
-        "/api/terminology/code-items?codelistId={}&offset={}&limit={}",
-        q.codelist_id, q.offset, q.limit
-    );
+    let mut path = String::from("/api/terminology/code-items?offset=");
+    path.push_str(&q.offset.to_string());
+    path.push_str("&limit=");
+    path.push_str(&q.limit.to_string());
+    if let Some(id) = q.codelist_id {
+        path.push_str("&codelistId=");
+        path.push_str(&id.to_string());
+    }
+    if let Some(v) = q.version_id {
+        path.push_str("&versionId=");
+        path.push_str(&v.to_string());
+    }
     if let Some(f) = q.fragment.as_deref().filter(|s| !s.trim().is_empty()) {
         path.push_str("&fragment=");
         path.push_str(&percent_encode_fragment(f));
@@ -226,7 +235,13 @@ mod tests {
             .await;
         let page = list_paged(
             &client(&server),
-            CodeItemListQuery { codelist_id: 11, fragment: None, offset: 0, limit: 20 },
+            CodeItemListQuery {
+                codelist_id: Some(11),
+                version_id: None,
+                fragment: None,
+                offset: 0,
+                limit: 20,
+            },
         )
         .await
         .unwrap();
@@ -247,7 +262,13 @@ mod tests {
             .await;
         let page = list_paged(
             &client(&server),
-            CodeItemListQuery { codelist_id: 11, fragment: None, offset: 40, limit: 20 },
+            CodeItemListQuery {
+                codelist_id: Some(11),
+                version_id: None,
+                fragment: None,
+                offset: 40,
+                limit: 20,
+            },
         )
         .await
         .unwrap();
@@ -269,7 +290,8 @@ mod tests {
         let page = list_paged(
             &client(&server),
             CodeItemListQuery {
-                codelist_id: 11,
+                codelist_id: Some(11),
+                version_id: None,
                 fragment: Some("AE".into()),
                 offset: 0,
                 limit: 20,
@@ -293,7 +315,8 @@ mod tests {
         let page = list_paged(
             &client(&server),
             CodeItemListQuery {
-                codelist_id: 11,
+                codelist_id: Some(11),
+                version_id: None,
                 fragment: Some("   ".into()),
                 offset: 0,
                 limit: 20,
@@ -319,11 +342,124 @@ mod tests {
             .await;
         let page = list_paged(
             &client(&server),
-            CodeItemListQuery { codelist_id: 11, fragment: None, offset: 0, limit: 20 },
+            CodeItemListQuery {
+                codelist_id: Some(11),
+                version_id: None,
+                fragment: None,
+                offset: 0,
+                limit: 20,
+            },
         )
         .await
         .unwrap();
         assert_eq!(page.next_offset, Some(60));
+    }
+
+    #[tokio::test]
+    async fn list_paged_with_none_codelist_id_omits_query_param() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/terminology/code-items"))
+            .and(query_param("versionId", "7"))
+            .and(query_param("fragment", "AE"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [item_json(1, "AE")]
+            })))
+            .mount(&server)
+            .await;
+        let page = list_paged(
+            &client(&server),
+            CodeItemListQuery {
+                codelist_id: None,
+                version_id: Some(7),
+                fragment: Some("AE".into()),
+                offset: 0,
+                limit: 20,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(page.items.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn list_paged_with_some_codelist_id_includes_query_param() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/terminology/code-items"))
+            .and(query_param("codelistId", "11"))
+            .and(query_param("offset", "0"))
+            .and(query_param("limit", "20"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [item_json(1, "X")]
+            })))
+            .mount(&server)
+            .await;
+        let page = list_paged(
+            &client(&server),
+            CodeItemListQuery {
+                codelist_id: Some(11),
+                version_id: None,
+                fragment: None,
+                offset: 0,
+                limit: 20,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(page.items.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn list_paged_with_some_version_id_includes_query_param() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/terminology/code-items"))
+            .and(query_param("versionId", "7"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [item_json(1, "Y")]
+            })))
+            .mount(&server)
+            .await;
+        let page = list_paged(
+            &client(&server),
+            CodeItemListQuery {
+                codelist_id: None,
+                version_id: Some(7),
+                fragment: None,
+                offset: 0,
+                limit: 20,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(page.items.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn list_paged_with_none_version_id_omits_query_param() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/terminology/code-items"))
+            .and(query_param("codelistId", "11"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [item_json(1, "Z")]
+            })))
+            .mount(&server)
+            .await;
+        let page = list_paged(
+            &client(&server),
+            CodeItemListQuery {
+                codelist_id: Some(11),
+                version_id: None,
+                fragment: None,
+                offset: 0,
+                limit: 20,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(page.items.len(), 1);
     }
 
     #[tokio::test]
