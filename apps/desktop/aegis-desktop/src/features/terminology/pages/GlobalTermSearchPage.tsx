@@ -103,7 +103,7 @@ function SearchCodeListTable({
       <TableContainer
         component={Paper}
         ref={setScrollEl}
-        sx={{ maxHeight: "calc(100vh - 240px)" }}
+        sx={{ maxHeight: "calc(100vh - 180px)" }}
       >
         <Table size="small" stickyHeader>
           <TableHead>
@@ -334,9 +334,6 @@ export function GlobalTermSearchPage() {
             placeholder={t("terminology.search.placeholder")}
           />
         </Box>
-      </Box>
-
-      <Box>
         <ToggleButtonGroup
           exclusive
           value={tab}
