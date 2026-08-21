@@ -481,6 +481,7 @@ async fn list_code_items_paginates_across_multiple_pages() {
         // Page 1: limit=2 → 2 items + nextOffset=2.
         let p1 = i_repo
             .search_or_list(CodeItemListQuery {
+                version_id: None,
                 codelist_id: Some(cl.id),
                 fragment: None,
                 offset: 0,
@@ -494,6 +495,7 @@ async fn list_code_items_paginates_across_multiple_pages() {
         // Page 2: offset=2, limit=2 → 2 items + nextOffset=4.
         let p2 = i_repo
             .search_or_list(CodeItemListQuery {
+                version_id: None,
                 codelist_id: Some(cl.id),
                 fragment: None,
                 offset: 2,
@@ -507,6 +509,7 @@ async fn list_code_items_paginates_across_multiple_pages() {
         // Page 3: offset=4, limit=2 → 1 item, no nextOffset.
         let p3 = i_repo
             .search_or_list(CodeItemListQuery {
+                version_id: None,
                 codelist_id: Some(cl.id),
                 fragment: None,
                 offset: 4,
@@ -606,6 +609,102 @@ async fn list_code_lists_with_fragment_uses_full_text_search() {
         let mut ids: Vec<i64> = page.items.iter().map(|c| c.id).collect();
         ids.sort();
         assert_eq!(ids, vec![age.id, sex.id]);
+    })
+    .await;
+}
+
+#[tokio::test]
+#[ignore = "requires AEGIS_TERMINOLOGY_DATABASE_URL"]
+async fn list_code_items_filters_by_version_id_in_postgres() {
+    // Regression for `CodeItemListQuery::version_id: Option<i64>`
+    // on the Postgres path: when the caller supplies
+    // `version_id`, only items whose `version_id` matches must
+    // come back, even when `codelist_id` is omitted.
+    use terminology::CodeItemListQuery;
+    with_pool(|pool| async move {
+        let v_repo = TerminologyVersionRepo::new(pool.clone());
+        let l_repo = CodeListRepo::new(pool.clone());
+        let i_repo = CodeItemRepo::new(pool.clone());
+
+        let v1 = v_repo
+            .create(TerminologyVersionNew {
+                kind: TerminologyKind::Sdtm,
+                name: unique("item-vid-v1"),
+            })
+            .await
+            .expect("version 1");
+        let v2 = v_repo
+            .create(TerminologyVersionNew {
+                kind: TerminologyKind::Sdtm,
+                name: unique("item-vid-v2"),
+            })
+            .await
+            .expect("version 2");
+        let cl1 = l_repo
+            .create(CodeListNew {
+                version_id: v1.id,
+                code: unique("item-vid-cl1"),
+                extensible: true,
+                name: "v1-codelist".into(),
+                submission_value: "sv".into(),
+                synonym: "".into(),
+                definition: "".into(),
+                nci_preferred_term: "".into(),
+            })
+            .await
+            .expect("codelist 1");
+        let cl2 = l_repo
+            .create(CodeListNew {
+                version_id: v2.id,
+                code: unique("item-vid-cl2"),
+                extensible: true,
+                name: "v2-codelist".into(),
+                submission_value: "sv".into(),
+                synonym: "".into(),
+                definition: "".into(),
+                nci_preferred_term: "".into(),
+            })
+            .await
+            .expect("codelist 2");
+
+        i_repo
+            .create(CodeItemNew {
+                codelist_id: cl1.id,
+                version_id: v1.id,
+                code: "ONLY_V1".into(),
+                submission_value: "sv".into(),
+                synonym: "".into(),
+                definition: "".into(),
+                nci_preferred_term: "".into(),
+            })
+            .await
+            .expect("item in v1");
+        i_repo
+            .create(CodeItemNew {
+                codelist_id: cl2.id,
+                version_id: v2.id,
+                code: "ONLY_V2".into(),
+                submission_value: "sv".into(),
+                synonym: "".into(),
+                definition: "".into(),
+                nci_preferred_term: "".into(),
+            })
+            .await
+            .expect("item in v2");
+
+        let page = i_repo
+            .search_or_list(CodeItemListQuery {
+                version_id: Some(v1.id),
+                codelist_id: None,
+                fragment: None,
+                offset: 0,
+                limit: 50,
+            })
+            .await
+            .expect("filter by version_id");
+        let mut codes: Vec<String> = page.items.iter().map(|i| i.code.clone()).collect();
+        codes.sort();
+        assert_eq!(codes, vec!["ONLY_V1".to_string()]);
     })
     .await;
 }

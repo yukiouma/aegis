@@ -329,6 +329,7 @@ where
         query: ApiCodeItemListQuery,
     ) -> Result<ApiPage<CodeItemView>, TerminologyApiError> {
         let internal_q = CodeItemListQuery {
+            version_id: query.version_id,
             codelist_id: query.codelist_id,
             fragment: query.fragment,
             offset: query.offset,

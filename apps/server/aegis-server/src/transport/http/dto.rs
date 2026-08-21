@@ -769,14 +769,16 @@ pub struct CodeListListQuery {
 }
 
 /// Query string for `GET /api/terminology/code-items`. Mirrors
-/// [`CodeListListQuery`] but scoped to a `codelistId`.
-/// `codelistId` is optional on the wire: omit (or send `null`) to
-/// list every code item known to the backend; supply an id to
-/// restrict to a single codelist (the typical per-codelist browse
-/// path).
+/// [`CodeListListQuery`] but scoped to a `codelistId`. Both
+/// `versionId` and `codelistId` are optional on the wire: omit
+/// (or send `null`) to list every code item known to the backend;
+/// supply an id to restrict to a single owning version /
+/// codelist (the typical per-version or per-codelist browse path).
 #[derive(Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CodeItemListQuery {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version_id: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub codelist_id: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

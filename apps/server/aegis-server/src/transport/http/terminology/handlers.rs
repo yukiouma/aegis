@@ -444,6 +444,7 @@ pub async fn batch_create_code_items(
     get, path = "/code-items", tag = "terminology",
     operation_id = "terminology_list_code_items",
     params(
+        ("versionId" = Option<i64>, Query, description = "Optional owning version id; restricts results to items whose `version_id` matches."),
         ("codelistId" = Option<i64>, Query, description = "Owning codelist id"),
         ("fragment" = Option<String>, Query, description = "Text fragment for FTS prefix-match (omit or empty for plain list)"),
         ("offset" = Option<u32>, Query, description = "Page offset (0-based, default 0)"),
@@ -461,6 +462,7 @@ pub async fn list_code_items(
     State(state): State<AppState>,
     _claims: AuthClaims,
     Query(CodeItemListQuery {
+        version_id,
         codelist_id,
         fragment,
         offset,
@@ -470,6 +472,7 @@ pub async fn list_code_items(
     let page = state
         .terminology
         .list_code_items(apis::terminology::CodeItemListQuery {
+            version_id,
             codelist_id,
             fragment,
             offset,
