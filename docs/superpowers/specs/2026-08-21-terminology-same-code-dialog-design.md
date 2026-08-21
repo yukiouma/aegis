@@ -77,8 +77,8 @@ navigation glue.
 | File | Change |
 |---|---|
 | `apps/desktop/aegis-desktop/src-tauri/src/http/terminology/code_item.rs` | Add `CodeItemListResponse`, `list_by_version_and_code`, wiremock tests. |
-| `apps/desktop/aegis-desktop/src-tauri/src/commands/terminology/code_item.rs` | New file: Tauri command shim `list_code_items_by_version_and_code`. |
-| `apps/desktop/aegis-desktop/src-tauri/src/commands/terminology.rs` | Declare the new submodule: `pub mod code_item;`. |
+| `apps/desktop/aegis-desktop/src-tauri/src/commands/terminology/code_item.rs` | **Modify.** Append a new Tauri command shim `list_code_items_by_version_and_code`. |
+| `apps/desktop/aegis-desktop/src-tauri/src/commands/terminology.rs` | No change. The `code_item` submodule is already declared. |
 | `apps/desktop/aegis-desktop/src/shared/api/index.ts` | Add `api.listCodeItemsByVersionAndCode(versionId, code)` (positional args, matches the existing `getCodeListById(id)` style). No new type in `types.ts` is required. |
 | `apps/desktop/aegis-desktop/src/shared/query/keys.ts` | Add `queryKeys.terminology.codeItemsByCode(versionId, code)`. |
 | `apps/desktop/aegis-desktop/src/features/terminology/data/list.ts` | Add `useListCodeItemsByVersionAndCode`, `useGetCodeListsByIds`. |
