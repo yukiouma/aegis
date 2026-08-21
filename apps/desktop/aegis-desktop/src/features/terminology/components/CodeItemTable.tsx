@@ -41,6 +41,10 @@ export interface CodeItemTableProps {
    *  scroll container element so callers can wire IntersectionObserver
    *  roots that observe scroll-within-table. */
   bottomSlot?: (scrollEl: HTMLElement | null) => ReactNode;
+  /** Click handler for the code cell. When provided, the code renders
+   *  with a pointer cursor, hover underline, and tooltip. When omitted,
+   *  the cell renders identically to a non-interactive cell. */
+  onCodeClick?: (row: CodeItemView) => void;
 }
 
 export function CodeItemTable({
@@ -55,6 +59,7 @@ export function CodeItemTable({
   onDelete,
   emptyMessage,
   bottomSlot,
+  onCodeClick,
 }: CodeItemTableProps) {
   const { t } = useI18n();
   const showSpinner = loading && rows.length === 0;
@@ -127,7 +132,28 @@ export function CodeItemTable({
               const disabled = mutationLoading;
               return (
                 <TableRow key={row.id} hover>
-                  <TableCell>{row.code}</TableCell>
+                  <TableCell>
+                    <Tooltip
+                      title={t("terminology.codeitem.codeClick.tooltip")}
+                      disableInteractive
+                    >
+                      <Box
+                        component="span"
+                        onClick={
+                          onCodeClick ? () => onCodeClick(row) : undefined
+                        }
+                        sx={{
+                          cursor: onCodeClick ? "pointer" : "default",
+                          "&:hover": onCodeClick
+                            ? { textDecoration: "underline" }
+                            : undefined,
+                          display: "inline-block",
+                        }}
+                      >
+                        {row.code}
+                      </Box>
+                    </Tooltip>
+                  </TableCell>
                   <TableCell>{row.submissionValue}</TableCell>
                   <TableCell>
                     <DescriptionsCell
