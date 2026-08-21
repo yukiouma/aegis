@@ -360,6 +360,7 @@ impl CodeItemRepository for InMemoryCodeItemRepo {
             .by_id
             .values()
             .filter(|i| q.codelist_id.map_or(true, |cid| i.codelist_id == cid))
+            .filter(|i| q.version_id.map_or(true, |vid| i.version_id == vid))
             .cloned()
             .collect();
 
@@ -1257,6 +1258,61 @@ async fn list_code_items_without_codelist_id_returns_all_codelists() {
     let mut codes: Vec<String> = page.items.iter().map(|i| i.code.clone()).collect();
     codes.sort();
     assert_eq!(codes, vec!["A1".to_string(), "S1".to_string()]);
+}
+
+#[tokio::test]
+async fn list_code_items_with_version_id_filters_to_that_version() {
+    // Regression for `CodeItemListQuery::version_id: Option<i64>`:
+    // when the caller supplies `version_id`, only items whose
+    // `version_id` matches must come back, even when `codelist_id`
+    // is omitted (the global-list path).
+    let svc = service();
+    let v1 = svc.create_version(create_version_req("v1")).await.unwrap();
+    let v2 = svc.create_version(create_version_req("v2")).await.unwrap();
+    let cl1 = svc.create_code_list(create_code_list_req(v1.id, "C1")).await.unwrap();
+    let cl2 = svc.create_code_list(create_code_list_req(v2.id, "C2")).await.unwrap();
+    svc.create_code_item(create_code_item_req(cl1.id, v1.id, "ALPHA")).await.unwrap();
+    svc.create_code_item(create_code_item_req(cl2.id, v2.id, "BETA")).await.unwrap();
+
+    let page = svc
+        .list_code_items(apis::terminology::CodeItemListQuery {
+            version_id: Some(v1.id),
+            codelist_id: None,
+            fragment: None,
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .unwrap();
+    let mut codes: Vec<String> = page.items.iter().map(|i| i.code.clone()).collect();
+    codes.sort();
+    assert_eq!(codes, vec!["ALPHA".to_string()]);
+}
+
+#[tokio::test]
+async fn list_code_items_with_version_id_combined_with_codelist_id() {
+    // When both `version_id` and `codelist_id` are supplied,
+    // the result must satisfy BOTH predicates.
+    let svc = service();
+    let v = svc.create_version(create_version_req("v")).await.unwrap();
+    let cl1 = svc.create_code_list(create_code_list_req(v.id, "C1")).await.unwrap();
+    let cl2 = svc.create_code_list(create_code_list_req(v.id, "C2")).await.unwrap();
+    svc.create_code_item(create_code_item_req(cl1.id, v.id, "IN_CL1")).await.unwrap();
+    svc.create_code_item(create_code_item_req(cl2.id, v.id, "IN_CL2")).await.unwrap();
+
+    let page = svc
+        .list_code_items(apis::terminology::CodeItemListQuery {
+            version_id: Some(v.id),
+            codelist_id: Some(cl1.id),
+            fragment: None,
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .unwrap();
+    let mut codes: Vec<String> = page.items.iter().map(|i| i.code.clone()).collect();
+    codes.sort();
+    assert_eq!(codes, vec!["IN_CL1".to_string()]);
 }
 
 // ---- view projection smoke tests ----
