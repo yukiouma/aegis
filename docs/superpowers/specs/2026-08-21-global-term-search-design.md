@@ -1,7 +1,7 @@
 # Terminology — Global term search page — Design
 
 **Date:** 2026-08-21
-**Scope:** Frontend-only. Add a new `GlobalTermSearch` page in the `terminology` feature that searches code lists and code items across a whole terminology version using a single fragment. Touches the desktop app end-to-end (route, page, components, hooks, api wrapper, query keys, i18n keys, TerminologyPage edit). The aegis-server already supports cross-codelist code-item queries — no backend changes are required.
+**Scope:** Frontend + Tauri command surface. Add a new `GlobalTermSearch` page in the `terminology` feature that searches code lists and code items across a whole terminology version using a single fragment. Touches the desktop app end-to-end (route, page, components, hooks, api wrapper, query keys, i18n keys, TerminologyPage edit) **and** the Tauri command + HTTP layer for `list_code_items` (because the command currently requires `codelist_id`). The aegis-server already supports cross-codelist code-item queries — no backend changes are required.
 
 ---
 
@@ -17,7 +17,7 @@ The page must preserve `versionId` across navigation (forward from `TerminologyP
 
 ## 2. Non-goals
 
-- No backend / Tauri changes (the server's `list_code_items` already accepts an optional `codelistId`; the Tauri command `list_code_items` already takes positional args that flow through to the server).
+- No aegis-server changes (the server's `list_code_items` already accepts an optional `codelistId`).
 - No new server endpoint.
 - No new TS DTOs.
 - No full-text highlighting / snippets in the result table.
@@ -68,8 +68,8 @@ Click handler navigates to `/terminology/{kind}/search?versionId=<selected>`.
 | Search field | Reused `TermFilterBar` (controlled, debounced 300 ms). Placeholder: `terminology.search.placeholder`. |
 | Toggle | MUI `<ToggleButtonGroup exclusive>` (size small). Default value: `codelists`. State is local to the page (not URL state). |
 | Empty input | Hint message (`terminology.search.emptyInput`) replaces the table. The toggle remains usable. |
-| Loading | Reuse the existing inline loading pattern (top progress bar / disabled refresh button on the table header). |
-| Error | Inline alert + Retry button calling `refetch()`. i18n key `terminology.codelist.loadFailed` (for codelists) or `terminology.codeitem.loadFailed.search` (for items). |
+| Loading | When `loading === true` and no rows yet → centered `<CircularProgress />`. When rows exist, just keep them visible and let the InfiniteScrollSentinel trigger the next page. |
+| Error | Inline `<Alert severity="error">` + Retry `<Button>` calling `refetch()`. i18n key `terminology.codelist.loadFailed` (for codelists) or `terminology.codeitem.loadFailed.search` (for items). Pattern matches the existing `CodeListTable`. |
 | Empty results | Existing `terminology.codelist.noMatches` / `terminology.codeitem.noMatches` messages. |
 | Operation column | `IconButton size="small"` with `<LaunchIcon fontSize="small" />`, wrapped in `<Tooltip title={common.open}>`. Code Lists row navigates to `/terminology/{kind}/codelists/{row.id}?versionId=<v>`. Code Items row navigates to `/terminology/{kind}/codelists/{row.codelistId}?versionId=<v>`. |
 | Infinite scroll | Reuse `<InfiniteScrollSentinel>` as in `TerminologyPage`. |
@@ -115,9 +115,10 @@ TerminologyPage → click ManageSearch icon
                 │                 → GET /api/terminology/code-lists
                 └─ SearchCodeItemTable  → useSearchCodeItems(versionId, { fragment })
                       → api.listCodeItems(null, { fragment, offset, limit })
-                            → invoke('list_code_items')     [Tauri command unchanged]
+                            → invoke('list_code_items', { codelistId: undefined, … })
+                                  [Tauri command updated: codelistId now Option<i64>]
                                   → GET /api/terminology/code-items
-                                        ↑ codelistId param is omitted (null)
+                                        ↑ codelistId query param is omitted when None
 ```
 
 The page never writes to the URL when toggling tabs or typing — only navigation events (back / launch row / forward from `TerminologyPage`) carry params.
@@ -228,12 +229,68 @@ export const useSearchCodeItems = (
 ): UseInfiniteQueryResult<PagedCodeItemListResponse, ApiError>;
 ```
 
-Both use the existing `PAGE_SIZE` constant, `queryKeys.terminology.codeLists` / new `codeItemsGlobal` key, and `api.listCodeLists` / `api.listCodeItems(null, …)`. Both are disabled when `versionId == null || versionId <= 0`. Both `enabled` short-circuit when `fragment` trimmed is empty (gated by the page).
+Both use the existing `PAGE_SIZE` constant, `queryKeys.terminology.codeLists` / new `codeItemsGlobal` key, and `api.listCodeLists` / `api.listCodeItems(null, …)`. Both are disabled (`enabled: false`) when `versionId == null || versionId <= 0`. The page additionally chooses not to render the table at all when the trimmed fragment is empty — the hook itself does not gate on fragment (so that subsequent typing triggers a fresh query immediately, the same pattern `useListCodeLists` already uses).
 
 ### 6.4 Reused hooks
 
 - `useGetCodeList(id)` — already exists; used inside `CodelistNameCell`.
 - `useDebouncedValue` — already exists; used for the search input (300 ms / 1000 ms max wait, matches `TerminologyPage`).
+
+### 6.5 Tauri command + HTTP layer (modified)
+
+The current `list_code_items` Tauri command requires a non-null `codelist_id: i64`. We need to support the cross-codelist case where `codelist_id` is absent.
+
+`apps/desktop/aegis-desktop/src-tauri/src/http/terminology/code_item.rs`:
+
+```rust
+#[derive(Debug, Clone)]
+pub struct CodeItemListQuery {
+    pub codelist_id: Option<i64>,            // was i64
+    pub fragment: Option<String>,
+    pub offset: u32,
+    pub limit: u32,
+}
+
+pub async fn list_paged(
+    c: &HttpClient,
+    q: CodeItemListQuery,
+) -> Result<CodeItemPagedResponse, ApiError> {
+    let mut path = String::from("/api/terminology/code-items?offset=");
+    path.push_str(&q.offset.to_string());
+    path.push_str("&limit=");
+    path.push_str(&q.limit.to_string());
+    if let Some(id) = q.codelist_id {
+        path.push_str("&codelistId=");
+        path.push_str(&id.to_string());
+    }
+    if let Some(f) = q.fragment.as_deref().filter(|s| !s.trim().is_empty()) {
+        path.push_str("&fragment=");
+        path.push_str(&percent_encode_fragment(f));
+    }
+    c.request(reqwest::Method::GET, &path, None::<&()>).await
+}
+```
+
+`apps/desktop/aegis-desktop/src-tauri/src/commands/terminology/code_item.rs`:
+
+```rust
+#[tauri::command]
+pub async fn list_code_items(
+    client: State<'_, HttpClient>,
+    codelist_id: Option<i64>,                  // was i64
+    fragment: Option<String>,
+    offset: u32,
+    limit: u32,
+) -> Result<CodeItemPagedResponse, ApiError> {
+    code_item::list_paged(
+        &client,
+        CodeItemListQuery { codelist_id, fragment, offset, limit },
+    )
+    .await
+}
+```
+
+Existing call sites (e.g. `useListCodeItems`) pass a non-null number; the new behaviour is strictly additive at the wire level (an explicit `codelistId=null` from JS is deserialized to `None` and the query param is omitted from the URL).
 
 ## 7. i18n keys
 
@@ -277,16 +334,28 @@ Modified:
 - `apps/desktop/aegis-desktop/src/features/terminology/data/list.ts` — add `useSearchCodeLists`, `useSearchCodeItems`
 - `apps/desktop/aegis-desktop/src/shared/api/index.ts` — make `api.listCodeItems` accept `null` codelistId
 - `apps/desktop/aegis-desktop/src/shared/query/keys.ts` — add `codeItemsGlobal` factory
+- `apps/desktop/aegis-desktop/src-tauri/src/commands/terminology/code_item.rs` — `list_code_items` command: `codelist_id: i64` → `Option<i64>`
+- `apps/desktop/aegis-desktop/src-tauri/src/http/terminology/code_item.rs` — `CodeItemListQuery.codelist_id: i64` → `Option<i64>`; `list_paged` skips the query param when `None`; add wiremock tests
 - `lib/packages/ui/src/i18n/locales/en.ts` and `lib/packages/ui/src/i18n/locales/zhCN.ts` — new keys
 
 Untouched (verified unchanged):
 
 - aegis-server (no Rust edits)
-- `apps/desktop/aegis-desktop/src-tauri/**` (Tauri command signatures already accept `null`/omitted codelistId because the args are positional)
 - `apps/desktop/aegis-desktop/src/shared/api/types.ts` (no new DTOs)
 - `apps/desktop/aegis-desktop/src/features/terminology/components/CodeListTable.tsx` (not reused for the search page)
 
 ## 10. Testing
+
+### 10.1 Rust (Tauri HTTP layer, wiremock)
+
+Add to `apps/desktop/aegis-desktop/src-tauri/src/http/terminology/code_item.rs::tests`:
+
+- `list_paged_with_none_codelist_id_omits_query_param` — sends `CodeItemListQuery { codelist_id: None, fragment: Some("AE".into()), offset: 0, limit: 20 }`, asserts the mock server's path has no `codelistId` query param but does have `fragment=AE`. (Existing test for the fragment path stays green.)
+- `list_paged_with_some_codelist_id_includes_query_param` — `codelist_id: Some(11)`, asserts the path contains `codelistId=11`. Re-asserts the original wire shape.
+
+Run with `cargo test -p aegis-desktop --lib http::terminology::code_item`.
+
+### 10.2 TS / UI
 
 The project has no automated UI test suite for the desktop app, and the spec does not request new tests. Verification is manual:
 
@@ -297,16 +366,22 @@ The project has no automated UI test suite for the desktop app, and the spec doe
 5. Empty input → only toggle + hint are visible.
 6. Clear input after typing → results clear; toggle remains usable.
 7. Repeat 1-6 from `/terminology/adam`.
-8. `pnpm --filter aegis-desktop tsc --noEmit` — type check passes.
-9. `pnpm --filter aegis-desktop build` (or `cargo check` in `src-tauri`) — build passes (no Rust changes expected).
+
+### 10.3 Verification commands
+
+- `pnpm --filter aegis-desktop tsc --noEmit` — TS type check.
+- `pnpm --filter aegis-desktop build` — Vite build.
+- `cargo test -p aegis-desktop --lib http::terminology::code_item` — new Tauri wiremock tests.
+- `cargo check -p aegis-desktop` — Rust type check (Tauri command signature change must compile).
 
 ## 11. Rollback
 
 All changes are additive except:
 
 - `api.listCodeItems(codelistId: number, …)` → `api.listCodeItems(codelistId: number | null, …)`. Reverting to `number` would only fail compilation in the new `useSearchCodeItems` hook (which is also being reverted). All other call sites pass a non-null number, so the runtime wire shape is identical.
+- Tauri command `list_code_items(codelist_id: i64, …)` → `codelist_id: Option<i64>`. Reverting to `i64` would only fail compilation in the new `useSearchCodeItems` call site (which is also being reverted). The wire shape is unchanged for all existing call sites (they pass a number, which serializes to `Some(11)`).
 
-No migrations, no schema changes, no server changes — rollback is purely a frontend revert.
+No migrations, no schema changes, no server changes — rollback is purely a desktop-app revert (frontend + Tauri command surface).
 
 ## 12. Out of scope
 
