@@ -193,6 +193,10 @@ export const zhCN = {
   'terminology.codeitem.action.save': '保存',
   'terminology.codeitem.readOnly': '只读',
 
+  'terminology.codeitem.codeClick.tooltip': '在其他术语集中查看该 Code',
+  'terminology.codeitem.sameCode.dialogTitle': '同 Code 的条目（{code}）',
+  'terminology.codeitem.sameCode.empty': '该 Code 在其他术语集中不存在。',
+
   'terminology.action.delete.confirmTitle': '删除代码列表',
   'terminology.action.delete.confirmMessage': '确认删除此代码列表及其全部代码项？此操作不可撤销。',
   'terminology.codeitem.action.delete.confirmTitle': '删除代码项',
@@ -201,4 +205,5 @@ export const zhCN = {
   'common.confirm': '确认',
   'common.back': '返回',
   'common.submit': '提交',
+  'common.close': '关闭',
 } satisfies Record<keyof typeof en, string>;

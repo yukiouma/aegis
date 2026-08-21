@@ -29,6 +29,12 @@ pub struct CodeItemPagedResponse {
     pub next_offset: Option<u32>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodeItemListResponse {
+    pub items: Vec<CodeItemViewResponse>,
+}
+
 #[derive(Debug, Clone)]
 pub struct CodeItemListQuery {
     pub codelist_id: i64,
@@ -139,6 +145,19 @@ pub async fn list_paged(
         path.push_str("&fragment=");
         path.push_str(&percent_encode_fragment(f));
     }
+    c.request(reqwest::Method::GET, &path, None::<&()>).await
+}
+
+pub async fn list_by_version_and_code(
+    c: &HttpClient,
+    version_id: i64,
+    code: &str,
+) -> Result<CodeItemListResponse, ApiError> {
+    let path = format!(
+        "/api/terminology/code-items/by-version-and-code?versionId={}&code={}",
+        version_id,
+        percent_encode_fragment(code),
+    );
     c.request(reqwest::Method::GET, &path, None::<&()>).await
 }
 
@@ -428,5 +447,55 @@ mod tests {
             j,
             r#"{"codelistId":11,"versionId":7,"items":[{"code":"Y","submissionValue":"SV","synonym":"syn","definition":"def","nciPreferredTerm":"nci"}]}"#
         );
+    }
+
+    fn list_response_json(version_id: i64, count: usize) -> serde_json::Value {
+        let items: Vec<_> = (0..count).map(|i| {
+            serde_json::json!({
+                "id": i, "codelistId": 10 + i as i64, "versionId": version_id,
+                "code": "YES", "submissionValue": "SV",
+                "synonym": "syn", "definition": "def", "nciPreferredTerm": "nci",
+                "createdAt": "2026-01-01T00:00:00Z",
+                "updatedAt": "2026-01-01T00:00:00Z"
+            })
+        }).collect();
+        serde_json::json!({ "items": items })
+    }
+
+    #[tokio::test]
+    async fn list_by_version_and_code_returns_items() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/terminology/code-items/by-version-and-code"))
+            .and(query_param("versionId", "7"))
+            .and(query_param("code", "YES"))
+            .respond_with(ResponseTemplate::new(200)
+                .set_body_json(list_response_json(7, 2)))
+            .mount(&server)
+            .await;
+        let resp = list_by_version_and_code(&client(&server), 7, "YES").await.unwrap();
+        assert_eq!(resp.items.len(), 2);
+        assert_eq!(resp.items[0].code, "YES");
+        assert_eq!(resp.items[0].version_id, 7);
+        assert_eq!(resp.items[1].codelist_id, 11);
+    }
+
+    #[tokio::test]
+    async fn list_by_version_and_code_percent_encodes_value() {
+        // Code values may contain spaces or punctuation; the wire path
+        // must percent-encode them so the server parser sees the original
+        // value back after URL decoding.
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/terminology/code-items/by-version-and-code"))
+            .and(query_param("versionId", "7"))
+            .and(query_param("code", "A B"))
+            .respond_with(ResponseTemplate::new(200)
+                .set_body_json(list_response_json(7, 1)))
+            .mount(&server)
+            .await;
+        let resp = list_by_version_and_code(&client(&server), 7, "A B")
+            .await.unwrap();
+        assert_eq!(resp.items.len(), 1);
     }
 }
