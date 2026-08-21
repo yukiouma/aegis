@@ -107,15 +107,22 @@ impl CodeItemRepository for CodeItemRepo {
         let mut qb: sqlx::QueryBuilder<sqlx::Postgres> = sqlx::QueryBuilder::new(
             "SELECT id, codelist_id, version_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at FROM code_items",
         );
-        // `codelist_id` is optional on the domain query: when
-        // supplied we restrict to one codelist (the typical per-
-        // codelist browse path); when omitted we return every code
-        // item known to the backend. Build the WHERE clause
-        // dynamically so the fragment filter can chain with `AND`
-        // only when both are present.
+        // `version_id` and `codelist_id` are optional on the domain
+        // query: when supplied we restrict to that owning
+        // version / codelist (the typical per-version or per-
+        // codelist browse path); when omitted we return every
+        // code item known to the backend. Build the WHERE clause
+        // dynamically so the fragment filter can chain with
+        // `AND` only when at least one of them is present.
         let mut has_where = false;
+        if let Some(version_id) = q.version_id {
+            qb.push(" WHERE version_id = ");
+            qb.push_bind(version_id);
+            has_where = true;
+        }
         if let Some(codelist_id) = q.codelist_id {
-            qb.push(" WHERE codelist_id = ");
+            qb.push(if has_where { " AND " } else { " WHERE " });
+            qb.push("codelist_id = ");
             qb.push_bind(codelist_id);
             has_where = true;
         }
