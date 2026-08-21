@@ -90,7 +90,7 @@ export function CodeListTable(props: CodeListTableProps) {
       <TableContainer
         component={Paper}
         ref={containerRefCallback}
-        sx={{ maxHeight: "calc(100vh - 240px)" }}
+        sx={{ maxHeight: "calc(100vh - 120px)" }}
       >
         <Table size="small" stickyHeader>
           <TableHead>

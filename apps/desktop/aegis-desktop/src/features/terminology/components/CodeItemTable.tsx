@@ -94,7 +94,7 @@ export function CodeItemTable({
       <TableContainer
         component={Paper}
         ref={containerRefCallback}
-        sx={{ maxHeight: "calc(100vh - 240px)" }}
+        sx={{ maxHeight: "calc(100vh - 200px)" }}
       >
         <Table size="small" stickyHeader>
           <TableHead>
