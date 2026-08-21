@@ -118,10 +118,13 @@ pub struct CodeListListQuery {
 }
 
 /// Query for [`TerminologyService::list_code_items`]. Mirrors
-/// [`CodeListListQuery`] but scopes to a `codelist_id`.
+/// [`CodeListListQuery`] but scopes to a `codelist_id`. The
+/// `codelist_id` is optional: `Some(_)` restricts to one codelist
+/// (the typical per-codelist browse path); `None` lists every
+/// code item known to the backend.
 #[derive(Debug, Clone)]
 pub struct CodeItemListQuery {
-    pub codelist_id: i64,
+    pub codelist_id: Option<i64>,
     pub fragment: Option<String>,
     pub offset: u32,
     pub limit: u32,

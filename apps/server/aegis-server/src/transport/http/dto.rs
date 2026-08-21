@@ -770,10 +770,15 @@ pub struct CodeListListQuery {
 
 /// Query string for `GET /api/terminology/code-items`. Mirrors
 /// [`CodeListListQuery`] but scoped to a `codelistId`.
+/// `codelistId` is optional on the wire: omit (or send `null`) to
+/// list every code item known to the backend; supply an id to
+/// restrict to a single codelist (the typical per-codelist browse
+/// path).
 #[derive(Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CodeItemListQuery {
-    pub codelist_id: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub codelist_id: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fragment: Option<String>,
     #[serde(default)]
@@ -1489,11 +1494,30 @@ mod tests {
     fn code_item_list_query_with_fragment_roundtrip() {
         let json = r#"{"codelistId":11,"fragment":"yes","offset":50,"limit":25}"#;
         let q: CodeItemListQuery = serde_json::from_str(json).unwrap();
-        assert_eq!(q.codelist_id, 11);
+        assert_eq!(q.codelist_id, Some(11));
         assert_eq!(q.fragment.as_deref(), Some("yes"));
         assert_eq!(q.offset, 50);
         assert_eq!(q.limit, 25);
         assert_eq!(serde_json::to_string(&q).unwrap(), json);
+    }
+
+    #[test]
+    fn code_item_list_query_without_codelist_id_roundtrip() {
+        // Omitting `codelistId` (or sending `null`) must default to
+        // `None` and serialize back without the key, preserving
+        // the optional semantics on the wire.
+        let json = r#"{"fragment":"x","offset":0,"limit":50}"#;
+        let q: CodeItemListQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(q.codelist_id, None);
+        assert_eq!(q.fragment.as_deref(), Some("x"));
+        assert_eq!(q.offset, 0);
+        assert_eq!(q.limit, 50);
+        assert_eq!(serde_json::to_string(&q).unwrap(), json);
+
+        // Explicit `null` is also accepted.
+        let q_null: CodeItemListQuery =
+            serde_json::from_str(r#"{"codelistId":null,"offset":0,"limit":50}"#).unwrap();
+        assert_eq!(q_null.codelist_id, None);
     }
 
     #[test]
