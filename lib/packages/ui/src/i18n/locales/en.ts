@@ -224,4 +224,5 @@ export const en = {
   'common.back': 'Back',
   'common.submit': 'Submit',
   'common.close': 'Close',
+  'common.open': 'Open',
 } as const;

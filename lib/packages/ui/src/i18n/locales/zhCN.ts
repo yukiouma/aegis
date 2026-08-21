@@ -215,4 +215,5 @@ export const zhCN = {
   'common.back': '返回',
   'common.submit': '提交',
   'common.close': '关闭',
+  'common.open': '打开',
 } satisfies Record<keyof typeof en, string>;
