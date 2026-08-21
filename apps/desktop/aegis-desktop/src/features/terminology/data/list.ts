@@ -1,6 +1,7 @@
 import {
   useInfiniteQuery,
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
   type InfiniteData,
@@ -10,6 +11,7 @@ import {
 import {
   api,
   type ApiError,
+  type CodeItemListResponse,
   type CodeItemView,
   type CodeListView,
   type CreateCodeItemInput,
@@ -223,5 +225,42 @@ export function useDeleteCodeItem() {
         queryKey: ["terminology", "codeItems", vars.codelistId],
       });
     },
+  });
+}
+
+/**
+ * Single-page lookup of all code items sharing a given code within a
+ * terminology version. The server endpoint is non-paginated, so we use
+ * `useQuery` instead of `useInfiniteQuery`. The hook is `enabled` only when
+ * both `versionId` and `code` are usable; the dialog flips `code` to a
+ * real value to trigger the fetch.
+ */
+export function useListCodeItemsByVersionAndCode(
+  versionId: number | null,
+  code: string | null,
+) {
+  return useQuery<CodeItemListResponse, ApiError>({
+    queryKey: queryKeys.terminology.codeItemsByCode(versionId ?? 0, code ?? ""),
+    queryFn: () => api.listCodeItemsByVersionAndCode(versionId!, code!),
+    enabled: versionId != null && versionId > 0 && !!code,
+  });
+}
+
+/**
+ * Bulk lookup of codelists by id. Returns one `UseQueryResult` per id in
+ * the same order. React Query dedupes by `queryKey`, so overlapping ids
+ * across dialog opens share their cache entry with the single-id
+ * `useGetCodeList` hook.
+ *
+ * `staleTime: 30_000` keeps the dialog snappy on re-open within 30s.
+ */
+export function useGetCodeListsByIds(ids: number[]) {
+  return useQueries({
+    queries: ids.map((id) => ({
+      queryKey: queryKeys.terminology.codeList(id),
+      queryFn: () => api.getCodeListById(id),
+      enabled: id > 0,
+      staleTime: 30_000,
+    })),
   });
 }
