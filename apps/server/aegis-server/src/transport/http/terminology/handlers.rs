@@ -426,11 +426,14 @@ pub async fn batch_create_code_items(
                 .collect(),
         })
         .await?;
-    Ok((StatusCode::CREATED, Json(dto::BatchCreateCodeItemsResponse {
-        count: resp.count,
-        codelist_id: resp.codelist_id,
-        version_id: resp.version_id,
-    })))
+    Ok((
+        StatusCode::CREATED,
+        Json(dto::BatchCreateCodeItemsResponse {
+            count: resp.count,
+            codelist_id: resp.codelist_id,
+            version_id: resp.version_id,
+        }),
+    ))
 }
 
 /// `GET /api/terminology/code-items?…` — unified list+search for
@@ -441,7 +444,7 @@ pub async fn batch_create_code_items(
     get, path = "/code-items", tag = "terminology",
     operation_id = "terminology_list_code_items",
     params(
-        ("codelistId" = i64, Query, description = "Owning codelist id"),
+        ("codelistId" = Option<i64>, Query, description = "Owning codelist id"),
         ("fragment" = Option<String>, Query, description = "Text fragment for FTS prefix-match (omit or empty for plain list)"),
         ("offset" = Option<u32>, Query, description = "Page offset (0-based, default 0)"),
         ("limit" = Option<u32>, Query, description = "Page size (0 = server default 50, max 500)"),

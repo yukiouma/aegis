@@ -359,7 +359,7 @@ impl CodeItemRepository for InMemoryCodeItemRepo {
             .unwrap()
             .by_id
             .values()
-            .filter(|i| i.codelist_id == q.codelist_id)
+            .filter(|i| q.codelist_id.map_or(true, |cid| i.codelist_id == cid))
             .cloned()
             .collect();
 
@@ -836,7 +836,7 @@ async fn delete_code_list_removes_the_codelist() {
     // The orphaned item is also gone from the items path.
     let items = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
-            codelist_id: created.id,
+            codelist_id: Some(created.id),
             fragment: None,
             offset: 0,
             limit: 50,
@@ -993,7 +993,7 @@ async fn list_code_items_returns_items_in_codelist() {
         .unwrap();
     let mut items = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
-            codelist_id: cl.id,
+            codelist_id: Some(cl.id),
             fragment: None,
             offset: 0,
             limit: 50,
@@ -1116,7 +1116,7 @@ async fn delete_code_item_removes_the_item() {
     svc.delete_code_item(created.id).await.unwrap();
     let listed = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
-            codelist_id: cl.id,
+            codelist_id: Some(cl.id),
             fragment: None,
             offset: 0,
             limit: 50,
@@ -1149,7 +1149,7 @@ async fn list_code_items_with_fragment_returns_matching_items() {
         .unwrap();
     let page = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
-            codelist_id: cl.id,
+            codelist_id: Some(cl.id),
             fragment: Some("Y".into()),
             offset: 0,
             limit: 50,
@@ -1176,7 +1176,7 @@ async fn list_code_items_pagination_signals_next_offset() {
     }
     let page1 = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
-            codelist_id: cl.id,
+            codelist_id: Some(cl.id),
             fragment: None,
             offset: 0,
             limit: 2,
@@ -1188,7 +1188,7 @@ async fn list_code_items_pagination_signals_next_offset() {
 
     let page2 = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
-            codelist_id: cl.id,
+            codelist_id: Some(cl.id),
             fragment: None,
             offset: 2,
             limit: 2,
@@ -1204,7 +1204,7 @@ async fn list_code_items_rejects_reserved_tsquery_chars() {
     let svc = service();
     let err = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
-            codelist_id: 1,
+            codelist_id: Some(1),
             fragment: Some("a|b".into()),
             offset: 0,
             limit: 50,
@@ -1212,6 +1212,43 @@ async fn list_code_items_rejects_reserved_tsquery_chars() {
         .await
         .unwrap_err();
     assert!(matches!(err, TerminologyApiError::Validation(_)));
+}
+
+#[tokio::test]
+async fn list_code_items_without_codelist_id_returns_all_codelists() {
+    // Regression for `CodeItemListQuery::codelist_id: Option<i64>`:
+    // when the caller omits `codelist_id`, the service must
+    // return items from every codelist (not silently restrict to
+    // a default).
+    let svc = service();
+    let v = svc.create_version(create_version_req("v-all")).await.unwrap();
+    let cl1 = svc
+        .create_code_list(create_code_list_req(v.id, "C1"))
+        .await
+        .unwrap();
+    let cl2 = svc
+        .create_code_list(create_code_list_req(v.id, "C2"))
+        .await
+        .unwrap();
+    svc.create_code_item(create_code_item_req(cl1.id, v.id, "A1"))
+        .await
+        .unwrap();
+    svc.create_code_item(create_code_item_req(cl2.id, v.id, "S1"))
+        .await
+        .unwrap();
+
+    let page = svc
+        .list_code_items(apis::terminology::CodeItemListQuery {
+            codelist_id: None,
+            fragment: None,
+            offset: 0,
+            limit: 50,
+        })
+        .await
+        .unwrap();
+    let mut codes: Vec<String> = page.items.iter().map(|i| i.code.clone()).collect();
+    codes.sort();
+    assert_eq!(codes, vec!["A1".to_string(), "S1".to_string()]);
 }
 
 // ---- view projection smoke tests ----

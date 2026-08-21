@@ -105,12 +105,25 @@ impl CodeItemRepository for CodeItemRepo {
         q: CodeItemListQuery,
     ) -> Result<Page<CodeItem>, DomainError> {
         let mut qb: sqlx::QueryBuilder<sqlx::Postgres> = sqlx::QueryBuilder::new(
-            "SELECT id, codelist_id, version_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at FROM code_items WHERE codelist_id = ",
+            "SELECT id, codelist_id, version_id, code, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at FROM code_items",
         );
-        qb.push_bind(q.codelist_id);
+        // `codelist_id` is optional on the domain query: when
+        // supplied we restrict to one codelist (the typical per-
+        // codelist browse path); when omitted we return every code
+        // item known to the backend. Build the WHERE clause
+        // dynamically so the fragment filter can chain with `AND`
+        // only when both are present.
+        let mut has_where = false;
+        if let Some(codelist_id) = q.codelist_id {
+            qb.push(" WHERE codelist_id = ");
+            qb.push_bind(codelist_id);
+            has_where = true;
+        }
+        let frag_filter = q.fragment.as_deref().filter(|s| !s.trim().is_empty());
 
-        if let Some(frag) = q.fragment.as_deref().filter(|s| !s.trim().is_empty()) {
-            qb.push(" AND tsv @@ to_tsquery('english', ");
+        if let Some(frag) = frag_filter {
+            qb.push(if has_where { " AND " } else { " WHERE " });
+            qb.push("tsv @@ to_tsquery('english', ");
             qb.push_bind(format!("{frag}:*"));
             qb.push(") ORDER BY ts_rank(tsv, to_tsquery('english', ");
             qb.push_bind(format!("{frag}:*"));

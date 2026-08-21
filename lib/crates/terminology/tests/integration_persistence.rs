@@ -481,7 +481,7 @@ async fn list_code_items_paginates_across_multiple_pages() {
         // Page 1: limit=2 → 2 items + nextOffset=2.
         let p1 = i_repo
             .search_or_list(CodeItemListQuery {
-                codelist_id: cl.id,
+                codelist_id: Some(cl.id),
                 fragment: None,
                 offset: 0,
                 limit: 2,
@@ -494,7 +494,7 @@ async fn list_code_items_paginates_across_multiple_pages() {
         // Page 2: offset=2, limit=2 → 2 items + nextOffset=4.
         let p2 = i_repo
             .search_or_list(CodeItemListQuery {
-                codelist_id: cl.id,
+                codelist_id: Some(cl.id),
                 fragment: None,
                 offset: 2,
                 limit: 2,
@@ -507,7 +507,7 @@ async fn list_code_items_paginates_across_multiple_pages() {
         // Page 3: offset=4, limit=2 → 1 item, no nextOffset.
         let p3 = i_repo
             .search_or_list(CodeItemListQuery {
-                codelist_id: cl.id,
+                codelist_id: Some(cl.id),
                 fragment: None,
                 offset: 4,
                 limit: 2,

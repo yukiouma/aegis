@@ -324,7 +324,7 @@ impl CodeItemRepository for FakeCodeItemRepo {
             .unwrap()
             .by_id
             .values()
-            .filter(|i| i.codelist_id == q.codelist_id)
+            .filter(|i| q.codelist_id.map_or(true, |cid| i.codelist_id == cid))
             .cloned()
             .collect();
 
@@ -833,7 +833,7 @@ async fn create_code_item_round_trip_then_list_by_codelist() {
         .expect("create");
     let page = usecase
         .list_code_items(CodeItemListQuery {
-            codelist_id: 9,
+            codelist_id: Some(9),
             fragment: None,
             offset: 0,
             limit: 50,
