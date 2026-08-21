@@ -8,8 +8,11 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  IconButton,
+  Tooltip,
 } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
+import { ManageSearch as ManageSearchIcon } from "@aegis/ui/icons";
 
 import { errorMessage } from "../../../shared/api/error";
 import { InfiniteScrollSentinel } from "../../../shared/components/InfiniteScrollSentinel";
@@ -140,6 +143,24 @@ export function TerminologyPage({ kind }: TerminologyPageProps) {
           value={selectedVersionId}
           onChange={setSelectedVersionId}
         />
+        <Tooltip title={t("terminology.search.open")}>
+          <IconButton
+            aria-label={t("terminology.search.open")}
+            onClick={() =>
+              navigate({
+                to: "/terminology/$kind/search",
+                params: { kind },
+                search:
+                  selectedVersionId != null
+                    ? { versionId: selectedVersionId }
+                    : undefined,
+              })
+            }
+            disabled={selectedVersionId == null}
+          >
+            <ManageSearchIcon />
+          </IconButton>
+        </Tooltip>
         {canMutate && <ImportButton kind={kind} />}
       </Box>
 
