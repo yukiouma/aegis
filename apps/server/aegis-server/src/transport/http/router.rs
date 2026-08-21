@@ -993,17 +993,19 @@ mod tests {
             apis::terminology::TerminologyApiError,
         > {
             let id = query.offset as i64 + 1;
-            // `codelist_id` is now optional on the query: when the
-            // caller restricts to one codelist we echo it back,
-            // when they omit it we fall back to 0 (this stub only
-            // exists to satisfy the router test, so any
-            // deterministic default is fine).
+            // `version_id` and `codelist_id` are now optional on
+            // the query: when the caller restricts to one owning
+            // version / codelist we echo it back, when they omit
+            // it we fall back to 0 (this stub only exists to
+            // satisfy the router test, so any deterministic
+            // default is fine).
+            let version_id = query.version_id.unwrap_or(0);
             let codelist_id = query.codelist_id.unwrap_or(0);
             Ok(apis::terminology::Page {
                 items: vec![apis::terminology::CodeItemView {
                     id,
                     codelist_id,
-                    version_id: 1,
+                    version_id,
                     code: format!("CI{id}"),
                     submission_value: String::new(),
                     synonym: String::new(),
