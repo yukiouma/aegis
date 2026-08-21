@@ -52,6 +52,7 @@ import type {
 import { CodeItemDrawer } from "../components/CodeItemDrawer";
 import { CodeItemTable } from "../components/CodeItemTable";
 import { CodeListDrawer } from "../components/CodeListDrawer";
+import { SameCodeItemsDialog } from "../components/SameCodeItemsDialog";
 import { TermFilterBar } from "../components/TermFilterBar";
 
 const routeApi = getRouteApi(
@@ -91,6 +92,9 @@ export function CodeListDetailPage() {
   const [editCodelistDrawerOpen, setEditCodelistDrawerOpen] = useState(false);
   const [itemDrawer, setItemDrawer] = useState<ItemDrawerState>(null);
   const [confirmDelete, setConfirmDelete] = useState<CodeItemView | null>(null);
+  const [sameCodeDialog, setSameCodeDialog] = useState<{ code: string } | null>(
+    null,
+  );
 
   const debouncedFragment = useDebouncedValue(search2, {
     delayMs: 300,
@@ -220,6 +224,7 @@ export function CodeListDetailPage() {
         onCreate={() => setItemDrawer({ mode: "create" })}
         onEdit={(row) => setItemDrawer({ mode: "edit", row })}
         onDelete={(row) => setConfirmDelete(row)}
+        onCodeClick={(row) => setSameCodeDialog({ code: row.code })}
         emptyMessage={
           trimmedQuery
             ? t("terminology.codeitem.noMatches")
@@ -320,6 +325,15 @@ export function CodeListDetailPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <SameCodeItemsDialog
+        open={sameCodeDialog !== null}
+        code={sameCodeDialog?.code ?? null}
+        versionId={versionId}
+        currentCodelistId={codelistId}
+        kind={kind}
+        onClose={() => setSameCodeDialog(null)}
+      />
     </Box>
   );
 }
