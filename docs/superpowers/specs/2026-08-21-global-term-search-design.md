@@ -112,13 +112,14 @@ TerminologyPage → click ManageSearch icon
                 ├─ SearchCodeListTable  → useSearchCodeLists(versionId, { fragment })
                 │     → api.listCodeLists(versionId, { fragment, offset, limit })
                 │           → invoke('list_code_lists')     [Tauri command unchanged]
-                │                 → GET /api/terminology/code-lists
+                │                 → GET /api/terminology/code-lists?versionId=…
                 └─ SearchCodeItemTable  → useSearchCodeItems(versionId, { fragment })
-                      → api.listCodeItems(null, { fragment, offset, limit })
-                            → invoke('list_code_items', { codelistId: undefined, … })
-                                  [Tauri command updated: codelistId now Option<i64>]
-                                  → GET /api/terminology/code-items
-                                        ↑ codelistId query param is omitted when None
+                      → api.listCodeItems(null, { versionId, fragment, offset, limit })
+                            → invoke('list_code_items', { codelistId: undefined, versionId, … })
+                                  [Tauri command updated: codelist_id Option<i64>,
+                                   new version_id: Option<i64> arg]
+                                  → GET /api/terminology/code-items?versionId=…
+                                        ↑ codelistId param omitted, versionId param present
 ```
 
 The page never writes to the URL when toggling tabs or typing — only navigation events (back / launch row / forward from `TerminologyPage`) carry params.
@@ -192,17 +193,18 @@ navigate({
 ```ts
 listCodeItems: (
   codelistId: number | null,
-  options: CodeItemListQuery = {},
+  options: CodeItemListQuery & { versionId?: number | null } = {},
 ): Promise<PagedCodeItemListResponse> =>
   call<PagedCodeItemListResponse>("list_code_items", {
     codelistId: codelistId ?? undefined,
+    versionId: options.versionId ?? undefined,
     fragment: options.fragment,
     offset: options.offset,
     limit: options.limit,
   }),
 ```
 
-`codelistId: null` ⇒ key omitted from the Tauri args object. Existing per-codelist call sites pass a non-null `codelistId`, so their wire shape is unchanged.
+`codelistId: null` ⇒ key omitted from the Tauri args object. `versionId: null` (or absent) ⇒ key omitted from the Tauri args object. Existing per-codelist call sites pass a non-null `codelistId` and no `versionId`, so their wire shape is unchanged.
 
 ### 6.2 Query key factory (add)
 
@@ -229,7 +231,7 @@ export const useSearchCodeItems = (
 ): UseInfiniteQueryResult<PagedCodeItemListResponse, ApiError>;
 ```
 
-Both use the existing `PAGE_SIZE` constant, `queryKeys.terminology.codeLists` / new `codeItemsGlobal` key, and `api.listCodeLists` / `api.listCodeItems(null, …)`. Both are disabled (`enabled: false`) when `versionId == null || versionId <= 0`. The page additionally chooses not to render the table at all when the trimmed fragment is empty — the hook itself does not gate on fragment (so that subsequent typing triggers a fresh query immediately, the same pattern `useListCodeLists` already uses).
+`useSearchCodeLists` and `useSearchCodeItems` both pass `versionId` to `api.listCodeLists` / `api.listCodeItems`. The Code Items variant passes `versionId` and `codelistId: null` so the server applies only the version filter (cross-codelist search). Both hooks share the `PAGE_SIZE` constant, use the `queryKeys.terminology.codeLists` / new `codeItemsGlobal` keys, and are disabled (`enabled: false`) when `versionId == null || versionId <= 0`. The page additionally chooses not to render the table at all when the trimmed fragment is empty — the hook itself does not gate on fragment (so that subsequent typing triggers a fresh query immediately, the same pattern `useListCodeLists` already uses).
 
 ### 6.4 Reused hooks
 
@@ -238,7 +240,10 @@ Both use the existing `PAGE_SIZE` constant, `queryKeys.terminology.codeLists` / 
 
 ### 6.5 Tauri command + HTTP layer (modified)
 
-The current `list_code_items` Tauri command requires a non-null `codelist_id: i64`. We need to support the cross-codelist case where `codelist_id` is absent.
+The current Tauri `list_code_items` command and HTTP-layer `CodeItemListQuery` accept only a required `codelist_id` and no `version_id`. We need to support:
+
+1. Cross-codelist search (`codelist_id: None`) scoped to a version.
+2. Optional `version_id` for the version filter.
 
 `apps/desktop/aegis-desktop/src-tauri/src/http/terminology/code_item.rs`:
 
@@ -246,6 +251,7 @@ The current `list_code_items` Tauri command requires a non-null `codelist_id: i6
 #[derive(Debug, Clone)]
 pub struct CodeItemListQuery {
     pub codelist_id: Option<i64>,            // was i64
+    pub version_id: Option<i64>,             // new
     pub fragment: Option<String>,
     pub offset: u32,
     pub limit: u32,
@@ -263,6 +269,10 @@ pub async fn list_paged(
         path.push_str("&codelistId=");
         path.push_str(&id.to_string());
     }
+    if let Some(v) = q.version_id {
+        path.push_str("&versionId=");
+        path.push_str(&v.to_string());
+    }
     if let Some(f) = q.fragment.as_deref().filter(|s| !s.trim().is_empty()) {
         path.push_str("&fragment=");
         path.push_str(&percent_encode_fragment(f));
@@ -278,19 +288,20 @@ pub async fn list_paged(
 pub async fn list_code_items(
     client: State<'_, HttpClient>,
     codelist_id: Option<i64>,                  // was i64
+    version_id: Option<i64>,                   // new
     fragment: Option<String>,
     offset: u32,
     limit: u32,
 ) -> Result<CodeItemPagedResponse, ApiError> {
     code_item::list_paged(
         &client,
-        CodeItemListQuery { codelist_id, fragment, offset, limit },
+        CodeItemListQuery { codelist_id, version_id, fragment, offset, limit },
     )
     .await
 }
 ```
 
-Existing call sites (e.g. `useListCodeItems`) pass a non-null number; the new behaviour is strictly additive at the wire level (an explicit `codelistId=null` from JS is deserialized to `None` and the query param is omitted from the URL).
+Existing call sites (e.g. `useListCodeItems`) pass a non-null `codelistId` and no `versionId`; Tauri deserializes the absent JS key to `None`, so the wire shape of those calls is unchanged (no `versionId=` query param added). The new behaviour is additive: a `null` or absent `versionId` from JS ⇒ `None` ⇒ query param omitted.
 
 ## 7. i18n keys
 
@@ -332,10 +343,10 @@ Modified:
 - `apps/desktop/aegis-desktop/src/features/terminology/pages/index.ts` — re-export new page
 - `apps/desktop/aegis-desktop/src/features/terminology/pages/TerminologyPage.tsx` — add ManageSearch icon button
 - `apps/desktop/aegis-desktop/src/features/terminology/data/list.ts` — add `useSearchCodeLists`, `useSearchCodeItems`
-- `apps/desktop/aegis-desktop/src/shared/api/index.ts` — make `api.listCodeItems` accept `null` codelistId
+- `apps/desktop/aegis-desktop/src/shared/api/index.ts` — make `api.listCodeItems` accept `null` codelistId and `versionId`
 - `apps/desktop/aegis-desktop/src/shared/query/keys.ts` — add `codeItemsGlobal` factory
-- `apps/desktop/aegis-desktop/src-tauri/src/commands/terminology/code_item.rs` — `list_code_items` command: `codelist_id: i64` → `Option<i64>`
-- `apps/desktop/aegis-desktop/src-tauri/src/http/terminology/code_item.rs` — `CodeItemListQuery.codelist_id: i64` → `Option<i64>`; `list_paged` skips the query param when `None`; add wiremock tests
+- `apps/desktop/aegis-desktop/src-tauri/src/commands/terminology/code_item.rs` — `list_code_items` command: `codelist_id: i64` → `Option<i64>`; add new `version_id: Option<i64>` parameter
+- `apps/desktop/aegis-desktop/src-tauri/src/http/terminology/code_item.rs` — `CodeItemListQuery.codelist_id: i64` → `Option<i64>`; add `version_id: Option<i64>`; `list_paged` skips the query params when `None`; update existing tests for the new field and add wiremock tests for version_id
 - `lib/packages/ui/src/i18n/locales/en.ts` and `lib/packages/ui/src/i18n/locales/zhCN.ts` — new keys
 
 Untouched (verified unchanged):
@@ -350,8 +361,12 @@ Untouched (verified unchanged):
 
 Add to `apps/desktop/aegis-desktop/src-tauri/src/http/terminology/code_item.rs::tests`:
 
-- `list_paged_with_none_codelist_id_omits_query_param` — sends `CodeItemListQuery { codelist_id: None, fragment: Some("AE".into()), offset: 0, limit: 20 }`, asserts the mock server's path has no `codelistId` query param but does have `fragment=AE`. (Existing test for the fragment path stays green.)
-- `list_paged_with_some_codelist_id_includes_query_param` — `codelist_id: Some(11)`, asserts the path contains `codelistId=11`. Re-asserts the original wire shape.
+- `list_paged_with_none_codelist_id_omits_query_param` — sends `CodeItemListQuery { codelist_id: None, version_id: Some(7), fragment: Some("AE".into()), offset: 0, limit: 20 }`, asserts the mock server's path has no `codelistId` query param but does have `versionId=7` and `fragment=AE`.
+- `list_paged_with_some_codelist_id_includes_query_param` — `codelist_id: Some(11)`, asserts the path contains `codelistId=11`.
+- `list_paged_with_some_version_id_includes_query_param` — `version_id: Some(7)`, asserts the path contains `versionId=7`.
+- `list_paged_with_none_version_id_omits_query_param` — `version_id: None`, asserts no `versionId=` param in the path.
+
+Existing tests that pass `codelist_id: 11` must be updated to wrap it in `Some(11)`. Their wire assertions remain valid: no `versionId=` is expected when `version_id` is `None`.
 
 Run with `cargo test -p aegis-desktop --lib http::terminology::code_item`.
 
