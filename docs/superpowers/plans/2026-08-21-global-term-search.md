@@ -574,8 +574,7 @@ Create `apps/desktop/aegis-desktop/src/features/terminology/pages/GlobalTermSear
 
 ```tsx
 import { useState, type ReactNode } from "react";
-import { useNavigate } from "@tanstack/react-router";
-import { getRouteApi } from "@tanstack/react-router";
+import { getRouteApi, useNavigate } from "@tanstack/react-router";
 import {
   Alert,
   Box,
