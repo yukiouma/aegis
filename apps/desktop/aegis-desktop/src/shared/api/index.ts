@@ -3,6 +3,7 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 import type {
   CodeItemListQuery,
+  CodeItemListResponse,
   CodeItemView,
   CodeListListQuery,
   CodeListView,
@@ -158,6 +159,14 @@ export const api = {
       fragment: options.fragment,
       offset: options.offset,
       limit: options.limit,
+    }),
+  listCodeItemsByVersionAndCode: (
+    versionId: number,
+    code: string,
+  ): Promise<CodeItemListResponse> =>
+    call<CodeItemListResponse>("list_code_items_by_version_and_code", {
+      versionId,
+      code,
     }),
   createCodeItem: (input: CreateCodeItemInput): Promise<CodeItemView> =>
     call<CodeItemView>("create_code_item", { ...input }),
