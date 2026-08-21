@@ -38,14 +38,21 @@ pub async fn create_code_item(
 #[tauri::command]
 pub async fn list_code_items(
     client: State<'_, HttpClient>,
-    codelist_id: i64,
+    codelist_id: Option<i64>,
+    version_id: Option<i64>,
     fragment: Option<String>,
     offset: u32,
     limit: u32,
 ) -> Result<CodeItemPagedResponse, ApiError> {
     code_item::list_paged(
         &client,
-        CodeItemListQuery { codelist_id, fragment, offset, limit },
+        CodeItemListQuery {
+            codelist_id,
+            version_id,
+            fragment,
+            offset,
+            limit,
+        },
     )
     .await
 }
