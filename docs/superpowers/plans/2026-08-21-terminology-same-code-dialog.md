@@ -417,6 +417,12 @@ In `lib/packages/ui/src/i18n/locales/en.ts`, after the existing `terminology.cod
   'terminology.codeitem.sameCode.empty': 'No items share this code.',
 ```
 
+Also add a generic `common.close` key next to the existing `common.cancel/confirm/back/etc.` keys (around line 207):
+
+```ts
+  'common.close': 'Close',
+```
+
 - [ ] **Step 2: Add the Chinese strings**
 
 In `lib/packages/ui/src/i18n/locales/zhCN.ts`, find the same insertion point (mirror of step 1) and add the translations. Use these to match existing terminology tone:
@@ -425,6 +431,12 @@ In `lib/packages/ui/src/i18n/locales/zhCN.ts`, find the same insertion point (mi
   'terminology.codeitem.codeClick.tooltip': '在其他术语集中查看该 Code',
   'terminology.codeitem.sameCode.dialogTitle': '同 Code 的条目（{code}）',
   'terminology.codeitem.sameCode.empty': '该 Code 在其他术语集中不存在。',
+```
+
+Also add the Chinese translation of `common.close` next to the existing `common.*` keys (around line 201):
+
+```ts
+  'common.close': '关闭',
 ```
 
 (Confirm by reading 5 lines around the insertion point first — exact wording can be tweaked in review.)
