@@ -197,6 +197,11 @@ export const en = {
   'terminology.codeitem.action.save': 'Save',
   'terminology.codeitem.readOnly': 'Read-only',
 
+  'terminology.codeitem.codeClick.tooltip':
+    'Show this code in other codelists',
+  'terminology.codeitem.sameCode.dialogTitle': 'Code items with code "{code}"',
+  'terminology.codeitem.sameCode.empty': 'No items share this code.',
+
   'terminology.action.delete.confirmTitle': 'Delete code list',
   'terminology.action.delete.confirmMessage':
     'Delete this code list and all of its items? This cannot be undone.',
@@ -207,4 +212,5 @@ export const en = {
   'common.confirm': 'Confirm',
   'common.back': 'Back',
   'common.submit': 'Submit',
+  'common.close': 'Close',
 } as const;
