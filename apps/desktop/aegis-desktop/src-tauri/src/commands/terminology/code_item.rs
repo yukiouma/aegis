@@ -5,8 +5,8 @@ use tauri::State;
 use crate::http::client::HttpClient;
 use crate::http::dto::ApiError;
 use crate::http::terminology::code_item::{
-    self, CodeItemListQuery, CodeItemPagedResponse, CodeItemViewResponse,
-    CreateCodeItemRequest, UpdateCodeItemRequest,
+    self, CodeItemListQuery, CodeItemListResponse, CodeItemPagedResponse,
+    CodeItemViewResponse, CreateCodeItemRequest, UpdateCodeItemRequest,
 };
 
 #[tauri::command]
@@ -65,4 +65,13 @@ pub async fn delete_code_item(
     id: i64,
 ) -> Result<(), ApiError> {
     code_item::delete(&client, id).await
+}
+
+#[tauri::command]
+pub async fn list_code_items_by_version_and_code(
+    client: State<'_, HttpClient>,
+    version_id: i64,
+    code: String,
+) -> Result<CodeItemListResponse, ApiError> {
+    code_item::list_by_version_and_code(&client, version_id, &code).await
 }
