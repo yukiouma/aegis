@@ -151,11 +151,12 @@ export const api = {
     call<void>("delete_code_list", { id }),
 
   listCodeItems: (
-    codelistId: number,
-    options: CodeItemListQuery = {},
+    codelistId: number | null,
+    options: CodeItemListQuery & { versionId?: number | null } = {},
   ): Promise<PagedCodeItemListResponse> =>
     call<PagedCodeItemListResponse>("list_code_items", {
-      codelistId,
+      codelistId: codelistId ?? undefined,
+      versionId: options.versionId ?? undefined,
       fragment: options.fragment,
       offset: options.offset,
       limit: options.limit,

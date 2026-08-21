@@ -32,5 +32,7 @@ export const queryKeys = {
       ["terminology", "codeItems", codelistId, fragment] as const,
     codeItemsByCode: (versionId: number, code: string) =>
       ["terminology", "codeItemsByCode", versionId, code] as const,
+    codeItemsGlobal: (versionId: number, fragment: string) =>
+      ["terminology", "codeItemsGlobal", versionId, fragment] as const,
   },
 } as const;
