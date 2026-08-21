@@ -103,7 +103,7 @@ function SearchCodeListTable({
       <TableContainer
         component={Paper}
         ref={setScrollEl}
-        sx={{ maxHeight: "calc(100vh - 180px)" }}
+        sx={{ maxHeight: "calc(100vh - 120px)" }}
       >
         <Table size="small" stickyHeader>
           <TableHead>
@@ -216,7 +216,7 @@ function SearchCodeItemTable({
       <TableContainer
         component={Paper}
         ref={setScrollEl}
-        sx={{ maxHeight: "calc(100vh - 240px)" }}
+        sx={{ maxHeight: "calc(100vh - 120px)" }}
       >
         <Table size="small" stickyHeader>
           <TableHead>
@@ -327,13 +327,11 @@ export function GlobalTermSearchPage() {
             <ArrowBackIcon />
           </IconButton>
         </Tooltip>
-        <Box sx={{ flex: 1 }}>
-          <TermFilterBar
-            query={query}
-            onQueryChange={setQuery}
-            placeholder={t("terminology.search.placeholder")}
-          />
-        </Box>
+        <TermFilterBar
+          query={query}
+          onQueryChange={setQuery}
+          placeholder={t("terminology.search.placeholder")}
+        />
         <ToggleButtonGroup
           exclusive
           value={tab}
