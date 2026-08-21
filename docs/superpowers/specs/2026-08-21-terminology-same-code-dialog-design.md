@@ -79,14 +79,13 @@ navigation glue.
 | `apps/desktop/aegis-desktop/src-tauri/src/http/terminology/code_item.rs` | Add `CodeItemListResponse`, `list_by_version_and_code`, wiremock tests. |
 | `apps/desktop/aegis-desktop/src-tauri/src/commands/terminology/code_item.rs` | New file: Tauri command shim `list_code_items_by_version_and_code`. |
 | `apps/desktop/aegis-desktop/src-tauri/src/commands/terminology.rs` | Declare the new submodule: `pub mod code_item;`. |
-| `apps/desktop/aegis-desktop/src/shared/api/types.ts` | Add `CodeItemByVersionAndCodeQuery { versionId, code }`. (Optional — only needed if we type the wire query.) |
-| `apps/desktop/aegis-desktop/src/shared/api/index.ts` | Add `api.listCodeItemsByVersionAndCode(versionId, code)`. |
+| `apps/desktop/aegis-desktop/src/shared/api/index.ts` | Add `api.listCodeItemsByVersionAndCode(versionId, code)` (positional args, matches the existing `getCodeListById(id)` style). No new type in `types.ts` is required. |
 | `apps/desktop/aegis-desktop/src/shared/query/keys.ts` | Add `queryKeys.terminology.codeItemsByCode(versionId, code)`. |
 | `apps/desktop/aegis-desktop/src/features/terminology/data/list.ts` | Add `useListCodeItemsByVersionAndCode`, `useGetCodeListsByIds`. |
 | `apps/desktop/aegis-desktop/src/features/terminology/components/CodeItemTable.tsx` | Add optional `onCodeClick` prop; restyle code cell with hover affordance + Tooltip. |
 | `apps/desktop/aegis-desktop/src/features/terminology/components/SameCodeItemsDialog.tsx` | New file. |
 | `apps/desktop/aegis-desktop/src/features/terminology/pages/CodeListDetailPage.tsx` | Add `sameCodeDialog` state; wire `onCodeClick`; render the dialog. |
-| `apps/desktop/aegis-desktop/src/i18n/locales/en/terminology.json` (or equivalent) | 3 keys. |
+| `lib/packages/ui/src/i18n/locales/en.ts` and `.../zhCN.ts` | 3 new keys under `terminology.codeitem.*`. |
 
 ## Public contracts
 
