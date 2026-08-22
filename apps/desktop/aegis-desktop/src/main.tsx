@@ -39,18 +39,29 @@ declare module "@tanstack/react-router" {
 
 function App() {
   React.useEffect(() => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(async () => {
-        try {
-          const win = getCurrentWindow();
-          await win.show();
-          await win.setFocus();
-        } catch (err) {
-          console.error("[App] Failed to show window:", err);
+    let cancelled = false;
+    const showWindow = async () => {
+      // Wait long enough for Tauri IPC + window context to be ready
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      if (cancelled) return;
+
+      try {
+        const win = getCurrentWindow();
+        if (await win.isMinimized()) {
+          await win.unminimize();
         }
-      });
-    });
-  });
+        await win.show();
+        await win.maximize(); // Maximize AFTER showing, not in config
+        await win.setFocus();
+      } catch (err) {
+        console.error("[App] Failed to show window:", err);
+      }
+    };
+    void showWindow();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   return (
     <React.StrictMode>
       <PersistentThemeProvider>
