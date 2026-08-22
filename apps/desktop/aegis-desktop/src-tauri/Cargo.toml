@@ -27,11 +27,14 @@ reqwest = { workspace = true }
 tokio = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
-windows-utils = { path = "../../../../lib/crates/windows-utils" }
 chrono = { workspace = true }
 base64 = { workspace = true }
 terminology = { git = "https://github.com/yukiouma/ypsilo.git", tag = "v0.1.0-alpha.1", package = "terminology" }
 tauri-plugin-dialog = "2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-utils = { path = "../../../../lib/crates/windows-utils" }
+
 
 [dev-dependencies]
 wiremock = "0.6"
