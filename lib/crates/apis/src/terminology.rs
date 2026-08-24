@@ -290,10 +290,7 @@ pub trait TerminologyService: Send + Sync {
     ) -> Result<CodeListView, TerminologyApiError>;
 
     /// Look up a codelist by its surrogate id.
-    async fn get_code_list_by_id(
-        &self,
-        id: i64,
-    ) -> Result<CodeListView, TerminologyApiError>;
+    async fn get_code_list_by_id(&self, id: i64) -> Result<CodeListView, TerminologyApiError>;
 
     /// Unified list+search under a version. Returns one page of
     /// `CodeListView`s. `query.fragment = None` (or `Some("")`)

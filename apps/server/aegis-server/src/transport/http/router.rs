@@ -319,6 +319,8 @@ mod tests {
             project: Arc::new(NullProjectService) as Arc<dyn apis::project::ProjectService>,
             terminology: Arc::new(crate::state::test_support::NullTerminologyService)
                 as Arc<dyn apis::terminology::TerminologyService>,
+            domain_model: Arc::new(crate::state::test_support::NullDomainModelService)
+                as Arc<dyn apis::domain_model::DomainModelService>,
         }
     }
 
@@ -332,6 +334,8 @@ mod tests {
             project: Arc::new(NullProjectService) as Arc<dyn apis::project::ProjectService>,
             terminology: Arc::new(crate::state::test_support::NullTerminologyService)
                 as Arc<dyn apis::terminology::TerminologyService>,
+            domain_model: Arc::new(crate::state::test_support::NullDomainModelService)
+                as Arc<dyn apis::domain_model::DomainModelService>,
         }
     }
 
@@ -344,6 +348,8 @@ mod tests {
             project: Arc::new(StubProjectService) as Arc<dyn apis::project::ProjectService>,
             terminology: Arc::new(crate::state::test_support::NullTerminologyService)
                 as Arc<dyn apis::terminology::TerminologyService>,
+            domain_model: Arc::new(crate::state::test_support::NullDomainModelService)
+                as Arc<dyn apis::domain_model::DomainModelService>,
         }
     }
 
@@ -1062,6 +1068,8 @@ mod tests {
             project: Arc::new(NullProjectService) as Arc<dyn apis::project::ProjectService>,
             terminology: Arc::new(StubTerminologyService)
                 as Arc<dyn apis::terminology::TerminologyService>,
+            domain_model: Arc::new(crate::state::test_support::NullDomainModelService)
+                as Arc<dyn apis::domain_model::DomainModelService>,
         }
     }
 

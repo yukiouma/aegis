@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use apis::auth::AuthService;
+use apis::domain_model::DomainModelService;
 use apis::terminology::TerminologyService;
 use apis::user::UserService;
 use auth::{
@@ -18,6 +19,10 @@ use auth::{
     TokenVersionCache, UserCredentialsRepo,
 };
 use auth::{UserService as AuthUserService, UserServiceImpl as AuthUserServiceImpl};
+use domain_model::{
+    DomainModelServiceImpl, DomainModelUsecase, DomainModelUsecaseConfig, SdtmDomainRepoPg,
+    SdtmVariableRepoPg, SdtmVersionRepoPg,
+};
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
 use terminology::{
@@ -45,13 +50,15 @@ pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send 
     let auth = build_auth_service(&config, pool.clone(), cache)?;
     let user = build_user_service(pool.clone());
     let project = build_project_service(pool.clone(), user.clone());
-    let terminology = build_terminology_service(pool);
+    let terminology = build_terminology_service(pool.clone());
+    let domain_model = build_domain_model_service(pool);
 
     let state = AppState {
         auth,
         user,
         project,
         terminology,
+        domain_model,
     };
     let app = transport::http::router(state);
 
@@ -208,6 +215,22 @@ fn build_terminology_service(pool: PgPool) -> Arc<dyn TerminologyService> {
         code_item_repo,
     });
     Arc::new(TerminologyServiceImpl::new(usecase))
+}
+
+/// Wire the domain-model crate's adapters into the apis
+/// `DomainModelService` trait object. The three Postgres repos
+/// share the same pool as auth / user / project / terminology;
+/// no second pool or env var is introduced.
+fn build_domain_model_service(pool: PgPool) -> Arc<dyn DomainModelService> {
+    let version_repo = SdtmVersionRepoPg::new(pool.clone());
+    let domain_repo = SdtmDomainRepoPg::new(pool.clone());
+    let variable_repo = SdtmVariableRepoPg::new(pool);
+    let usecase = DomainModelUsecase::new(DomainModelUsecaseConfig {
+        version_repo,
+        domain_repo,
+        variable_repo,
+    });
+    Arc::new(DomainModelServiceImpl::new(usecase))
 }
 
 #[cfg(test)]
