@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
@@ -16,16 +16,16 @@ function createMemoryStorage(): Storage {
     clear() {
       data.clear();
     },
-    getItem(key) {
+    getItem(key: string) {
       return data.has(key) ? data.get(key)! : null;
     },
-    key(index) {
+    key(index: number) {
       return Array.from(data.keys())[index] ?? null;
     },
-    removeItem(key) {
+    removeItem(key: string) {
       data.delete(key);
     },
-    setItem(key, value) {
+    setItem(key: string, value: string) {
       data.set(key, value);
     },
   } as unknown as Storage;
@@ -49,47 +49,53 @@ function renderMetadata() {
   );
 }
 
+function findCardByTitle(title: string): HTMLElement {
+  // MUI's CardHeader renders its `title` as a <span> with class
+  // `MuiCardHeader-title`. The closest `MuiCard-root` is the card itself.
+  const titleEl = screen.getByText(title);
+  const card = titleEl.closest(".MuiCard-root");
+  if (!card) {
+    throw new Error(`No MUI Card found containing "${title}"`);
+  }
+  return card as HTMLElement;
+}
+
 describe("MetadataPage", () => {
-  it("renders the heading and both block titles", async () => {
+  it("renders the page heading and one card per kind", async () => {
     await renderMetadata();
     expect(
       screen.getByRole("heading", { level: 4, name: /metadata/i }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { level: 6, name: /^SDTM$/ }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { level: 6, name: /^ADaM$/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByText("SDTM")).toBeInTheDocument();
+    expect(screen.getByText("ADaM")).toBeInTheDocument();
   });
 
   it("renders a disabled Domain Model row in each card", async () => {
     await renderMetadata();
-    const domainRows = screen.getAllByRole("button", { name: /domain model/i });
-    expect(domainRows).toHaveLength(2);
-    for (const row of domainRows) {
-      expect(row).toBeDisabled();
+    for (const kind of ["SDTM", "ADaM"] as const) {
+      const card = findCardByTitle(kind);
+      const domainRow = within(card).getByRole("button", {
+        name: /domain model/i,
+      });
+      expect(domainRow).toHaveAttribute("aria-disabled", "true");
     }
   });
 
   it("renders an enabled Terminology row in each card", async () => {
     await renderMetadata();
-    const termRows = screen.getAllByRole("button", { name: /^terminology$/i });
-    expect(termRows).toHaveLength(2);
-    for (const row of termRows) {
-      expect(row).not.toBeDisabled();
+    for (const kind of ["SDTM", "ADaM"] as const) {
+      const card = findCardByTitle(kind);
+      const termRow = within(card).getByRole("button", { name: /^terminology$/i });
+      expect(termRow).not.toHaveAttribute("aria-disabled", "true");
     }
   });
 
   it("navigates to /terminology/sdtm when the SDTM Terminology row is clicked", async () => {
     const { router } = await renderMetadata();
-    const sdtmCard = screen.getByRole("heading", {
-      level: 6,
-      name: /^SDTM$/,
-    }).parentElement!;
-    const sdtmTerm = sdtmCard.querySelector(
-      "button:not([disabled])",
-    ) as HTMLButtonElement;
+    const sdtmCard = findCardByTitle("SDTM");
+    const sdtmTerm = within(sdtmCard).getByRole("button", {
+      name: /^terminology$/i,
+    });
     await userEvent.click(sdtmTerm);
     await waitFor(() =>
       expect(router.state.location.pathname).toBe("/terminology/sdtm"),
@@ -98,13 +104,10 @@ describe("MetadataPage", () => {
 
   it("navigates to /terminology/adam when the ADaM Terminology row is clicked", async () => {
     const { router } = await renderMetadata();
-    const adamCard = screen.getByRole("heading", {
-      level: 6,
-      name: /^ADaM$/,
-    }).parentElement!;
-    const adamTerm = adamCard.querySelector(
-      "button:not([disabled])",
-    ) as HTMLButtonElement;
+    const adamCard = findCardByTitle("ADaM");
+    const adamTerm = within(adamCard).getByRole("button", {
+      name: /^terminology$/i,
+    });
     await userEvent.click(adamTerm);
     await waitFor(() =>
       expect(router.state.location.pathname).toBe("/terminology/adam"),
@@ -113,10 +116,11 @@ describe("MetadataPage", () => {
 
   it("shows the Coming soon tooltip on the Domain Model rows", async () => {
     await renderMetadata();
-    const firstDomainRow = screen.getAllByRole("button", {
-      name: /domain model/i,
-    })[0];
-    await userEvent.hover(firstDomainRow);
+    // The disabled button has pointer-events: none; hover its wrapper
+    // <span aria-label="Coming soon"> instead.
+    const wrappers = screen.getAllByLabelText(/coming soon/i);
+    expect(wrappers.length).toBeGreaterThan(0);
+    await userEvent.hover(wrappers[0]);
     expect(
       await screen.findByRole("tooltip", { name: /coming soon/i }),
     ).toBeInTheDocument();
