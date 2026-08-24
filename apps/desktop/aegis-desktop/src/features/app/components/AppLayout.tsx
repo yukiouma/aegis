@@ -4,12 +4,11 @@ import { Box } from "@aegis/ui/mui";
 import { Sidebar, type MenuItem, type SidebarProps } from "@aegis/ui";
 import {
   AdminPanelSettings as AdminPanelSettingsIcon,
-  Analytics as AnalyticsIcon,
+  Description as DescriptionIcon,
   Home as HomeIcon,
-  MenuBook as MenuBookIcon,
+  LibraryBooks as LibraryBooksIcon,
   People as PeopleIcon,
   Settings as SettingsIcon,
-  Storage as StorageIcon,
   Workspaces as WorkspacesIcon,
 } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
@@ -21,9 +20,8 @@ const ProjectsMenuIcon = () => <WorkspacesIcon />;
 const SettingsMenuIcon = () => <SettingsIcon />;
 const ManagementMenuIcon = () => <AdminPanelSettingsIcon />;
 const UsersMenuIcon = () => <PeopleIcon />;
-const TerminologyMenuIcon = () => <MenuBookIcon />;
-const SdtmMenuIcon = () => <StorageIcon />;
-const AdamMenuIcon = () => <AnalyticsIcon />;
+const KnowledgeBaseMenuIcon = () => <LibraryBooksIcon />;
+const MetadataMenuIcon = () => <DescriptionIcon />;
 
 /**
  * Authenticated app shell: the `Sidebar` plus the active child route.
@@ -53,20 +51,15 @@ export function AppLayout() {
     ],
   };
 
-  const terminologyEntry: MenuItem = {
-    link: "#terminology",
-    title: t("nav.terminology"),
-    icon: TerminologyMenuIcon,
+  const metadataEntry: MenuItem = {
+    link: "#metadata",
+    title: t("nav.knowledgeBase"),
+    icon: KnowledgeBaseMenuIcon,
     subMenu: [
       {
-        link: "/terminology/sdtm",
-        title: t("nav.terminology.sdtm"),
-        icon: SdtmMenuIcon,
-      },
-      {
-        link: "/terminology/adam",
-        title: t("nav.terminology.adam"),
-        icon: AdamMenuIcon,
+        link: "/metadata",
+        title: t("nav.metadata"),
+        icon: MetadataMenuIcon,
       },
     ],
   };
@@ -74,13 +67,13 @@ export function AppLayout() {
   const baseMenu: MenuItem[] = [
     { link: "/", title: t("nav.home"), icon: HomeMenuIcon },
     { link: "/projects", title: t("nav.projects"), icon: ProjectsMenuIcon },
-    terminologyEntry, // Terminology (submenu: SDTM, ADaM)
+    metadataEntry, // Knowledge Base (submenu: Metadata)
     { link: "/settings", title: t("nav.settings"), icon: SettingsMenuIcon },
   ];
 
   const menu: MenuItem[] = canManage
     ? [
-        ...baseMenu.slice(0, 3), // Home, Projects
+        ...baseMenu.slice(0, 3), // Home, Projects, Knowledge Base
         managementEntry, // Management (submenu: Users)
         ...baseMenu.slice(3), // Settings
       ]

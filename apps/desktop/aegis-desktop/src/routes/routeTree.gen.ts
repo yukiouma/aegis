@@ -16,6 +16,7 @@ import { Route as RegisterRouteImport } from './register'
 import { Route as AuthedLayoutRouteRouteImport } from './_authed/_layout/route'
 import { Route as AuthedLayoutIndexRouteImport } from './_authed/_layout/index'
 import { Route as AuthedLayoutManagementRouteRouteImport } from './_authed/_layout/management/route'
+import { Route as AuthedLayoutMetadataRouteImport } from './_authed/_layout/metadata'
 import { Route as AuthedLayoutProjectsRouteImport } from './_authed/_layout/projects'
 import { Route as AuthedLayoutSettingsRouteImport } from './_authed/_layout/settings'
 import { Route as AuthedProjectProjectCodeRouteRouteImport } from './_authed/project/$projectCode/route'
@@ -63,6 +64,11 @@ const AuthedLayoutManagementRouteRoute =
     path: '/management',
     getParentRoute: () => AuthedLayoutRouteRoute,
   } as any)
+const AuthedLayoutMetadataRoute = AuthedLayoutMetadataRouteImport.update({
+  id: '/metadata',
+  path: '/metadata',
+  getParentRoute: () => AuthedLayoutRouteRoute,
+} as any)
 const AuthedLayoutProjectsRoute = AuthedLayoutProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
@@ -141,6 +147,7 @@ export interface FileRoutesByFullPath {
   '/register': typeof RegisterRoute
   '/management': typeof AuthedLayoutManagementRouteRouteWithChildren
   '/project/$projectCode': typeof AuthedProjectProjectCodeRouteRouteWithChildren
+  '/metadata': typeof AuthedLayoutMetadataRoute
   '/projects': typeof AuthedLayoutProjectsRoute
   '/settings': typeof AuthedLayoutSettingsRoute
   '/management/users': typeof AuthedLayoutManagementUsersRoute
@@ -159,6 +166,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/management': typeof AuthedLayoutManagementRouteRouteWithChildren
+  '/metadata': typeof AuthedLayoutMetadataRoute
   '/projects': typeof AuthedLayoutProjectsRoute
   '/settings': typeof AuthedLayoutSettingsRoute
   '/management/users': typeof AuthedLayoutManagementUsersRoute
@@ -180,6 +188,7 @@ export interface FileRoutesById {
   '/_authed/_layout': typeof AuthedLayoutRouteRouteWithChildren
   '/_authed/_layout/management': typeof AuthedLayoutManagementRouteRouteWithChildren
   '/_authed/project/$projectCode': typeof AuthedProjectProjectCodeRouteRouteWithChildren
+  '/_authed/_layout/metadata': typeof AuthedLayoutMetadataRoute
   '/_authed/_layout/projects': typeof AuthedLayoutProjectsRoute
   '/_authed/_layout/settings': typeof AuthedLayoutSettingsRoute
   '/_authed/_layout/': typeof AuthedLayoutIndexRoute
@@ -202,6 +211,7 @@ export interface FileRouteTypes {
     | '/register'
     | '/management'
     | '/project/$projectCode'
+    | '/metadata'
     | '/projects'
     | '/settings'
     | '/management/users'
@@ -220,6 +230,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/management'
+    | '/metadata'
     | '/projects'
     | '/settings'
     | '/management/users'
@@ -240,6 +251,7 @@ export interface FileRouteTypes {
     | '/_authed/_layout'
     | '/_authed/_layout/management'
     | '/_authed/project/$projectCode'
+    | '/_authed/_layout/metadata'
     | '/_authed/_layout/projects'
     | '/_authed/_layout/settings'
     | '/_authed/_layout/'
@@ -310,6 +322,13 @@ declare module '@tanstack/react-router' {
       path: '/management'
       fullPath: '/management'
       preLoaderRoute: typeof AuthedLayoutManagementRouteRouteImport
+      parentRoute: typeof AuthedLayoutRouteRoute
+    }
+    '/_authed/_layout/metadata': {
+      id: '/_authed/_layout/metadata'
+      path: '/metadata'
+      fullPath: '/metadata'
+      preLoaderRoute: typeof AuthedLayoutMetadataRouteImport
       parentRoute: typeof AuthedLayoutRouteRoute
     }
     '/_authed/_layout/projects': {
@@ -415,6 +434,7 @@ const AuthedLayoutManagementRouteRouteWithChildren =
 
 interface AuthedLayoutRouteRouteChildren {
   AuthedLayoutManagementRouteRoute: typeof AuthedLayoutManagementRouteRouteWithChildren
+  AuthedLayoutMetadataRoute: typeof AuthedLayoutMetadataRoute
   AuthedLayoutProjectsRoute: typeof AuthedLayoutProjectsRoute
   AuthedLayoutSettingsRoute: typeof AuthedLayoutSettingsRoute
   AuthedLayoutIndexRoute: typeof AuthedLayoutIndexRoute
@@ -428,6 +448,7 @@ interface AuthedLayoutRouteRouteChildren {
 const AuthedLayoutRouteRouteChildren: AuthedLayoutRouteRouteChildren = {
   AuthedLayoutManagementRouteRoute:
     AuthedLayoutManagementRouteRouteWithChildren,
+  AuthedLayoutMetadataRoute: AuthedLayoutMetadataRoute,
   AuthedLayoutProjectsRoute: AuthedLayoutProjectsRoute,
   AuthedLayoutSettingsRoute: AuthedLayoutSettingsRoute,
   AuthedLayoutIndexRoute: AuthedLayoutIndexRoute,
