@@ -104,8 +104,11 @@ use crate::transport::http::error::ErrorBody;
         dto::CreateSdtmVariableRequest,
         dto::UpdateSdtmVariableRequest,
         dto::SdtmVersionViewResponse,
+        dto::SdtmVersionListResponse,
         dto::SdtmDomainViewResponse,
+        dto::SdtmDomainListResponse,
         dto::SdtmVariableViewResponse,
+        dto::SdtmVariableListResponse,
         ErrorBody,
     )),
     tags(
@@ -238,8 +241,11 @@ mod tests {
             "CreateSdtmVariableRequest",
             "UpdateSdtmVariableRequest",
             "SdtmVersionViewResponse",
+            "SdtmVersionListResponse",
             "SdtmDomainViewResponse",
+            "SdtmDomainListResponse",
             "SdtmVariableViewResponse",
+            "SdtmVariableListResponse",
         ] {
             let entry: &RefOr<_> = schemas
                 .get(name)

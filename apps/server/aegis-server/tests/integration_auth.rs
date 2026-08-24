@@ -780,8 +780,7 @@ impl apis::domain_model::DomainModelService for NullDomainModelService {
     }
     async fn list_versions(
         &self,
-    ) -> Result<Vec<apis::domain_model::SdtmVersionView>, apis::domain_model::DomainModelApiError>
-    {
+    ) -> Result<apis::domain_model::SdtmVersionList, apis::domain_model::DomainModelApiError> {
         unimplemented!()
     }
     async fn update_version(
@@ -811,8 +810,7 @@ impl apis::domain_model::DomainModelService for NullDomainModelService {
     async fn list_domains_by_version(
         &self,
         _version_id: i64,
-    ) -> Result<Vec<apis::domain_model::SdtmDomainView>, apis::domain_model::DomainModelApiError>
-    {
+    ) -> Result<apis::domain_model::SdtmDomainList, apis::domain_model::DomainModelApiError> {
         unimplemented!()
     }
     async fn update_domain(
@@ -839,8 +837,7 @@ impl apis::domain_model::DomainModelService for NullDomainModelService {
     async fn list_variables_by_domain(
         &self,
         _domain_id: i64,
-    ) -> Result<Vec<apis::domain_model::SdtmVariableView>, apis::domain_model::DomainModelApiError>
-    {
+    ) -> Result<apis::domain_model::SdtmVariableList, apis::domain_model::DomainModelApiError> {
         unimplemented!()
     }
     async fn update_variable(

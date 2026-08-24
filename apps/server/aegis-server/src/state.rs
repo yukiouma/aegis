@@ -147,8 +147,10 @@ pub(crate) mod test_support {
         async fn batch_create_code_items(
             &self,
             _req: apis::terminology::BatchCreateCodeItemsRequest,
-        ) -> Result<apis::terminology::BatchCreateCodeItemsResponse, apis::terminology::TerminologyApiError>
-        {
+        ) -> Result<
+            apis::terminology::BatchCreateCodeItemsResponse,
+            apis::terminology::TerminologyApiError,
+        > {
             unimplemented!()
         }
     }
@@ -166,27 +168,21 @@ pub(crate) mod test_support {
         async fn create_version(
             &self,
             _req: apis::domain_model::CreateSdtmVersionRequest,
-        ) -> Result<
-            apis::domain_model::SdtmVersionView,
-            apis::domain_model::DomainModelApiError,
-        > {
+        ) -> Result<apis::domain_model::SdtmVersionView, apis::domain_model::DomainModelApiError>
+        {
             unimplemented!()
         }
         async fn list_versions(
             &self,
-        ) -> Result<
-            Vec<apis::domain_model::SdtmVersionView>,
-            apis::domain_model::DomainModelApiError,
-        > {
+        ) -> Result<apis::domain_model::SdtmVersionList, apis::domain_model::DomainModelApiError>
+        {
             unimplemented!()
         }
         async fn update_version(
             &self,
             _req: apis::domain_model::UpdateSdtmVersionRequest,
-        ) -> Result<
-            apis::domain_model::SdtmVersionView,
-            apis::domain_model::DomainModelApiError,
-        > {
+        ) -> Result<apis::domain_model::SdtmVersionView, apis::domain_model::DomainModelApiError>
+        {
             unimplemented!()
         }
         async fn delete_version(
@@ -198,37 +194,29 @@ pub(crate) mod test_support {
         async fn create_domain(
             &self,
             _req: apis::domain_model::CreateSdtmDomainRequest,
-        ) -> Result<
-            apis::domain_model::SdtmDomainView,
-            apis::domain_model::DomainModelApiError,
-        > {
+        ) -> Result<apis::domain_model::SdtmDomainView, apis::domain_model::DomainModelApiError>
+        {
             unimplemented!()
         }
         async fn get_domain_by_id(
             &self,
             _id: i64,
-        ) -> Result<
-            apis::domain_model::SdtmDomainView,
-            apis::domain_model::DomainModelApiError,
-        > {
+        ) -> Result<apis::domain_model::SdtmDomainView, apis::domain_model::DomainModelApiError>
+        {
             unimplemented!()
         }
         async fn list_domains_by_version(
             &self,
             _version_id: i64,
-        ) -> Result<
-            Vec<apis::domain_model::SdtmDomainView>,
-            apis::domain_model::DomainModelApiError,
-        > {
+        ) -> Result<apis::domain_model::SdtmDomainList, apis::domain_model::DomainModelApiError>
+        {
             unimplemented!()
         }
         async fn update_domain(
             &self,
             _req: apis::domain_model::UpdateSdtmDomainRequest,
-        ) -> Result<
-            apis::domain_model::SdtmDomainView,
-            apis::domain_model::DomainModelApiError,
-        > {
+        ) -> Result<apis::domain_model::SdtmDomainView, apis::domain_model::DomainModelApiError>
+        {
             unimplemented!()
         }
         async fn delete_domain(
@@ -240,37 +228,29 @@ pub(crate) mod test_support {
         async fn create_variable(
             &self,
             _req: apis::domain_model::CreateSdtmVariableRequest,
-        ) -> Result<
-            apis::domain_model::SdtmVariableView,
-            apis::domain_model::DomainModelApiError,
-        > {
+        ) -> Result<apis::domain_model::SdtmVariableView, apis::domain_model::DomainModelApiError>
+        {
             unimplemented!()
         }
         async fn get_variable_by_id(
             &self,
             _id: i64,
-        ) -> Result<
-            apis::domain_model::SdtmVariableView,
-            apis::domain_model::DomainModelApiError,
-        > {
+        ) -> Result<apis::domain_model::SdtmVariableView, apis::domain_model::DomainModelApiError>
+        {
             unimplemented!()
         }
         async fn list_variables_by_domain(
             &self,
             _domain_id: i64,
-        ) -> Result<
-            Vec<apis::domain_model::SdtmVariableView>,
-            apis::domain_model::DomainModelApiError,
-        > {
+        ) -> Result<apis::domain_model::SdtmVariableList, apis::domain_model::DomainModelApiError>
+        {
             unimplemented!()
         }
         async fn update_variable(
             &self,
             _req: apis::domain_model::UpdateSdtmVariableRequest,
-        ) -> Result<
-            apis::domain_model::SdtmVariableView,
-            apis::domain_model::DomainModelApiError,
-        > {
+        ) -> Result<apis::domain_model::SdtmVariableView, apis::domain_model::DomainModelApiError>
+        {
             unimplemented!()
         }
         async fn delete_variable(

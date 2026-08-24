@@ -57,7 +57,7 @@ pub async fn create_version(
     get, path = "/versions", tag = "domain-model",
     operation_id = "domain_model_list_versions",
     responses(
-        (status = 200, description = "Versions list", body = Vec<dto::SdtmVersionViewResponse>),
+        (status = 200, description = "Versions list", body = dto::SdtmVersionListResponse),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
@@ -66,10 +66,9 @@ pub async fn create_version(
 pub async fn list_versions(
     State(state): State<AppState>,
     _claims: AuthClaims,
-) -> Result<Json<Vec<dto::SdtmVersionViewResponse>>, ApiError> {
-    let views = state.domain_model.list_versions().await?;
-    let out = views.into_iter().map(Into::into).collect();
-    Ok(Json(out))
+) -> Result<Json<dto::SdtmVersionListResponse>, ApiError> {
+    let out = state.domain_model.list_versions().await?;
+    Ok(Json(out.into()))
 }
 
 /// `PUT /api/domain-model/versions/{id}` — partial update of an SDTM version.
@@ -188,7 +187,7 @@ pub async fn get_domain_by_id(
         ("version_id" = i64, Path, description = "SDTM version id"),
     ),
     responses(
-        (status = 200, description = "Domains list", body = Vec<dto::SdtmDomainViewResponse>),
+        (status = 200, description = "Domains list", body = dto::SdtmDomainListResponse),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
@@ -198,13 +197,12 @@ pub async fn list_domains_by_version(
     State(state): State<AppState>,
     _claims: AuthClaims,
     Path(version_id): Path<i64>,
-) -> Result<Json<Vec<dto::SdtmDomainViewResponse>>, ApiError> {
-    let views = state
+) -> Result<Json<dto::SdtmDomainListResponse>, ApiError> {
+    let out = state
         .domain_model
         .list_domains_by_version(version_id)
         .await?;
-    let out = views.into_iter().map(Into::into).collect();
-    Ok(Json(out))
+    Ok(Json(out.into()))
 }
 
 /// `PUT /api/domain-model/domains/{id}` — partial update of an SDTM domain.
@@ -330,7 +328,7 @@ pub async fn get_variable_by_id(
         ("domain_id" = i64, Path, description = "SDTM domain id"),
     ),
     responses(
-        (status = 200, description = "Variables list", body = Vec<dto::SdtmVariableViewResponse>),
+        (status = 200, description = "Variables list", body = dto::SdtmVariableListResponse),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
@@ -340,13 +338,12 @@ pub async fn list_variables_by_domain(
     State(state): State<AppState>,
     _claims: AuthClaims,
     Path(domain_id): Path<i64>,
-) -> Result<Json<Vec<dto::SdtmVariableViewResponse>>, ApiError> {
-    let views = state
+) -> Result<Json<dto::SdtmVariableListResponse>, ApiError> {
+    let out = state
         .domain_model
         .list_variables_by_domain(domain_id)
         .await?;
-    let out = views.into_iter().map(Into::into).collect();
-    Ok(Json(out))
+    Ok(Json(out.into()))
 }
 
 /// `PUT /api/domain-model/variables/{id}` — partial update of an SDTM variable.

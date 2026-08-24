@@ -1122,6 +1122,53 @@ impl From<apis::domain_model::SdtmVariableView> for SdtmVariableViewResponse {
     }
 }
 
+// ---- list wrappers ----
+
+/// Wire projection of `GET /api/domain-model/versions`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmVersionListResponse {
+    pub versions: Vec<SdtmVersionViewResponse>,
+}
+
+impl From<apis::domain_model::SdtmVersionList> for SdtmVersionListResponse {
+    fn from(l: apis::domain_model::SdtmVersionList) -> Self {
+        Self {
+            versions: l.versions.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// Wire projection of `GET /api/domain-model/versions/{version_id}/domains`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmDomainListResponse {
+    pub domains: Vec<SdtmDomainViewResponse>,
+}
+
+impl From<apis::domain_model::SdtmDomainList> for SdtmDomainListResponse {
+    fn from(l: apis::domain_model::SdtmDomainList) -> Self {
+        Self {
+            domains: l.domains.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// Wire projection of `GET /api/domain-model/domains/{domain_id}/variables`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmVariableListResponse {
+    pub variables: Vec<SdtmVariableViewResponse>,
+}
+
+impl From<apis::domain_model::SdtmVariableList> for SdtmVariableListResponse {
+    fn from(l: apis::domain_model::SdtmVariableList) -> Self {
+        Self {
+            variables: l.variables.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 // ---- request bodies ----
 
 /// `POST /api/domain-model/versions` body.

@@ -190,6 +190,28 @@ pub struct SdtmVariableView {
     pub updated_at: DateTime<Utc>,
 }
 
+// ---- list wrappers ----
+
+/// Wire-friendly wrapper around `Vec<SdtmVersionView>`. List
+/// endpoints return this so the response shape can grow (e.g.
+/// add pagination cursors) without breaking every consumer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SdtmVersionList {
+    pub versions: Vec<SdtmVersionView>,
+}
+
+/// Wire-friendly wrapper around `Vec<SdtmDomainView>`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SdtmDomainList {
+    pub domains: Vec<SdtmDomainView>,
+}
+
+/// Wire-friendly wrapper around `Vec<SdtmVariableView>`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SdtmVariableList {
+    pub variables: Vec<SdtmVariableView>,
+}
+
 // ---- request DTOs ----
 
 /// Input DTO for [`DomainModelService::create_version`].
@@ -286,7 +308,7 @@ pub trait DomainModelService: Send + Sync {
 
     /// List every version known to the backend. Order is
     /// backend-defined.
-    async fn list_versions(&self) -> Result<Vec<SdtmVersionView>, DomainModelApiError>;
+    async fn list_versions(&self) -> Result<SdtmVersionList, DomainModelApiError>;
 
     /// Apply the optional fields on `req` to the version
     /// identified by `req.id`. Returns `SdtmVersionNotFound` if no
@@ -320,7 +342,7 @@ pub trait DomainModelService: Send + Sync {
     async fn list_domains_by_version(
         &self,
         version_id: i64,
-    ) -> Result<Vec<SdtmDomainView>, DomainModelApiError>;
+    ) -> Result<SdtmDomainList, DomainModelApiError>;
 
     /// Apply the optional fields on `req` to the domain identified
     /// by `req.id`. Returns `SdtmDomainNotFound` if no such domain
@@ -354,7 +376,7 @@ pub trait DomainModelService: Send + Sync {
     async fn list_variables_by_domain(
         &self,
         domain_id: i64,
-    ) -> Result<Vec<SdtmVariableView>, DomainModelApiError>;
+    ) -> Result<SdtmVariableList, DomainModelApiError>;
 
     /// Apply the optional fields on `req` to the variable
     /// identified by `req.id`. Returns `SdtmVariableNotFound` if

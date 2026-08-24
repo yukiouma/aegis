@@ -327,11 +327,11 @@ async fn version_crud_round_trips_through_api() {
     assert_eq!(updated.name, "2026-09-01");
 
     let listed = svc.list_versions().await.unwrap();
-    assert_eq!(listed.len(), 1);
-    assert_eq!(listed[0].name, "2026-09-01");
+    assert_eq!(listed.versions.len(), 1);
+    assert_eq!(listed.versions[0].name, "2026-09-01");
 
     svc.delete_version(created.id).await.unwrap();
-    assert_eq!(svc.list_versions().await.unwrap().len(), 0);
+    assert_eq!(svc.list_versions().await.unwrap().versions.len(), 0);
 }
 
 #[tokio::test]
@@ -415,8 +415,8 @@ async fn domain_crud_round_trips_through_api_with_descriptions() {
     assert_eq!(fetched.descriptions.len(), 2);
 
     let listed = svc.list_domains_by_version(v.id).await.unwrap();
-    assert_eq!(listed.len(), 1);
-    assert_eq!(listed[0].name, "AE");
+    assert_eq!(listed.domains.len(), 1);
+    assert_eq!(listed.domains[0].name, "AE");
 
     // Replace descriptions with a single-language list.
     let new_descs = vec![api_domain_desc(
@@ -452,7 +452,14 @@ async fn domain_crud_round_trips_through_api_with_descriptions() {
     assert!(cleared.descriptions.is_empty());
 
     svc.delete_domain(created.id).await.unwrap();
-    assert_eq!(svc.list_domains_by_version(v.id).await.unwrap().len(), 0);
+    assert_eq!(
+        svc.list_domains_by_version(v.id)
+            .await
+            .unwrap()
+            .domains
+            .len(),
+        0
+    );
 }
 
 #[tokio::test]
@@ -582,11 +589,18 @@ async fn variable_crud_round_trips_through_api_with_descriptions() {
     assert_eq!(fetched.descriptions[0].details.label, "Reported Term");
 
     let listed = svc.list_variables_by_domain(d.id).await.unwrap();
-    assert_eq!(listed.len(), 1);
-    assert_eq!(listed[0].name, "AETERM");
+    assert_eq!(listed.variables.len(), 1);
+    assert_eq!(listed.variables[0].name, "AETERM");
 
     svc.delete_variable(created.id).await.unwrap();
-    assert_eq!(svc.list_variables_by_domain(d.id).await.unwrap().len(), 0);
+    assert_eq!(
+        svc.list_variables_by_domain(d.id)
+            .await
+            .unwrap()
+            .variables
+            .len(),
+        0
+    );
 }
 
 #[tokio::test]

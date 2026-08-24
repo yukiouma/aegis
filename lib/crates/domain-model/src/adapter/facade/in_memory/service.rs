@@ -14,11 +14,11 @@ use apis::domain_model::{
     CreateSdtmDomainRequest, CreateSdtmVariableRequest, CreateSdtmVersionRequest,
     DomainCategory as ApiCategory, DomainModelApiError, DomainModelService,
     SdtmDomainDescription as ApiSdtmDomainDescription,
-    SdtmDomainDescriptionDetail as ApiSdtmDomainDescriptionDetail, SdtmDomainView,
+    SdtmDomainDescriptionDetail as ApiSdtmDomainDescriptionDetail, SdtmDomainList, SdtmDomainView,
     SdtmRole as ApiSdtmRole, SdtmVariableCore as ApiSdtmVariableCore,
     SdtmVariableDescription as ApiSdtmVariableDescription,
-    SdtmVariableDescriptionDetail as ApiSdtmVariableDescriptionDetail,
-    SdtmVariableType as ApiSdtmVariableType, SdtmVariableView, SdtmVersionView,
+    SdtmVariableDescriptionDetail as ApiSdtmVariableDescriptionDetail, SdtmVariableList,
+    SdtmVariableType as ApiSdtmVariableType, SdtmVariableView, SdtmVersionList, SdtmVersionView,
     UpdateSdtmDomainRequest, UpdateSdtmVariableRequest, UpdateSdtmVersionRequest,
 };
 
@@ -320,9 +320,11 @@ where
         Ok(version_view_from_internal(view))
     }
 
-    async fn list_versions(&self) -> Result<Vec<SdtmVersionView>, DomainModelApiError> {
+    async fn list_versions(&self) -> Result<SdtmVersionList, DomainModelApiError> {
         let views = self.usecase.list_versions().await?;
-        Ok(views.into_iter().map(version_view_from_internal).collect())
+        Ok(SdtmVersionList {
+            versions: views.into_iter().map(version_view_from_internal).collect(),
+        })
     }
 
     async fn update_version(
@@ -366,9 +368,11 @@ where
     async fn list_domains_by_version(
         &self,
         version_id: i64,
-    ) -> Result<Vec<SdtmDomainView>, DomainModelApiError> {
+    ) -> Result<SdtmDomainList, DomainModelApiError> {
         let views = self.usecase.list_domains_by_version(version_id).await?;
-        Ok(views.into_iter().map(domain_view_from_internal).collect())
+        Ok(SdtmDomainList {
+            domains: views.into_iter().map(domain_view_from_internal).collect(),
+        })
     }
 
     async fn update_domain(
@@ -418,9 +422,11 @@ where
     async fn list_variables_by_domain(
         &self,
         domain_id: i64,
-    ) -> Result<Vec<SdtmVariableView>, DomainModelApiError> {
+    ) -> Result<SdtmVariableList, DomainModelApiError> {
         let views = self.usecase.list_variables_by_domain(domain_id).await?;
-        Ok(views.into_iter().map(variable_view_from_internal).collect())
+        Ok(SdtmVariableList {
+            variables: views.into_iter().map(variable_view_from_internal).collect(),
+        })
     }
 
     async fn update_variable(
