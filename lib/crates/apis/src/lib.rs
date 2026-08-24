@@ -7,6 +7,7 @@
 //! own types to the ones defined here.
 
 pub mod auth;
+pub mod domain_model;
 pub mod project;
 pub mod terminology;
 pub mod user;
