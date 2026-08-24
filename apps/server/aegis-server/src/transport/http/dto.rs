@@ -797,6 +797,482 @@ pub struct CodeItemByVersionAndCodeQuery {
     pub code: String,
 }
 
+// ---- domain_model wire DTOs ----------------------------------------
+
+// The DTOs below mirror the apis::domain_model types. Each request
+// / view / query lives in its own struct so the wire format (field
+// names, optionality, casing) can evolve independently of the
+// backend contract. Handlers translate via `From` / `.into()` so
+// they stay one-liners.
+
+/// Wire enum mirroring [`apis::domain_model::DomainCategory`].
+/// The apis contract pins the JSON spelling per variant (e.g.
+/// `"Special Purpose"` with a space); the round-trip test pins
+/// the wire shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum DomainCategory {
+    #[serde(rename = "Special Purpose")]
+    SpecialPurpose,
+    #[serde(rename = "Interventions")]
+    Interventions,
+    #[serde(rename = "Events")]
+    Events,
+    #[serde(rename = "Findings")]
+    Findings,
+    #[serde(rename = "Trial Design")]
+    TrialDesign,
+    #[serde(rename = "Relationships")]
+    Relationships,
+    #[serde(rename = "Study Reference")]
+    StudyReference,
+}
+
+/// Wire enum mirroring [`apis::domain_model::SdtmVariableType`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "PascalCase")]
+pub enum SdtmVariableType {
+    Numeric,
+    Character,
+}
+
+/// Wire enum mirroring [`apis::domain_model::SdtmVariableCore`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "PascalCase")]
+pub enum SdtmVariableCore {
+    Req,
+    Exp,
+    Perm,
+    Supp,
+}
+
+/// Wire enum mirroring [`apis::domain_model::SdtmRole`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum SdtmRole {
+    Identifier,
+    #[serde(rename = "Topic")]
+    Topic,
+    #[serde(rename = "Timing")]
+    Timing,
+    #[serde(rename = "Record Qualifier")]
+    RecordQualifier,
+    #[serde(rename = "Synonym Qualifier")]
+    SynonymQualifier,
+    #[serde(rename = "Variable Qualifier")]
+    VariableQualifier,
+    #[serde(rename = "Grouping Qualifier")]
+    GroupingQualifier,
+    Rule,
+}
+
+impl From<apis::domain_model::DomainCategory> for DomainCategory {
+    fn from(c: apis::domain_model::DomainCategory) -> Self {
+        match c {
+            apis::domain_model::DomainCategory::SpecialPurpose => Self::SpecialPurpose,
+            apis::domain_model::DomainCategory::Interventions => Self::Interventions,
+            apis::domain_model::DomainCategory::Events => Self::Events,
+            apis::domain_model::DomainCategory::Findings => Self::Findings,
+            apis::domain_model::DomainCategory::TrialDesign => Self::TrialDesign,
+            apis::domain_model::DomainCategory::Relationships => Self::Relationships,
+            apis::domain_model::DomainCategory::StudyReference => Self::StudyReference,
+        }
+    }
+}
+
+impl From<DomainCategory> for apis::domain_model::DomainCategory {
+    fn from(c: DomainCategory) -> Self {
+        match c {
+            DomainCategory::SpecialPurpose => Self::SpecialPurpose,
+            DomainCategory::Interventions => Self::Interventions,
+            DomainCategory::Events => Self::Events,
+            DomainCategory::Findings => Self::Findings,
+            DomainCategory::TrialDesign => Self::TrialDesign,
+            DomainCategory::Relationships => Self::Relationships,
+            DomainCategory::StudyReference => Self::StudyReference,
+        }
+    }
+}
+
+impl From<apis::domain_model::SdtmVariableType> for SdtmVariableType {
+    fn from(t: apis::domain_model::SdtmVariableType) -> Self {
+        match t {
+            apis::domain_model::SdtmVariableType::Numeric => Self::Numeric,
+            apis::domain_model::SdtmVariableType::Character => Self::Character,
+        }
+    }
+}
+
+impl From<SdtmVariableType> for apis::domain_model::SdtmVariableType {
+    fn from(t: SdtmVariableType) -> Self {
+        match t {
+            SdtmVariableType::Numeric => Self::Numeric,
+            SdtmVariableType::Character => Self::Character,
+        }
+    }
+}
+
+impl From<apis::domain_model::SdtmVariableCore> for SdtmVariableCore {
+    fn from(c: apis::domain_model::SdtmVariableCore) -> Self {
+        match c {
+            apis::domain_model::SdtmVariableCore::Req => Self::Req,
+            apis::domain_model::SdtmVariableCore::Exp => Self::Exp,
+            apis::domain_model::SdtmVariableCore::Perm => Self::Perm,
+            apis::domain_model::SdtmVariableCore::Supp => Self::Supp,
+        }
+    }
+}
+
+impl From<SdtmVariableCore> for apis::domain_model::SdtmVariableCore {
+    fn from(c: SdtmVariableCore) -> Self {
+        match c {
+            SdtmVariableCore::Req => Self::Req,
+            SdtmVariableCore::Exp => Self::Exp,
+            SdtmVariableCore::Perm => Self::Perm,
+            SdtmVariableCore::Supp => Self::Supp,
+        }
+    }
+}
+
+impl From<apis::domain_model::SdtmRole> for SdtmRole {
+    fn from(r: apis::domain_model::SdtmRole) -> Self {
+        match r {
+            apis::domain_model::SdtmRole::Identifier => Self::Identifier,
+            apis::domain_model::SdtmRole::Topic => Self::Topic,
+            apis::domain_model::SdtmRole::Timing => Self::Timing,
+            apis::domain_model::SdtmRole::RecordQualifier => Self::RecordQualifier,
+            apis::domain_model::SdtmRole::SynonymQualifier => Self::SynonymQualifier,
+            apis::domain_model::SdtmRole::VariableQualifier => Self::VariableQualifier,
+            apis::domain_model::SdtmRole::GroupingQualifier => Self::GroupingQualifier,
+            apis::domain_model::SdtmRole::Rule => Self::Rule,
+        }
+    }
+}
+
+impl From<SdtmRole> for apis::domain_model::SdtmRole {
+    fn from(r: SdtmRole) -> Self {
+        match r {
+            SdtmRole::Identifier => Self::Identifier,
+            SdtmRole::Topic => Self::Topic,
+            SdtmRole::Timing => Self::Timing,
+            SdtmRole::RecordQualifier => Self::RecordQualifier,
+            SdtmRole::SynonymQualifier => Self::SynonymQualifier,
+            SdtmRole::VariableQualifier => Self::VariableQualifier,
+            SdtmRole::GroupingQualifier => Self::GroupingQualifier,
+            SdtmRole::Rule => Self::Rule,
+        }
+    }
+}
+
+/// Wire projection of an SDTM domain description. Carried on
+/// [`SdtmDomainView`] and round-trips through the backend as a
+/// single JSONB blob.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmDomainDescription {
+    pub lang: String,
+    pub details: SdtmDomainDescriptionDetail,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmDomainDescriptionDetail {
+    pub description: String,
+    pub structure: String,
+}
+
+/// Wire projection of an SDTM variable description.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmVariableDescription {
+    pub lang: String,
+    pub details: SdtmVariableDescriptionDetail,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmVariableDescriptionDetail {
+    pub label: String,
+}
+
+impl From<apis::domain_model::SdtmDomainDescription> for SdtmDomainDescription {
+    fn from(d: apis::domain_model::SdtmDomainDescription) -> Self {
+        Self {
+            lang: d.lang,
+            details: SdtmDomainDescriptionDetail {
+                description: d.details.description,
+                structure: d.details.structure,
+            },
+        }
+    }
+}
+
+impl From<SdtmDomainDescription> for apis::domain_model::SdtmDomainDescription {
+    fn from(d: SdtmDomainDescription) -> Self {
+        Self {
+            lang: d.lang,
+            details: apis::domain_model::SdtmDomainDescriptionDetail {
+                description: d.details.description,
+                structure: d.details.structure,
+            },
+        }
+    }
+}
+
+impl From<apis::domain_model::SdtmVariableDescription> for SdtmVariableDescription {
+    fn from(d: apis::domain_model::SdtmVariableDescription) -> Self {
+        Self {
+            lang: d.lang,
+            details: SdtmVariableDescriptionDetail {
+                label: d.details.label,
+            },
+        }
+    }
+}
+
+impl From<SdtmVariableDescription> for apis::domain_model::SdtmVariableDescription {
+    fn from(d: SdtmVariableDescription) -> Self {
+        Self {
+            lang: d.lang,
+            details: apis::domain_model::SdtmVariableDescriptionDetail {
+                label: d.details.label,
+            },
+        }
+    }
+}
+
+/// Wire projection of [`apis::domain_model::SdtmVersionView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmVersionViewResponse {
+    pub id: i64,
+    pub name: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::domain_model::SdtmVersionView> for SdtmVersionViewResponse {
+    fn from(v: apis::domain_model::SdtmVersionView) -> Self {
+        Self {
+            id: v.id,
+            name: v.name,
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+/// Wire projection of [`apis::domain_model::SdtmDomainView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmDomainViewResponse {
+    pub id: i64,
+    pub version_id: i64,
+    pub name: String,
+    pub category: DomainCategory,
+    pub descriptions: Vec<SdtmDomainDescription>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::domain_model::SdtmDomainView> for SdtmDomainViewResponse {
+    fn from(v: apis::domain_model::SdtmDomainView) -> Self {
+        Self {
+            id: v.id,
+            version_id: v.version_id,
+            name: v.name,
+            category: v.category.into(),
+            descriptions: v.descriptions.into_iter().map(Into::into).collect(),
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+/// Wire projection of [`apis::domain_model::SdtmVariableView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmVariableViewResponse {
+    pub id: i64,
+    pub domain_id: i64,
+    pub name: String,
+    pub variable_controlled: Option<String>,
+    pub variable_type: SdtmVariableType,
+    pub variable_core: SdtmVariableCore,
+    pub variable_role: Option<SdtmRole>,
+    pub variable_sequence: i64,
+    pub descriptions: Vec<SdtmVariableDescription>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::domain_model::SdtmVariableView> for SdtmVariableViewResponse {
+    fn from(v: apis::domain_model::SdtmVariableView) -> Self {
+        Self {
+            id: v.id,
+            domain_id: v.domain_id,
+            name: v.name,
+            variable_controlled: v.variable_controlled,
+            variable_type: v.variable_type.into(),
+            variable_core: v.variable_core.into(),
+            variable_role: v.variable_role.map(Into::into),
+            variable_sequence: v.variable_sequence,
+            descriptions: v.descriptions.into_iter().map(Into::into).collect(),
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+// ---- list wrappers ----
+
+/// Wire projection of `GET /api/domain-model/versions`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmVersionListResponse {
+    pub versions: Vec<SdtmVersionViewResponse>,
+}
+
+impl From<apis::domain_model::SdtmVersionList> for SdtmVersionListResponse {
+    fn from(l: apis::domain_model::SdtmVersionList) -> Self {
+        Self {
+            versions: l.versions.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// Wire projection of `GET /api/domain-model/versions/{version_id}/domains`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmDomainListResponse {
+    pub domains: Vec<SdtmDomainViewResponse>,
+}
+
+impl From<apis::domain_model::SdtmDomainList> for SdtmDomainListResponse {
+    fn from(l: apis::domain_model::SdtmDomainList) -> Self {
+        Self {
+            domains: l.domains.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+/// Wire projection of `GET /api/domain-model/domains/{domain_id}/variables`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmVariableListResponse {
+    pub variables: Vec<SdtmVariableViewResponse>,
+}
+
+impl From<apis::domain_model::SdtmVariableList> for SdtmVariableListResponse {
+    fn from(l: apis::domain_model::SdtmVariableList) -> Self {
+        Self {
+            variables: l.variables.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+// ---- request bodies ----
+
+/// `POST /api/domain-model/versions` body.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSdtmVersionRequest {
+    pub name: String,
+}
+
+/// `PUT /api/domain-model/versions/{id}` body. All fields are
+/// optional; absent fields are not touched (partial update).
+#[derive(Debug, Default, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSdtmVersionRequest {
+    pub name: Option<String>,
+}
+
+/// `POST /api/domain-model/domains` body.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSdtmDomainRequest {
+    pub version_id: i64,
+    pub name: String,
+    pub category: DomainCategory,
+    pub descriptions: Vec<SdtmDomainDescription>,
+}
+
+/// `PUT /api/domain-model/domains/{id}` body. All fields optional
+/// except via the apis partial-update contract.
+#[derive(Debug, Default, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSdtmDomainRequest {
+    pub name: Option<String>,
+    pub category: Option<DomainCategory>,
+    pub descriptions: Option<Vec<SdtmDomainDescription>>,
+}
+
+/// `POST /api/domain-model/variables` body.
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSdtmVariableRequest {
+    pub domain_id: i64,
+    pub name: String,
+    pub variable_controlled: Option<String>,
+    pub variable_type: SdtmVariableType,
+    pub variable_core: SdtmVariableCore,
+    pub variable_role: Option<SdtmRole>,
+    pub variable_sequence: i64,
+    pub descriptions: Vec<SdtmVariableDescription>,
+}
+
+/// `PUT /api/domain-model/variables/{id}` body. Nullable fields use
+/// `Option<Option<T>>` so the caller can distinguish "absent" from
+/// "present and null" — see the spec's three-state semantics.
+#[derive(Debug, Default, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSdtmVariableRequest {
+    pub name: Option<String>,
+    pub variable_controlled: Option<Option<String>>,
+    pub variable_type: Option<SdtmVariableType>,
+    pub variable_core: Option<SdtmVariableCore>,
+    pub variable_role: Option<Option<SdtmRole>>,
+    pub variable_sequence: Option<i64>,
+    pub descriptions: Option<Vec<SdtmVariableDescription>>,
+}
+
+// ---- adapters between wire DTOs and apis DTOs ----
+//
+// Create requests convert via `From` (one-arg, no `id`). Update
+// requests are built inline by the handler because the apis DTO
+// carries the `id` (read from the URL path), not the wire DTO.
+
+impl From<CreateSdtmVersionRequest> for apis::domain_model::CreateSdtmVersionRequest {
+    fn from(r: CreateSdtmVersionRequest) -> Self {
+        Self { name: r.name }
+    }
+}
+
+impl From<CreateSdtmDomainRequest> for apis::domain_model::CreateSdtmDomainRequest {
+    fn from(r: CreateSdtmDomainRequest) -> Self {
+        Self {
+            version_id: r.version_id,
+            name: r.name,
+            category: r.category.into(),
+            descriptions: r.descriptions.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<CreateSdtmVariableRequest> for apis::domain_model::CreateSdtmVariableRequest {
+    fn from(r: CreateSdtmVariableRequest) -> Self {
+        Self {
+            domain_id: r.domain_id,
+            name: r.name,
+            variable_controlled: r.variable_controlled,
+            variable_type: r.variable_type.into(),
+            variable_core: r.variable_core.into(),
+            variable_role: r.variable_role.map(Into::into),
+            variable_sequence: r.variable_sequence,
+            descriptions: r.descriptions.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

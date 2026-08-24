@@ -191,6 +191,8 @@ fn build_app(pool: PgPool) -> Router {
         project,
         terminology: Arc::new(NullTerminologyService)
             as Arc<dyn apis::terminology::TerminologyService>,
+        domain_model: Arc::new(NullDomainModelService)
+            as Arc<dyn apis::domain_model::DomainModelService>,
     };
 
     http_router(state)
@@ -760,6 +762,96 @@ async fn cleanup_registered(pool: &PgPool, code: &str) {
         .execute(pool)
         .await;
     cleanup_user(pool, code).await;
+}
+
+/// Stub [`apis::domain_model::DomainModelService`] for the live-DB
+/// auth test. Every method `unimplemented!()`s — this test never
+/// exercises domain-model routes.
+#[derive(Clone)]
+struct NullDomainModelService;
+
+#[async_trait]
+impl apis::domain_model::DomainModelService for NullDomainModelService {
+    async fn create_version(
+        &self,
+        _req: apis::domain_model::CreateSdtmVersionRequest,
+    ) -> Result<apis::domain_model::SdtmVersionView, apis::domain_model::DomainModelApiError> {
+        unimplemented!()
+    }
+    async fn list_versions(
+        &self,
+    ) -> Result<apis::domain_model::SdtmVersionList, apis::domain_model::DomainModelApiError> {
+        unimplemented!()
+    }
+    async fn update_version(
+        &self,
+        _req: apis::domain_model::UpdateSdtmVersionRequest,
+    ) -> Result<apis::domain_model::SdtmVersionView, apis::domain_model::DomainModelApiError> {
+        unimplemented!()
+    }
+    async fn delete_version(
+        &self,
+        _id: i64,
+    ) -> Result<(), apis::domain_model::DomainModelApiError> {
+        unimplemented!()
+    }
+    async fn create_domain(
+        &self,
+        _req: apis::domain_model::CreateSdtmDomainRequest,
+    ) -> Result<apis::domain_model::SdtmDomainView, apis::domain_model::DomainModelApiError> {
+        unimplemented!()
+    }
+    async fn get_domain_by_id(
+        &self,
+        _id: i64,
+    ) -> Result<apis::domain_model::SdtmDomainView, apis::domain_model::DomainModelApiError> {
+        unimplemented!()
+    }
+    async fn list_domains_by_version(
+        &self,
+        _version_id: i64,
+    ) -> Result<apis::domain_model::SdtmDomainList, apis::domain_model::DomainModelApiError> {
+        unimplemented!()
+    }
+    async fn update_domain(
+        &self,
+        _req: apis::domain_model::UpdateSdtmDomainRequest,
+    ) -> Result<apis::domain_model::SdtmDomainView, apis::domain_model::DomainModelApiError> {
+        unimplemented!()
+    }
+    async fn delete_domain(&self, _id: i64) -> Result<(), apis::domain_model::DomainModelApiError> {
+        unimplemented!()
+    }
+    async fn create_variable(
+        &self,
+        _req: apis::domain_model::CreateSdtmVariableRequest,
+    ) -> Result<apis::domain_model::SdtmVariableView, apis::domain_model::DomainModelApiError> {
+        unimplemented!()
+    }
+    async fn get_variable_by_id(
+        &self,
+        _id: i64,
+    ) -> Result<apis::domain_model::SdtmVariableView, apis::domain_model::DomainModelApiError> {
+        unimplemented!()
+    }
+    async fn list_variables_by_domain(
+        &self,
+        _domain_id: i64,
+    ) -> Result<apis::domain_model::SdtmVariableList, apis::domain_model::DomainModelApiError> {
+        unimplemented!()
+    }
+    async fn update_variable(
+        &self,
+        _req: apis::domain_model::UpdateSdtmVariableRequest,
+    ) -> Result<apis::domain_model::SdtmVariableView, apis::domain_model::DomainModelApiError> {
+        unimplemented!()
+    }
+    async fn delete_variable(
+        &self,
+        _id: i64,
+    ) -> Result<(), apis::domain_model::DomainModelApiError> {
+        unimplemented!()
+    }
 }
 
 /// Cheap per-run unique suffix. `uuid` is not a workspace dep and

@@ -194,7 +194,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
     use tower::ServiceExt;
 
-    use crate::state::test_support::NullTerminologyService;
+    use crate::state::test_support::{NullDomainModelService, NullTerminologyService};
 
     use apis::auth::{
         AuthApiError, AuthClaims, AuthService, CreateUserCredentialRequest,
@@ -393,6 +393,8 @@ mod tests {
             project: Arc::new(NullProjectService) as Arc<dyn apis::project::ProjectService>,
             terminology: Arc::new(NullTerminologyService)
                 as Arc<dyn apis::terminology::TerminologyService>,
+            domain_model: Arc::new(NullDomainModelService)
+                as Arc<dyn apis::domain_model::DomainModelService>,
         }
     }
 

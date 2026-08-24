@@ -8,6 +8,7 @@
 //! `use aegis_server::transport::router` (the outer re-export).
 
 pub mod auth;
+pub mod domain_model;
 pub mod dto;
 pub mod error;
 pub mod healthz;

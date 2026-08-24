@@ -1,0 +1,31 @@
+[package]
+name = "domain-model"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sqlx = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+# `chrono` provides the `DateTime<Utc>` type carried on every
+# aggregate's `created_at` / `updated_at` columns. The `clock`
+# feature keeps the binary small (no local time zones) while
+# still allowing `NOW()` round-trips through `chrono::Utc`.
+chrono = { workspace = true }
+# `serde` + `serde_json` are required for the JSONB
+# round-trip of `Vec<SdtmDomainDescription>` /
+# `Vec<SdtmVariableDescription>` at the postgres adapter
+# boundary, and for the derive-based Serialize / Deserialize
+# on the four enums + the description DTOs.
+serde = { workspace = true }
+serde_json = { workspace = true }
+# `apis` provides the outbound `DomainModelService` port the
+# in-memory facade implements. Path-dep because both crates
+# share the workspace.
+apis = { path = "../apis" }
+
+[dev-dependencies]
+dotenvy = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
