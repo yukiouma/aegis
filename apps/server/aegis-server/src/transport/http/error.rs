@@ -48,6 +48,9 @@ pub enum ApiError {
     #[error("{0}")]
     Terminology(#[from] apis::terminology::TerminologyApiError),
 
+    #[error("{0}")]
+    DomainModel(#[from] apis::domain_model::DomainModelApiError),
+
     #[error("admin or root role required")]
     Forbidden,
 }
@@ -60,6 +63,7 @@ impl ApiError {
             Self::User(e) => user_status(e),
             Self::Project(e) => project_status(e),
             Self::Terminology(e) => terminology_status(e),
+            Self::DomainModel(e) => domain_model_status(e),
             Self::Forbidden => StatusCode::FORBIDDEN,
         }
     }
@@ -71,6 +75,7 @@ impl ApiError {
             Self::User(e) => user_code(e),
             Self::Project(e) => project_code(e),
             Self::Terminology(e) => terminology_code(e),
+            Self::DomainModel(e) => domain_model_code(e),
             Self::Forbidden => "forbidden",
         }
     }
@@ -168,6 +173,40 @@ fn terminology_code(e: &apis::terminology::TerminologyApiError) -> &'static str 
         TerminologyApiError::DuplicateCodeList { .. } => "duplicate_code_list",
         TerminologyApiError::DuplicateCodeItem { .. } => "duplicate_code_item",
         TerminologyApiError::Repository(_) => "repository_error",
+    }
+}
+
+fn domain_model_status(e: &apis::domain_model::DomainModelApiError) -> StatusCode {
+    use apis::domain_model::DomainModelApiError;
+    match e {
+        DomainModelApiError::Validation(_) => StatusCode::BAD_REQUEST,
+        DomainModelApiError::NotFound
+        | DomainModelApiError::SdtmVersionNotFound(_)
+        | DomainModelApiError::SdtmDomainNotFound(_)
+        | DomainModelApiError::SdtmVariableNotFound(_) => StatusCode::NOT_FOUND,
+        DomainModelApiError::DuplicateSdtmVersion { .. }
+        | DomainModelApiError::DuplicateSdtmDomain { .. }
+        | DomainModelApiError::DuplicateSdtmVariable { .. } => StatusCode::CONFLICT,
+        DomainModelApiError::FkSdtmVersionNotFound(_)
+        | DomainModelApiError::FkSdtmDomainNotFound(_) => StatusCode::BAD_REQUEST,
+        DomainModelApiError::Repository(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn domain_model_code(e: &apis::domain_model::DomainModelApiError) -> &'static str {
+    use apis::domain_model::DomainModelApiError;
+    match e {
+        DomainModelApiError::Validation(_) => "validation_failed",
+        DomainModelApiError::NotFound => "not_found",
+        DomainModelApiError::SdtmVersionNotFound(_) => "sdtm_version_not_found",
+        DomainModelApiError::SdtmDomainNotFound(_) => "sdtm_domain_not_found",
+        DomainModelApiError::SdtmVariableNotFound(_) => "sdtm_variable_not_found",
+        DomainModelApiError::DuplicateSdtmVersion { .. } => "duplicate_sdtm_version",
+        DomainModelApiError::DuplicateSdtmDomain { .. } => "duplicate_sdtm_domain",
+        DomainModelApiError::DuplicateSdtmVariable { .. } => "duplicate_sdtm_variable",
+        DomainModelApiError::FkSdtmVersionNotFound(_) => "fk_sdtm_version_not_found",
+        DomainModelApiError::FkSdtmDomainNotFound(_) => "fk_sdtm_domain_not_found",
+        DomainModelApiError::Repository(_) => "repository_error",
     }
 }
 
@@ -471,6 +510,135 @@ mod tests {
     async fn terminology_repository_maps_to_500() {
         let (status, body) = render_terminology(
             apis::terminology::TerminologyApiError::Repository("db".into()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body.code, "repository_error");
+    }
+
+    // ---- DomainModelApiError mapping -----
+
+    async fn render_domain_model(
+        err: apis::domain_model::DomainModelApiError,
+    ) -> (StatusCode, ErrorBody) {
+        let api = ApiError::from(err);
+        let response = api.into_response();
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap();
+        let parsed: ErrorBody = serde_json::from_slice(&body).unwrap();
+        (status, parsed)
+    }
+
+    #[tokio::test]
+    async fn domain_model_validation_maps_to_400() {
+        let (status, body) = render_domain_model(
+            apis::domain_model::DomainModelApiError::Validation("bad".into()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body.code, "validation_failed");
+    }
+
+    #[tokio::test]
+    async fn domain_model_not_found_maps_to_404() {
+        let (status, body) =
+            render_domain_model(apis::domain_model::DomainModelApiError::NotFound).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "not_found");
+    }
+
+    #[tokio::test]
+    async fn domain_model_sdtm_version_not_found_maps_to_404() {
+        let (status, body) = render_domain_model(
+            apis::domain_model::DomainModelApiError::SdtmVersionNotFound(42),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "sdtm_version_not_found");
+    }
+
+    #[tokio::test]
+    async fn domain_model_sdtm_domain_not_found_maps_to_404() {
+        let (status, body) = render_domain_model(
+            apis::domain_model::DomainModelApiError::SdtmDomainNotFound(42),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "sdtm_domain_not_found");
+    }
+
+    #[tokio::test]
+    async fn domain_model_sdtm_variable_not_found_maps_to_404() {
+        let (status, body) = render_domain_model(
+            apis::domain_model::DomainModelApiError::SdtmVariableNotFound(42),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "sdtm_variable_not_found");
+    }
+
+    #[tokio::test]
+    async fn domain_model_duplicate_sdtm_version_maps_to_409() {
+        let (status, body) = render_domain_model(
+            apis::domain_model::DomainModelApiError::DuplicateSdtmVersion { name: "v1".into() },
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body.code, "duplicate_sdtm_version");
+    }
+
+    #[tokio::test]
+    async fn domain_model_duplicate_sdtm_domain_maps_to_409() {
+        let (status, body) = render_domain_model(
+            apis::domain_model::DomainModelApiError::DuplicateSdtmDomain {
+                version_id: 1,
+                name: "DM".into(),
+            },
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body.code, "duplicate_sdtm_domain");
+    }
+
+    #[tokio::test]
+    async fn domain_model_duplicate_sdtm_variable_maps_to_409() {
+        let (status, body) = render_domain_model(
+            apis::domain_model::DomainModelApiError::DuplicateSdtmVariable {
+                domain_id: 1,
+                name: "AGE".into(),
+            },
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body.code, "duplicate_sdtm_variable");
+    }
+
+    #[tokio::test]
+    async fn domain_model_fk_sdtm_version_not_found_maps_to_400() {
+        let (status, body) = render_domain_model(
+            apis::domain_model::DomainModelApiError::FkSdtmVersionNotFound(99),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body.code, "fk_sdtm_version_not_found");
+    }
+
+    #[tokio::test]
+    async fn domain_model_fk_sdtm_domain_not_found_maps_to_400() {
+        let (status, body) = render_domain_model(
+            apis::domain_model::DomainModelApiError::FkSdtmDomainNotFound(99),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body.code, "fk_sdtm_domain_not_found");
+    }
+
+    #[tokio::test]
+    async fn domain_model_repository_maps_to_500() {
+        let (status, body) = render_domain_model(
+            apis::domain_model::DomainModelApiError::Repository("db".into()),
         )
         .await;
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);

@@ -8,6 +8,8 @@
 //! - `/api/auth/user-credential`        user-credential (self-service: PATCH only — creation is out of band)
 //! - `/api/user`                         user CRUD
 //! - `/api/user/{code}`
+//! - `/api/terminology/*`                terminology CRUD
+//! - `/api/domain-model/*`               SDTM domain model CRUD
 //! - `/healthz`                         liveness probe
 //! - `/swagger-ui/`                      swagger-ui HTML
 //! - `/swagger-ui/{*rest}`               swagger-ui assets
@@ -22,6 +24,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::state::AppState;
 use crate::transport::http::auth;
+use crate::transport::http::domain_model::router as domain_model_router;
 use crate::transport::http::healthz;
 use crate::transport::http::openapi::ApiDoc;
 use crate::transport::http::project::router as project_router;
@@ -39,11 +42,13 @@ use crate::transport::http::user;
 pub fn router(state: AppState) -> axum::Router {
     let project_routes = project_router::router();
     let terminology_routes = terminology_router::router();
+    let domain_model_routes = domain_model_router::router();
     let api_routers = OpenApiRouter::new()
         .nest("/auth", auth::router())
         .nest("/user", user::router())
         .nest("/project", project_routes)
-        .nest("/terminology", terminology_routes);
+        .nest("/terminology", terminology_routes)
+        .nest("/domain-model", domain_model_routes);
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/api", api_routers)
@@ -470,7 +475,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), AxStatus::OK);
-        let body = axum::body::to_bytes(response.into_body(), 64 * 1024)
+        let body = axum::body::to_bytes(response.into_body(), 256 * 1024)
             .await
             .unwrap();
         let doc: serde_json::Value = serde_json::from_slice(&body).unwrap();
@@ -481,6 +486,16 @@ mod tests {
         assert!(doc["paths"]["/api/auth/logout"].is_object());
         assert!(doc["paths"]["/api/auth/user-credential"].is_object());
         assert!(doc["paths"]["/healthz"].is_object());
+        // domain-model endpoints are auto-registered by the
+        // OpenApiRouter nest; assert the surface is present.
+        assert!(doc["paths"]["/api/domain-model/versions"].is_object());
+        assert!(doc["paths"]["/api/domain-model/versions/{id}"].is_object());
+        assert!(doc["paths"]["/api/domain-model/domains"].is_object());
+        assert!(doc["paths"]["/api/domain-model/domains/{id}"].is_object());
+        assert!(doc["paths"]["/api/domain-model/versions/{version_id}/domains"].is_object());
+        assert!(doc["paths"]["/api/domain-model/variables"].is_object());
+        assert!(doc["paths"]["/api/domain-model/variables/{id}"].is_object());
+        assert!(doc["paths"]["/api/domain-model/domains/{domain_id}/variables"].is_object());
 
         // The Bearer security scheme must be registered so
         // refresh / logout advertise the BearerAuth requirement.
