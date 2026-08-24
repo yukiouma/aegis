@@ -1,9 +1,8 @@
 use chrono::{DateTime, Utc};
 
 use crate::domain::{
-    DomainCategory, SdtmDomain, SdtmDomainDescription, SdtmDomainDescriptionDetail, SdtmRole,
-    SdtmVariable, SdtmVariableCore, SdtmVariableDescription, SdtmVariableDescriptionDetail,
-    SdtmVariableType, SdtmVersion,
+    DomainCategory, SdtmDomain, SdtmDomainDescription, SdtmRole, SdtmVariable, SdtmVariableCore,
+    SdtmVariableDescription, SdtmVariableType, SdtmVersion,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
