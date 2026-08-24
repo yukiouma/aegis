@@ -8,6 +8,10 @@ pub mod adapter;
 pub mod domain;
 pub mod usecase;
 
+pub use adapter::persistence::postgres::{
+    sdtm_domain_repo::SdtmDomainRepoPg, sdtm_variable_repo::SdtmVariableRepoPg,
+    sdtm_version_repo::SdtmVersionRepoPg,
+};
 pub use domain::{
     DomainCategory, DomainError, SdtmDomain, SdtmDomainDescription, SdtmDomainDescriptionDetail,
     SdtmDomainNew, SdtmDomainRepository, SdtmDomainUpdate, SdtmRole, SdtmVariable,
