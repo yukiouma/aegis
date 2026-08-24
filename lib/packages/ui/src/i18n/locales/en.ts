@@ -145,9 +145,6 @@ export const en = {
   'workspace.placeholder': 'Coming soon',
   'workspace.focusMain': 'Back to main',
 
-  'nav.terminology': 'Terminology',
-  'nav.terminology.sdtm': 'SDTM',
-  'nav.terminology.adam': 'ADaM',
   'nav.knowledgeBase': 'Knowledge Base',
   'nav.metadata': 'Metadata',
   'metadata.heading': 'Metadata',

@@ -143,9 +143,6 @@ export const zhCN = {
   'workspace.placeholder': '敬请期待',
   'workspace.focusMain': '返回主窗口',
 
-  'nav.terminology': '术语',
-  'nav.terminology.sdtm': 'SDTM',
-  'nav.terminology.adam': 'ADaM',
   'nav.knowledgeBase': '知识库',
   'nav.metadata': '元数据',
   'metadata.heading': '元数据',
