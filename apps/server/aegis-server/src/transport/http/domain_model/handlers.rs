@@ -48,10 +48,7 @@ pub async fn create_version(
     Json(req): Json<dto::CreateSdtmVersionRequest>,
 ) -> Result<(StatusCode, Json<dto::SdtmVersionViewResponse>), ApiError> {
     require_admin_or_root(&claims)?;
-    let view = state
-        .domain_model
-        .create_version(req.into())
-        .await?;
+    let view = state.domain_model.create_version(req.into()).await?;
     Ok((StatusCode::CREATED, Json(view.into())))
 }
 
@@ -102,10 +99,7 @@ pub async fn update_version(
     require_admin_or_root(&claims)?;
     let view = state
         .domain_model
-        .update_version(apis::domain_model::UpdateSdtmVersionRequest {
-            id,
-            name: req.name,
-        })
+        .update_version(apis::domain_model::UpdateSdtmVersionRequest { id, name: req.name })
         .await?;
     Ok(Json(view.into()))
 }
@@ -205,7 +199,10 @@ pub async fn list_domains_by_version(
     _claims: AuthClaims,
     Path(version_id): Path<i64>,
 ) -> Result<Json<Vec<dto::SdtmDomainViewResponse>>, ApiError> {
-    let views = state.domain_model.list_domains_by_version(version_id).await?;
+    let views = state
+        .domain_model
+        .list_domains_by_version(version_id)
+        .await?;
     let out = views.into_iter().map(Into::into).collect();
     Ok(Json(out))
 }
@@ -344,7 +341,10 @@ pub async fn list_variables_by_domain(
     _claims: AuthClaims,
     Path(domain_id): Path<i64>,
 ) -> Result<Json<Vec<dto::SdtmVariableViewResponse>>, ApiError> {
-    let views = state.domain_model.list_variables_by_domain(domain_id).await?;
+    let views = state
+        .domain_model
+        .list_variables_by_domain(domain_id)
+        .await?;
     let out = views.into_iter().map(Into::into).collect();
     Ok(Json(out))
 }
@@ -382,9 +382,7 @@ pub async fn update_variable(
             variable_controlled: req.variable_controlled,
             variable_type: req.variable_type.map(Into::into),
             variable_core: req.variable_core.map(Into::into),
-            variable_role: req
-                .variable_role
-                .map(|inner| inner.map(Into::into)),
+            variable_role: req.variable_role.map(|inner| inner.map(Into::into)),
             variable_sequence: req.variable_sequence,
             descriptions: req
                 .descriptions

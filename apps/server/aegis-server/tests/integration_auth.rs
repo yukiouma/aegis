@@ -775,23 +775,19 @@ impl apis::domain_model::DomainModelService for NullDomainModelService {
     async fn create_version(
         &self,
         _req: apis::domain_model::CreateSdtmVersionRequest,
-    ) -> Result<apis::domain_model::SdtmVersionView, apis::domain_model::DomainModelApiError>
-    {
+    ) -> Result<apis::domain_model::SdtmVersionView, apis::domain_model::DomainModelApiError> {
         unimplemented!()
     }
     async fn list_versions(
         &self,
-    ) -> Result<
-        Vec<apis::domain_model::SdtmVersionView>,
-        apis::domain_model::DomainModelApiError,
-    > {
+    ) -> Result<Vec<apis::domain_model::SdtmVersionView>, apis::domain_model::DomainModelApiError>
+    {
         unimplemented!()
     }
     async fn update_version(
         &self,
         _req: apis::domain_model::UpdateSdtmVersionRequest,
-    ) -> Result<apis::domain_model::SdtmVersionView, apis::domain_model::DomainModelApiError>
-    {
+    ) -> Result<apis::domain_model::SdtmVersionView, apis::domain_model::DomainModelApiError> {
         unimplemented!()
     }
     async fn delete_version(
@@ -803,15 +799,13 @@ impl apis::domain_model::DomainModelService for NullDomainModelService {
     async fn create_domain(
         &self,
         _req: apis::domain_model::CreateSdtmDomainRequest,
-    ) -> Result<apis::domain_model::SdtmDomainView, apis::domain_model::DomainModelApiError>
-    {
+    ) -> Result<apis::domain_model::SdtmDomainView, apis::domain_model::DomainModelApiError> {
         unimplemented!()
     }
     async fn get_domain_by_id(
         &self,
         _id: i64,
-    ) -> Result<apis::domain_model::SdtmDomainView, apis::domain_model::DomainModelApiError>
-    {
+    ) -> Result<apis::domain_model::SdtmDomainView, apis::domain_model::DomainModelApiError> {
         unimplemented!()
     }
     async fn list_domains_by_version(
@@ -824,28 +818,22 @@ impl apis::domain_model::DomainModelService for NullDomainModelService {
     async fn update_domain(
         &self,
         _req: apis::domain_model::UpdateSdtmDomainRequest,
-    ) -> Result<apis::domain_model::SdtmDomainView, apis::domain_model::DomainModelApiError>
-    {
+    ) -> Result<apis::domain_model::SdtmDomainView, apis::domain_model::DomainModelApiError> {
         unimplemented!()
     }
-    async fn delete_domain(
-        &self,
-        _id: i64,
-    ) -> Result<(), apis::domain_model::DomainModelApiError> {
+    async fn delete_domain(&self, _id: i64) -> Result<(), apis::domain_model::DomainModelApiError> {
         unimplemented!()
     }
     async fn create_variable(
         &self,
         _req: apis::domain_model::CreateSdtmVariableRequest,
-    ) -> Result<apis::domain_model::SdtmVariableView, apis::domain_model::DomainModelApiError>
-    {
+    ) -> Result<apis::domain_model::SdtmVariableView, apis::domain_model::DomainModelApiError> {
         unimplemented!()
     }
     async fn get_variable_by_id(
         &self,
         _id: i64,
-    ) -> Result<apis::domain_model::SdtmVariableView, apis::domain_model::DomainModelApiError>
-    {
+    ) -> Result<apis::domain_model::SdtmVariableView, apis::domain_model::DomainModelApiError> {
         unimplemented!()
     }
     async fn list_variables_by_domain(
@@ -858,8 +846,7 @@ impl apis::domain_model::DomainModelService for NullDomainModelService {
     async fn update_variable(
         &self,
         _req: apis::domain_model::UpdateSdtmVariableRequest,
-    ) -> Result<apis::domain_model::SdtmVariableView, apis::domain_model::DomainModelApiError>
-    {
+    ) -> Result<apis::domain_model::SdtmVariableView, apis::domain_model::DomainModelApiError> {
         unimplemented!()
     }
     async fn delete_variable(
