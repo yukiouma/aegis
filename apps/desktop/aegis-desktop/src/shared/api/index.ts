@@ -10,6 +10,7 @@ import type {
   CreateCodeItemInput,
   CreateCodeListInput,
   CreateProjectInput,
+  CreateSdtmVariableInput,
   CreateTerminologyVersionInput,
   CreateUserInput,
   Identity,
@@ -20,6 +21,8 @@ import type {
   RegisterUserResponse,
   SdtmDomainListResponse,
   SdtmDomainView,
+  SdtmVariableListResponse,
+  SdtmVariableView,
   SdtmVersionListResponse,
   SdtmVersionView,
   TerminologyKind,
@@ -27,6 +30,8 @@ import type {
   UpdateCodeItemInput,
   UpdateCodeListInput,
   UpdateProjectBody,
+  UpdateSdtmDomainInput,
+  UpdateSdtmVariableInput,
   UpdateTerminologyVersionInput,
   UpdateUserBody,
   UpdateUserCredentialInput,
@@ -205,6 +210,41 @@ export const api = {
   },
   deleteSdtmDomain: (id: number): Promise<void> =>
     call<void>("delete_sdtm_domain", { id }),
+
+  // SDTM domains (detail page)
+  getSdtmDomainById: (id: number): Promise<SdtmDomainView> =>
+    call<SdtmDomainView>("get_sdtm_domain_by_id", { id }),
+
+  updateSdtmDomain: (
+    id: number,
+    body: UpdateSdtmDomainInput,
+  ): Promise<SdtmDomainView> =>
+    call<SdtmDomainView>("update_sdtm_domain", { id, body: { ...body } }),
+
+  // SDTM variables
+  listSdtmVariablesByDomain: async (
+    domainId: number,
+  ): Promise<SdtmVariableView[]> => {
+    const resp = await call<SdtmVariableListResponse>(
+      "list_sdtm_variables_by_domain",
+      { domainId },
+    );
+    return resp.variables;
+  },
+
+  createSdtmVariable: (
+    input: CreateSdtmVariableInput,
+  ): Promise<SdtmVariableView> =>
+    call<SdtmVariableView>("create_sdtm_variable", { ...input }),
+
+  updateSdtmVariable: (
+    id: number,
+    body: UpdateSdtmVariableInput,
+  ): Promise<SdtmVariableView> =>
+    call<SdtmVariableView>("update_sdtm_variable", { id, body: { ...body } }),
+
+  deleteSdtmVariable: (id: number): Promise<void> =>
+    call<void>("delete_sdtm_variable", { id }),
 } as const;
 
 export type { ApiError } from "./types";
@@ -218,6 +258,7 @@ export type {
   CreateCodeItemInput,
   CreateCodeListInput,
   CreateProjectInput,
+  CreateSdtmVariableInput,
   CreateTerminologyVersionInput,
   CreateUserInput,
   DomainCategory,
@@ -234,6 +275,13 @@ export type {
   SdtmDomainDescriptionDetail,
   SdtmDomainListResponse,
   SdtmDomainView,
+  SdtmRole,
+  SdtmVariableCore,
+  SdtmVariableDescription,
+  SdtmVariableDescriptionDetail,
+  SdtmVariableListResponse,
+  SdtmVariableType,
+  SdtmVariableView,
   SdtmVersionListResponse,
   SdtmVersionView,
   Tag,
@@ -243,6 +291,8 @@ export type {
   UpdateCodeItemInput,
   UpdateCodeListInput,
   UpdateProjectBody,
+  UpdateSdtmDomainInput,
+  UpdateSdtmVariableInput,
   UpdateTerminologyVersionInput,
   UpdateUserBody,
   UpdateUserCredentialInput,
