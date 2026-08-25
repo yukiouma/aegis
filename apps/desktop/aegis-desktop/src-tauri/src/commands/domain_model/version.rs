@@ -3,10 +3,11 @@
 use tauri::State;
 
 use crate::http::client::HttpClient;
-use crate::http::dto::ApiError;
 use crate::http::domain_model::version::{
-    self, CreateSdtmVersionRequest, SdtmVersionViewResponse, UpdateSdtmVersionRequest,
+    self, CreateSdtmVersionRequest, SdtmVersionListResponse, SdtmVersionViewResponse,
+    UpdateSdtmVersionRequest,
 };
+use crate::http::dto::ApiError;
 
 #[tauri::command]
 pub async fn create_sdtm_version(
@@ -19,7 +20,7 @@ pub async fn create_sdtm_version(
 #[tauri::command]
 pub async fn list_sdtm_versions(
     client: State<'_, HttpClient>,
-) -> Result<Vec<SdtmVersionViewResponse>, ApiError> {
+) -> Result<SdtmVersionListResponse, ApiError> {
     version::list(&client).await
 }
 
@@ -41,9 +42,6 @@ pub async fn update_sdtm_version(
 }
 
 #[tauri::command]
-pub async fn delete_sdtm_version(
-    client: State<'_, HttpClient>,
-    id: i64,
-) -> Result<(), ApiError> {
+pub async fn delete_sdtm_version(client: State<'_, HttpClient>, id: i64) -> Result<(), ApiError> {
     version::delete(&client, id).await
 }

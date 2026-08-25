@@ -38,11 +38,15 @@ pub async fn create(
     c: &HttpClient,
     body: CreateSdtmVersionRequest,
 ) -> Result<SdtmVersionViewResponse, ApiError> {
-    c.request(reqwest::Method::POST, "/api/domain-model/versions", Some(&body))
-        .await
+    c.request(
+        reqwest::Method::POST,
+        "/api/domain-model/versions",
+        Some(&body),
+    )
+    .await
 }
 
-pub async fn list(c: &HttpClient) -> Result<Vec<SdtmVersionViewResponse>, ApiError> {
+pub async fn list(c: &HttpClient) -> Result<SdtmVersionListResponse, ApiError> {
     let resp: SdtmVersionListResponse = c
         .request(
             reqwest::Method::GET,
@@ -50,13 +54,10 @@ pub async fn list(c: &HttpClient) -> Result<Vec<SdtmVersionViewResponse>, ApiErr
             None::<&()>,
         )
         .await?;
-    Ok(resp.versions)
+    Ok(resp)
 }
 
-pub async fn get_by_id(
-    c: &HttpClient,
-    id: i64,
-) -> Result<SdtmVersionViewResponse, ApiError> {
+pub async fn get_by_id(c: &HttpClient, id: i64) -> Result<SdtmVersionViewResponse, ApiError> {
     c.request(
         reqwest::Method::GET,
         &format!("/api/domain-model/versions/{id}"),
@@ -123,10 +124,10 @@ mod tests {
             .mount(&server)
             .await;
         let versions = list(&client(&server)).await.unwrap();
-        assert_eq!(versions.len(), 1);
-        assert_eq!(versions[0].name, "2024-06-28");
+        assert_eq!(versions.versions.len(), 1);
+        assert_eq!(versions.versions[0].name, "2024-06-28");
         assert_eq!(
-            versions[0].created_at,
+            versions.versions[0].created_at,
             Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()
         );
     }
