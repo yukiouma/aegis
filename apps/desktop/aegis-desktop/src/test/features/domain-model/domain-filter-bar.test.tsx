@@ -27,4 +27,17 @@ describe("DomainFilterBar", () => {
     wrap(<DomainFilterBar query="AE" onQueryChange={() => {}} />);
     expect(screen.getByDisplayValue("AE")).toBeInTheDocument();
   });
+
+  it("uses the placeholderKey when provided", () => {
+    wrap(
+      <DomainFilterBar
+        query=""
+        onQueryChange={() => {}}
+        placeholderKey="domainModel.sdtm.detail.filter.placeholder"
+      />,
+    );
+    expect(
+      screen.getByLabelText("Filter by name or label"),
+    ).toBeInTheDocument();
+  });
 });
