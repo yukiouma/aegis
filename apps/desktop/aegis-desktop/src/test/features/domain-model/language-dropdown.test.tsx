@@ -4,7 +4,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
-import { LanguageDropdown } from "./LanguageDropdown";
+import { LanguageDropdown } from "../../../features/domain-model/components/LanguageDropdown";
 
 function wrap(ui: React.ReactNode) {
   return render(

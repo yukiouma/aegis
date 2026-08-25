@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
-import { DomainFilterBar } from "./DomainFilterBar";
+import { DomainFilterBar } from "../../../features/domain-model/components/DomainFilterBar";
 
 function wrap(ui: React.ReactNode) {
   return render(

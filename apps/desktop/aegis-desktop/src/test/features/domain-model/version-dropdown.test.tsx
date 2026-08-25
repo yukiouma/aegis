@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
 import type { SdtmVersionView } from "../../../shared/api";
-import { VersionDropdown } from "./VersionDropdown";
+import { VersionDropdown } from "../../../features/domain-model/components/VersionDropdown";
 
 function wrap(ui: React.ReactNode) {
   return render(

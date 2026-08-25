@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
 import type { SdtmDomainView } from "../../../shared/api";
-import { DomainTable } from "./DomainTable";
+import { DomainTable } from "../../../features/domain-model/components/DomainTable";
 
 function wrap(ui: React.ReactNode) {
   return render(

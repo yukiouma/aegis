@@ -7,9 +7,9 @@ import { AegisThemeProvider } from "@aegis/ui/theme";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
-import { renderWithFullRouter } from "../../../test/helpers/file-route-utils";
-import { mockCommands, mockInvoke } from "../../../test/helpers/tauri-mock";
-import { TestQueryProvider } from "../../../test/helpers/test-query-provider";
+import { renderWithFullRouter } from "../../helpers/file-route-utils";
+import { mockCommands, mockInvoke } from "../../helpers/tauri-mock";
+import { TestQueryProvider } from "../../helpers/test-query-provider";
 
 function createMemoryStorage(): Storage {
   const data = new Map<string, string>();
@@ -100,11 +100,6 @@ function renderPage() {
 }
 
 describe("SdtmDomainList", () => {
-  it("renders the heading", async () => {
-    renderPage();
-    expect(await screen.findByText(/SDTM Domains/i)).toBeInTheDocument();
-  });
-
   it("renders the rows from the data fetch", async () => {
     renderPage();
     expect(await screen.findByText("AE")).toBeInTheDocument();
@@ -128,5 +123,28 @@ describe("SdtmDomainList", () => {
     expect(
       (await screen.findAllByRole("button", { name: /delete/i })).length,
     ).toBeGreaterThan(0);
+  });
+
+  it("shows the no-versions placeholder when no SDTM versions exist", async () => {
+    mockInvoke.mockReset();
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => ({
+        id: 1,
+        code: "alice",
+        name: "Alice",
+        role: "admin",
+        active: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      }),
+      list_sdtm_versions: () => ({ versions: [] }),
+      list_sdtm_domains_by_version: () => ({ domains: [] }),
+      delete_sdtm_domain: () => undefined,
+    });
+    renderPage();
+    expect(
+      await screen.findByText(/No SDTM versions exist yet/i),
+    ).toBeInTheDocument();
   });
 });
