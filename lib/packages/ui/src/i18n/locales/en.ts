@@ -246,4 +246,5 @@ export const en = {
   "domainModel.sdtm.delete.confirmTitle": "Delete domain?",
   "domainModel.sdtm.delete.confirmMessage": "This cannot be undone.",
   "domainModel.sdtm.noVersions": "No SDTM versions exist yet.",
+  "domainModel.sdtm.loadFailed": "Failed to load domains: {message}",
 } as const;

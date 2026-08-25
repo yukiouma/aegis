@@ -18,6 +18,7 @@ import {
   OpenInNew as OpenInNewIcon,
 } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
+import { errorMessage } from "../../../shared/api/error";
 import type { SdtmDomainView } from "../../../shared/api";
 
 export interface DomainTableProps {
@@ -53,7 +54,11 @@ export function DomainTable({
   if (error) {
     return (
       <Paper sx={{ p: 2 }}>
-        <Typography color="error">{String(error)}</Typography>
+        <Typography color="error">
+          {t("domainModel.sdtm.loadFailed", {
+            message: errorMessage(error),
+          })}
+        </Typography>
         <Button onClick={onRetry} sx={{ mt: 1 }}>
           {t("common.retry")}
         </Button>
