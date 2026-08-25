@@ -30,6 +30,13 @@ export interface DomainTableProps {
   onRetry: () => void;
   onDelete: (row: SdtmDomainView) => void;
   emptyMessage: string;
+  /**
+   * Optional click handler for the open-detail button. When provided the
+   * button is enabled; when omitted it stays disabled with a "coming soon"
+   * tooltip so older callers don't need to wire navigation just to render
+   * the table.
+   */
+  onNavigate?: (row: SdtmDomainView) => void;
 }
 
 const cellEllipsis = {
@@ -48,6 +55,7 @@ export function DomainTable({
   onRetry,
   onDelete,
   emptyMessage,
+  onNavigate,
 }: DomainTableProps) {
   const { t } = useI18n();
 
@@ -113,7 +121,12 @@ export function DomainTable({
                 <TableCell sx={{ whiteSpace: "nowrap" }}>
                   <Tooltip title={t("domainModel.sdtm.action.navigate.tooltip")}>
                     <span>
-                      <IconButton size="small" disabled aria-label="open-detail">
+                      <IconButton
+                        size="small"
+                        disabled={!onNavigate}
+                        aria-label="open-detail"
+                        onClick={() => onNavigate?.(row)}
+                      >
                         <OpenInNewIcon fontSize="small" />
                       </IconButton>
                     </span>
