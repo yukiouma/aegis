@@ -255,7 +255,7 @@ export function VariableEditDrawer({
                   key={idx}
                   direction="row"
                   spacing={1}
-                  alignItems="center"
+                  sx={{ alignItems: "center" }}
                 >
                   <TextField
                     size="small"

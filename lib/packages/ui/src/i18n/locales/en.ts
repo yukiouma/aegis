@@ -280,4 +280,5 @@ export const en = {
   "domainModel.sdtm.variable.delete.confirmTitle": "Delete variable?",
   "domainModel.sdtm.variable.delete.confirmMessage": "This cannot be undone.",
   "common.create": "Create",
+  "common.save": "Save",
 } as const;

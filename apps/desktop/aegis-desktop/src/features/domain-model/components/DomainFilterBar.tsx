@@ -1,5 +1,5 @@
 import { TextField } from "@aegis/ui/mui";
-import { useI18n } from "@aegis/ui/i18n";
+import { useI18n, type TranslationKey } from "@aegis/ui/i18n";
 
 export interface DomainFilterBarProps {
   query: string;
@@ -10,7 +10,7 @@ export interface DomainFilterBarProps {
    * used by the SDTM list page. The detail page uses
    * `domainModel.sdtm.detail.filter.placeholder` ("Filter by name or label").
    */
-  placeholderKey?: string;
+  placeholderKey?: TranslationKey;
 }
 
 export function DomainFilterBar({
