@@ -1,4 +1,7 @@
 import {
+  Box,
+  Button,
+  CircularProgress,
   IconButton,
   Paper,
   Table,
@@ -51,11 +54,21 @@ export function DomainTable({
     return (
       <Paper sx={{ p: 2 }}>
         <Typography color="error">{String(error)}</Typography>
+        <Button onClick={onRetry} sx={{ mt: 1 }}>
+          {t("common.retry")}
+        </Button>
       </Paper>
     );
   }
 
   if (rows.length === 0) {
+    if (loading) {
+      return (
+        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+          <CircularProgress />
+        </Box>
+      );
+    }
     return (
       <Paper sx={{ p: 4, textAlign: "center" }}>
         <Typography>{emptyMessage}</Typography>

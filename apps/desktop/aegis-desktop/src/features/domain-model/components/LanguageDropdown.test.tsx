@@ -9,7 +9,7 @@ import { LanguageDropdown } from "./LanguageDropdown";
 function wrap(ui: React.ReactNode) {
   return render(
     <AegisThemeProvider>
-      <AegisI18nProvider locale="en">{ui}</AegisI18nProvider>
+      <AegisI18nProvider defaultLocale="en">{ui}</AegisI18nProvider>
     </AegisThemeProvider>,
   );
 }

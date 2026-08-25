@@ -35,7 +35,7 @@ export function DeleteDomainDialog({
         <DialogContentText>
           {t("domainModel.sdtm.delete.confirmMessage")}
         </DialogContentText>
-        {error && (
+        {Boolean(error) && (
           <DialogContentText sx={{ mt: 2, color: "error.main" }}>
             {errorMessage(error)}
           </DialogContentText>
