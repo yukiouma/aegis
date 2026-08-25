@@ -59,6 +59,17 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::terminology::code_item::delete_code_item,
             commands::terminology::code_item::list_code_items_by_version_and_code,
             commands::terminology::import::import_terminology,
+            // domain-model
+            commands::domain_model::version::create_sdtm_version,
+            commands::domain_model::version::list_sdtm_versions,
+            commands::domain_model::version::get_sdtm_version_by_id,
+            commands::domain_model::version::update_sdtm_version,
+            commands::domain_model::version::delete_sdtm_version,
+            commands::domain_model::domain::create_sdtm_domain,
+            commands::domain_model::domain::list_sdtm_domains_by_version,
+            commands::domain_model::domain::get_sdtm_domain_by_id,
+            commands::domain_model::domain::update_sdtm_domain,
+            commands::domain_model::domain::delete_sdtm_domain,
             // health
             commands::healthz::healthz,
             // legacy greet (kept for the existing test)
