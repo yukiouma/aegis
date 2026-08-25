@@ -18,6 +18,10 @@ import type {
   ProjectView,
   RegisterUserInput,
   RegisterUserResponse,
+  SdtmDomainListResponse,
+  SdtmDomainView,
+  SdtmVersionListResponse,
+  SdtmVersionView,
   TerminologyKind,
   TerminologyVersionView,
   UpdateCodeItemInput,
@@ -184,6 +188,23 @@ export const api = {
     filepath: string,
   ): Promise<TerminologyVersionView> =>
     call<TerminologyVersionView>("import_terminology", { kind, filepath }),
+
+  // domain-model
+  listSdtmVersions: async (): Promise<SdtmVersionView[]> => {
+    const resp = await call<SdtmVersionListResponse>("list_sdtm_versions");
+    return resp.versions;
+  },
+  listSdtmDomainsByVersion: async (
+    versionId: number,
+  ): Promise<SdtmDomainView[]> => {
+    const resp = await call<SdtmDomainListResponse>(
+      "list_sdtm_domains_by_version",
+      { versionId },
+    );
+    return resp.domains;
+  },
+  deleteSdtmDomain: (id: number): Promise<void> =>
+    call<void>("delete_sdtm_domain", { id }),
 } as const;
 
 export type { ApiError } from "./types";
@@ -199,6 +220,7 @@ export type {
   CreateProjectInput,
   CreateTerminologyVersionInput,
   CreateUserInput,
+  DomainCategory,
   Identity,
   PagedCodeItemListResponse,
   PagedCodeListListResponse,
@@ -208,6 +230,12 @@ export type {
   Role,
   RegisterUserInput,
   RegisterUserResponse,
+  SdtmDomainDescription,
+  SdtmDomainDescriptionDetail,
+  SdtmDomainListResponse,
+  SdtmDomainView,
+  SdtmVersionListResponse,
+  SdtmVersionView,
   Tag,
   TerminologyKind,
   TerminologyVersionListResponse,
