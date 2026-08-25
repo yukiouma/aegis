@@ -682,9 +682,36 @@ English placeholders, per the existing pattern):
 
 ## Testing
 
-### Feature integration test
-`apps/desktop/aegis-desktop/src/features/domain-model/pages/SdtmDomainDetail.test.tsx`
-renders the page with `QueryClientProvider`, TanStack Router test
+Tests live under `apps/desktop/aegis-desktop/src/test/features/domain-model/`,
+flat (no `pages/` subdirectory), mirroring the existing
+`test/features/domain-model/` layout (e.g. `domain-table.test.tsx`,
+`sdtm-domain-list.test.tsx`, `version-dropdown.test.tsx`). The test
+file naming convention is `{component-name}.test.tsx`. Data-hook tests
+live in a `data/` subfolder (mirroring
+`test/features/terminology/data/list.test.tsx`).
+
+### Component tests (one file per component, `src/test/features/domain-model/`)
+
+- `domain-header-table.test.tsx` — renders the headless row, hides the
+  edit icon for general-role users, falls back to the error alert with
+  back button when the domain fetch errors.
+- `variable-table.test.tsx` — renders the five columns, applies the
+  type/core chips correctly, swaps label when `selectedLang` changes,
+  hides the add/edit/delete icons for general-role users, and exercises
+  the drag-and-drop hook: simulate `onReorder([2,1,3,4])` and assert
+  the page receives exactly that ordering.
+- `domain-edit-drawer.test.tsx` — submit fires `onUpdate` with the
+  expected body; mutation error renders the inline `Alert`.
+- `variable-edit-drawer.test.tsx` — both modes: create uses the
+  provided `initialSequence` and `domainId`, edit uses the row's id
+  and never sends `variableSequence`. Three-state semantics for
+  `variableControlled` / `variableRole`.
+- `delete-variable-dialog.test.tsx` — confirm fires `onConfirm(row)`;
+  pending disables buttons; error renders in `error.main`.
+
+### Page integration test (`src/test/features/domain-model/sdtm-domain-detail.test.tsx`)
+
+Renders the page with `QueryClientProvider`, TanStack Router test
 adapter, and a mocked `useCurrentUser`. Cover:
 
 - `params.domainId = 0` → inline error alert + back button.
@@ -701,12 +728,22 @@ adapter, and a mocked `useCurrentUser`. Cover:
   with `{ domainId, variableSequence: max+1, ... }`. Drawer does not
   render a `variableSequence` field.
 - Admin-role user: open delete dialog, confirm → row disappears.
-- Drag-and-drop: simulate `onReorder([2,1,3,4])` via the test hook on
-  `VariableTable` → only the affected variables get PUTs;
-  `useUpdateSdtmVariable` mock receives
+- Drag-and-drop: `onReorder([2,1,3,4])` from the test hook → only the
+  affected variables get PUTs; `useUpdateSdtmVariable` mock receives
   `{id:1, body:{variableSequence:2}}` and
   `{id:2, body:{variableSequence:1}}` (NOT ids 3 and 4, since their
   positions didn't change).
+
+### Data hook tests (`src/test/features/domain-model/data/list.test.tsx`)
+
+Cover the new hooks in isolation:
+- `useGetSdtmDomain` is disabled for `id = 0`/`null`.
+- `useListSdtmVariables` is disabled for `domainId = 0`/`null`.
+- `useCreateSdtmVariable` on success invalidates
+  `["domainModel", "sdtmVariables", created.domainId]`.
+- `useDeleteSdtmVariable` on success invalidates
+  `["domainModel", "sdtmVariables"]` (broad — no domainId in the
+  mutation result).
 
 ### Tauri HTTP shim tests
 `apps/desktop/aegis-desktop/src-tauri/src/http/domain_model/variable.rs::tests`:
@@ -722,12 +759,18 @@ adapter, and a mocked `useCurrentUser`. Cover:
 New files:
 
 - `apps/desktop/aegis-desktop/src/features/domain-model/pages/SdtmDomainDetail.tsx`
-- `apps/desktop/aegis-desktop/src/features/domain-model/pages/SdtmDomainDetail.test.tsx`
 - `apps/desktop/aegis-desktop/src/features/domain-model/components/DomainHeaderTable.tsx`
 - `apps/desktop/aegis-desktop/src/features/domain-model/components/VariableTable.tsx`
 - `apps/desktop/aegis-desktop/src/features/domain-model/components/DomainEditDrawer.tsx`
 - `apps/desktop/aegis-desktop/src/features/domain-model/components/VariableEditDrawer.tsx`
 - `apps/desktop/aegis-desktop/src/features/domain-model/components/DeleteVariableDialog.tsx`
+- `apps/desktop/aegis-desktop/src/test/features/domain-model/sdtm-domain-detail.test.tsx`
+- `apps/desktop/aegis-desktop/src/test/features/domain-model/domain-header-table.test.tsx`
+- `apps/desktop/aegis-desktop/src/test/features/domain-model/variable-table.test.tsx`
+- `apps/desktop/aegis-desktop/src/test/features/domain-model/domain-edit-drawer.test.tsx`
+- `apps/desktop/aegis-desktop/src/test/features/domain-model/variable-edit-drawer.test.tsx`
+- `apps/desktop/aegis-desktop/src/test/features/domain-model/delete-variable-dialog.test.tsx`
+- `apps/desktop/aegis-desktop/src/test/features/domain-model/data/list.test.tsx`
 - `apps/desktop/aegis-desktop/src/routes/_authed/_layout/domain-model/sdtm/$domainId.tsx`
 - `apps/desktop/aegis-desktop/src-tauri/src/http/domain_model/variable.rs`
 - `apps/desktop/aegis-desktop/src-tauri/src/commands/domain_model/variable.rs`
