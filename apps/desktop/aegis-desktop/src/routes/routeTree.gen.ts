@@ -20,7 +20,6 @@ import { Route as AuthedLayoutMetadataRouteImport } from './_authed/_layout/meta
 import { Route as AuthedLayoutProjectsRouteImport } from './_authed/_layout/projects'
 import { Route as AuthedLayoutSettingsRouteImport } from './_authed/_layout/settings'
 import { Route as AuthedProjectProjectCodeRouteRouteImport } from './_authed/project/$projectCode/route'
-import { Route as AuthedLayoutDomainModelSdtmRouteImport } from './_authed/_layout/domain-model/sdtm'
 import { Route as AuthedLayoutManagementUsersRouteImport } from './_authed/_layout/management/users'
 import { Route as AuthedLayoutTerminologyAdamRouteImport } from './_authed/_layout/terminology/adam'
 import { Route as AuthedLayoutTerminologyImportRouteImport } from './_authed/_layout/terminology/import'
@@ -28,6 +27,8 @@ import { Route as AuthedLayoutTerminologySdtmRouteImport } from './_authed/_layo
 import { Route as AuthedProjectProjectCodeIndexRouteImport } from './_authed/project/$projectCode/index'
 import { Route as AuthedProjectProjectCodeConfigurationRouteImport } from './_authed/project/$projectCode/configuration'
 import { Route as AuthedProjectProjectCodeDashboardRouteImport } from './_authed/project/$projectCode/dashboard'
+import { Route as AuthedLayoutDomainModelSdtmIndexRouteImport } from './_authed/_layout/domain-model/sdtm/index'
+import { Route as AuthedLayoutDomainModelSdtmDomainIdRouteImport } from './_authed/_layout/domain-model/sdtm/$domainId'
 import { Route as AuthedLayoutTerminologyKindSearchRouteImport } from './_authed/_layout/terminology/$kind/search'
 import { Route as AuthedLayoutTerminologyKindCodelistsCodelistIdRouteImport } from './_authed/_layout/terminology/$kind/codelists/$codelistId'
 
@@ -86,12 +87,6 @@ const AuthedProjectProjectCodeRouteRoute =
     path: '/project/$projectCode',
     getParentRoute: () => AuthedRouteRoute,
   } as any)
-const AuthedLayoutDomainModelSdtmRoute =
-  AuthedLayoutDomainModelSdtmRouteImport.update({
-    id: '/domain-model/sdtm',
-    path: '/domain-model/sdtm',
-    getParentRoute: () => AuthedLayoutRouteRoute,
-  } as any)
 const AuthedLayoutManagementUsersRoute =
   AuthedLayoutManagementUsersRouteImport.update({
     id: '/users',
@@ -134,6 +129,18 @@ const AuthedProjectProjectCodeDashboardRoute =
     path: '/dashboard',
     getParentRoute: () => AuthedProjectProjectCodeRouteRoute,
   } as any)
+const AuthedLayoutDomainModelSdtmIndexRoute =
+  AuthedLayoutDomainModelSdtmIndexRouteImport.update({
+    id: '/domain-model/sdtm/',
+    path: '/domain-model/sdtm/',
+    getParentRoute: () => AuthedLayoutRouteRoute,
+  } as any)
+const AuthedLayoutDomainModelSdtmDomainIdRoute =
+  AuthedLayoutDomainModelSdtmDomainIdRouteImport.update({
+    id: '/domain-model/sdtm/$domainId',
+    path: '/domain-model/sdtm/$domainId',
+    getParentRoute: () => AuthedLayoutRouteRoute,
+  } as any)
 const AuthedLayoutTerminologyKindSearchRoute =
   AuthedLayoutTerminologyKindSearchRouteImport.update({
     id: '/terminology/$kind/search',
@@ -157,7 +164,6 @@ export interface FileRoutesByFullPath {
   '/metadata': typeof AuthedLayoutMetadataRoute
   '/projects': typeof AuthedLayoutProjectsRoute
   '/settings': typeof AuthedLayoutSettingsRoute
-  '/domain-model/sdtm': typeof AuthedLayoutDomainModelSdtmRoute
   '/management/users': typeof AuthedLayoutManagementUsersRoute
   '/terminology/adam': typeof AuthedLayoutTerminologyAdamRoute
   '/terminology/import': typeof AuthedLayoutTerminologyImportRoute
@@ -165,7 +171,9 @@ export interface FileRoutesByFullPath {
   '/project/$projectCode/configuration': typeof AuthedProjectProjectCodeConfigurationRoute
   '/project/$projectCode/dashboard': typeof AuthedProjectProjectCodeDashboardRoute
   '/project/$projectCode/': typeof AuthedProjectProjectCodeIndexRoute
+  '/domain-model/sdtm/$domainId': typeof AuthedLayoutDomainModelSdtmDomainIdRoute
   '/terminology/$kind/search': typeof AuthedLayoutTerminologyKindSearchRoute
+  '/domain-model/sdtm/': typeof AuthedLayoutDomainModelSdtmIndexRoute
   '/terminology/$kind/codelists/$codelistId': typeof AuthedLayoutTerminologyKindCodelistsCodelistIdRoute
 }
 export interface FileRoutesByTo {
@@ -177,7 +185,6 @@ export interface FileRoutesByTo {
   '/metadata': typeof AuthedLayoutMetadataRoute
   '/projects': typeof AuthedLayoutProjectsRoute
   '/settings': typeof AuthedLayoutSettingsRoute
-  '/domain-model/sdtm': typeof AuthedLayoutDomainModelSdtmRoute
   '/management/users': typeof AuthedLayoutManagementUsersRoute
   '/terminology/adam': typeof AuthedLayoutTerminologyAdamRoute
   '/terminology/import': typeof AuthedLayoutTerminologyImportRoute
@@ -185,7 +192,9 @@ export interface FileRoutesByTo {
   '/project/$projectCode/configuration': typeof AuthedProjectProjectCodeConfigurationRoute
   '/project/$projectCode/dashboard': typeof AuthedProjectProjectCodeDashboardRoute
   '/project/$projectCode': typeof AuthedProjectProjectCodeIndexRoute
+  '/domain-model/sdtm/$domainId': typeof AuthedLayoutDomainModelSdtmDomainIdRoute
   '/terminology/$kind/search': typeof AuthedLayoutTerminologyKindSearchRoute
+  '/domain-model/sdtm': typeof AuthedLayoutDomainModelSdtmIndexRoute
   '/terminology/$kind/codelists/$codelistId': typeof AuthedLayoutTerminologyKindCodelistsCodelistIdRoute
 }
 export interface FileRoutesById {
@@ -201,7 +210,6 @@ export interface FileRoutesById {
   '/_authed/_layout/projects': typeof AuthedLayoutProjectsRoute
   '/_authed/_layout/settings': typeof AuthedLayoutSettingsRoute
   '/_authed/_layout/': typeof AuthedLayoutIndexRoute
-  '/_authed/_layout/domain-model/sdtm': typeof AuthedLayoutDomainModelSdtmRoute
   '/_authed/_layout/management/users': typeof AuthedLayoutManagementUsersRoute
   '/_authed/_layout/terminology/adam': typeof AuthedLayoutTerminologyAdamRoute
   '/_authed/_layout/terminology/import': typeof AuthedLayoutTerminologyImportRoute
@@ -209,7 +217,9 @@ export interface FileRoutesById {
   '/_authed/project/$projectCode/configuration': typeof AuthedProjectProjectCodeConfigurationRoute
   '/_authed/project/$projectCode/dashboard': typeof AuthedProjectProjectCodeDashboardRoute
   '/_authed/project/$projectCode/': typeof AuthedProjectProjectCodeIndexRoute
+  '/_authed/_layout/domain-model/sdtm/$domainId': typeof AuthedLayoutDomainModelSdtmDomainIdRoute
   '/_authed/_layout/terminology/$kind/search': typeof AuthedLayoutTerminologyKindSearchRoute
+  '/_authed/_layout/domain-model/sdtm/': typeof AuthedLayoutDomainModelSdtmIndexRoute
   '/_authed/_layout/terminology/$kind/codelists/$codelistId': typeof AuthedLayoutTerminologyKindCodelistsCodelistIdRoute
 }
 export interface FileRouteTypes {
@@ -224,7 +234,6 @@ export interface FileRouteTypes {
     | '/metadata'
     | '/projects'
     | '/settings'
-    | '/domain-model/sdtm'
     | '/management/users'
     | '/terminology/adam'
     | '/terminology/import'
@@ -232,7 +241,9 @@ export interface FileRouteTypes {
     | '/project/$projectCode/configuration'
     | '/project/$projectCode/dashboard'
     | '/project/$projectCode/'
+    | '/domain-model/sdtm/$domainId'
     | '/terminology/$kind/search'
+    | '/domain-model/sdtm/'
     | '/terminology/$kind/codelists/$codelistId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -244,7 +255,6 @@ export interface FileRouteTypes {
     | '/metadata'
     | '/projects'
     | '/settings'
-    | '/domain-model/sdtm'
     | '/management/users'
     | '/terminology/adam'
     | '/terminology/import'
@@ -252,7 +262,9 @@ export interface FileRouteTypes {
     | '/project/$projectCode/configuration'
     | '/project/$projectCode/dashboard'
     | '/project/$projectCode'
+    | '/domain-model/sdtm/$domainId'
     | '/terminology/$kind/search'
+    | '/domain-model/sdtm'
     | '/terminology/$kind/codelists/$codelistId'
   id:
     | '__root__'
@@ -267,7 +279,6 @@ export interface FileRouteTypes {
     | '/_authed/_layout/projects'
     | '/_authed/_layout/settings'
     | '/_authed/_layout/'
-    | '/_authed/_layout/domain-model/sdtm'
     | '/_authed/_layout/management/users'
     | '/_authed/_layout/terminology/adam'
     | '/_authed/_layout/terminology/import'
@@ -275,7 +286,9 @@ export interface FileRouteTypes {
     | '/_authed/project/$projectCode/configuration'
     | '/_authed/project/$projectCode/dashboard'
     | '/_authed/project/$projectCode/'
+    | '/_authed/_layout/domain-model/sdtm/$domainId'
     | '/_authed/_layout/terminology/$kind/search'
+    | '/_authed/_layout/domain-model/sdtm/'
     | '/_authed/_layout/terminology/$kind/codelists/$codelistId'
   fileRoutesById: FileRoutesById
 }
@@ -365,13 +378,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProjectProjectCodeRouteRouteImport
       parentRoute: typeof AuthedRouteRoute
     }
-    '/_authed/_layout/domain-model/sdtm': {
-      id: '/_authed/_layout/domain-model/sdtm'
-      path: '/domain-model/sdtm'
-      fullPath: '/domain-model/sdtm'
-      preLoaderRoute: typeof AuthedLayoutDomainModelSdtmRouteImport
-      parentRoute: typeof AuthedLayoutRouteRoute
-    }
     '/_authed/_layout/management/users': {
       id: '/_authed/_layout/management/users'
       path: '/users'
@@ -421,6 +427,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProjectProjectCodeDashboardRouteImport
       parentRoute: typeof AuthedProjectProjectCodeRouteRoute
     }
+    '/_authed/_layout/domain-model/sdtm/': {
+      id: '/_authed/_layout/domain-model/sdtm/'
+      path: '/domain-model/sdtm'
+      fullPath: '/domain-model/sdtm/'
+      preLoaderRoute: typeof AuthedLayoutDomainModelSdtmIndexRouteImport
+      parentRoute: typeof AuthedLayoutRouteRoute
+    }
+    '/_authed/_layout/domain-model/sdtm/$domainId': {
+      id: '/_authed/_layout/domain-model/sdtm/$domainId'
+      path: '/domain-model/sdtm/$domainId'
+      fullPath: '/domain-model/sdtm/$domainId'
+      preLoaderRoute: typeof AuthedLayoutDomainModelSdtmDomainIdRouteImport
+      parentRoute: typeof AuthedLayoutRouteRoute
+    }
     '/_authed/_layout/terminology/$kind/search': {
       id: '/_authed/_layout/terminology/$kind/search'
       path: '/terminology/$kind/search'
@@ -458,11 +478,12 @@ interface AuthedLayoutRouteRouteChildren {
   AuthedLayoutProjectsRoute: typeof AuthedLayoutProjectsRoute
   AuthedLayoutSettingsRoute: typeof AuthedLayoutSettingsRoute
   AuthedLayoutIndexRoute: typeof AuthedLayoutIndexRoute
-  AuthedLayoutDomainModelSdtmRoute: typeof AuthedLayoutDomainModelSdtmRoute
   AuthedLayoutTerminologyAdamRoute: typeof AuthedLayoutTerminologyAdamRoute
   AuthedLayoutTerminologyImportRoute: typeof AuthedLayoutTerminologyImportRoute
   AuthedLayoutTerminologySdtmRoute: typeof AuthedLayoutTerminologySdtmRoute
+  AuthedLayoutDomainModelSdtmDomainIdRoute: typeof AuthedLayoutDomainModelSdtmDomainIdRoute
   AuthedLayoutTerminologyKindSearchRoute: typeof AuthedLayoutTerminologyKindSearchRoute
+  AuthedLayoutDomainModelSdtmIndexRoute: typeof AuthedLayoutDomainModelSdtmIndexRoute
   AuthedLayoutTerminologyKindCodelistsCodelistIdRoute: typeof AuthedLayoutTerminologyKindCodelistsCodelistIdRoute
 }
 
@@ -473,12 +494,14 @@ const AuthedLayoutRouteRouteChildren: AuthedLayoutRouteRouteChildren = {
   AuthedLayoutProjectsRoute: AuthedLayoutProjectsRoute,
   AuthedLayoutSettingsRoute: AuthedLayoutSettingsRoute,
   AuthedLayoutIndexRoute: AuthedLayoutIndexRoute,
-  AuthedLayoutDomainModelSdtmRoute: AuthedLayoutDomainModelSdtmRoute,
   AuthedLayoutTerminologyAdamRoute: AuthedLayoutTerminologyAdamRoute,
   AuthedLayoutTerminologyImportRoute: AuthedLayoutTerminologyImportRoute,
   AuthedLayoutTerminologySdtmRoute: AuthedLayoutTerminologySdtmRoute,
+  AuthedLayoutDomainModelSdtmDomainIdRoute:
+    AuthedLayoutDomainModelSdtmDomainIdRoute,
   AuthedLayoutTerminologyKindSearchRoute:
     AuthedLayoutTerminologyKindSearchRoute,
+  AuthedLayoutDomainModelSdtmIndexRoute: AuthedLayoutDomainModelSdtmIndexRoute,
   AuthedLayoutTerminologyKindCodelistsCodelistIdRoute:
     AuthedLayoutTerminologyKindCodelistsCodelistIdRoute,
 }

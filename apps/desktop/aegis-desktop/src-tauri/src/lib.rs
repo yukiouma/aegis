@@ -70,6 +70,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::domain_model::domain::get_sdtm_domain_by_id,
             commands::domain_model::domain::update_sdtm_domain,
             commands::domain_model::domain::delete_sdtm_domain,
+            commands::domain_model::variable::create_sdtm_variable,
+            commands::domain_model::variable::list_sdtm_variables_by_domain,
+            commands::domain_model::variable::get_sdtm_variable_by_id,
+            commands::domain_model::variable::update_sdtm_variable,
+            commands::domain_model::variable::delete_sdtm_variable,
             // health
             commands::healthz::healthz,
             // legacy greet (kept for the existing test)

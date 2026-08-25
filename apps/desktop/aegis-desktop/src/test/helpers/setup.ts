@@ -21,3 +21,29 @@ class NoopIntersectionObserver implements IntersectionObserver {
 }
 (globalThis as unknown as { IntersectionObserver: typeof IntersectionObserver }).IntersectionObserver =
   NoopIntersectionObserver;
+
+// jsdom does not implement ResizeObserver. @dnd-kit/react requires it at
+// module-load time. Shim with a no-op so DragDropProvider can mount in tests.
+class NoopResizeObserver implements ResizeObserver {
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+}
+(globalThis as unknown as { ResizeObserver: typeof ResizeObserver }).ResizeObserver =
+  NoopResizeObserver;
+
+// jsdom does not implement PointerEvent. @dnd-kit/dom checks
+// `event instanceof PointerEvent` when a click happens on a draggable
+// element; without a global `PointerEvent` constructor that `instanceof`
+// throws. A no-op class is enough — dnd-kit only checks the type.
+class NoopPointerEvent extends MouseEvent {
+  readonly pointerId: number;
+  readonly pointerType: string;
+  constructor(type: string, params?: PointerEventInit) {
+    super(type, params);
+    this.pointerId = params?.pointerId ?? 0;
+    this.pointerType = params?.pointerType ?? "";
+  }
+}
+(globalThis as unknown as { PointerEvent: typeof PointerEvent }).PointerEvent =
+  NoopPointerEvent as unknown as typeof PointerEvent;

@@ -100,4 +100,19 @@ describe("DomainTable", () => {
     );
     expect(screen.getByText("No matches.")).toBeInTheDocument();
   });
+
+  it("keeps the open-detail button disabled when onNavigate is not provided", () => {
+    renderTable();
+    const btn = screen.getByRole("button", { name: /open-detail/i });
+    expect(btn).toBeDisabled();
+  });
+
+  it("enables the open-detail button and calls onNavigate when provided", async () => {
+    const onNavigate = vi.fn();
+    renderTable({ onNavigate });
+    const btn = screen.getByRole("button", { name: /open-detail/i });
+    expect(btn).not.toBeDisabled();
+    await userEvent.click(btn);
+    expect(onNavigate).toHaveBeenCalledWith(row);
+  });
 });

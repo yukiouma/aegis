@@ -171,6 +171,13 @@ export function SdtmDomainList() {
             selectedLang={selectedLang}
             onRetry={() => domainsQuery.refetch()}
             onDelete={(row) => setConfirmDelete(row)}
+            onNavigate={(row) =>
+              navigate({
+                to: "/domain-model/sdtm/$domainId",
+                params: { domainId: String(row.id) },
+                search: { lang: selectedLang ?? undefined },
+              })
+            }
             emptyMessage={
               trimmedFragment
                 ? t("domainModel.sdtm.noMatches")

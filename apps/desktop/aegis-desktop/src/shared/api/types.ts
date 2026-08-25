@@ -320,3 +320,66 @@ export interface SdtmDomainListResponse {
 export interface SdtmVersionListResponse {
   versions: SdtmVersionView[];
 }
+
+// SDTM variables
+
+export type SdtmVariableType = "Numeric" | "Character";
+export type SdtmVariableCore = "Req" | "Exp" | "Perm" | "Supp";
+export type SdtmRole =
+  | "Identifier"
+  | "Topic"
+  | "Timing"
+  | "Record Qualifier"
+  | "Synonym Qualifier"
+  | "Variable Qualifier"
+  | "Grouping Qualifier"
+  | "Rule";
+
+export interface SdtmVariableDescriptionDetail {
+  label: string;
+}
+export interface SdtmVariableDescription {
+  lang: string;
+  details: SdtmVariableDescriptionDetail;
+}
+export interface SdtmVariableView {
+  id: number;
+  domainId: number;
+  name: string;
+  variableControlled?: string;
+  variableType: SdtmVariableType;
+  variableCore: SdtmVariableCore;
+  variableRole?: SdtmRole;
+  variableSequence: number;
+  descriptions: SdtmVariableDescription[];
+  createdAt: string;
+  updatedAt: string;
+}
+export interface SdtmVariableListResponse {
+  variables: SdtmVariableView[];
+}
+export interface CreateSdtmVariableInput {
+  domainId: number;
+  name: string;
+  variableControlled?: string;
+  variableType: SdtmVariableType;
+  variableCore: SdtmVariableCore;
+  variableRole?: SdtmRole;
+  variableSequence: number;
+  descriptions: SdtmVariableDescription[];
+}
+// Three-state semantics: absent = no change, null = clear, value = replace.
+export interface UpdateSdtmVariableInput {
+  name?: string;
+  variableControlled?: string | null;
+  variableType?: SdtmVariableType;
+  variableCore?: SdtmVariableCore;
+  variableRole?: SdtmRole | null;
+  variableSequence?: number;
+  descriptions?: SdtmVariableDescription[];
+}
+export interface UpdateSdtmDomainInput {
+  name?: string;
+  category?: DomainCategory;
+  descriptions?: SdtmDomainDescription[];
+}
