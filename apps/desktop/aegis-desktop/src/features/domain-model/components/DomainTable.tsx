@@ -14,7 +14,7 @@ import {
   Typography,
 } from "@aegis/ui/mui";
 import {
-  DeleteOutlined as DeleteOutlinedIcon,
+  Delete as DeleteIcon,
   OpenInNew as OpenInNewIcon,
 } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
@@ -118,9 +118,10 @@ export function DomainTable({
                       <IconButton
                         size="small"
                         aria-label="delete-domain"
+                        color="error"
                         onClick={() => onDelete(row)}
                       >
-                        <DeleteOutlinedIcon fontSize="small" />
+                        <DeleteIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                   )}

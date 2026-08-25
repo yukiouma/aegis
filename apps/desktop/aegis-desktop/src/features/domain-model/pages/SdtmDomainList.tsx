@@ -132,7 +132,6 @@ export function SdtmDomainList() {
 
   return (
     <Box sx={{ p: 4, display: "flex", flexDirection: "column", gap: 2 }}>
-      <Typography variant="h4">{t("domainModel.sdtm.heading")}</Typography>
 
       {noVersions ? (
         <Typography color="text.secondary">

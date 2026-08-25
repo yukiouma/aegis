@@ -14,7 +14,7 @@ export function DomainFilterBar({ query, onQueryChange }: DomainFilterBarProps) 
       label={t("domainModel.sdtm.filter.placeholder")}
       value={query}
       onChange={(e) => onQueryChange(e.target.value)}
-      sx={{ minWidth: 280 }}
+      sx={{ flex: 1 }}
     />
   );
 }
