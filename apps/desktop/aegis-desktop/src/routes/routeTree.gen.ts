@@ -20,6 +20,7 @@ import { Route as AuthedLayoutMetadataRouteImport } from './_authed/_layout/meta
 import { Route as AuthedLayoutProjectsRouteImport } from './_authed/_layout/projects'
 import { Route as AuthedLayoutSettingsRouteImport } from './_authed/_layout/settings'
 import { Route as AuthedProjectProjectCodeRouteRouteImport } from './_authed/project/$projectCode/route'
+import { Route as AuthedLayoutDomainModelSdtmRouteImport } from './_authed/_layout/domain-model/sdtm'
 import { Route as AuthedLayoutManagementUsersRouteImport } from './_authed/_layout/management/users'
 import { Route as AuthedLayoutTerminologyAdamRouteImport } from './_authed/_layout/terminology/adam'
 import { Route as AuthedLayoutTerminologyImportRouteImport } from './_authed/_layout/terminology/import'
@@ -84,6 +85,12 @@ const AuthedProjectProjectCodeRouteRoute =
     id: '/project/$projectCode',
     path: '/project/$projectCode',
     getParentRoute: () => AuthedRouteRoute,
+  } as any)
+const AuthedLayoutDomainModelSdtmRoute =
+  AuthedLayoutDomainModelSdtmRouteImport.update({
+    id: '/domain-model/sdtm',
+    path: '/domain-model/sdtm',
+    getParentRoute: () => AuthedLayoutRouteRoute,
   } as any)
 const AuthedLayoutManagementUsersRoute =
   AuthedLayoutManagementUsersRouteImport.update({
@@ -150,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/metadata': typeof AuthedLayoutMetadataRoute
   '/projects': typeof AuthedLayoutProjectsRoute
   '/settings': typeof AuthedLayoutSettingsRoute
+  '/domain-model/sdtm': typeof AuthedLayoutDomainModelSdtmRoute
   '/management/users': typeof AuthedLayoutManagementUsersRoute
   '/terminology/adam': typeof AuthedLayoutTerminologyAdamRoute
   '/terminology/import': typeof AuthedLayoutTerminologyImportRoute
@@ -169,6 +177,7 @@ export interface FileRoutesByTo {
   '/metadata': typeof AuthedLayoutMetadataRoute
   '/projects': typeof AuthedLayoutProjectsRoute
   '/settings': typeof AuthedLayoutSettingsRoute
+  '/domain-model/sdtm': typeof AuthedLayoutDomainModelSdtmRoute
   '/management/users': typeof AuthedLayoutManagementUsersRoute
   '/terminology/adam': typeof AuthedLayoutTerminologyAdamRoute
   '/terminology/import': typeof AuthedLayoutTerminologyImportRoute
@@ -192,6 +201,7 @@ export interface FileRoutesById {
   '/_authed/_layout/projects': typeof AuthedLayoutProjectsRoute
   '/_authed/_layout/settings': typeof AuthedLayoutSettingsRoute
   '/_authed/_layout/': typeof AuthedLayoutIndexRoute
+  '/_authed/_layout/domain-model/sdtm': typeof AuthedLayoutDomainModelSdtmRoute
   '/_authed/_layout/management/users': typeof AuthedLayoutManagementUsersRoute
   '/_authed/_layout/terminology/adam': typeof AuthedLayoutTerminologyAdamRoute
   '/_authed/_layout/terminology/import': typeof AuthedLayoutTerminologyImportRoute
@@ -214,6 +224,7 @@ export interface FileRouteTypes {
     | '/metadata'
     | '/projects'
     | '/settings'
+    | '/domain-model/sdtm'
     | '/management/users'
     | '/terminology/adam'
     | '/terminology/import'
@@ -233,6 +244,7 @@ export interface FileRouteTypes {
     | '/metadata'
     | '/projects'
     | '/settings'
+    | '/domain-model/sdtm'
     | '/management/users'
     | '/terminology/adam'
     | '/terminology/import'
@@ -255,6 +267,7 @@ export interface FileRouteTypes {
     | '/_authed/_layout/projects'
     | '/_authed/_layout/settings'
     | '/_authed/_layout/'
+    | '/_authed/_layout/domain-model/sdtm'
     | '/_authed/_layout/management/users'
     | '/_authed/_layout/terminology/adam'
     | '/_authed/_layout/terminology/import'
@@ -352,6 +365,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedProjectProjectCodeRouteRouteImport
       parentRoute: typeof AuthedRouteRoute
     }
+    '/_authed/_layout/domain-model/sdtm': {
+      id: '/_authed/_layout/domain-model/sdtm'
+      path: '/domain-model/sdtm'
+      fullPath: '/domain-model/sdtm'
+      preLoaderRoute: typeof AuthedLayoutDomainModelSdtmRouteImport
+      parentRoute: typeof AuthedLayoutRouteRoute
+    }
     '/_authed/_layout/management/users': {
       id: '/_authed/_layout/management/users'
       path: '/users'
@@ -438,6 +458,7 @@ interface AuthedLayoutRouteRouteChildren {
   AuthedLayoutProjectsRoute: typeof AuthedLayoutProjectsRoute
   AuthedLayoutSettingsRoute: typeof AuthedLayoutSettingsRoute
   AuthedLayoutIndexRoute: typeof AuthedLayoutIndexRoute
+  AuthedLayoutDomainModelSdtmRoute: typeof AuthedLayoutDomainModelSdtmRoute
   AuthedLayoutTerminologyAdamRoute: typeof AuthedLayoutTerminologyAdamRoute
   AuthedLayoutTerminologyImportRoute: typeof AuthedLayoutTerminologyImportRoute
   AuthedLayoutTerminologySdtmRoute: typeof AuthedLayoutTerminologySdtmRoute
@@ -452,6 +473,7 @@ const AuthedLayoutRouteRouteChildren: AuthedLayoutRouteRouteChildren = {
   AuthedLayoutProjectsRoute: AuthedLayoutProjectsRoute,
   AuthedLayoutSettingsRoute: AuthedLayoutSettingsRoute,
   AuthedLayoutIndexRoute: AuthedLayoutIndexRoute,
+  AuthedLayoutDomainModelSdtmRoute: AuthedLayoutDomainModelSdtmRoute,
   AuthedLayoutTerminologyAdamRoute: AuthedLayoutTerminologyAdamRoute,
   AuthedLayoutTerminologyImportRoute: AuthedLayoutTerminologyImportRoute,
   AuthedLayoutTerminologySdtmRoute: AuthedLayoutTerminologySdtmRoute,

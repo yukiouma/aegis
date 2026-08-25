@@ -27,6 +27,7 @@ interface BlockSpec {
   kind: Kind;
   blockKey: "metadata.block.sdtm" | "metadata.block.adam";
   terminologyTarget: "/terminology/sdtm" | "/terminology/adam";
+  domainModelTarget?: string;
   terminologyIcon: typeof StorageIcon;
 }
 
@@ -35,6 +36,7 @@ const BLOCKS: BlockSpec[] = [
     kind: "sdtm",
     blockKey: "metadata.block.sdtm",
     terminologyTarget: "/terminology/sdtm",
+    domainModelTarget: "/domain-model/sdtm",
     terminologyIcon: StorageIcon,
   },
   {
@@ -62,7 +64,7 @@ export function MetadataPage() {
                 <Tooltip title={t("metadata.disabled.tooltip")}>
                   {/* span wrapper so Tooltip can attach to a disabled button */}
                   <span style={{ width: "100%" }}>
-                    <ListItemButton disabled>
+                    <ListItemButton disabled={block.domainModelTarget === undefined} onClick={() => navigate({ to: block.domainModelTarget })}>
                       <ListItemIcon>
                         <ArchitectureIcon />
                       </ListItemIcon>

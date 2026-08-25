@@ -29,6 +29,27 @@ pub enum TerminologyKind {
     Adam,
 }
 
+/// SDTM domain category. Wire form is the human-friendly string
+/// (`"Special Purpose"`, `"Trial Design"`, …) matching the server's
+/// `#[serde(rename = "...")]` attributes on `apis::domain_model::DomainCategory`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum DomainCategory {
+    #[serde(rename = "Special Purpose")]
+    SpecialPurpose,
+    #[serde(rename = "Interventions")]
+    Interventions,
+    #[serde(rename = "Events")]
+    Events,
+    #[serde(rename = "Findings")]
+    Findings,
+    #[serde(rename = "Trial Design")]
+    TrialDesign,
+    #[serde(rename = "Relationships")]
+    Relationships,
+    #[serde(rename = "Study Reference")]
+    StudyReference,
+}
+
 /// The single error type every `#[tauri::command]` returns to the frontend.
 /// Serialized as a tagged object (`{"kind": "http", ...}` etc.) so the
 /// frontend can discriminate by `kind`.
@@ -149,6 +170,27 @@ mod tests {
         assert_eq!(k, TerminologyKind::Sdtm);
         let k: TerminologyKind = serde_json::from_str("\"adam\"").unwrap();
         assert_eq!(k, TerminologyKind::Adam);
+    }
+
+    #[test]
+    fn domain_category_serializes_human_strings() {
+        use super::DomainCategory::*;
+        assert_eq!(serde_json::to_string(&SpecialPurpose).unwrap(), "\"Special Purpose\"");
+        assert_eq!(serde_json::to_string(&Interventions).unwrap(), "\"Interventions\"");
+        assert_eq!(serde_json::to_string(&Events).unwrap(), "\"Events\"");
+        assert_eq!(serde_json::to_string(&Findings).unwrap(), "\"Findings\"");
+        assert_eq!(serde_json::to_string(&TrialDesign).unwrap(), "\"Trial Design\"");
+        assert_eq!(serde_json::to_string(&Relationships).unwrap(), "\"Relationships\"");
+        assert_eq!(serde_json::to_string(&StudyReference).unwrap(), "\"Study Reference\"");
+    }
+
+    #[test]
+    fn domain_category_deserializes_human_strings() {
+        use super::DomainCategory::*;
+        let c: DomainCategory = serde_json::from_str("\"Special Purpose\"").unwrap();
+        assert_eq!(c, SpecialPurpose);
+        let c: DomainCategory = serde_json::from_str("\"Study Reference\"").unwrap();
+        assert_eq!(c, StudyReference);
     }
 
     #[test]
