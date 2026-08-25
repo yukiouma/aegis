@@ -274,3 +274,49 @@ export interface BatchCreateCodeItemsResponse {
   codelistId: number;
   versionId: number;
 }
+
+// Domain model
+
+export type DomainCategory =
+  | "Special Purpose"
+  | "Interventions"
+  | "Events"
+  | "Findings"
+  | "Trial Design"
+  | "Relationships"
+  | "Study Reference";
+
+export interface SdtmDomainDescriptionDetail {
+  description: string;
+  structure: string;
+}
+
+export interface SdtmDomainDescription {
+  lang: string;
+  details: SdtmDomainDescriptionDetail;
+}
+
+export interface SdtmDomainView {
+  id: number;
+  versionId: number;
+  name: string;
+  category: DomainCategory;
+  descriptions: SdtmDomainDescription[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SdtmVersionView {
+  id: number;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SdtmDomainListResponse {
+  domains: SdtmDomainView[];
+}
+
+export interface SdtmVersionListResponse {
+  versions: SdtmVersionView[];
+}
