@@ -35,4 +35,9 @@ export const queryKeys = {
     codeItemsGlobal: (versionId: number, fragment: string) =>
       ["terminology", "codeItemsGlobal", versionId, fragment] as const,
   },
+  domainModel: {
+    sdtmVersions: () => ["domainModel", "sdtmVersions"] as const,
+    sdtmDomains: (versionId: number) =>
+      ["domainModel", "sdtmDomains", versionId] as const,
+  },
 } as const;
