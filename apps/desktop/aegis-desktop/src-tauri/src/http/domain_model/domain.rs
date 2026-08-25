@@ -63,14 +63,18 @@ pub async fn create(
     c: &HttpClient,
     body: CreateSdtmDomainRequest,
 ) -> Result<SdtmDomainViewResponse, ApiError> {
-    c.request(reqwest::Method::POST, "/api/domain-model/domains", Some(&body))
-        .await
+    c.request(
+        reqwest::Method::POST,
+        "/api/domain-model/domains",
+        Some(&body),
+    )
+    .await
 }
 
 pub async fn list_by_version(
     c: &HttpClient,
     version_id: i64,
-) -> Result<Vec<SdtmDomainViewResponse>, ApiError> {
+) -> Result<SdtmDomainListResponse, ApiError> {
     let resp: SdtmDomainListResponse = c
         .request(
             reqwest::Method::GET,
@@ -78,13 +82,10 @@ pub async fn list_by_version(
             None::<&()>,
         )
         .await?;
-    Ok(resp.domains)
+    Ok(resp)
 }
 
-pub async fn get_by_id(
-    c: &HttpClient,
-    id: i64,
-) -> Result<SdtmDomainViewResponse, ApiError> {
+pub async fn get_by_id(c: &HttpClient, id: i64) -> Result<SdtmDomainViewResponse, ApiError> {
     c.request(
         reqwest::Method::GET,
         &format!("/api/domain-model/domains/{id}"),
@@ -153,17 +154,17 @@ mod tests {
             .mount(&server)
             .await;
         let domains = list_by_version(&client(&server), 5).await.unwrap();
-        assert_eq!(domains.len(), 1);
-        assert_eq!(domains[0].name, "AE");
-        assert_eq!(domains[0].category, DomainCategory::Events);
-        assert_eq!(domains[0].descriptions.len(), 1);
-        assert_eq!(domains[0].descriptions[0].lang, "en");
+        assert_eq!(domains.domains.len(), 1);
+        assert_eq!(domains.domains[0].name, "AE");
+        assert_eq!(domains.domains[0].category, DomainCategory::Events);
+        assert_eq!(domains.domains[0].descriptions.len(), 1);
+        assert_eq!(domains.domains[0].descriptions[0].lang, "en");
         assert_eq!(
-            domains[0].descriptions[0].details.description,
+            domains.domains[0].descriptions[0].details.description,
             "Adverse Events"
         );
         assert_eq!(
-            domains[0].created_at,
+            domains.domains[0].created_at,
             Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()
         );
     }

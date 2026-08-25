@@ -3,10 +3,11 @@
 use tauri::State;
 
 use crate::http::client::HttpClient;
-use crate::http::dto::ApiError;
 use crate::http::domain_model::domain::{
-    self, CreateSdtmDomainRequest, SdtmDomainViewResponse, UpdateSdtmDomainRequest,
+    self, CreateSdtmDomainRequest, SdtmDomainListResponse, SdtmDomainViewResponse,
+    UpdateSdtmDomainRequest,
 };
+use crate::http::dto::ApiError;
 
 #[tauri::command]
 pub async fn create_sdtm_domain(
@@ -20,7 +21,7 @@ pub async fn create_sdtm_domain(
 pub async fn list_sdtm_domains_by_version(
     client: State<'_, HttpClient>,
     version_id: i64,
-) -> Result<Vec<SdtmDomainViewResponse>, ApiError> {
+) -> Result<SdtmDomainListResponse, ApiError> {
     domain::list_by_version(&client, version_id).await
 }
 
@@ -42,9 +43,6 @@ pub async fn update_sdtm_domain(
 }
 
 #[tauri::command]
-pub async fn delete_sdtm_domain(
-    client: State<'_, HttpClient>,
-    id: i64,
-) -> Result<(), ApiError> {
+pub async fn delete_sdtm_domain(client: State<'_, HttpClient>, id: i64) -> Result<(), ApiError> {
     domain::delete(&client, id).await
 }
