@@ -259,6 +259,7 @@ export function SdtmDomainDetail() {
         row={variableDrawer?.mode === "edit" ? variableDrawer.row : undefined}
         domainId={domainId}
         initialSequence={initialSequence}
+        availableLanguages={availableLanguages}
         onClose={() => setVariableDrawer(null)}
         onCreate={(input: CreateSdtmVariableInput) =>
           createVariable.mutate(input, {
