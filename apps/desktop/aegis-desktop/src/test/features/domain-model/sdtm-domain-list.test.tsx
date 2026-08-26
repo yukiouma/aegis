@@ -79,7 +79,33 @@ beforeEach(() => {
       updatedAt: "2026-01-01T00:00:00Z",
     }),
     list_sdtm_versions: () => ({ versions }),
-    list_sdtm_domains_by_version: () => ({ domains }),
+    list_sdtm_domains_by_version: () => ({
+      domains: [
+        ...domains,
+        {
+          id: 99,
+          versionId: 1,
+          name: "ZZ",
+          category: "Findings",
+          descriptions: [
+            { lang: "en", details: { description: "ZZ created", structure: "One per ZZ" } },
+          ],
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    }),
+    create_sdtm_domain: () => ({
+      id: 99,
+      versionId: 1,
+      name: "ZZ",
+      category: "Findings",
+      descriptions: [
+        { lang: "en", details: { description: "ZZ created", structure: "One per ZZ" } },
+      ],
+      createdAt: "",
+      updatedAt: "",
+    }),
     delete_sdtm_domain: () => undefined,
   });
 });
@@ -146,5 +172,27 @@ describe("SdtmDomainList", () => {
     expect(
       await screen.findByText(/No SDTM versions exist yet/i),
     ).toBeInTheDocument();
+  });
+
+  it("opens the create drawer from the header + button and creates a new domain", async () => {
+    renderPage();
+    const createBtn = await screen.findByRole("button", {
+      name: /create domain/i,
+    });
+    await userEvent.click(createBtn);
+    const nameInput = await screen.findByRole("textbox", { name: /^code$/i });
+    await userEvent.type(nameInput, "ZZ");
+    // The drawer pre-fills one row per existing language. Existing
+    // domains contain `en`, so a row is already there — fill it.
+    const langInput = await screen.findByRole("textbox", { name: /^lang$/i });
+    expect(langInput).toHaveValue("en");
+    const row = langInput.closest(".MuiStack-root")!;
+    const descInput = row.querySelectorAll("input")[1] as HTMLInputElement;
+    await userEvent.type(descInput, "ZZ created");
+    const structInput = row.querySelectorAll("input")[2] as HTMLInputElement;
+    await userEvent.type(structInput, "One per ZZ");
+    await userEvent.click(screen.getByRole("button", { name: /^Create$/ }));
+    expect(await screen.findByText("ZZ created")).toBeInTheDocument();
+    expect(screen.getByText("One per ZZ")).toBeInTheDocument();
   });
 });

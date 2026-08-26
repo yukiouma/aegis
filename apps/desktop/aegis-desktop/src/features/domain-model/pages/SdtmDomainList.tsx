@@ -6,13 +6,19 @@ import { useI18n } from "@aegis/ui/i18n";
 import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
 import { useCurrentUser } from "../../auth";
 import {
+  useCreateSdtmDomain,
   useDeleteSdtmDomain,
   useListSdtmDomains,
   useListSdtmVersions,
+  useUpdateSdtmDomain,
 } from "../data";
-import type { SdtmDomainView } from "../../../shared/api";
+import type {
+  CreateSdtmDomainInput,
+  SdtmDomainView,
+} from "../../../shared/api";
 import {
   DeleteDomainDialog,
+  DomainEditDrawer,
   DomainFilterBar,
   DomainTable,
   LanguageDropdown,
@@ -34,6 +40,12 @@ export function SdtmDomainList() {
 
   const [searchFragment, setSearchFragment] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<SdtmDomainView | null>(null);
+
+  type DomainDrawerState =
+    | { mode: "edit"; row: SdtmDomainView }
+    | { mode: "create" }
+    | null;
+  const [domainDrawer, setDomainDrawer] = useState<DomainDrawerState>(null);
 
   const versions = versionsQuery.data ?? [];
 
@@ -125,6 +137,8 @@ export function SdtmDomainList() {
   }, [allDomains, trimmedFragment]);
 
   const deleteDomain = useDeleteSdtmDomain();
+  const updateDomain = useUpdateSdtmDomain();
+  const createDomain = useCreateSdtmDomain();
   const role = currentUser.data?.role;
   const canMutate = role === "admin" || role === "root";
 
@@ -170,6 +184,7 @@ export function SdtmDomainList() {
             canMutate={canMutate}
             selectedLang={selectedLang}
             onRetry={() => domainsQuery.refetch()}
+            onCreate={() => setDomainDrawer({ mode: "create" })}
             onDelete={(row) => setConfirmDelete(row)}
             onNavigate={(row) =>
               navigate({
@@ -199,6 +214,44 @@ export function SdtmDomainList() {
         pending={deleteDomain.isPending}
         error={deleteDomain.error}
       />
+
+      {domainDrawer?.mode === "edit" && (
+        <DomainEditDrawer
+          open
+          mode="edit"
+          row={domainDrawer.row}
+          onClose={() => setDomainDrawer(null)}
+          onUpdate={(_id, body) =>
+            updateDomain.mutate(
+              { id: domainDrawer.row.id, body },
+              { onSuccess: () => setDomainDrawer(null) },
+            )
+          }
+          canMutate={canMutate}
+          mutationError={updateDomain.error ?? null}
+          mutationPending={updateDomain.isPending}
+        />
+      )}
+
+      {domainDrawer?.mode === "create" && (
+        <DomainEditDrawer
+          open
+          mode="create"
+          row={{} as SdtmDomainView}
+          versionId={selectedVersionId ?? undefined}
+          availableLanguages={availableLanguages}
+          onClose={() => setDomainDrawer(null)}
+          onUpdate={() => {}}
+          onCreate={(input: CreateSdtmDomainInput) =>
+            createDomain.mutate(input, {
+              onSuccess: () => setDomainDrawer(null),
+            })
+          }
+          canMutate={canMutate}
+          mutationError={createDomain.error ?? null}
+          mutationPending={createDomain.isPending}
+        />
+      )}
     </Box>
   );
 }

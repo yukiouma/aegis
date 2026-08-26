@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   api,
   type ApiError,
+  type CreateSdtmDomainInput,
   type CreateSdtmVariableInput,
   type SdtmDomainView,
   type SdtmVariableView,
@@ -110,6 +111,18 @@ export function useDeleteSdtmVariable() {
     onSuccess: () => {
       qc.invalidateQueries({
         queryKey: ["domainModel", "sdtmVariables"],
+      });
+    },
+  });
+}
+
+export function useCreateSdtmDomain() {
+  const qc = useQueryClient();
+  return useMutation<SdtmDomainView, ApiError, CreateSdtmDomainInput>({
+    mutationFn: (input) => api.createSdtmDomain(input),
+    onSuccess: (created) => {
+      qc.invalidateQueries({
+        queryKey: ["domainModel", "sdtmDomains", created.versionId],
       });
     },
   });

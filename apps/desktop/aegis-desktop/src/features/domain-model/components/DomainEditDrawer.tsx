@@ -19,6 +19,7 @@ import { useI18n } from "@aegis/ui/i18n";
 import { errorMessage } from "../../../shared/api/error";
 import type {
   ApiError,
+  CreateSdtmDomainInput,
   DomainCategory,
   SdtmDomainDescription,
   SdtmDomainView,
@@ -28,8 +29,17 @@ import type {
 export interface DomainEditDrawerProps {
   open: boolean;
   row: SdtmDomainView;
+  mode?: "create" | "edit";
+  versionId?: number;
+  /**
+   * Languages to pre-populate as empty description rows in create mode.
+   * Each language becomes one row with `lang` pre-filled and the
+   * description/structure fields blank for the user to complete.
+   */
+  availableLanguages?: string[];
   onClose: () => void;
   onUpdate: (id: number, body: UpdateSdtmDomainInput) => void;
+  onCreate?: (input: CreateSdtmDomainInput) => void;
   canMutate: boolean;
   mutationError: ApiError | null;
   mutationPending: boolean;
@@ -50,27 +60,52 @@ const EMPTY_DESCRIPTIONS: SdtmDomainDescription[] = [];
 export function DomainEditDrawer({
   open,
   row,
+  mode = "edit",
+  versionId,
+  availableLanguages,
   onClose,
   onUpdate,
+  onCreate,
   canMutate,
   mutationError,
   mutationPending,
 }: DomainEditDrawerProps) {
   const { t } = useI18n();
-  const [name, setName] = useState(row.name);
-  const [category, setCategory] = useState<DomainCategory>(row.category);
+  const seedCreateDescriptions = () =>
+    (availableLanguages ?? []).map((lang) => ({
+      lang,
+      details: { description: "", structure: "" },
+    }));
+
+  const [name, setName] = useState(() =>
+    mode === "create" ? "" : row.name,
+  );
+  const [category, setCategory] = useState<DomainCategory>(() =>
+    mode === "create" ? "Special Purpose" : row.category,
+  );
   const [descriptions, setDescriptions] = useState<SdtmDomainDescription[]>(
-    row.descriptions.length ? [...row.descriptions] : EMPTY_DESCRIPTIONS,
+    () =>
+      mode === "create"
+        ? seedCreateDescriptions()
+        : row.descriptions.length
+          ? [...row.descriptions]
+          : EMPTY_DESCRIPTIONS,
   );
 
   useEffect(() => {
     if (!open) return;
-    setName(row.name);
-    setCategory(row.category);
-    setDescriptions(
-      row.descriptions.length ? [...row.descriptions] : EMPTY_DESCRIPTIONS,
-    );
-  }, [open, row]);
+    if (mode === "create") {
+      setName("");
+      setCategory("Special Purpose");
+      setDescriptions(seedCreateDescriptions());
+    } else {
+      setName(row.name);
+      setCategory(row.category);
+      setDescriptions(
+        row.descriptions.length ? [...row.descriptions] : EMPTY_DESCRIPTIONS,
+      );
+    }
+  }, [open, mode, row, availableLanguages]);
 
   function addDescription() {
     setDescriptions((d) => [
@@ -94,6 +129,16 @@ export function DomainEditDrawer({
     if (!canMutate) return;
     const trimmed = name.trim();
     if (trimmed === "") return;
+    if (mode === "create") {
+      if (versionId == null || onCreate == null) return;
+      onCreate({
+        versionId,
+        name: trimmed,
+        category,
+        descriptions: descriptions.filter((d) => d.lang.trim() !== ""),
+      });
+      return;
+    }
     const body: UpdateSdtmDomainInput = {
       name: trimmed,
       category,
@@ -111,7 +156,9 @@ export function DomainEditDrawer({
     >
       <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}>
         <Typography variant="h6">
-          {t("domainModel.sdtm.detail.editTitle")}
+          {mode === "create"
+            ? t("domainModel.sdtm.create.title")
+            : t("domainModel.sdtm.detail.editTitle")}
         </Typography>
         <Stack spacing={2}>
           <TextField
@@ -226,9 +273,14 @@ export function DomainEditDrawer({
           <Button
             variant="contained"
             onClick={handleSubmit}
-            disabled={!canMutate || name.trim() === "" || mutationPending}
+            disabled={
+              !canMutate ||
+              name.trim() === "" ||
+              (mode === "create" && versionId == null) ||
+              mutationPending
+            }
           >
-            {t("common.save")}
+            {mode === "create" ? t("common.create") : t("common.save")}
           </Button>
         </Box>
       </Box>
