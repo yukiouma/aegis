@@ -10,6 +10,7 @@ import { AegisThemeProvider } from "@aegis/ui/theme";
 import { mockCommands, mockInvoke } from "../../../helpers/tauri-mock";
 import { TestQueryProvider } from "../../../helpers/test-query-provider";
 import {
+  useCreateSdtmDomain,
   useCreateSdtmVariable,
   useDeleteSdtmVariable,
   useGetSdtmDomain,
@@ -26,6 +27,7 @@ function Probe(props: {
   const domain = useGetSdtmDomain(props.domainId);
   const vars = useListSdtmVariables(props.domainId ?? 0);
   const updateDomain = useUpdateSdtmDomain();
+  const createDomain = useCreateSdtmDomain();
   const createVar = useCreateSdtmVariable();
   const updateVar = useUpdateSdtmVariable();
   const deleteVar = useDeleteSdtmVariable();
@@ -40,6 +42,21 @@ function Probe(props: {
         }
       >
         update
+      </button>
+      <button
+        data-testid="create-domain"
+        onClick={() =>
+          createDomain.mutate({
+            versionId: props.versionId,
+            name: "AENEW",
+            category: "Events",
+            descriptions: [
+              { lang: "en", details: { description: "d", structure: "s" } },
+            ],
+          })
+        }
+      >
+        create-domain
       </button>
       <button
         data-testid="create-var"
@@ -104,6 +121,7 @@ beforeEach(() => {
     get_sdtm_domain_by_id: () => sampleDomain,
     list_sdtm_variables_by_domain: () => ({ variables: sampleVariables }),
     update_sdtm_domain: () => sampleDomain,
+    create_sdtm_domain: () => ({ ...sampleDomain, id: 99, name: "AENEW" }),
     create_sdtm_variable: () => sampleVariables[0],
     update_sdtm_variable: () => sampleVariables[0],
     delete_sdtm_variable: () => undefined,
@@ -153,6 +171,26 @@ describe("domain-model data hooks", () => {
       "update_sdtm_domain",
       expect.objectContaining({ id: 1 }),
     ));
+  });
+
+  it("useCreateSdtmDomain calls the API", async () => {
+    renderProbe(1);
+    screen.getByTestId("create-domain").click();
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "create_sdtm_domain",
+        expect.objectContaining({
+          input: expect.objectContaining({
+            versionId: 1,
+            name: "AENEW",
+            category: "Events",
+            descriptions: [
+              { lang: "en", details: { description: "d", structure: "s" } },
+            ],
+          }),
+        }),
+      ),
+    );
   });
 
   it("useCreateSdtmVariable calls the API", async () => {
