@@ -29,7 +29,7 @@ import {
 import { useI18n } from "@aegis/ui/i18n";
 
 import { errorMessage } from "../../../shared/api/error";
-import type { SdtmVariableView } from "../../../shared/api";
+import type { SdtmVariableView, SdtmVariableCore } from "../../../shared/api";
 
 /**
  * Move `sourceId` to `targetId`'s slot in the ordered id sequence, shifting
@@ -120,6 +120,19 @@ interface DraggableRowProps {
   onDelete: (r: SdtmVariableView) => void;
 }
 
+function variableCoreColor(core: SdtmVariableCore): "error" | "warning" | "success" | "info" {
+  switch (core) {
+    case "Exp":
+      return "warning";
+    case "Req":
+      return "error";
+    case "Perm":
+      return "success";
+    default:
+      return "info";
+  }
+}
+
 function DraggableRow({
   row,
   canMutate,
@@ -153,8 +166,14 @@ function DraggableRow({
       <TableCell>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
           <span>{row.name}</span>
-          <Chip size="small" label={TYPE_CHIP[row.variableType]} />
+        </Box>
+      </TableCell>
+      <TableCell>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Chip size="small" label={TYPE_CHIP[row.variableType]} variant={row.variableType === "Character" ? "filled" : "outlined"} />
           <Chip
+            color={variableCoreColor(row.variableCore)}
+            variant="outlined"
             size="small"
             label={t(`domainModel.sdtm.variable.core.${row.variableCore}`)}
           />
@@ -255,12 +274,13 @@ export function VariableTable({
         onReorder(next);
       }}
     >
-      <TableContainer component={Paper}>
-        <Table size="small">
+      <TableContainer component={Paper} sx={{ maxHeight: "calc(100vh - 200px)" }}>
+        <Table size="small" stickyHeader>
           <TableHead>
             <TableRow>
               <TableCell />
               <TableCell>{t("domainModel.sdtm.detail.col.name")}</TableCell>
+              <TableCell></TableCell>
               <TableCell>{t("domainModel.sdtm.detail.col.label")}</TableCell>
               <TableCell>{t("domainModel.sdtm.detail.col.role")}</TableCell>
               <TableCell align="right">

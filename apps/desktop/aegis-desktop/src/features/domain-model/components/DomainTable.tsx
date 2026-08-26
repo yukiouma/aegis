@@ -90,9 +90,9 @@ export function DomainTable({
   }
 
   return (
-    <TableContainer component={Paper}>
-      <Table size="small">
-        <TableHead>
+    <TableContainer component={Paper} sx={{ maxHeight: "calc(100vh - 120px)" }}>
+      <Table size="small" stickyHeader>
+        <TableHead >
           <TableRow>
             <TableCell>{t("domainModel.sdtm.col.name")}</TableCell>
             <TableCell>{t("domainModel.sdtm.col.description")}</TableCell>
