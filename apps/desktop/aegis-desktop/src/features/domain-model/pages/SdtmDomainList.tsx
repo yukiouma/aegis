@@ -239,6 +239,7 @@ export function SdtmDomainList() {
           mode="create"
           row={{} as SdtmDomainView}
           versionId={selectedVersionId ?? undefined}
+          availableLanguages={availableLanguages}
           onClose={() => setDomainDrawer(null)}
           onUpdate={() => {}}
           onCreate={(input: CreateSdtmDomainInput) =>

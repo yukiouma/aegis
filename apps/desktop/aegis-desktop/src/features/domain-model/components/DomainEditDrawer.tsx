@@ -31,6 +31,12 @@ export interface DomainEditDrawerProps {
   row: SdtmDomainView;
   mode?: "create" | "edit";
   versionId?: number;
+  /**
+   * Languages to pre-populate as empty description rows in create mode.
+   * Each language becomes one row with `lang` pre-filled and the
+   * description/structure fields blank for the user to complete.
+   */
+  availableLanguages?: string[];
   onClose: () => void;
   onUpdate: (id: number, body: UpdateSdtmDomainInput) => void;
   onCreate?: (input: CreateSdtmDomainInput) => void;
@@ -56,6 +62,7 @@ export function DomainEditDrawer({
   row,
   mode = "edit",
   versionId,
+  availableLanguages,
   onClose,
   onUpdate,
   onCreate,
@@ -64,6 +71,12 @@ export function DomainEditDrawer({
   mutationPending,
 }: DomainEditDrawerProps) {
   const { t } = useI18n();
+  const seedCreateDescriptions = () =>
+    (availableLanguages ?? []).map((lang) => ({
+      lang,
+      details: { description: "", structure: "" },
+    }));
+
   const [name, setName] = useState(() =>
     mode === "create" ? "" : row.name,
   );
@@ -73,7 +86,7 @@ export function DomainEditDrawer({
   const [descriptions, setDescriptions] = useState<SdtmDomainDescription[]>(
     () =>
       mode === "create"
-        ? EMPTY_DESCRIPTIONS
+        ? seedCreateDescriptions()
         : row.descriptions.length
           ? [...row.descriptions]
           : EMPTY_DESCRIPTIONS,
@@ -84,7 +97,7 @@ export function DomainEditDrawer({
     if (mode === "create") {
       setName("");
       setCategory("Special Purpose");
-      setDescriptions(EMPTY_DESCRIPTIONS);
+      setDescriptions(seedCreateDescriptions());
     } else {
       setName(row.name);
       setCategory(row.category);
@@ -92,7 +105,7 @@ export function DomainEditDrawer({
         row.descriptions.length ? [...row.descriptions] : EMPTY_DESCRIPTIONS,
       );
     }
-  }, [open, mode, row]);
+  }, [open, mode, row, availableLanguages]);
 
   function addDescription() {
     setDescriptions((d) => [
