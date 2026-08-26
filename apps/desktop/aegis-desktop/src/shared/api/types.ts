@@ -383,3 +383,9 @@ export interface UpdateSdtmDomainInput {
   category?: DomainCategory;
   descriptions?: SdtmDomainDescription[];
 }
+export interface CreateSdtmDomainInput {
+  versionId: number;
+  name: string;
+  category: DomainCategory;
+  descriptions: SdtmDomainDescription[];
+}
