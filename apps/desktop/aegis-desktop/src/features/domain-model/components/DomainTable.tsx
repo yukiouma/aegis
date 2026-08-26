@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   Box,
   Button,
@@ -62,6 +63,14 @@ export function DomainTable({
 }: DomainTableProps) {
   const { t } = useI18n();
 
+  // Always render rows in alphabetical order by domain code. The server may
+  // return them in insertion order, but users expect a deterministic, scannable
+  // list — sort here so the table doesn't depend on the query ordering.
+  const sortedRows = useMemo(
+    () => [...rows].sort((a, b) => a.name.localeCompare(b.name)),
+    [rows],
+  );
+
   if (error) {
     return (
       <Paper sx={{ p: 2 }}>
@@ -115,14 +124,14 @@ export function DomainTable({
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.length === 0 ? (
+          {sortedRows.length === 0 ? (
             <TableRow>
               <TableCell colSpan={5} align="center">
                 <Typography color="text.secondary">{emptyMessage}</Typography>
               </TableCell>
             </TableRow>
           ) : (
-            rows.map((row) => {
+            sortedRows.map((row) => {
               const d = selectedLang
                 ? row.descriptions.find((x) => x.lang === selectedLang)
                 : undefined;
