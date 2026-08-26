@@ -47,12 +47,13 @@ function renderTable(props: {
   onReorder?: (orderedIds: number[]) => void;
   canMutate?: boolean;
   selectedLang?: string | null;
+  rows?: SdtmVariableView[];
 }) {
   return render(
     <AegisThemeProvider>
       <AegisI18nProvider>
         <VariableTable
-          rows={variables}
+          rows={props.rows ?? variables}
           loading={false}
           error={null}
           canMutate={props.canMutate ?? false}
@@ -147,6 +148,27 @@ describe("VariableTable", () => {
     // Smoke check: DragDropProvider is mounted in DOM
     void DragDropProvider;
     expect(document.querySelector("table")).toBeInTheDocument();
+  });
+
+  it("keeps the column headers visible on an empty table so the user can see the create action", () => {
+    renderTable({ rows: [] });
+    expect(screen.getByRole("columnheader", { name: "Name" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Label" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Role" })).toBeInTheDocument();
+  });
+
+  it("shows the empty message inside the body when rows is empty", () => {
+    renderTable({ rows: [] });
+    expect(screen.getByText("empty")).toBeInTheDocument();
+  });
+
+  it("keeps the header create button visible on an empty table when canMutate=true", async () => {
+    const onCreate = vi.fn();
+    renderTable({ rows: [], canMutate: true, onCreate });
+    const btn = screen.getByRole("button", { name: /create variable/i });
+    expect(btn).toBeInTheDocument();
+    await userEvent.click(btn);
+    expect(onCreate).toHaveBeenCalled();
   });
 });
 
