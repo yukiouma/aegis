@@ -64,10 +64,19 @@ export function DomainEditDrawer({
   mutationPending,
 }: DomainEditDrawerProps) {
   const { t } = useI18n();
-  const [name, setName] = useState(row.name);
-  const [category, setCategory] = useState<DomainCategory>(row.category);
+  const [name, setName] = useState(() =>
+    mode === "create" ? "" : row.name,
+  );
+  const [category, setCategory] = useState<DomainCategory>(() =>
+    mode === "create" ? "Special Purpose" : row.category,
+  );
   const [descriptions, setDescriptions] = useState<SdtmDomainDescription[]>(
-    row.descriptions.length ? [...row.descriptions] : EMPTY_DESCRIPTIONS,
+    () =>
+      mode === "create"
+        ? EMPTY_DESCRIPTIONS
+        : row.descriptions.length
+          ? [...row.descriptions]
+          : EMPTY_DESCRIPTIONS,
   );
 
   useEffect(() => {
