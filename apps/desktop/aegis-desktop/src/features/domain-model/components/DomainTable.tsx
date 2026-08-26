@@ -14,6 +14,7 @@ import {
   Typography,
 } from "@aegis/ui/mui";
 import {
+  Add as AddIcon,
   Delete as DeleteIcon,
   OpenInNew as OpenInNewIcon,
 } from "@aegis/ui/icons";
@@ -37,6 +38,7 @@ export interface DomainTableProps {
    * the table.
    */
   onNavigate?: (row: SdtmDomainView) => void;
+  onCreate?: () => void;
 }
 
 const cellEllipsis = {
@@ -56,6 +58,7 @@ export function DomainTable({
   onDelete,
   emptyMessage,
   onNavigate,
+  onCreate,
 }: DomainTableProps) {
   const { t } = useI18n();
 
@@ -98,7 +101,19 @@ export function DomainTable({
             <TableCell>{t("domainModel.sdtm.col.description")}</TableCell>
             <TableCell>{t("domainModel.sdtm.col.structure")}</TableCell>
             <TableCell>{t("domainModel.sdtm.col.category")}</TableCell>
-            <TableCell />
+            <TableCell align="right">
+              {canMutate && onCreate && (
+                <Tooltip title={t("domainModel.sdtm.create.tooltip")}>
+                  <IconButton
+                    size="small"
+                    aria-label={t("domainModel.sdtm.create.tooltip")}
+                    onClick={onCreate}
+                  >
+                    <AddIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
