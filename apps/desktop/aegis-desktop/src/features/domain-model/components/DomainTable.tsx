@@ -77,18 +77,16 @@ export function DomainTable({
     );
   }
 
-  if (rows.length === 0) {
-    if (loading) {
-      return (
-        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-          <CircularProgress />
-        </Box>
-      );
-    }
+  // Headers (with the create button) stay visible while the initial query is
+  // in flight, so the user can already see the shape of the table and — when
+  // they have permission — click the create action without waiting for the
+  // first load. We only fall back to a spinner on the very first render, when
+  // there are no rows yet to keep the table from feeling half-loaded.
+  if (loading && rows.length === 0) {
     return (
-      <Paper sx={{ p: 4, textAlign: "center" }}>
-        <Typography>{emptyMessage}</Typography>
-      </Paper>
+      <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+        <CircularProgress />
+      </Box>
     );
   }
 
@@ -117,51 +115,59 @@ export function DomainTable({
           </TableRow>
         </TableHead>
         <TableBody>
-          {rows.map((row) => {
-            const d = selectedLang
-              ? row.descriptions.find((x) => x.lang === selectedLang)
-              : undefined;
-            const description = d?.details.description ?? "";
-            const structure = d?.details.structure ?? "";
-            return (
-              <TableRow key={row.id}>
-                <TableCell>{row.name}</TableCell>
-                <TableCell sx={cellEllipsis} title={description}>
-                  {description}
-                </TableCell>
-                <TableCell sx={cellEllipsis} title={structure}>
-                  {structure}
-                </TableCell>
-                <TableCell>{row.category}</TableCell>
-                <TableCell sx={{ whiteSpace: "nowrap" }} align="right">
-                  <Tooltip title={t("domainModel.sdtm.action.navigate.tooltip")}>
-                    <span>
-                      <IconButton
-                        size="small"
-                        disabled={!onNavigate}
-                        aria-label="open-detail"
-                        onClick={() => onNavigate?.(row)}
-                      >
-                        <OpenInNewIcon fontSize="small" />
-                      </IconButton>
-                    </span>
-                  </Tooltip>
-                  {canMutate && (
-                    <Tooltip title={t("domainModel.sdtm.action.delete.tooltip")}>
-                      <IconButton
-                        size="small"
-                        aria-label="delete-domain"
-                        color="error"
-                        onClick={() => onDelete(row)}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
+          {rows.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={5} align="center">
+                <Typography color="text.secondary">{emptyMessage}</Typography>
+              </TableCell>
+            </TableRow>
+          ) : (
+            rows.map((row) => {
+              const d = selectedLang
+                ? row.descriptions.find((x) => x.lang === selectedLang)
+                : undefined;
+              const description = d?.details.description ?? "";
+              const structure = d?.details.structure ?? "";
+              return (
+                <TableRow key={row.id}>
+                  <TableCell>{row.name}</TableCell>
+                  <TableCell sx={cellEllipsis} title={description}>
+                    {description}
+                  </TableCell>
+                  <TableCell sx={cellEllipsis} title={structure}>
+                    {structure}
+                  </TableCell>
+                  <TableCell>{row.category}</TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap" }} align="right">
+                    <Tooltip title={t("domainModel.sdtm.action.navigate.tooltip")}>
+                      <span>
+                        <IconButton
+                          size="small"
+                          disabled={!onNavigate}
+                          aria-label="open-detail"
+                          onClick={() => onNavigate?.(row)}
+                        >
+                          <OpenInNewIcon fontSize="small" />
+                        </IconButton>
+                      </span>
                     </Tooltip>
-                  )}
-                </TableCell>
-              </TableRow>
-            );
-          })}
+                    {canMutate && (
+                      <Tooltip title={t("domainModel.sdtm.action.delete.tooltip")}>
+                        <IconButton
+                          size="small"
+                          aria-label="delete-domain"
+                          color="error"
+                          onClick={() => onDelete(row)}
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })
+          )}
         </TableBody>
       </Table>
     </TableContainer>

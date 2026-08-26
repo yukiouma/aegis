@@ -250,18 +250,16 @@ export function VariableTable({
     );
   }
 
-  if (rows.length === 0) {
-    if (loading) {
-      return (
-        <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
-          <CircularProgress />
-        </Box>
-      );
-    }
+  // Headers (with the create button) stay visible while the initial query is
+  // in flight, so the user can already see the shape of the table and — when
+  // they have permission — click the create action without waiting for the
+  // first load. We only fall back to a spinner on the very first render, when
+  // there are no rows yet to keep the table from feeling half-loaded.
+  if (loading && rows.length === 0) {
     return (
-      <Paper sx={{ p: 4, textAlign: "center" }}>
-        <Typography>{emptyMessage}</Typography>
-      </Paper>
+      <Box sx={{ display: "flex", justifyContent: "center", p: 4 }}>
+        <CircularProgress />
+      </Box>
     );
   }
 
@@ -303,20 +301,28 @@ export function VariableTable({
             </TableRow>
           </TableHead>
           <TableBody>
-            {orderedIds.map((id) => {
-              const row = rows.find((r) => r.id === id);
-              if (!row) return null;
-              return (
-                <DraggableRow
-                  key={row.id}
-                  row={row}
-                  canMutate={canMutate}
-                  selectedLang={selectedLang}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                />
-              );
-            })}
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} align="center">
+                  <Typography color="text.secondary">{emptyMessage}</Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              orderedIds.map((id) => {
+                const row = rows.find((r) => r.id === id);
+                if (!row) return null;
+                return (
+                  <DraggableRow
+                    key={row.id}
+                    row={row}
+                    canMutate={canMutate}
+                    selectedLang={selectedLang}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                  />
+                );
+              })
+            )}
           </TableBody>
         </Table>
       </TableContainer>

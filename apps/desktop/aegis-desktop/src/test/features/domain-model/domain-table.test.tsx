@@ -101,6 +101,52 @@ describe("DomainTable", () => {
     expect(screen.getByText("No matches.")).toBeInTheDocument();
   });
 
+  it("keeps the column headers visible when rows is empty so the user can see the create action", () => {
+    wrap(
+      <DomainTable
+        rows={[]}
+        loading={false}
+        error={null}
+        canMutate={false}
+        selectedLang="en"
+        onRetry={() => {}}
+        onDelete={() => {}}
+        emptyMessage="No matches."
+      />,
+    );
+    expect(screen.getByRole("columnheader", { name: "Name" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Description" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Structure" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("columnheader", { name: "Category" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the header create button visible on an empty table when canMutate=true and onCreate is provided", async () => {
+    const onCreate = vi.fn();
+    wrap(
+      <DomainTable
+        rows={[]}
+        loading={false}
+        error={null}
+        canMutate
+        selectedLang="en"
+        onRetry={() => {}}
+        onDelete={() => {}}
+        onCreate={onCreate}
+        emptyMessage="No matches."
+      />,
+    );
+    const btn = screen.getByRole("button", { name: /create domain/i });
+    expect(btn).toBeInTheDocument();
+    await userEvent.click(btn);
+    expect(onCreate).toHaveBeenCalledOnce();
+  });
+
   it("keeps the open-detail button disabled when onNavigate is not provided", () => {
     renderTable();
     const btn = screen.getByRole("button", { name: /open-detail/i });
