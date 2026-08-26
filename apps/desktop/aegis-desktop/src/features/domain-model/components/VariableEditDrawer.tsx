@@ -34,6 +34,7 @@ export interface VariableEditDrawerProps {
   row?: SdtmVariableView;
   domainId: number;
   initialSequence?: number;
+  availableLanguages?: string[];
   onClose: () => void;
   onCreate: (input: CreateSdtmVariableInput) => void;
   onUpdate: (id: number, body: UpdateSdtmVariableInput) => void;
@@ -64,6 +65,7 @@ export function VariableEditDrawer({
   row,
   domainId,
   initialSequence,
+  availableLanguages,
   onClose,
   onCreate,
   onUpdate,
@@ -99,7 +101,10 @@ export function VariableEditDrawer({
       setVariableType("Character");
       setVariableCore("Req");
       setVariableRole(null);
-      setDescriptions([]);
+      const langs = availableLanguages ?? [];
+      setDescriptions(
+        langs.map((lang) => ({ lang, details: { label: "" } })),
+      );
     }
   }, [open, mode, row]);
 
