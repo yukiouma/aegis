@@ -81,17 +81,28 @@ describe("VariableTable", () => {
     expect(screen.getByText("AESEV")).toBeInTheDocument();
   });
 
-  it("renders the type and core chips next to the name", () => {
+  it("renders the type and core chips in their own column, separate from the name", () => {
     renderTable({});
     const row1 = screen.getByText("AETERM").closest("tr")!;
-    expect(within(row1).getByText("C")).toBeInTheDocument();
-    expect(within(row1).getByText("Required")).toBeInTheDocument();
+    const cells = within(row1).getAllByRole("cell");
+    // cells[0] = drag handle, cells[1] = name, cells[2] = type/core chips,
+    // cells[3] = label, cells[4] = role, cells[5] = actions
+    expect(cells[1]).toHaveTextContent("AETERM");
+    expect(within(cells[1]).queryByText("C")).toBeNull();
+    expect(within(cells[1]).queryByText("Required")).toBeNull();
+    expect(within(cells[2]).getByText("C")).toBeInTheDocument();
+    expect(within(cells[2]).getByText("Required")).toBeInTheDocument();
   });
 
   it("swaps the label cell when selectedLang changes", () => {
     renderTable({ selectedLang: "zh-CN" });
     const row1 = screen.getByText("AETERM").closest("tr")!;
-    expect(within(row1).getAllByRole("cell")[2]).toHaveTextContent("");
+    const cells = within(row1).getAllByRole("cell");
+    // Label lives in cells[3] now that the type/core chips occupy cells[2].
+    expect(cells[3]).toBeEmptyDOMElement();
+    // The chips column is unaffected by selectedLang.
+    expect(within(cells[2]).getByText("C")).toBeInTheDocument();
+    expect(within(cells[2]).getByText("Required")).toBeInTheDocument();
   });
 
   it("hides add/edit/delete when canMutate is false", () => {

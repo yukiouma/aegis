@@ -107,7 +107,7 @@ export function DomainEditDrawer({
       anchor="right"
       open={open}
       onClose={onClose}
-      slotProps={{ paper: { sx: { width: 480 } } }}
+      slotProps={{ paper: { sx: { width: 850 } } }}
     >
       <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}>
         <Typography variant="h6">
@@ -187,6 +187,7 @@ export function DomainEditDrawer({
                   />
                   {canMutate && (
                     <IconButton
+                      color="error"
                       size="small"
                       aria-label="remove-description"
                       onClick={() => removeDescription(idx)}
