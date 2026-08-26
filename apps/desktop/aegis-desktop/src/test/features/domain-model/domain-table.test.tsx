@@ -68,6 +68,22 @@ describe("DomainTable", () => {
     expect(cells[2].textContent).toBe("");
   });
 
+  it("sorts rows alphabetically by name regardless of the input order", () => {
+    const rows: SdtmDomainView[] = [
+      { ...row, id: 2, name: "DM" },
+      { ...row, id: 3, name: "AE" },
+      { ...row, id: 4, name: "VS" },
+      { ...row, id: 5, name: "LB" },
+    ];
+    renderTable({ rows });
+    // screen.getAllByRole("row") includes the header row first; skip it.
+    const bodyRows = screen.getAllByRole("row").slice(1);
+    const names = bodyRows.map(
+      (r) => within(r).getAllByRole("cell")[0]?.textContent ?? "",
+    );
+    expect(names).toEqual(["AE", "DM", "LB", "VS"]);
+  });
+
   it("renders the delete icon only when canMutate=true", () => {
     renderTable({ canMutate: true });
     expect(screen.getByRole("button", { name: /delete/i })).toBeInTheDocument();
