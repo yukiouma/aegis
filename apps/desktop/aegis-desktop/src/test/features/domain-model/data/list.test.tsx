@@ -160,7 +160,9 @@ describe("domain-model data hooks", () => {
     screen.getByTestId("create-var").click();
     await waitFor(() => expect(mockInvoke).toHaveBeenCalledWith(
       "create_sdtm_variable",
-      expect.objectContaining({ name: "AGE" }),
+      expect.objectContaining({
+        input: expect.objectContaining({ name: "AGE" }),
+      }),
     ));
   });
 

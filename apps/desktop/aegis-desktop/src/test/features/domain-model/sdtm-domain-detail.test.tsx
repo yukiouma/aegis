@@ -130,8 +130,10 @@ describe("SdtmDomainDetail", () => {
       expect(mockInvoke).toHaveBeenCalledWith(
         "create_sdtm_variable",
         expect.objectContaining({
-          domainId: 7,
-          variableSequence: 3,
+          input: expect.objectContaining({
+            domainId: 7,
+            variableSequence: 3,
+          }),
         }),
       );
     });

@@ -31,6 +31,61 @@ import { useI18n } from "@aegis/ui/i18n";
 import { errorMessage } from "../../../shared/api/error";
 import type { SdtmVariableView } from "../../../shared/api";
 
+/**
+ * Move `sourceId` to `targetId`'s slot in the ordered id sequence, shifting
+ * the target and other rows as needed. Returns `null` when the move is a
+ * no-op (source === target, or either id is missing from the sequence).
+ *
+ * The insertion index is the *original* index of the target (computed before
+ * source is removed). That index lands on the source in the post-removal
+ * array regardless of which side of the target the source started on, so this
+ * works for both "drag down" and "drag up" cases:
+ *   [1, 2, 3, 4], src=1, tgt=3 → [2, 3, 1, 4]  (target shifts right)
+ *   [1, 2, 3, 4], src=4, tgt=2 → [1, 4, 2, 3]  (target stays put)
+ */
+export function computeReorder(
+  orderedIds: readonly number[],
+  sourceId: number,
+  targetId: number,
+): number[] | null {
+  if (sourceId === targetId) return null;
+  const next = [...orderedIds];
+  const srcIdx = next.indexOf(sourceId);
+  const tgtIdx = next.indexOf(targetId);
+  if (srcIdx < 0 || tgtIdx < 0) return null;
+  const [moved] = next.splice(srcIdx, 1);
+  next.splice(tgtIdx, 0, moved);
+  return next;
+}
+
+/**
+ * Adapter from a `@dnd-kit/react` `dragend` event to `computeReorder`.
+ *
+ * Reads the dragged row from `event.operation.source` — NOT
+ * `event.operation.target`, which is the drop slot. Respecting
+ * `event.canceled` keeps the table stable when the drag is aborted. Returns
+ * `null` when there is nothing to reorder.
+ */
+export function applyReorder(
+  orderedIds: readonly number[],
+  event: {
+    canceled: boolean;
+    operation: {
+      source: { id: string | number } | null;
+      target: { id: string | number } | null;
+    };
+  },
+): number[] | null {
+  if (event.canceled) return null;
+  const source = event.operation.source;
+  const target = event.operation.target;
+  if (source == null || target == null) return null;
+  const sourceId = Number(source.id);
+  const targetId = Number(target.id);
+  if (!Number.isFinite(sourceId) || !Number.isFinite(targetId)) return null;
+  return computeReorder(orderedIds, sourceId, targetId);
+}
+
 export interface VariableTableProps {
   rows: SdtmVariableView[];
   loading: boolean;
@@ -193,17 +248,9 @@ export function VariableTable({
 
   return (
     <DragDropProvider
-      onDragEnd={(event: {
-        operation: { target: { id: string | number } | null };
-      }) => {
-        const targetId =
-          event.operation.target == null
-            ? null
-            : Number(event.operation.target.id);
-        if (targetId == null || Number.isNaN(targetId)) return;
-        const next = orderedIds.filter((id) => id !== targetId);
-        const insertAt = next.length;
-        next.splice(insertAt, 0, targetId);
+      onDragEnd={(event) => {
+        const next = applyReorder(orderedIds, event);
+        if (next == null) return;
         setInternalOrder(next);
         onReorder(next);
       }}

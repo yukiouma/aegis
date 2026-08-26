@@ -140,4 +140,38 @@ describe("api wrappers", () => {
     await api.healthz();
     expect(mockInvoke).toHaveBeenCalledWith("healthz");
   });
+
+  it("createSdtmVariable -> invoke('create_sdtm_variable', { input })", async () => {
+    // The Rust command's struct payload parameter is named `input`; the
+    // wrapper must match that key or Tauri rejects the call with
+    // "command create_sdtm_variable missing required key input".
+    mockInvoke.mockResolvedValueOnce({});
+    await api.createSdtmVariable({
+      domainId: 7,
+      name: "AETOX",
+      variableType: "Character",
+      variableCore: "Req",
+      variableSequence: 3,
+      descriptions: [],
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("create_sdtm_variable", {
+      input: {
+        domainId: 7,
+        name: "AETOX",
+        variableType: "Character",
+        variableCore: "Req",
+        variableSequence: 3,
+        descriptions: [],
+      },
+    });
+  });
+
+  it("updateSdtmVariable -> invoke('update_sdtm_variable', { id, body })", async () => {
+    mockInvoke.mockResolvedValueOnce({});
+    await api.updateSdtmVariable(1, { name: "AETOX" });
+    expect(mockInvoke).toHaveBeenCalledWith("update_sdtm_variable", {
+      id: 1,
+      body: { name: "AETOX" },
+    });
+  });
 });

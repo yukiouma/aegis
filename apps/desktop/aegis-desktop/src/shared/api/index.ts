@@ -235,7 +235,10 @@ export const api = {
   createSdtmVariable: (
     input: CreateSdtmVariableInput,
   ): Promise<SdtmVariableView> =>
-    call<SdtmVariableView>("create_sdtm_variable", { ...input }),
+    // The Rust command's struct payload parameter is named `input`; the
+    // wrapper must match that key or Tauri rejects the call with
+    // "command create_sdtm_variable missing required key input".
+    call<SdtmVariableView>("create_sdtm_variable", { input: { ...input } }),
 
   updateSdtmVariable: (
     id: number,
