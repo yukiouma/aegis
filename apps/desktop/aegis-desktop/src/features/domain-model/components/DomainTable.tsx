@@ -133,7 +133,7 @@ export function DomainTable({
                   {structure}
                 </TableCell>
                 <TableCell>{row.category}</TableCell>
-                <TableCell sx={{ whiteSpace: "nowrap" }}>
+                <TableCell sx={{ whiteSpace: "nowrap" }} align="right">
                   <Tooltip title={t("domainModel.sdtm.action.navigate.tooltip")}>
                     <span>
                       <IconButton
