@@ -115,4 +115,34 @@ describe("DomainTable", () => {
     await userEvent.click(btn);
     expect(onNavigate).toHaveBeenCalledWith(row);
   });
+
+  it("renders the create header button when canMutate=true and onCreate is provided", () => {
+    renderTable({ canMutate: true, onCreate: vi.fn() });
+    expect(
+      screen.getByRole("button", { name: /create domain/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the create header button when canMutate=false", () => {
+    renderTable({ canMutate: false, onCreate: vi.fn() });
+    expect(
+      screen.queryByRole("button", { name: /create domain/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides the create header button when onCreate is not provided", () => {
+    renderTable({ canMutate: true });
+    expect(
+      screen.queryByRole("button", { name: /create domain/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("calls onCreate when the header create button is clicked", async () => {
+    const onCreate = vi.fn();
+    renderTable({ canMutate: true, onCreate });
+    await userEvent.click(
+      screen.getByRole("button", { name: /create domain/i }),
+    );
+    expect(onCreate).toHaveBeenCalledOnce();
+  });
 });
