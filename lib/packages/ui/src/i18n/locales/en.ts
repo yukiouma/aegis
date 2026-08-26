@@ -241,7 +241,7 @@ export const en = {
   "domainModel.sdtm.col.description": "Description",
   "domainModel.sdtm.col.structure": "Structure",
   "domainModel.sdtm.col.category": "Category",
-  "domainModel.sdtm.action.navigate.tooltip": "Open detail (coming soon)",
+  "domainModel.sdtm.action.navigate.tooltip": "Open detail",
   "domainModel.sdtm.action.delete.tooltip": "Delete domain",
   "domainModel.sdtm.delete.confirmTitle": "Delete domain?",
   "domainModel.sdtm.delete.confirmMessage": "This cannot be undone.",

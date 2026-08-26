@@ -232,7 +232,7 @@ export const zhCN = {
   "domainModel.sdtm.col.description": "描述",
   "domainModel.sdtm.col.structure": "结构",
   "domainModel.sdtm.col.category": "类别",
-  "domainModel.sdtm.action.navigate.tooltip": "打开详情（敬请期待）",
+  "domainModel.sdtm.action.navigate.tooltip": "打开详情",
   "domainModel.sdtm.action.delete.tooltip": "删除域",
   "domainModel.sdtm.delete.confirmTitle": "删除域？",
   "domainModel.sdtm.delete.confirmMessage": "此操作不可撤销。",
