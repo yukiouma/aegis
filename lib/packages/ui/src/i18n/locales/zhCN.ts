@@ -251,6 +251,8 @@ export const zhCN = {
   "domainModel.sdtm.detail.variablesLoadFailed": "Failed to load variables: {message}",
   "domainModel.sdtm.detail.reorderFailed": "Reorder failed: {message}",
   "domainModel.sdtm.detail.saveFailed": "Save failed: {message}",
+  "domainModel.sdtm.create.title": "新建域",
+  "domainModel.sdtm.create.tooltip": "新建域",
   "domainModel.sdtm.variable.create.title": "Create variable",
   "domainModel.sdtm.variable.create.tooltip": "Create variable",
   "domainModel.sdtm.variable.editTitle": "Edit variable",
