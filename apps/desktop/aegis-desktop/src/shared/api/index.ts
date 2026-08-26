@@ -10,6 +10,7 @@ import type {
   CreateCodeItemInput,
   CreateCodeListInput,
   CreateProjectInput,
+  CreateSdtmDomainInput,
   CreateSdtmVariableInput,
   CreateTerminologyVersionInput,
   CreateUserInput,
@@ -211,6 +212,11 @@ export const api = {
   deleteSdtmDomain: (id: number): Promise<void> =>
     call<void>("delete_sdtm_domain", { id }),
 
+  createSdtmDomain: (
+    input: CreateSdtmDomainInput,
+  ): Promise<SdtmDomainView> =>
+    call<SdtmDomainView>("create_sdtm_domain", { input: { ...input } }),
+
   // SDTM domains (detail page)
   getSdtmDomainById: (id: number): Promise<SdtmDomainView> =>
     call<SdtmDomainView>("get_sdtm_domain_by_id", { id }),
@@ -261,6 +267,7 @@ export type {
   CreateCodeItemInput,
   CreateCodeListInput,
   CreateProjectInput,
+  CreateSdtmDomainInput,
   CreateSdtmVariableInput,
   CreateTerminologyVersionInput,
   CreateUserInput,
