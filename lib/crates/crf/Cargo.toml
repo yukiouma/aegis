@@ -1,0 +1,27 @@
+[package]
+name = "crf"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sqlx = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+# `chrono` provides the `DateTime<Utc>` type carried on every
+# aggregate's `created_at` / `updated_at` columns.
+chrono = { workspace = true }
+# `serde` + `serde_json` are required by the apis port's DTOs
+# (`CrfService` derives `Serialize` / `Deserialize` on its view
+# types via the `serialize` derives used by the wider workspace).
+serde = { workspace = true }
+serde_json = { workspace = true }
+# `apis` provides the outbound `CrfService` port the in-memory
+# facade implements and the `ProjectService` the
+# `ProjectLookupImpl` adapts.
+apis = { path = "../apis" }
+
+[dev-dependencies]
+dotenvy = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
