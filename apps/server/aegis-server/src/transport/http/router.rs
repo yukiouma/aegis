@@ -1379,6 +1379,29 @@ mod tests {
                     .with_timezone(&chrono::Utc),
             })
         }
+        async fn get_form_detail(
+            &self,
+            req: apis::crf::GetCrfFormDetailRequest,
+        ) -> Result<apis::crf::CrfFormDetailView, apis::crf::CrfApiError> {
+            use chrono::TimeZone;
+            let now = chrono::Utc.timestamp_opt(0, 0).unwrap();
+            let form_view = apis::crf::CrfFormView {
+                id: req.form_id,
+                version_id: 1,
+                code: format!("F{}", req.form_id),
+                name: format!("Form {}", req.form_id),
+                order: 0,
+                not_submitted: false,
+                created_at: now,
+                updated_at: now,
+            };
+            Ok(apis::crf::CrfFormDetailView {
+                form: form_view,
+                form_annotations: Vec::new(),
+                items: Vec::new(),
+                domain_annotations: Vec::new(),
+            })
+        }
         async fn list_forms_by_version(
             &self,
             _req: apis::crf::ListCrfFormsByVersionRequest,

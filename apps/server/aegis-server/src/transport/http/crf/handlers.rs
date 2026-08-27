@@ -375,6 +375,38 @@ pub async fn get_form_by_id(
     Ok(Json(view.into()))
 }
 
+/// `GET /api/crf/forms/{id}/details` — return the form together
+/// with every piece of state owned by it: items composed with
+/// their options, units, and per-layer annotations; the form's
+/// domain annotations; and form-level annotations. Single
+/// response, up to nine DB round-trips with at most four in
+/// flight via `tokio::try_join!`.
+#[utoipa::path(
+    get, path = "/forms/{id}/details", tag = "crf",
+    operation_id = "crf_get_form_details",
+    params(
+        ("id" = i64, Path, description = "CRF form id"),
+    ),
+    responses(
+        (status = 200, description = "Form detail", body = dto::CrfFormDetailResponse),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 404, description = "Form not found", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
+    ),
+    security(("BearerAuth" = [])),
+)]
+pub async fn get_form_details(
+    State(state): State<AppState>,
+    _claims: AuthClaims,
+    Path(CrfPathId { id }): Path<CrfPathId>,
+) -> Result<Json<dto::CrfFormDetailResponse>, ApiError> {
+    let view = state
+        .crf
+        .get_form_detail(apis::crf::GetCrfFormDetailRequest { form_id: id })
+        .await?;
+    Ok(Json(view.into()))
+}
+
 /// `PATCH /api/crf/forms/{id}` — partial update of a CRF form.
 #[utoipa::path(
     patch, path = "/forms/{id}", tag = "crf",

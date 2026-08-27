@@ -20,6 +20,7 @@
 //! - `GET    /versions/{version_id}/forms`                 list_forms_by_version
 //! - `GET    /versions/{version_id}/forms/search`          search_forms_by_version
 //! - `GET    /forms/{id}`                                  get_form_by_id
+//! - `GET    /forms/{id}/details`                          get_form_details
 //! - `PATCH  /forms/{id}`                                  update_form
 //! - `DELETE /forms/{id}`                                  delete_form
 //! - `POST   /forms/{form_id}/items`                       create_item
@@ -79,6 +80,7 @@ pub fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(handlers::list_forms_by_version))
         .routes(routes!(handlers::search_forms_by_version))
         .routes(routes!(handlers::get_form_by_id))
+        .routes(routes!(handlers::get_form_details))
         .routes(routes!(handlers::update_form))
         .routes(routes!(handlers::delete_form))
         // ---- CrfItem ----
