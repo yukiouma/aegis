@@ -172,7 +172,6 @@ pub struct CrfUnit {
 // domain/domain_annotation.rs
 pub struct DomainAnnotation {
     pub id: i32,
-    pub version_id: i32,
     pub form_id: i32,
     pub name: String,
     pub description: String,
@@ -244,7 +243,6 @@ crf_units
 
 crf_domain_annotations
   id             BIGSERIAL PRIMARY KEY
-  version_id     BIGINT NOT NULL REFERENCES crf_versions(id) ON DELETE CASCADE
   form_id        BIGINT NOT NULL REFERENCES crf_forms(id) ON DELETE CASCADE
   name           TEXT NOT NULL
   description    TEXT NOT NULL DEFAULT ''
@@ -268,12 +266,12 @@ crf_annotations                               -- polymorphic: owned by exactly o
 One `BEFORE UPDATE` trigger per table refreshes `updated_at` to `NOW()` so every
 code path (direct SQL, ad-hoc psql, future pgBouncer proxies) is covered.
 
-`DomainAnnotation` carries both `version_id` and `form_id` for ergonomic
-joins: `version_id` scopes search and forms a `UNIQUE (version_id, name)`
-constraint candidate; `form_id` makes "list labels attached to this form"
-a direct FK lookup. The chosen `UNIQUE (form_id, name)` reflects the
-"label names are unique within a form" semantic, which matches the
-"one domain annotation belongs to one form" decision.
+`DomainAnnotation` belongs to exactly one form (`form_id` FK). It
+deliberately carries no `version_id`: a form is the unique parent, and
+version_id is reachable through `crf_forms.version_id` whenever a
+version-scoped query needs to join. `UNIQUE (form_id, name)` enforces
+"label names are unique within a form" — the natural key for a form-scoped
+label pool.
 
 ## List strategy
 
@@ -302,7 +300,7 @@ than a JOIN-per-row and keeps the per-entity queries cacheable.
 | `search_items_by_version` | `code, name` | `WHERE form_id IN (SELECT id FROM crf_forms WHERE version_id = $1)` |
 | `search_options_by_version` | `value` | `WHERE item_id IN (SELECT id FROM crf_items WHERE form_id IN (SELECT id FROM crf_forms WHERE version_id = $1))` |
 | `search_units_by_version` | `value` | same path as options |
-| `search_domain_annotations_by_version` | `name, description` | `JOIN crf_forms ON ... WHERE version_id = $1` |
+| `search_domain_annotations_by_version` | `name, description` | `JOIN crf_forms ON crf_domain_annotations.form_id = crf_forms.id WHERE crf_forms.version_id = $1` |
 | `search_annotations_by_version` | `content` | UNION of all four owner types where the chain reaches the version |
 
 Search uses `ILIKE '%' || $2 || '%'` (case-insensitive). No FTS — keeps the
@@ -504,7 +502,7 @@ pub struct CrfOptionView        { pub id: i32, pub item_id: i32, pub value: Stri
 pub struct CrfUnitView          { pub id: i32, pub item_id: i32, pub value: String,
                                    pub not_submitted: bool,
                                    pub created_at: DateTime<Utc>, pub updated_at: DateTime<Utc> }
-pub struct DomainAnnotationView { pub id: i32, pub version_id: i32, pub form_id: i32,
+pub struct DomainAnnotationView { pub id: i32, pub form_id: i32,
                                    pub name: String, pub description: String,
                                    pub created_at: DateTime<Utc>, pub updated_at: DateTime<Utc> }
 pub struct AnnotationView       { pub id: i32, pub domain_annotation_id: i32,
@@ -524,7 +522,7 @@ pub struct CreateCrfOptionRequest      { pub item_id: i32, pub value: String, pu
 pub struct UpdateCrfOptionRequest      { ... }
 pub struct CreateCrfUnitRequest        { pub item_id: i32, pub value: String, pub not_submitted: bool }
 pub struct UpdateCrfUnitRequest        { ... }
-pub struct CreateDomainAnnotationRequest { pub version_id: i32, pub form_id: i32,
+pub struct CreateDomainAnnotationRequest { pub form_id: i32,
                                             pub name: String, pub description: String }
 pub struct UpdateDomainAnnotationRequest { pub id: i32, /* name?, description? */ }
 pub struct CreateAnnotationRequest     { pub owner: AnnotationOwner, pub domain_annotation_id: i32,
