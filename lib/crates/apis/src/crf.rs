@@ -182,6 +182,44 @@ pub struct BulkCreateCrfFormResult {
     pub items: Vec<CrfItemView>,
 }
 
+/// Composed view for [`CrfService::get_form_detail`]. Mirrors
+/// `crf::usecase::CrfFormDetailView` — see that type for the
+/// field-level semantics. The facade adapts `usecase::*DetailView`
+/// into this shape via field-by-field `From` impls.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrfFormDetailView {
+    pub form: CrfFormView,
+    pub form_annotations: Vec<AnnotationView>,
+    pub items: Vec<CrfItemDetailView>,
+    pub domain_annotations: Vec<DomainAnnotationView>,
+}
+
+/// One item in `CrfFormDetailView::items`, composed with its
+/// options, units, and item-level annotations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrfItemDetailView {
+    pub item: CrfItemView,
+    pub options: Vec<CrfOptionDetailView>,
+    pub units: Vec<CrfUnitDetailView>,
+    pub annotations: Vec<AnnotationView>,
+}
+
+/// One option in `CrfItemDetailView::options`, composed with
+/// its option-level annotations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrfOptionDetailView {
+    pub option: CrfOptionView,
+    pub annotations: Vec<AnnotationView>,
+}
+
+/// One unit in `CrfItemDetailView::units`, composed with its
+/// unit-level annotations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrfUnitDetailView {
+    pub unit: CrfUnitView,
+    pub annotations: Vec<AnnotationView>,
+}
+
 /// Input DTO for [`CrfService::update_form`].
 #[derive(Debug, Default, Clone)]
 pub struct UpdateCrfFormRequest {
@@ -287,6 +325,12 @@ pub struct GetCrfVersionByIdRequest {
 #[derive(Debug, Clone)]
 pub struct GetCrfFormByIdRequest {
     pub id: i64,
+}
+
+/// Input DTO for [`CrfService::get_form_detail`].
+#[derive(Debug, Clone)]
+pub struct GetCrfFormDetailRequest {
+    pub form_id: i64,
 }
 #[derive(Debug, Clone)]
 pub struct GetCrfItemByIdRequest {
@@ -523,6 +567,17 @@ pub trait CrfService: Send + Sync {
     async fn create_form(&self, req: CreateCrfFormRequest) -> Result<CrfFormView, CrfApiError>;
 
     async fn get_form_by_id(&self, req: GetCrfFormByIdRequest) -> Result<CrfFormView, CrfApiError>;
+
+    /// Return every piece of state owned by this form (items
+    /// composed with their options, units, and per-layer
+    /// annotations, plus the form's domain annotations and
+    /// form-level annotations) in a single response. Returns
+    /// `CrfApiError::CrfFormNotFound(form_id)` if the form does
+    /// not exist.
+    async fn get_form_detail(
+        &self,
+        req: GetCrfFormDetailRequest,
+    ) -> Result<CrfFormDetailView, CrfApiError>;
 
     /// List every form attached to the given version, ordered
     /// by `order ASC, id ASC`.
