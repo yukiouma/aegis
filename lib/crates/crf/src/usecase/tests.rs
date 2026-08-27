@@ -324,10 +324,7 @@ impl CrfOptionRepository for InMemoryOptions {
             .cloned()
             .collect())
     }
-    async fn list_by_items(
-        &self,
-        item_ids: &[i64],
-    ) -> Result<Vec<CrfOption>, DomainError> {
+    async fn list_by_items(&self, item_ids: &[i64]) -> Result<Vec<CrfOption>, DomainError> {
         if item_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -414,10 +411,7 @@ impl CrfUnitRepository for InMemoryUnits {
             .cloned()
             .collect())
     }
-    async fn list_by_items(
-        &self,
-        item_ids: &[i64],
-    ) -> Result<Vec<CrfUnit>, DomainError> {
+    async fn list_by_items(&self, item_ids: &[i64]) -> Result<Vec<CrfUnit>, DomainError> {
         if item_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -592,10 +586,7 @@ impl AnnotationRepository for InMemoryAnnotations {
             .cloned()
             .collect())
     }
-    async fn list_by_items(
-        &self,
-        item_ids: &[i64],
-    ) -> Result<Vec<Annotation>, DomainError> {
+    async fn list_by_items(&self, item_ids: &[i64]) -> Result<Vec<Annotation>, DomainError> {
         if item_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -606,24 +597,20 @@ impl AnnotationRepository for InMemoryAnnotations {
             .cloned()
             .collect())
     }
-    async fn list_by_options(
-        &self,
-        option_ids: &[i64],
-    ) -> Result<Vec<Annotation>, DomainError> {
+    async fn list_by_options(&self, option_ids: &[i64]) -> Result<Vec<Annotation>, DomainError> {
         if option_ids.is_empty() {
             return Ok(Vec::new());
         }
         let rows = self.rows.lock().unwrap();
         Ok(rows
             .values()
-            .filter(|a| matches!(a.owner, AnnotationOwner::Option { id } if option_ids.contains(&id)))
+            .filter(
+                |a| matches!(a.owner, AnnotationOwner::Option { id } if option_ids.contains(&id)),
+            )
             .cloned()
             .collect())
     }
-    async fn list_by_units(
-        &self,
-        unit_ids: &[i64],
-    ) -> Result<Vec<Annotation>, DomainError> {
+    async fn list_by_units(&self, unit_ids: &[i64]) -> Result<Vec<Annotation>, DomainError> {
         if unit_ids.is_empty() {
             return Ok(Vec::new());
         }

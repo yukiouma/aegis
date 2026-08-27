@@ -648,5 +648,8 @@ async fn get_form_detail_missing_form_returns_not_found() {
     let pool = connect().await;
     let forms = CrfFormRepoPg::new(pool);
     let result = forms.find_by_id(99_999_999).await;
-    assert!(matches!(result, Err(DomainError::CrfFormNotFound(99_999_999))));
+    assert!(matches!(
+        result,
+        Err(DomainError::CrfFormNotFound(99_999_999))
+    ));
 }

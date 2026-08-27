@@ -247,10 +247,7 @@ impl<
     /// wave 2, 1 each in waves 3 and 4 (9 queries, max 4 in
     /// flight). Waves 2-4 are skipped entirely when their
     /// inputs are empty.
-    pub async fn get_form_detail(
-        &self,
-        form_id: i64,
-    ) -> Result<CrfFormDetailView, UsecaseError> {
+    pub async fn get_form_detail(&self, form_id: i64) -> Result<CrfFormDetailView, UsecaseError> {
         use std::collections::HashMap;
 
         // Wave 1: form + items + domain_annotations + form-level annotations.

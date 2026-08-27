@@ -178,10 +178,7 @@ impl AnnotationRepository for AnnotationRepoPg {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    async fn list_by_items(
-        &self,
-        item_ids: &[i64],
-    ) -> Result<Vec<Annotation>, DomainError> {
+    async fn list_by_items(&self, item_ids: &[i64]) -> Result<Vec<Annotation>, DomainError> {
         if item_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -197,10 +194,7 @@ impl AnnotationRepository for AnnotationRepoPg {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    async fn list_by_options(
-        &self,
-        option_ids: &[i64],
-    ) -> Result<Vec<Annotation>, DomainError> {
+    async fn list_by_options(&self, option_ids: &[i64]) -> Result<Vec<Annotation>, DomainError> {
         if option_ids.is_empty() {
             return Ok(Vec::new());
         }
@@ -216,10 +210,7 @@ impl AnnotationRepository for AnnotationRepoPg {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    async fn list_by_units(
-        &self,
-        unit_ids: &[i64],
-    ) -> Result<Vec<Annotation>, DomainError> {
+    async fn list_by_units(&self, unit_ids: &[i64]) -> Result<Vec<Annotation>, DomainError> {
         if unit_ids.is_empty() {
             return Ok(Vec::new());
         }

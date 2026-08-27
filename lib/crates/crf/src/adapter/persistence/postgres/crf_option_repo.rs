@@ -80,10 +80,7 @@ impl CrfOptionRepository for CrfOptionRepoPg {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    async fn list_by_items(
-        &self,
-        item_ids: &[i64],
-    ) -> Result<Vec<CrfOption>, DomainError> {
+    async fn list_by_items(&self, item_ids: &[i64]) -> Result<Vec<CrfOption>, DomainError> {
         if item_ids.is_empty() {
             return Ok(Vec::new());
         }

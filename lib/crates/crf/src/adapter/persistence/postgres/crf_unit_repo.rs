@@ -80,10 +80,7 @@ impl CrfUnitRepository for CrfUnitRepoPg {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    async fn list_by_items(
-        &self,
-        item_ids: &[i64],
-    ) -> Result<Vec<CrfUnit>, DomainError> {
+    async fn list_by_items(&self, item_ids: &[i64]) -> Result<Vec<CrfUnit>, DomainError> {
         if item_ids.is_empty() {
             return Ok(Vec::new());
         }
