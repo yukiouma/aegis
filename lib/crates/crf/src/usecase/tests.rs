@@ -414,6 +414,20 @@ impl CrfUnitRepository for InMemoryUnits {
             .cloned()
             .collect())
     }
+    async fn list_by_items(
+        &self,
+        item_ids: &[i64],
+    ) -> Result<Vec<CrfUnit>, DomainError> {
+        if item_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows = self.rows.lock().unwrap();
+        Ok(rows
+            .values()
+            .filter(|u| item_ids.contains(&u.item_id))
+            .cloned()
+            .collect())
+    }
     async fn update(&self, input: CrfUnitUpdate) -> Result<CrfUnit, DomainError> {
         let mut rows = self.rows.lock().unwrap();
         let u = rows

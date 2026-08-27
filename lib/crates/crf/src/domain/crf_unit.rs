@@ -88,6 +88,14 @@ pub trait CrfUnitRepository: Send + Sync {
     async fn create(&self, input: CrfUnitNew) -> Result<CrfUnit, DomainError>;
     async fn find_by_id(&self, id: i64) -> Result<CrfUnit, DomainError>;
     async fn list_by_item(&self, item_id: i64) -> Result<Vec<CrfUnit>, DomainError>;
+    /// Batch-fetch every unit whose `item_id` is in `item_ids`.
+    /// Returns `Ok(Vec::new())` for empty input without hitting
+    /// the DB. Used by the form-detail usecase to hydrate the
+    /// items subtree in one round-trip.
+    async fn list_by_items(
+        &self,
+        item_ids: &[i64],
+    ) -> Result<Vec<CrfUnit>, DomainError>;
     async fn update(&self, input: CrfUnitUpdate) -> Result<CrfUnit, DomainError>;
     async fn delete(&self, id: i64) -> Result<(), DomainError>;
     async fn search_by_version(

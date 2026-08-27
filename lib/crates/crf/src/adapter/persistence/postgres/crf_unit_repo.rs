@@ -80,6 +80,24 @@ impl CrfUnitRepository for CrfUnitRepoPg {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
+    async fn list_by_items(
+        &self,
+        item_ids: &[i64],
+    ) -> Result<Vec<CrfUnit>, DomainError> {
+        if item_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows = sqlx::query_as::<_, CrfUnitRow>(
+            "SELECT id, item_id, value, not_submitted, created_at, updated_at
+             FROM crf_units WHERE item_id = ANY($1) ORDER BY id ASC",
+        )
+        .bind(item_ids)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
     async fn update(&self, input: CrfUnitUpdate) -> Result<CrfUnit, DomainError> {
         let row: CrfUnitRow = sqlx::query_as::<_, CrfUnitRow>(
             "UPDATE crf_units SET
