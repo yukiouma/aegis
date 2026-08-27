@@ -19,11 +19,11 @@
 use std::sync::atomic::{AtomicI64, Ordering};
 
 use crf::{
-    Annotation, AnnotationOwner, CrfFormNew, CrfFormRepoPg, CrfFormRepository, CrfItemKind,
-    CrfItemNew, CrfItemRepoPg, CrfItemRepository, CrfOptionNew, CrfOptionRepoPg,
-    CrfOptionRepository, CrfUnitNew, CrfUnitRepoPg, CrfUnitRepository, CrfVersion, CrfVersionNew,
-    CrfVersionRepoPg, CrfVersionRepository, DomainAnnotationNew, DomainAnnotationRepoPg,
-    DomainAnnotationRepository, DomainError,
+    Annotation, AnnotationOwner, AnnotationRepoPg, AnnotationRepository, CrfFormNew, CrfFormRepoPg,
+    CrfFormRepository, CrfItemKind, CrfItemNew, CrfItemRepoPg, CrfItemRepository, CrfOptionNew,
+    CrfOptionRepoPg, CrfOptionRepository, CrfUnitNew, CrfUnitRepoPg, CrfUnitRepository, CrfVersion,
+    CrfVersionNew, CrfVersionRepoPg, CrfVersionRepository, DomainAnnotationNew,
+    DomainAnnotationRepoPg, DomainAnnotationRepository, DomainError,
 };
 
 static ID_GEN: AtomicI64 = AtomicI64::new(0);
@@ -473,4 +473,180 @@ async fn polymorphic_owner_round_trip() {
 #[test]
 fn domain_aggregates_construct() {
     let _ = CrfVersion::new("P1".into(), "v1".into()).unwrap();
+}
+
+// Exercise every new batch port method against Postgres. The
+// seed uses raw SQL for annotations (matching the
+// `polymorphic_owner_round_trip` convention so each FK column
+// gets the right literal query and the polymorphic CHECK
+// constraint is satisfied).
+#[tokio::test]
+#[ignore]
+async fn get_form_detail_batch_ports_round_trip() {
+    let pool = connect().await;
+    let versions = CrfVersionRepoPg::new(pool.clone());
+    let forms = CrfFormRepoPg::new(pool.clone());
+    let items = CrfItemRepoPg::new(pool.clone());
+    let options = CrfOptionRepoPg::new(pool.clone());
+    let units = CrfUnitRepoPg::new(pool.clone());
+    let domain_annotations = DomainAnnotationRepoPg::new(pool.clone());
+    let annotations = AnnotationRepoPg::new(pool.clone());
+
+    let suffix = unique_suffix();
+    let v = versions
+        .create(CrfVersionNew {
+            project_code: format!("P_{suffix}"),
+            name: "v1".into(),
+        })
+        .await
+        .unwrap();
+    let f = forms
+        .create(CrfFormNew {
+            version_id: v.id,
+            code: format!("F_{suffix}"),
+            name: "F".into(),
+            order: 0,
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+    let i1 = items
+        .create(CrfItemNew {
+            form_id: f.id,
+            code: format!("I1_{suffix}"),
+            name: "I1".into(),
+            kind: CrfItemKind::Text,
+            order: 0,
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+    let i2 = items
+        .create(CrfItemNew {
+            form_id: f.id,
+            code: format!("I2_{suffix}"),
+            name: "I2".into(),
+            kind: CrfItemKind::Text,
+            order: 1,
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+    let o1 = options
+        .create(CrfOptionNew {
+            item_id: i1.id,
+            value: "yes".into(),
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+    let u1 = units
+        .create(CrfUnitNew {
+            item_id: i1.id,
+            value: "mg".into(),
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+    let d = domain_annotations
+        .create(DomainAnnotationNew {
+            form_id: f.id,
+            name: format!("D_{suffix}"),
+            description: "d".into(),
+        })
+        .await
+        .unwrap();
+
+    // Insert one annotation per layer via raw SQL (the
+    // polymorphic CHECK constraint needs exactly one FK).
+    sqlx::query_as::<_, (i64,)>(
+        "INSERT INTO crf_annotations (form_id, domain_annotation_id, content, assign)
+         VALUES ($1, $2, $3, $4) RETURNING id",
+    )
+    .bind(f.id)
+    .bind(d.id)
+    .bind("form-level")
+    .bind(false)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query_as::<_, (i64,)>(
+        "INSERT INTO crf_annotations (item_id, domain_annotation_id, content, assign)
+         VALUES ($1, $2, $3, $4) RETURNING id",
+    )
+    .bind(i1.id)
+    .bind(d.id)
+    .bind("item-1")
+    .bind(false)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query_as::<_, (i64,)>(
+        "INSERT INTO crf_annotations (option_id, domain_annotation_id, content, assign)
+         VALUES ($1, $2, $3, $4) RETURNING id",
+    )
+    .bind(o1.id)
+    .bind(d.id)
+    .bind("option-1")
+    .bind(false)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    sqlx::query_as::<_, (i64,)>(
+        "INSERT INTO crf_annotations (unit_id, domain_annotation_id, content, assign)
+         VALUES ($1, $2, $3, $4) RETURNING id",
+    )
+    .bind(u1.id)
+    .bind(d.id)
+    .bind("unit-1")
+    .bind(false)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+
+    // Exercise every new batch port.
+    let item_ids = vec![i1.id, i2.id];
+    let batch_opts = options.list_by_items(&item_ids).await.unwrap();
+    assert_eq!(batch_opts.len(), 1, "i1 has one option");
+    assert_eq!(batch_opts[0].id, o1.id);
+
+    let batch_units = units.list_by_items(&item_ids).await.unwrap();
+    assert_eq!(batch_units.len(), 1);
+    assert_eq!(batch_units[0].id, u1.id);
+
+    let batch_item_anns = annotations.list_by_items(&item_ids).await.unwrap();
+    assert_eq!(batch_item_anns.len(), 1);
+    assert_eq!(
+        batch_item_anns[0].owner,
+        AnnotationOwner::Item { id: i1.id }
+    );
+
+    let batch_opt_anns = annotations.list_by_options(&[o1.id]).await.unwrap();
+    assert_eq!(batch_opt_anns.len(), 1);
+    assert_eq!(
+        batch_opt_anns[0].owner,
+        AnnotationOwner::Option { id: o1.id }
+    );
+
+    let batch_unit_anns = annotations.list_by_units(&[u1.id]).await.unwrap();
+    assert_eq!(batch_unit_anns.len(), 1);
+    assert_eq!(
+        batch_unit_anns[0].owner,
+        AnnotationOwner::Unit { id: u1.id }
+    );
+
+    // Empty-input short-circuit.
+    let empty_opts = options.list_by_items(&[]).await.unwrap();
+    assert!(empty_opts.is_empty());
+    let empty_item_anns = annotations.list_by_items(&[]).await.unwrap();
+    assert!(empty_item_anns.is_empty());
+}
+
+#[tokio::test]
+#[ignore]
+async fn get_form_detail_missing_form_returns_not_found() {
+    let pool = connect().await;
+    let forms = CrfFormRepoPg::new(pool);
+    let result = forms.find_by_id(99_999_999).await;
+    assert!(matches!(result, Err(DomainError::CrfFormNotFound(99_999_999))));
 }
