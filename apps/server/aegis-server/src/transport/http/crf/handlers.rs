@@ -9,19 +9,13 @@
 //! `CrfApiError` is funnelled through [`ApiError::from`] so each
 //! route returns `Result<Json<T>, ApiError>` and the error mapping
 //! in `transport::http::error` does the rest.
-//!
-//! The role policy lives in
-//! [`crate::transport::http::auth::middleware::require_admin_or_root`];
-//! every write handler (POST / PATCH / DELETE) calls it before
-//! dispatching to the usecase, matching the terminology module's
-//! policy.
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 
 use crate::state::AppState;
-use crate::transport::http::auth::middleware::{AuthClaims, require_admin_or_root};
+use crate::transport::http::auth::middleware::AuthClaims;
 use crate::transport::http::dto::{self, CrfFragmentQuery, CrfPathId, ProjectPathCode};
 use crate::transport::http::error::ApiError;
 
@@ -49,11 +43,10 @@ use crate::transport::http::error::ApiError;
 )]
 pub async fn create_version(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(ProjectPathCode { project_code }): Path<ProjectPathCode>,
     Json(req): Json<dto::CreateCrfVersionRequest>,
 ) -> Result<(StatusCode, Json<dto::CrfVersionViewResponse>), ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let view = state
         .crf
         .create_version(apis::crf::CreateCrfVersionRequest {
@@ -139,11 +132,10 @@ pub async fn get_version_by_id(
 )]
 pub async fn update_version(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id }): Path<CrfPathId>,
     Json(req): Json<dto::UpdateCrfVersionRequest>,
 ) -> Result<Json<dto::CrfVersionViewResponse>, ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let view = state
         .crf
         .update_version(apis::crf::UpdateCrfVersionRequest { id, name: req.name })
@@ -169,10 +161,9 @@ pub async fn update_version(
 )]
 pub async fn delete_version(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id }): Path<CrfPathId>,
 ) -> Result<StatusCode, ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     state.crf.delete_version(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -201,11 +192,10 @@ pub async fn delete_version(
 )]
 pub async fn create_form(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id: version_id }): Path<CrfPathId>,
     Json(req): Json<dto::CreateCrfFormRequest>,
 ) -> Result<(StatusCode, Json<dto::CrfFormViewResponse>), ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let view = state
         .crf
         .create_form(apis::crf::CreateCrfFormRequest {
@@ -245,11 +235,10 @@ pub async fn create_form(
 )]
 pub async fn bulk_create_form(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id: version_id }): Path<CrfPathId>,
     Json(req): Json<dto::BulkCreateCrfFormRequest>,
 ) -> Result<(StatusCode, Json<dto::BulkCreateCrfFormResponse>), ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let result = state
         .crf
         .bulk_create_form(apis::crf::BulkCreateCrfFormRequest {
@@ -407,11 +396,10 @@ pub async fn get_form_by_id(
 )]
 pub async fn update_form(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id }): Path<CrfPathId>,
     Json(req): Json<dto::UpdateCrfFormRequest>,
 ) -> Result<Json<dto::CrfFormViewResponse>, ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let view = state
         .crf
         .update_form(apis::crf::UpdateCrfFormRequest {
@@ -443,10 +431,9 @@ pub async fn update_form(
 )]
 pub async fn delete_form(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id }): Path<CrfPathId>,
 ) -> Result<StatusCode, ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     state.crf.delete_form(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -475,11 +462,10 @@ pub async fn delete_form(
 )]
 pub async fn create_item(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id: form_id }): Path<CrfPathId>,
     Json(req): Json<dto::CreateCrfItemRequest>,
 ) -> Result<(StatusCode, Json<dto::CrfItemViewResponse>), ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let view = state
         .crf
         .create_item(apis::crf::CreateCrfItemRequest {
@@ -609,11 +595,10 @@ pub async fn get_item_by_id(
 )]
 pub async fn update_item(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id }): Path<CrfPathId>,
     Json(req): Json<dto::UpdateCrfItemRequest>,
 ) -> Result<Json<dto::CrfItemViewResponse>, ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let view = state
         .crf
         .update_item(apis::crf::UpdateCrfItemRequest {
@@ -646,10 +631,9 @@ pub async fn update_item(
 )]
 pub async fn delete_item(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id }): Path<CrfPathId>,
 ) -> Result<StatusCode, ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     state.crf.delete_item(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -677,11 +661,10 @@ pub async fn delete_item(
 )]
 pub async fn create_option(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id: item_id }): Path<CrfPathId>,
     Json(req): Json<dto::CreateCrfOptionRequest>,
 ) -> Result<(StatusCode, Json<dto::CrfOptionViewResponse>), ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let view = state
         .crf
         .create_option(apis::crf::CreateCrfOptionRequest {
@@ -811,11 +794,10 @@ pub async fn get_option_by_id(
 )]
 pub async fn update_option(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id }): Path<CrfPathId>,
     Json(req): Json<dto::UpdateCrfOptionRequest>,
 ) -> Result<Json<dto::CrfOptionViewResponse>, ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let view = state
         .crf
         .update_option(apis::crf::UpdateCrfOptionRequest {
@@ -845,10 +827,9 @@ pub async fn update_option(
 )]
 pub async fn delete_option(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id }): Path<CrfPathId>,
 ) -> Result<StatusCode, ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     state.crf.delete_option(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -876,11 +857,10 @@ pub async fn delete_option(
 )]
 pub async fn create_unit(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id: item_id }): Path<CrfPathId>,
     Json(req): Json<dto::CreateCrfUnitRequest>,
 ) -> Result<(StatusCode, Json<dto::CrfUnitViewResponse>), ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let view = state
         .crf
         .create_unit(apis::crf::CreateCrfUnitRequest {
@@ -1010,11 +990,10 @@ pub async fn get_unit_by_id(
 )]
 pub async fn update_unit(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id }): Path<CrfPathId>,
     Json(req): Json<dto::UpdateCrfUnitRequest>,
 ) -> Result<Json<dto::CrfUnitViewResponse>, ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let view = state
         .crf
         .update_unit(apis::crf::UpdateCrfUnitRequest {
@@ -1044,10 +1023,9 @@ pub async fn update_unit(
 )]
 pub async fn delete_unit(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id }): Path<CrfPathId>,
 ) -> Result<StatusCode, ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     state.crf.delete_unit(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -1076,11 +1054,10 @@ pub async fn delete_unit(
 )]
 pub async fn create_domain_annotation(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id: form_id }): Path<CrfPathId>,
     Json(req): Json<dto::CreateDomainAnnotationRequest>,
 ) -> Result<(StatusCode, Json<dto::DomainAnnotationViewResponse>), ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let view = state
         .crf
         .create_domain_annotation(apis::crf::CreateDomainAnnotationRequest {
@@ -1208,11 +1185,10 @@ pub async fn get_domain_annotation_by_id(
 )]
 pub async fn update_domain_annotation(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id }): Path<CrfPathId>,
     Json(req): Json<dto::UpdateDomainAnnotationRequest>,
 ) -> Result<Json<dto::DomainAnnotationViewResponse>, ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let view = state
         .crf
         .update_domain_annotation(apis::crf::UpdateDomainAnnotationRequest {
@@ -1243,10 +1219,9 @@ pub async fn update_domain_annotation(
 )]
 pub async fn delete_domain_annotation(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id }): Path<CrfPathId>,
 ) -> Result<StatusCode, ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     state.crf.delete_domain_annotation(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -1271,10 +1246,9 @@ pub async fn delete_domain_annotation(
 )]
 pub async fn create_annotation(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Json(req): Json<dto::CreateAnnotationRequest>,
 ) -> Result<(StatusCode, Json<dto::AnnotationViewResponse>), ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let view = state
         .crf
         .create_annotation(apis::crf::CreateAnnotationRequest {
@@ -1483,11 +1457,10 @@ pub async fn get_annotation_by_id(
 )]
 pub async fn update_annotation(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id }): Path<CrfPathId>,
     Json(req): Json<dto::UpdateAnnotationRequest>,
 ) -> Result<Json<dto::AnnotationViewResponse>, ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     let view = state
         .crf
         .update_annotation(apis::crf::UpdateAnnotationRequest {
@@ -1517,10 +1490,9 @@ pub async fn update_annotation(
 )]
 pub async fn delete_annotation(
     State(state): State<AppState>,
-    claims: AuthClaims,
     Path(CrfPathId { id }): Path<CrfPathId>,
 ) -> Result<StatusCode, ApiError> {
-    require_admin_or_root(&claims)?;
+    // TODO: reject or not base on the project role
     state.crf.delete_annotation(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
