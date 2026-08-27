@@ -3,7 +3,10 @@
 //! `Update*Request` 1:1 so the facade can `From`-convert at
 //! the boundary without losing data.
 
-use crate::domain::{AnnotationOwner, CrfItemKind, CrfItemUpdate as DomainCrfItemUpdate};
+use crate::domain::{
+    AnnotationOwner, CrfBulkCreateForm as DomainCrfBulkCreateForm, CrfFormNew, CrfItemKind,
+    CrfItemNew, CrfItemUpdate as DomainCrfItemUpdate, CrfOptionNew, CrfUnitNew,
+};
 
 // ---- CrfVersion ----
 
@@ -159,4 +162,68 @@ pub struct SearchDomainAnnotationsByVersion {
 pub struct SearchAnnotationsByVersion {
     pub version_id: i64,
     pub fragment: String,
+}
+
+// ---- CrfBulkForm ----
+
+/// Bulk create a form + every item + each item's options + units
+/// atomically. Mirrors `apis::crf::BulkCreateCrfFormRequest`.
+pub struct CreateCrfBulkForm {
+    pub form: CreateCrfForm,
+    pub items: Vec<CreateCrfBulkItem>,
+}
+
+/// One item in the bulk input plus its options and units. The
+/// `item.form_id` field is `0` — the port stamps the real
+/// surrogate id on the row at insert time.
+pub struct CreateCrfBulkItem {
+    pub item: CreateCrfItem,
+    pub options: Vec<CreateCrfOption>,
+    pub units: Vec<CreateCrfUnit>,
+}
+
+impl From<CreateCrfBulkForm> for DomainCrfBulkCreateForm {
+    fn from(cmd: CreateCrfBulkForm) -> Self {
+        DomainCrfBulkCreateForm {
+            form: CrfFormNew {
+                version_id: cmd.form.version_id,
+                code: cmd.form.code,
+                name: cmd.form.name,
+                order: cmd.form.order,
+                not_submitted: cmd.form.not_submitted,
+            },
+            items: cmd
+                .items
+                .into_iter()
+                .map(|bi| crate::domain::CrfBulkCreateItem {
+                    item: CrfItemNew {
+                        form_id: 0, // port stamps the real form_id
+                        code: bi.item.code,
+                        name: bi.item.name,
+                        kind: bi.item.kind,
+                        order: bi.item.order,
+                        not_submitted: bi.item.not_submitted,
+                    },
+                    options: bi
+                        .options
+                        .into_iter()
+                        .map(|o| CrfOptionNew {
+                            item_id: 0, // port stamps the real item_id
+                            value: o.value,
+                            not_submitted: o.not_submitted,
+                        })
+                        .collect(),
+                    units: bi
+                        .units
+                        .into_iter()
+                        .map(|u| CrfUnitNew {
+                            item_id: 0, // port stamps the real item_id
+                            value: u.value,
+                            not_submitted: u.not_submitted,
+                        })
+                        .collect(),
+                })
+                .collect(),
+        }
+    }
 }

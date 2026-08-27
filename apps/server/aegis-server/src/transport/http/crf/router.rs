@@ -16,6 +16,7 @@
 //! - `PATCH  /versions/{id}`                               update_version
 //! - `DELETE /versions/{id}`                               delete_version
 //! - `POST   /versions/{version_id}/forms`                 create_form
+//! - `POST   /versions/{version_id}/forms/bulk`            bulk_create_form
 //! - `GET    /versions/{version_id}/forms`                 list_forms_by_version
 //! - `GET    /versions/{version_id}/forms/search`          search_forms_by_version
 //! - `GET    /forms/{id}`                                  get_form_by_id
@@ -74,6 +75,7 @@ pub fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(handlers::delete_version))
         // ---- CrfForm ----
         .routes(routes!(handlers::create_form))
+        .routes(routes!(handlers::bulk_create_form))
         .routes(routes!(handlers::list_forms_by_version))
         .routes(routes!(handlers::search_forms_by_version))
         .routes(routes!(handlers::get_form_by_id))

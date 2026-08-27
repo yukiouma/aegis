@@ -8,6 +8,7 @@
 //! `DomainError`. No I/O, no `sqlx`, no `tokio`.
 
 mod annotation;
+mod crf_bulk_form;
 mod crf_form;
 mod crf_item;
 mod crf_item_kind;
@@ -23,6 +24,10 @@ mod tests;
 
 pub use annotation::{
     Annotation, AnnotationNew, AnnotationOwner, AnnotationRepository, AnnotationUpdate,
+};
+pub use crf_bulk_form::{
+    CrfBulkCreateForm, CrfBulkCreateFormResult, CrfBulkCreateItem, CrfBulkFormRepository,
+    validate_bulk_create,
 };
 pub use crf_form::{CrfForm, CrfFormNew, CrfFormRepository, CrfFormUpdate};
 pub use crf_item::{CrfItem, CrfItemNew, CrfItemRepository, CrfItemUpdate};

@@ -179,3 +179,12 @@ impl From<Annotation> for AnnotationView {
         }
     }
 }
+
+/// Return shape for `CrfUsecase::create_bulk_form`. Mirrors
+/// `apis::crf::BulkCreateCrfFormResult`. Caller can fetch options
+/// and units through the existing per-item list endpoints.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrfBulkFormResult {
+    pub form: CrfFormView,
+    pub items: Vec<CrfItemView>,
+}

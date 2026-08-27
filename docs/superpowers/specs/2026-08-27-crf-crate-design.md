@@ -16,9 +16,14 @@ The crate owns:
 - A narrow `domain::ProjectLookup` port (just `get_by_code`) that the usecase
   uses to validate `CrfVersion.project_code` against the `project` crate. The
   concrete adapter delegates to `apis::project::ProjectService`.
-- A single `CrfUsecase<V, F, I, O, U, Da, A, P>` generic over all eight ports
-  (seven repos + project lookup) that orchestrates every CRUD operation, the
-  version-scoped search, and projects domain aggregates into view DTOs.
+- A transactional `domain::CrfBulkFormRepository` port (plus the
+  `CrfBulkFormRepoPg` adapter) that atomically inserts a form, every
+  item, and each item's options + units in a single
+  `pool.begin()` transaction. The port stays free of `sqlx` types.
+- A single `CrfUsecase<V, F, I, O, U, Da, A, P, B>` generic over all nine
+  ports (seven repos + project lookup + bulk form) that orchestrates
+  every CRUD operation, the version-scoped search, the bulk form
+  creation, and projects domain aggregates into view DTOs.
 - A `CrfServiceImpl` in-memory facade that adapts `CrfUsecase` to the apis
   `CrfService` port.
 
@@ -39,7 +44,7 @@ Ports-and-adapters DDD structure, mirroring
   `AnnotationRepository`), cross-crate port (`ProjectLookup`), and
   `DomainError`. No I/O, no `sqlx`, no `tokio`. The narrow `ProjectLookup`
   port lives here so the domain never reaches the `apis` crate.
-- `usecase` — `CrfUsecase<V, F, I, O, U, Da, A, P>`, command DTOs (one
+- `usecase` — `CrfUsecase<V, F, I, O, U, Da, A, P, B>`, command DTOs (one
   `Create*` / `Update*` per aggregate plus `CreateAnnotation`),
   view DTOs (`CrfVersionView`, `CrfFormView`, `CrfItemView`,
   `CrfOptionView`, `CrfUnitView`, `DomainAnnotationView`,
@@ -81,18 +86,19 @@ crf/
 │   │   ├── crf_unit.rs
 │   │   ├── domain_annotation.rs
 │   │   ├── annotation.rs                # aggregate + polymorphic constructors
+│   │   ├── crf_bulk_form.rs             # bulk port + CrfBulkCreateForm input + validate_bulk_create
 │   │   └── tests.rs
 │   ├── usecase.rs
 │   ├── usecase/
 │   │   ├── error.rs
-│   │   ├── commands.rs                  # Create*/Update* DTOs
-│   │   ├── views.rs                     # View DTOs + From impls
-│   │   ├── crf_usecase.rs               # the orchestrator
-│   │   └── tests.rs
+│   │   ├── commands.rs                  # Create*/Update* DTOs + CreateCrfBulkForm/CreateCrfBulkItem
+│   │   ├── views.rs                     # View DTOs + From impls + CrfBulkFormResult
+│   │   ├── crf_usecase.rs               # the orchestrator (incl. create_bulk_form)
+│   │   └── tests.rs                     # in-memory fakes + InMemoryBulkForms + bulk_create_form tests
 │   ├── adapter.rs
 │   └── adapter/
 │       ├── persistence.rs               # pub mod postgres
-│       ├── persistence/postgres.rs      # pub mod {crf_version_repo, ...}
+│       ├── persistence/postgres.rs      # pub mod {crf_version_repo, ..., crf_bulk_form_repo}
 │       ├── persistence/postgres/crf_version_repo.rs
 │       ├── persistence/postgres/crf_form_repo.rs
 │       ├── persistence/postgres/crf_item_repo.rs
@@ -100,13 +106,14 @@ crf/
 │       ├── persistence/postgres/crf_unit_repo.rs
 │       ├── persistence/postgres/domain_annotation_repo.rs
 │       ├── persistence/postgres/annotation_repo.rs
+│       ├── persistence/postgres/crf_bulk_form_repo.rs  # transactional bulk insert
 │       ├── service.rs                   # pub mod project
 │       ├── service/project.rs           # pub mod project_lookup_impl
 │       ├── service/project/project_lookup_impl.rs
 │       ├── facade.rs                    # pub mod in_memory
 │       ├── facade/in_memory.rs          # mod service; #[cfg(test)] mod tests;
-│       ├── facade/in_memory/service.rs  # CrfServiceImpl
-│       └── facade/in_memory/tests.rs
+│       ├── facade/in_memory/service.rs  # CrfServiceImpl (incl. bulk_create_form)
+│       └── facade/in_memory/tests.rs    # facade_bulk_create_form_* tests
 └── tests/
     ├── public_api.rs
     └── integration_persistence.rs
@@ -117,7 +124,7 @@ crf/
 ```rust
 // domain/crf_version.rs
 pub struct CrfVersion {
-    pub id: i32,
+    pub id: i64,
     pub project_code: String,
     pub name: String,
     pub created_at: DateTime<Utc>,
@@ -126,11 +133,11 @@ pub struct CrfVersion {
 
 // domain/crf_form.rs
 pub struct CrfForm {
-    pub id: i32,
-    pub version_id: i32,
+    pub id: i64,
+    pub version_id: i64,
     pub code: String,
     pub name: String,
-    pub order: i32,
+    pub order: i64,
     pub not_submitted: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -138,12 +145,12 @@ pub struct CrfForm {
 
 // domain/crf_item.rs
 pub struct CrfItem {
-    pub id: i32,
-    pub form_id: i32,
+    pub id: i64,
+    pub form_id: i64,
     pub code: String,
     pub name: String,
     pub kind: CrfItemKind,
-    pub order: i32,
+    pub order: i64,
     pub not_submitted: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -151,8 +158,8 @@ pub struct CrfItem {
 
 // domain/crf_option.rs
 pub struct CrfOption {
-    pub id: i32,
-    pub item_id: i32,
+    pub id: i64,
+    pub item_id: i64,
     pub value: String,
     pub not_submitted: bool,
     pub created_at: DateTime<Utc>,
@@ -161,8 +168,8 @@ pub struct CrfOption {
 
 // domain/crf_unit.rs
 pub struct CrfUnit {
-    pub id: i32,
-    pub item_id: i32,
+    pub id: i64,
+    pub item_id: i64,
     pub value: String,
     pub not_submitted: bool,
     pub created_at: DateTime<Utc>,
@@ -171,8 +178,8 @@ pub struct CrfUnit {
 
 // domain/domain_annotation.rs
 pub struct DomainAnnotation {
-    pub id: i32,
-    pub form_id: i32,
+    pub id: i64,
+    pub form_id: i64,
     pub name: String,
     pub description: String,
     pub created_at: DateTime<Utc>,
@@ -181,11 +188,11 @@ pub struct DomainAnnotation {
 
 // domain/annotation.rs
 pub struct Annotation {
-    pub id: i32,
-    pub domain_annotation_id: i32,
+    pub id: i64,
+    pub domain_annotation_id: i64,
     pub content: String,
     pub assign: bool,
-    pub owner: AnnotationOwner,    // {Form(i32), Item(i32), Option(i32), Unit(i32)}
+    pub owner: AnnotationOwner,    // {Form(i64), Item(i64), Option(i64), Unit(i64)}
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -378,12 +385,14 @@ pub mod usecase;
 
 pub use adapter::facade::in_memory::CrfServiceImpl;
 pub use adapter::persistence::postgres::{
-    AnnotationRepoPg, CrfFormRepoPg, CrfItemRepoPg, CrfOptionRepoPg,
-    CrfUnitRepoPg, CrfVersionRepoPg, DomainAnnotationRepoPg,
+    AnnotationRepoPg, CrfBulkFormRepoPg, CrfFormRepoPg, CrfItemRepoPg,
+    CrfOptionRepoPg, CrfUnitRepoPg, CrfVersionRepoPg, DomainAnnotationRepoPg,
 };
 pub use adapter::service::project::ProjectLookupImpl;
 pub use domain::{
     Annotation, AnnotationOwner, CrfApiError as _, /* never — error stays in apis */
+    CrfBulkCreateForm, CrfBulkCreateFormResult, CrfBulkCreateItem,
+    CrfBulkFormRepository,
     CrfForm, CrfFormNew, CrfFormRepository, CrfFormUpdate,
     CrfItem, CrfItemKind, CrfItemNew, CrfItemRepository, CrfItemUpdate,
     CrfOption, CrfOptionNew, CrfOptionRepository, CrfOptionUpdate,
@@ -393,8 +402,9 @@ pub use domain::{
     DomainError, ProjectLookup,
 };
 pub use usecase::{
-    AnnotationView, CrfFormView, CrfItemView, CrfOptionView, CrfUsecase,
+    AnnotationView, CrfBulkFormResult, CrfFormView, CrfItemView, CrfOptionView, CrfUsecase,
     CrfUsecaseConfig, CrfUnitView, CrfVersionView, CreateAnnotation,
+    CreateCrfBulkForm, CreateCrfBulkItem,
     CreateCrfForm, CreateCrfItem, CreateCrfOption, CreateCrfUnit,
     CreateCrfVersion, CreateDomainAnnotation, DomainAnnotationView,
     SearchCrfFormsByVersion, SearchCrfItemsByVersion,
@@ -439,37 +449,37 @@ pub enum DomainError {
     // ---- existence / FK / duplicate (runtime) ----
     #[error("project not found: {0}")]
     ProjectNotFound(String),
-    #[error("crf version not found: {0}")] CrfVersionNotFound(i32),
-    #[error("crf form not found: {0}")] CrfFormNotFound(i32),
-    #[error("crf item not found: {0}")] CrfItemNotFound(i32),
-    #[error("crf option not found: {0}")] CrfOptionNotFound(i32),
-    #[error("crf unit not found: {0}")] CrfUnitNotFound(i32),
+    #[error("crf version not found: {0}")] CrfVersionNotFound(i64),
+    #[error("crf form not found: {0}")] CrfFormNotFound(i64),
+    #[error("crf item not found: {0}")] CrfItemNotFound(i64),
+    #[error("crf option not found: {0}")] CrfOptionNotFound(i64),
+    #[error("crf unit not found: {0}")] CrfUnitNotFound(i64),
     #[error("domain annotation not found: {0}")]
-    DomainAnnotationNotFound(i32),
+    DomainAnnotationNotFound(i64),
     #[error("annotation not found: {0}")]
-    AnnotationNotFound(i32),
+    AnnotationNotFound(i64),
 
     #[error("crf version already exists: {project_code} / {name}")]
     DuplicateCrfVersion { project_code: String, name: String },
     #[error("crf form already exists: version {version_id} / {code}")]
-    DuplicateCrfForm { version_id: i32, code: String },
+    DuplicateCrfForm { version_id: i64, code: String },
     #[error("crf item already exists: form {form_id} / {code}")]
-    DuplicateCrfItem { form_id: i32, code: String },
+    DuplicateCrfItem { form_id: i64, code: String },
     #[error("domain annotation already exists: form {form_id} / {name}")]
-    DuplicateDomainAnnotation { form_id: i32, name: String },
+    DuplicateDomainAnnotation { form_id: i64, name: String },
 
     #[error("referenced crf version not found: {0}")]
-    FkCrfVersionNotFound(i32),
+    FkCrfVersionNotFound(i64),
     #[error("referenced crf form not found: {0}")]
-    FkCrfFormNotFound(i32),
+    FkCrfFormNotFound(i64),
     #[error("referenced crf item not found: {0}")]
-    FkCrfItemNotFound(i32),
+    FkCrfItemNotFound(i64),
     #[error("referenced crf option not found: {0}")]
-    FkCrfOptionNotFound(i32),
+    FkCrfOptionNotFound(i64),
     #[error("referenced crf unit not found: {0}")]
-    FkCrfUnitNotFound(i32),
+    FkCrfUnitNotFound(i64),
     #[error("referenced domain annotation not found: {0}")]
-    FkDomainAnnotationNotFound(i32),
+    FkDomainAnnotationNotFound(i64),
 
     #[error("not found")]
     NotFound,
@@ -485,57 +495,63 @@ New file `lib/crates/apis/src/crf.rs`, exporting `pub mod crf;` from
 
 ```rust
 pub enum CrfItemKind { Text, Selection, Checkbox, Datetime, Label }
-pub enum AnnotationOwner { Form(i32), Item(i32), Option(i32), Unit(i32) }
+pub enum AnnotationOwner { Form(i64), Item(i64), Option(i64), Unit(i64) }
 
-pub struct CrfVersionView       { pub id: i32, pub project_code: String, pub name: String,
+pub struct CrfVersionView       { pub id: i64, pub project_code: String, pub name: String,
                                    pub created_at: DateTime<Utc>, pub updated_at: DateTime<Utc> }
-pub struct CrfFormView          { pub id: i32, pub version_id: i32, pub code: String, pub name: String,
-                                   pub order: i32, pub not_submitted: bool,
+pub struct CrfFormView          { pub id: i64, pub version_id: i64, pub code: String, pub name: String,
+                                   pub order: i64, pub not_submitted: bool,
                                    pub domain_annotations: Vec<DomainAnnotationView>,
                                    pub created_at: DateTime<Utc>, pub updated_at: DateTime<Utc> }
-pub struct CrfItemView          { pub id: i32, pub form_id: i32, pub code: String, pub name: String,
-                                   pub kind: CrfItemKind, pub order: i32, pub not_submitted: bool,
+pub struct CrfItemView          { pub id: i64, pub form_id: i64, pub code: String, pub name: String,
+                                   pub kind: CrfItemKind, pub order: i64, pub not_submitted: bool,
                                    pub created_at: DateTime<Utc>, pub updated_at: DateTime<Utc> }
-pub struct CrfOptionView        { pub id: i32, pub item_id: i32, pub value: String,
+pub struct CrfOptionView        { pub id: i64, pub item_id: i64, pub value: String,
                                    pub not_submitted: bool,
                                    pub created_at: DateTime<Utc>, pub updated_at: DateTime<Utc> }
-pub struct CrfUnitView          { pub id: i32, pub item_id: i32, pub value: String,
+pub struct CrfUnitView          { pub id: i64, pub item_id: i64, pub value: String,
                                    pub not_submitted: bool,
                                    pub created_at: DateTime<Utc>, pub updated_at: DateTime<Utc> }
-pub struct DomainAnnotationView { pub id: i32, pub form_id: i32,
+pub struct DomainAnnotationView { pub id: i64, pub form_id: i64,
                                    pub name: String, pub description: String,
                                    pub created_at: DateTime<Utc>, pub updated_at: DateTime<Utc> }
-pub struct AnnotationView       { pub id: i32, pub domain_annotation_id: i32,
+pub struct AnnotationView       { pub id: i64, pub domain_annotation_id: i64,
                                    pub content: String, pub assign: bool,
                                    pub owner: AnnotationOwner,
                                    pub created_at: DateTime<Utc>, pub updated_at: DateTime<Utc> }
 
 pub struct CreateCrfVersionRequest     { pub project_code: String, pub name: String }
-pub struct UpdateCrfVersionRequest     { pub id: i32, pub name: Option<String> }
-pub struct CreateCrfFormRequest        { pub version_id: i32, pub code: String, pub name: String,
+pub struct UpdateCrfVersionRequest     { pub id: i64, pub name: Option<String> }
+pub struct CreateCrfFormRequest        { pub version_id: i64, pub code: String, pub name: String,
                                           pub order: int, pub not_submitted: bool }
-pub struct UpdateCrfFormRequest        { pub id: i32, /* all optional except id */ }
-pub struct CreateCrfItemRequest        { pub form_id: i32, pub code: String, pub name: String,
+pub struct UpdateCrfFormRequest        { pub id: i64, /* all optional except id */ }
+pub struct BulkCreateCrfFormRequest    { pub form: CreateCrfFormRequest,
+                                          pub items: Vec<BulkCreateCrfItemInput> }
+pub struct BulkCreateCrfItemInput      { pub item: CreateCrfItemRequest,
+                                          pub options: Vec<CreateCrfOptionRequest>,
+                                          pub units: Vec<CreateCrfUnitRequest> }
+pub struct BulkCreateCrfFormResult     { pub form: CrfFormView, pub items: Vec<CrfItemView> }
+pub struct CreateCrfItemRequest        { pub form_id: i64, pub code: String, pub name: String,
                                           pub kind: CrfItemKind, pub order: int, pub not_submitted: bool }
 pub struct UpdateCrfItemRequest        { ... }
-pub struct CreateCrfOptionRequest      { pub item_id: i32, pub value: String, pub not_submitted: bool }
+pub struct CreateCrfOptionRequest      { pub item_id: i64, pub value: String, pub not_submitted: bool }
 pub struct UpdateCrfOptionRequest      { ... }
-pub struct CreateCrfUnitRequest        { pub item_id: i32, pub value: String, pub not_submitted: bool }
+pub struct CreateCrfUnitRequest        { pub item_id: i64, pub value: String, pub not_submitted: bool }
 pub struct UpdateCrfUnitRequest        { ... }
-pub struct CreateDomainAnnotationRequest { pub form_id: i32,
+pub struct CreateDomainAnnotationRequest { pub form_id: i64,
                                             pub name: String, pub description: String }
-pub struct UpdateDomainAnnotationRequest { pub id: i32, /* name?, description? */ }
-pub struct CreateAnnotationRequest     { pub owner: AnnotationOwner, pub domain_annotation_id: i32,
+pub struct UpdateDomainAnnotationRequest { pub id: i64, /* name?, description? */ }
+pub struct CreateAnnotationRequest     { pub owner: AnnotationOwner, pub domain_annotation_id: i64,
                                           pub content: String, pub assign: bool }
-pub struct UpdateAnnotationRequest     { pub id: i32, pub content: Option<String>,
+pub struct UpdateAnnotationRequest     { pub id: i64, pub content: Option<String>,
                                           pub assign: Option<bool> }
 
-pub struct SearchCrfFormsByVersionRequest           { pub version_id: i32, pub fragment: String }
-pub struct SearchCrfItemsByVersionRequest           { pub version_id: i32, pub fragment: String }
-pub struct SearchCrfOptionsByVersionRequest         { pub version_id: i32, pub fragment: String }
-pub struct SearchCrfUnitsByVersionRequest           { pub version_id: i32, pub fragment: String }
-pub struct SearchDomainAnnotationsByVersionRequest  { pub version_id: i32, pub fragment: String }
-pub struct SearchAnnotationsByVersionRequest        { pub version_id: i32, pub fragment: String }
+pub struct SearchCrfFormsByVersionRequest           { pub version_id: i64, pub fragment: String }
+pub struct SearchCrfItemsByVersionRequest           { pub version_id: i64, pub fragment: String }
+pub struct SearchCrfOptionsByVersionRequest         { pub version_id: i64, pub fragment: String }
+pub struct SearchCrfUnitsByVersionRequest           { pub version_id: i64, pub fragment: String }
+pub struct SearchDomainAnnotationsByVersionRequest  { pub version_id: i64, pub fragment: String }
+pub struct SearchAnnotationsByVersionRequest        { pub version_id: i64, pub fragment: String }
 
 #[derive(Debug, Clone, Error)]
 pub enum CrfApiError {
@@ -545,28 +561,28 @@ pub enum CrfApiError {
     NotFound,
     #[error("project not found: {0}")]
     ProjectNotFound(String),
-    #[error("crf version not found: {0}")] CrfVersionNotFound(i32),
-    #[error("crf form not found: {0}")] CrfFormNotFound(i32),
-    #[error("crf item not found: {0}")] CrfItemNotFound(i32),
-    #[error("crf option not found: {0}")] CrfOptionNotFound(i32),
-    #[error("crf unit not found: {0}")] CrfUnitNotFound(i32),
-    #[error("domain annotation not found: {0}")] DomainAnnotationNotFound(i32),
-    #[error("annotation not found: {0}")] AnnotationNotFound(i32),
+    #[error("crf version not found: {0}")] CrfVersionNotFound(i64),
+    #[error("crf form not found: {0}")] CrfFormNotFound(i64),
+    #[error("crf item not found: {0}")] CrfItemNotFound(i64),
+    #[error("crf option not found: {0}")] CrfOptionNotFound(i64),
+    #[error("crf unit not found: {0}")] CrfUnitNotFound(i64),
+    #[error("domain annotation not found: {0}")] DomainAnnotationNotFound(i64),
+    #[error("annotation not found: {0}")] AnnotationNotFound(i64),
     #[error("crf version already exists: {project_code} / {name}")]
     DuplicateCrfVersion { project_code: String, name: String },
     #[error("crf form already exists: version {version_id} / {code}")]
-    DuplicateCrfForm { version_id: i32, code: String },
+    DuplicateCrfForm { version_id: i64, code: String },
     #[error("crf item already exists: form {form_id} / {code}")]
-    DuplicateCrfItem { form_id: i32, code: String },
+    DuplicateCrfItem { form_id: i64, code: String },
     #[error("domain annotation already exists: form {form_id} / {name}")]
-    DuplicateDomainAnnotation { form_id: i32, name: String },
-    #[error("referenced crf version not found: {0}")] FkCrfVersionNotFound(i32),
-    #[error("referenced crf form not found: {0}")] FkCrfFormNotFound(i32),
-    #[error("referenced crf item not found: {0}")] FkCrfItemNotFound(i32),
-    #[error("referenced crf option not found: {0}")] FkCrfOptionNotFound(i32),
-    #[error("referenced crf unit not found: {0}")] FkCrfUnitNotFound(i32),
+    DuplicateDomainAnnotation { form_id: i64, name: String },
+    #[error("referenced crf version not found: {0}")] FkCrfVersionNotFound(i64),
+    #[error("referenced crf form not found: {0}")] FkCrfFormNotFound(i64),
+    #[error("referenced crf item not found: {0}")] FkCrfItemNotFound(i64),
+    #[error("referenced crf option not found: {0}")] FkCrfOptionNotFound(i64),
+    #[error("referenced crf unit not found: {0}")] FkCrfUnitNotFound(i64),
     #[error("referenced domain annotation not found: {0}")]
-    FkDomainAnnotationNotFound(i32),
+    FkDomainAnnotationNotFound(i64),
     #[error("search fragment cannot be empty")]
     EmptySearchFragment,
     #[error("kind-shape violation: {kind:?} cannot carry {field}")]
@@ -579,55 +595,65 @@ pub enum CrfApiError {
 pub trait CrfService: Send + Sync {
     // ---- CrfVersion ----
     async fn create_version(&self, req: CreateCrfVersionRequest) -> Result<CrfVersionView, CrfApiError>;
-    async fn get_version_by_id(&self, id: i32) -> Result<CrfVersionView, CrfApiError>;
+    async fn get_version_by_id(&self, id: i64) -> Result<CrfVersionView, CrfApiError>;
     async fn list_versions_by_project(&self, project_code: &str) -> Result<Vec<CrfVersionView>, CrfApiError>;
     async fn update_version(&self, req: UpdateCrfVersionRequest) -> Result<CrfVersionView, CrfApiError>;
-    async fn delete_version(&self, id: i32) -> Result<(), CrfApiError>;
+    async fn delete_version(&self, id: i64) -> Result<(), CrfApiError>;
 
     // ---- CrfForm ----
     async fn create_form(&self, req: CreateCrfFormRequest) -> Result<CrfFormView, CrfApiError>;
-    async fn get_form_by_id(&self, id: i32) -> Result<CrfFormView, CrfApiError>;
-    async fn list_forms_by_version(&self, version_id: i32) -> Result<Vec<CrfFormView>, CrfApiError>;
+    /// Atomically create a form + every item + each item's options +
+    /// units. The owning `version_id` comes from the path segment
+    /// on the wire, so the body carries only the form's own
+    /// scalar fields plus the items subtree. Item / option / unit
+    /// inputs use the same `Create*` shapes as the single-row
+    /// endpoints; the bulk port stamps the surrogate `form_id` /
+    /// `item_id` onto each row at insert time. Returns the new
+    /// form view plus every item view in input order.
+    async fn bulk_create_form(&self, req: BulkCreateCrfFormRequest)
+        -> Result<BulkCreateCrfFormResult, CrfApiError>;
+    async fn get_form_by_id(&self, id: i64) -> Result<CrfFormView, CrfApiError>;
+    async fn list_forms_by_version(&self, version_id: i64) -> Result<Vec<CrfFormView>, CrfApiError>;
     async fn update_form(&self, req: UpdateCrfFormRequest) -> Result<CrfFormView, CrfApiError>;
-    async fn delete_form(&self, id: i32) -> Result<(), CrfApiError>;
+    async fn delete_form(&self, id: i64) -> Result<(), CrfApiError>;
 
     // ---- CrfItem ----
     async fn create_item(&self, req: CreateCrfItemRequest) -> Result<CrfItemView, CrfApiError>;
-    async fn get_item_by_id(&self, id: i32) -> Result<CrfItemView, CrfApiError>;
+    async fn get_item_by_id(&self, id: i64) -> Result<CrfItemView, CrfApiError>;
     /// Every item attached to the form, each one carrying the full
     /// nested tree (options / units / annotations).
-    async fn list_items_by_form(&self, form_id: i32) -> Result<Vec<CrfItemView>, CrfApiError>;
+    async fn list_items_by_form(&self, form_id: i64) -> Result<Vec<CrfItemView>, CrfApiError>;
     async fn update_item(&self, req: UpdateCrfItemRequest) -> Result<CrfItemView, CrfApiError>;
-    async fn delete_item(&self, id: i32) -> Result<(), CrfApiError>;
+    async fn delete_item(&self, id: i64) -> Result<(), CrfApiError>;
 
     // ---- CrfOption / CrfUnit ----
     async fn create_option(&self, req: CreateCrfOptionRequest) -> Result<CrfOptionView, CrfApiError>;
-    async fn get_option_by_id(&self, id: i32) -> Result<CrfOptionView, CrfApiError>;
-    async fn list_options_by_item(&self, item_id: i32) -> Result<Vec<CrfOptionView>, CrfApiError>;
+    async fn get_option_by_id(&self, id: i64) -> Result<CrfOptionView, CrfApiError>;
+    async fn list_options_by_item(&self, item_id: i64) -> Result<Vec<CrfOptionView>, CrfApiError>;
     async fn update_option(&self, req: UpdateCrfOptionRequest) -> Result<CrfOptionView, CrfApiError>;
-    async fn delete_option(&self, id: i32) -> Result<(), CrfApiError>;
+    async fn delete_option(&self, id: i64) -> Result<(), CrfApiError>;
     async fn create_unit(&self, req: CreateCrfUnitRequest) -> Result<CrfUnitView, CrfApiError>;
-    async fn get_unit_by_id(&self, id: i32) -> Result<CrfUnitView, CrfApiError>;
-    async fn list_units_by_item(&self, item_id: i32) -> Result<Vec<CrfUnitView>, CrfApiError>;
+    async fn get_unit_by_id(&self, id: i64) -> Result<CrfUnitView, CrfApiError>;
+    async fn list_units_by_item(&self, item_id: i64) -> Result<Vec<CrfUnitView>, CrfApiError>;
     async fn update_unit(&self, req: UpdateCrfUnitRequest) -> Result<CrfUnitView, CrfApiError>;
-    async fn delete_unit(&self, id: i32) -> Result<(), CrfApiError>;
+    async fn delete_unit(&self, id: i64) -> Result<(), CrfApiError>;
 
     // ---- DomainAnnotation ----
     async fn create_domain_annotation(&self, req: CreateDomainAnnotationRequest) -> Result<DomainAnnotationView, CrfApiError>;
-    async fn get_domain_annotation_by_id(&self, id: i32) -> Result<DomainAnnotationView, CrfApiError>;
-    async fn list_domain_annotations_by_form(&self, form_id: i32) -> Result<Vec<DomainAnnotationView>, CrfApiError>;
+    async fn get_domain_annotation_by_id(&self, id: i64) -> Result<DomainAnnotationView, CrfApiError>;
+    async fn list_domain_annotations_by_form(&self, form_id: i64) -> Result<Vec<DomainAnnotationView>, CrfApiError>;
     async fn update_domain_annotation(&self, req: UpdateDomainAnnotationRequest) -> Result<DomainAnnotationView, CrfApiError>;
-    async fn delete_domain_annotation(&self, id: i32) -> Result<(), CrfApiError>;
+    async fn delete_domain_annotation(&self, id: i64) -> Result<(), CrfApiError>;
 
     // ---- Annotation ----
     async fn create_annotation(&self, req: CreateAnnotationRequest) -> Result<AnnotationView, CrfApiError>;
-    async fn get_annotation_by_id(&self, id: i32) -> Result<AnnotationView, CrfApiError>;
-    async fn list_annotations_by_form(&self, form_id: i32) -> Result<Vec<AnnotationView>, CrfApiError>;
-    async fn list_annotations_by_item(&self, item_id: i32) -> Result<Vec<AnnotationView>, CrfApiError>;
-    async fn list_annotations_by_option(&self, option_id: i32) -> Result<Vec<AnnotationView>, CrfApiError>;
-    async fn list_annotations_by_unit(&self, unit_id: i32) -> Result<Vec<AnnotationView>, CrfApiError>;
+    async fn get_annotation_by_id(&self, id: i64) -> Result<AnnotationView, CrfApiError>;
+    async fn list_annotations_by_form(&self, form_id: i64) -> Result<Vec<AnnotationView>, CrfApiError>;
+    async fn list_annotations_by_item(&self, item_id: i64) -> Result<Vec<AnnotationView>, CrfApiError>;
+    async fn list_annotations_by_option(&self, option_id: i64) -> Result<Vec<AnnotationView>, CrfApiError>;
+    async fn list_annotations_by_unit(&self, unit_id: i64) -> Result<Vec<AnnotationView>, CrfApiError>;
     async fn update_annotation(&self, req: UpdateAnnotationRequest) -> Result<AnnotationView, CrfApiError>;
-    async fn delete_annotation(&self, id: i32) -> Result<(), CrfApiError>;
+    async fn delete_annotation(&self, id: i64) -> Result<(), CrfApiError>;
 
     // ---- Search ----
     async fn search_forms_by_version(&self, req: SearchCrfFormsByVersionRequest) -> Result<Vec<CrfFormView>, CrfApiError>;
@@ -669,12 +695,87 @@ slices (the in-memory representation of which is delegated to the
 domain: the domain `CrfItem` aggregate carries just the scalar fields,
 and the usecase stitches the per-row children in via separate lookups).
 
+### Bulk form repo (`crf_bulk_form_repo.rs`)
+
+`CrfBulkFormRepoPg` is the one persistence adapter that owns a
+transaction end-to-end. The full path:
+
+1. `pool.begin()` → `tx`.
+2. `INSERT INTO crf_forms (...) RETURNING id, ...` — the freshly
+   stamped `id` becomes the `form_id` for the items subtree.
+3. For each item: `INSERT INTO crf_items (...) RETURNING id, ...`,
+   then `INSERT INTO crf_options / crf_units` for the child's
+   children.
+4. `tx.commit()`.
+
+If any `INSERT` returns `Err`, the `Transaction` is dropped without
+`commit()` — sqlx issues a `ROLLBACK` from `Drop`, so every prior
+insert in the same call is reversed. No partial state can survive
+an `Err`.
+
+`map_db_err` for the bulk port maps:
+- SQLSTATE `23505` against `crf_forms_version_code_unique` →
+  `DuplicateCrfForm { version_id: 0, code: "(unknown)" }`
+- SQLSTATE `23505` against `crf_items_form_code_unique` →
+  `DuplicateCrfItem { form_id: 0, code: "(unknown)" }`
+- FK violation against `crf_forms_version_id_fkey` →
+  `FkCrfVersionNotFound(0)`
+- FK violation against `crf_items_form_id_fkey` →
+  `FkCrfFormNotFound(0)`
+- FK violation against `crf_options_item_id_fkey` /
+  `crf_units_item_id_fkey` → `FkCrfItemNotFound(0)`
+- otherwise → `Repository(err.to_string())`
+
+The `(unknown)` placeholders are intentional — the bulk port
+treats every constraint violation as a single `Err` and the caller
+gets the same shape as the single-row endpoints; the usecase's
+`validate_bulk_create` runs first so a constraint failure is
+always an unexpected race, not a normal flow.
+
+## Bulk port — `domain::crf_bulk_form`
+
+The bulk port is intentionally separate from the per-aggregate
+`CrfFormRepository` / `CrfItemRepository` / etc. — it doesn't
+belong on any one aggregate, and the `pool.begin()` transaction
+belongs in the adapter, not in the domain. The port stays free
+of `sqlx` types:
+
+```rust
+#[derive(Debug, Clone)]
+pub struct CrfBulkCreateForm {
+    pub form: CrfFormNew,           // form fields, no form_id
+    pub items: Vec<CrfBulkCreateItem>,
+}
+pub struct CrfBulkCreateItem {
+    pub item: CrfItemNew,           // item fields, form_id must be 0
+    pub options: Vec<CrfOptionNew>, // option_id must be 0
+    pub units: Vec<CrfUnitNew>,     // unit_id must be 0
+}
+pub struct CrfBulkCreateFormResult { pub form: CrfForm, pub items: Vec<CrfItem> }
+
+#[async_trait]
+pub trait CrfBulkFormRepository: Send + Sync {
+    async fn bulk_create(
+        &self,
+        input: CrfBulkCreateForm,
+    ) -> Result<CrfBulkCreateFormResult, DomainError>;
+}
+```
+
+`validate_bulk_create(&input)` runs up-front at the usecase (BEFORE
+the port call) so a `KindShapeViolation` or empty-field violation
+never leaves partial state. The port stamps the surrogate ids as
+it walks the input — the caller passes placeholder `0`s in the
+`*New` DTOs and the port fills them in.
+
 ## Facade — `adapter/facade/in_memory/service.rs`
 
-`CrfServiceImpl<V, F, I, O, U, Da, A, P>` wraps `CrfUsecase` and
+`CrfServiceImpl<V, F, I, O, U, Da, A, P, B>` wraps `CrfUsecase` and
 implements `apis::crf::CrfService`. Two constructors:
 `from_usecase(usecase)` and `from_repos(version_repo, form_repo, item_repo,
-option_repo, unit_repo, domain_annotation_repo, annotation_repo, project_lookup)`.
+option_repo, unit_repo, domain_annotation_repo, annotation_repo,
+project_lookup, bulk_form_repo)` — note the 9-argument `from_repos`,
+with `bulk_form_repo: Arc<B>` appended.
 
 The body is a per-method projection: convert `apis::crf::Request` →
 `usecase::Command`, call usecase, project the internal view to
@@ -738,6 +839,33 @@ In this order, per `lib-crate-development.md` §9:
      on every aggregate; polymorphic FK CHECK rejects annotations with
      two owners; FK CASCADE removes children when parent is deleted;
      search returns version-scoped rows only
+   - `bulk_create_form` happy path on a fresh version: form + items +
+     options + units appear together after a single call; duplicate
+     item code surfaces as `DomainError::DuplicateCrfItem` and the
+     transaction rolls back (no form row visible afterward)
+
+**Bulk-port unit tests** (`src/usecase/tests.rs` + facade tests):
+
+- `bulk_create_form_inserts_form_items_options_units` — happy path
+  through `InMemoryBulkForms`, two items each with options / units,
+  every item stamped with the freshly-allocated form_id
+- `bulk_create_form_returns_results_in_input_order` — five items
+  round-trip back in input order
+- `bulk_create_form_rejects_empty_form_code` — `Validation`
+  surface before the port is called
+- `bulk_create_form_rejects_text_kind_with_options` —
+  `KindShapeViolation { kind: Text, field: "options" }`
+- `bulk_create_form_rejects_selection_without_options` —
+  `KindShapeViolation { kind: Selection, field: "options" }`
+- `bulk_create_form_rejects_empty_item_code` — `Validation`
+- `bulk_create_form_validation_rejects_empty_code_with_existing_version`
+  — confirms validation runs after the version lookup
+- `bulk_create_form_rejects_missing_parent_version` —
+  `CrfVersionNotFound(id)` from the usecase's pre-port check
+- `facade_bulk_create_form_round_trip` — same shape through the
+  `apis::crf::CrfService` facade
+- `facade_bulk_create_form_rejects_text_with_options` — wire-shape
+  `KindShapeViolation` end-to-end
 
 ## Dependencies (`Cargo.toml`)
 
@@ -813,7 +941,10 @@ cargo check --workspace
 
 - HTTP layer (a future `aegis-server` route module mounts `CrfServiceImpl`
   and translates each trait call into an `axum` handler with `utoipa`
-  annotations).
+  annotations). The bulk endpoint is `POST
+  /api/crf/versions/{version_id}/forms/bulk`; the request body
+  mirrors `BulkCreateCrfFormRequest` and the response is
+  `BulkCreateCrfFormResponse` (form + items in input order).
 - Desktop-side TS types and feature modules (a future spec wires the
   Tauri shell).
 - Full-text search via `tsvector` (the ILIKE-based search is sufficient

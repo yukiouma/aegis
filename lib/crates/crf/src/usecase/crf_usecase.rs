@@ -22,29 +22,31 @@
 use std::sync::Arc;
 
 use crate::domain::{
-    AnnotationNew, AnnotationOwner, AnnotationRepository, AnnotationUpdate, CrfFormNew,
-    CrfFormRepository, CrfFormUpdate, CrfItemNew, CrfItemRepository, CrfItemUpdate, CrfOptionNew,
-    CrfOptionRepository, CrfOptionUpdate, CrfUnitNew, CrfUnitRepository, CrfUnitUpdate,
-    CrfVersionNew, CrfVersionRepository, CrfVersionUpdate, DomainAnnotationNew,
+    AnnotationNew, AnnotationOwner, AnnotationRepository, AnnotationUpdate, CrfBulkFormRepository,
+    CrfFormNew, CrfFormRepository, CrfFormUpdate, CrfItemNew, CrfItemRepository, CrfItemUpdate,
+    CrfOptionNew, CrfOptionRepository, CrfOptionUpdate, CrfUnitNew, CrfUnitRepository,
+    CrfUnitUpdate, CrfVersionNew, CrfVersionRepository, CrfVersionUpdate, DomainAnnotationNew,
     DomainAnnotationRepository, DomainAnnotationUpdate, DomainError, ProjectLookup,
+    validate_bulk_create,
 };
 
 use super::commands::{
-    CreateAnnotation, CreateCrfForm, CreateCrfItem, CreateCrfOption, CreateCrfUnit,
-    CreateCrfVersion, CreateDomainAnnotation, SearchAnnotationsByVersion, SearchCrfFormsByVersion,
-    SearchCrfItemsByVersion, SearchCrfOptionsByVersion, SearchCrfUnitsByVersion,
-    SearchDomainAnnotationsByVersion, UpdateAnnotation, UpdateCrfForm, UpdateCrfItem,
-    UpdateCrfOption, UpdateCrfUnit, UpdateCrfVersion, UpdateDomainAnnotation,
+    CreateAnnotation, CreateCrfBulkForm, CreateCrfForm, CreateCrfItem, CreateCrfOption,
+    CreateCrfUnit, CreateCrfVersion, CreateDomainAnnotation, SearchAnnotationsByVersion,
+    SearchCrfFormsByVersion, SearchCrfItemsByVersion, SearchCrfOptionsByVersion,
+    SearchCrfUnitsByVersion, SearchDomainAnnotationsByVersion, UpdateAnnotation, UpdateCrfForm,
+    UpdateCrfItem, UpdateCrfOption, UpdateCrfUnit, UpdateCrfVersion, UpdateDomainAnnotation,
 };
 use super::error::UsecaseError;
 use super::views::{
-    AnnotationView, CrfFormView, CrfItemView, CrfOptionView, CrfUnitView, CrfVersionView,
-    DomainAnnotationView,
+    AnnotationView, CrfBulkFormResult, CrfFormView, CrfItemView, CrfOptionView, CrfUnitView,
+    CrfVersionView, DomainAnnotationView,
 };
 
 /// Configuration for `CrfUsecase::new`. Wraps the seven
 /// concrete (or fake) repositories plus the cross-crate
-/// project lookup so the constructor stays readable.
+/// project lookup plus the bulk-form port so the constructor
+/// stays readable.
 pub struct CrfUsecaseConfig<
     V: CrfVersionRepository,
     F: CrfFormRepository,
@@ -54,6 +56,7 @@ pub struct CrfUsecaseConfig<
     Da: DomainAnnotationRepository,
     A: AnnotationRepository,
     P: ProjectLookup,
+    B: CrfBulkFormRepository,
 > {
     pub version_repo: V,
     pub form_repo: F,
@@ -63,11 +66,13 @@ pub struct CrfUsecaseConfig<
     pub domain_annotation_repo: Da,
     pub annotation_repo: A,
     pub projects: Arc<P>,
+    pub bulk_form_repo: Arc<B>,
 }
 
 /// Async orchestration for the seven Case Report Form
-/// aggregates plus version-scoped search. Generic over all
-/// eight ports so tests inject in-memory fakes.
+/// aggregates plus version-scoped search plus the bulk-form
+/// transaction. Generic over all nine ports so tests inject
+/// in-memory fakes.
 pub struct CrfUsecase<
     V: CrfVersionRepository,
     F: CrfFormRepository,
@@ -77,6 +82,7 @@ pub struct CrfUsecase<
     Da: DomainAnnotationRepository,
     A: AnnotationRepository,
     P: ProjectLookup,
+    B: CrfBulkFormRepository,
 > {
     version_repo: V,
     form_repo: F,
@@ -86,6 +92,7 @@ pub struct CrfUsecase<
     domain_annotation_repo: Da,
     annotation_repo: A,
     projects: Arc<P>,
+    bulk_form_repo: Arc<B>,
 }
 
 impl<
@@ -97,9 +104,10 @@ impl<
     Da: DomainAnnotationRepository,
     A: AnnotationRepository,
     P: ProjectLookup,
-> CrfUsecase<V, F, I, O, U, Da, A, P>
+    B: CrfBulkFormRepository,
+> CrfUsecase<V, F, I, O, U, Da, A, P, B>
 {
-    pub fn new(cfg: CrfUsecaseConfig<V, F, I, O, U, Da, A, P>) -> Self {
+    pub fn new(cfg: CrfUsecaseConfig<V, F, I, O, U, Da, A, P, B>) -> Self {
         Self {
             version_repo: cfg.version_repo,
             form_repo: cfg.form_repo,
@@ -109,6 +117,7 @@ impl<
             domain_annotation_repo: cfg.domain_annotation_repo,
             annotation_repo: cfg.annotation_repo,
             projects: cfg.projects,
+            bulk_form_repo: cfg.bulk_form_repo,
         }
     }
 
@@ -223,6 +232,33 @@ impl<
     pub async fn delete_form(&self, id: i64) -> Result<(), UsecaseError> {
         self.form_repo.delete(id).await?;
         Ok(())
+    }
+
+    /// Atomically create a form, every item, and each item's
+    /// options + units. Validates up-front so a kind-shape or
+    /// empty-field violation never leaves partial state. The
+    /// adapter owns the transaction.
+    pub async fn create_bulk_form(
+        &self,
+        cmd: CreateCrfBulkForm,
+    ) -> Result<CrfBulkFormResult, UsecaseError> {
+        // 1. Confirm parent version exists so a stale `version_id`
+        //    surfaces as a meaningful error rather than an FK
+        //    violation.
+        let _ = self.version_repo.find_by_id(cmd.form.version_id).await?;
+
+        // 2. Up-front validation — empty fields + kind-shape.
+        let domain_input: crate::domain::CrfBulkCreateForm = cmd.into();
+        validate_bulk_create(&domain_input).map_err(UsecaseError::Validation)?;
+
+        // 3. Single atomic insert through the bulk port.
+        let result = self.bulk_form_repo.bulk_create(domain_input).await?;
+
+        // 4. Project to view DTOs.
+        Ok(CrfBulkFormResult {
+            form: result.form.into(),
+            items: result.items.into_iter().map(Into::into).collect(),
+        })
     }
 
     // ---- CrfItem ----

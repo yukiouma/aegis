@@ -14,8 +14,8 @@ use apis::crf::{
 };
 
 use crate::usecase::tests::{
-    AcceptProject, InMemoryAnnotations, InMemoryDomainAnnotations, InMemoryForms, InMemoryItems,
-    InMemoryOptions, InMemoryUnits, InMemoryVersions,
+    AcceptProject, InMemoryAnnotations, InMemoryBulkForms, InMemoryDomainAnnotations,
+    InMemoryForms, InMemoryItems, InMemoryOptions, InMemoryUnits, InMemoryVersions,
 };
 use crate::usecase::{CrfUsecase, CrfUsecaseConfig};
 
@@ -30,6 +30,7 @@ type TestService = CrfServiceImpl<
     InMemoryDomainAnnotations,
     InMemoryAnnotations,
     AcceptProject,
+    InMemoryBulkForms,
 >;
 
 fn service() -> TestService {
@@ -42,6 +43,7 @@ fn service() -> TestService {
         InMemoryDomainAnnotations,
         InMemoryAnnotations,
         AcceptProject,
+        InMemoryBulkForms,
     > = CrfUsecase::new(CrfUsecaseConfig {
         version_repo: InMemoryVersions::default(),
         form_repo: InMemoryForms::default(),
@@ -51,6 +53,7 @@ fn service() -> TestService {
         domain_annotation_repo: InMemoryDomainAnnotations::default(),
         annotation_repo: InMemoryAnnotations::default(),
         projects: Arc::new(AcceptProject),
+        bulk_form_repo: Arc::new(InMemoryBulkForms),
     });
     CrfServiceImpl::from_usecase(usecase)
 }
@@ -327,4 +330,129 @@ async fn facade_annotation_polymorphic() {
         .unwrap();
     assert!(matches!(a.owner, AnnotationOwner::Form(_)));
     svc.delete_annotation(a.id).await.unwrap();
+}
+
+#[tokio::test]
+async fn facade_bulk_create_form_round_trip() {
+    // Round-trips the bulk create through the apis wire shape and
+    // confirms the projections on the response — every item
+    // stamped with the freshly-allocated form_id, the response
+    // shape mirrors the request items list.
+    use apis::crf::{BulkCreateCrfItemInput, CrfItemKind as ApiKind};
+
+    let svc = service();
+    let v = svc
+        .create_version(CreateCrfVersionRequest {
+            project_code: "P1".into(),
+            name: "v1".into(),
+        })
+        .await
+        .unwrap();
+    let r = svc
+        .bulk_create_form(apis::crf::BulkCreateCrfFormRequest {
+            form: apis::crf::CreateCrfFormRequest {
+                version_id: v.id,
+                code: "F1".into(),
+                name: "Form 1".into(),
+                order: 0,
+                not_submitted: false,
+            },
+            items: vec![
+                BulkCreateCrfItemInput {
+                    item: apis::crf::CreateCrfItemRequest {
+                        form_id: 0,
+                        code: "I1".into(),
+                        name: "Item 1".into(),
+                        kind: ApiKind::Selection,
+                        order: 0,
+                        not_submitted: false,
+                    },
+                    options: vec![
+                        apis::crf::CreateCrfOptionRequest {
+                            item_id: 0,
+                            value: "yes".into(),
+                            not_submitted: false,
+                        },
+                        apis::crf::CreateCrfOptionRequest {
+                            item_id: 0,
+                            value: "no".into(),
+                            not_submitted: false,
+                        },
+                    ],
+                    units: vec![],
+                },
+                BulkCreateCrfItemInput {
+                    item: apis::crf::CreateCrfItemRequest {
+                        form_id: 0,
+                        code: "I2".into(),
+                        name: "Item 2".into(),
+                        kind: ApiKind::Text,
+                        order: 1,
+                        not_submitted: false,
+                    },
+                    options: vec![],
+                    units: vec![apis::crf::CreateCrfUnitRequest {
+                        item_id: 0,
+                        value: "mg".into(),
+                        not_submitted: false,
+                    }],
+                },
+            ],
+        })
+        .await
+        .unwrap();
+    assert_eq!(r.form.code, "F1");
+    assert_eq!(r.form.version_id, v.id);
+    assert_eq!(r.items.len(), 2);
+    assert_eq!(r.items[0].code, "I1");
+    assert_eq!(r.items[1].code, "I2");
+    assert_eq!(r.items[0].form_id, r.form.id);
+    assert_eq!(r.items[1].form_id, r.form.id);
+    assert!(r.items[0].id > 0);
+    assert!(r.items[1].id > 0);
+}
+
+#[tokio::test]
+async fn facade_bulk_create_form_rejects_text_with_options() {
+    // The wire shape `kind` enum is distinct from the domain's,
+    // so it must be routed through the kind-shape rule at the
+    // usecase. A Text item with options should surface as
+    // `KindShapeViolation` on the wire.
+    let svc = service();
+    let v = svc
+        .create_version(CreateCrfVersionRequest {
+            project_code: "P1".into(),
+            name: "v1".into(),
+        })
+        .await
+        .unwrap();
+    let err = svc
+        .bulk_create_form(apis::crf::BulkCreateCrfFormRequest {
+            form: apis::crf::CreateCrfFormRequest {
+                version_id: v.id,
+                code: "F1".into(),
+                name: "Form 1".into(),
+                order: 0,
+                not_submitted: false,
+            },
+            items: vec![apis::crf::BulkCreateCrfItemInput {
+                item: apis::crf::CreateCrfItemRequest {
+                    form_id: 0,
+                    code: "I1".into(),
+                    name: "Item 1".into(),
+                    kind: apis::crf::CrfItemKind::Text,
+                    order: 0,
+                    not_submitted: false,
+                },
+                options: vec![apis::crf::CreateCrfOptionRequest {
+                    item_id: 0,
+                    value: "yes".into(),
+                    not_submitted: false,
+                }],
+                units: vec![],
+            }],
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(err, CrfApiError::KindShapeViolation { .. }));
 }

@@ -16,15 +16,16 @@ mod views;
 pub(crate) mod tests;
 
 pub use commands::{
-    CreateAnnotation, CreateCrfForm, CreateCrfItem, CreateCrfOption, CreateCrfUnit,
-    CreateCrfVersion, CreateDomainAnnotation, SearchAnnotationsByVersion, SearchCrfFormsByVersion,
-    SearchCrfItemsByVersion, SearchCrfOptionsByVersion, SearchCrfUnitsByVersion,
-    SearchDomainAnnotationsByVersion, UpdateAnnotation, UpdateCrfForm, UpdateCrfItem,
-    UpdateCrfOption, UpdateCrfUnit, UpdateCrfVersion, UpdateDomainAnnotation,
+    CreateAnnotation, CreateCrfBulkForm, CreateCrfBulkItem, CreateCrfForm, CreateCrfItem,
+    CreateCrfOption, CreateCrfUnit, CreateCrfVersion, CreateDomainAnnotation,
+    SearchAnnotationsByVersion, SearchCrfFormsByVersion, SearchCrfItemsByVersion,
+    SearchCrfOptionsByVersion, SearchCrfUnitsByVersion, SearchDomainAnnotationsByVersion,
+    UpdateAnnotation, UpdateCrfForm, UpdateCrfItem, UpdateCrfOption, UpdateCrfUnit,
+    UpdateCrfVersion, UpdateDomainAnnotation,
 };
 pub use crf_usecase::{CrfUsecase, CrfUsecaseConfig};
 pub use error::UsecaseError;
 pub use views::{
-    AnnotationView, CrfFormView, CrfItemView, CrfOptionView, CrfUnitView, CrfVersionView,
-    DomainAnnotationView,
+    AnnotationView, CrfBulkFormResult, CrfFormView, CrfItemView, CrfOptionView, CrfUnitView,
+    CrfVersionView, DomainAnnotationView,
 };

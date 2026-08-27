@@ -219,6 +219,84 @@ pub async fn create_form(
     Ok((StatusCode::CREATED, Json(view.into())))
 }
 
+/// `POST /api/crf/versions/{version_id}/forms/bulk` — atomically
+/// create a CRF form along with all of its items, options, and
+/// units in one transactional insert. Owning `version_id` comes
+/// from the path; the body carries the form's own fields plus the
+/// items subtree. The bulk port stamps the surrogate
+/// `form_id` / `item_id` on each row at insert time.
+#[utoipa::path(
+    post, path = "/versions/{version_id}/forms/bulk", tag = "crf",
+    operation_id = "crf_bulk_create_form",
+    params(
+        ("version_id" = i64, Path, description = "Owning CRF version id"),
+    ),
+    request_body = dto::BulkCreateCrfFormRequest,
+    responses(
+        (status = 201, description = "Form + items + options + units created", body = dto::BulkCreateCrfFormResponse),
+        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 403, description = "Admin or root required", body = crate::transport::http::error::ErrorBody),
+        (status = 404, description = "CRF version not found", body = crate::transport::http::error::ErrorBody),
+        (status = 409, description = "Duplicate form code or item code", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
+    ),
+    security(("BearerAuth" = [])),
+)]
+pub async fn bulk_create_form(
+    State(state): State<AppState>,
+    claims: AuthClaims,
+    Path(CrfPathId { id: version_id }): Path<CrfPathId>,
+    Json(req): Json<dto::BulkCreateCrfFormRequest>,
+) -> Result<(StatusCode, Json<dto::BulkCreateCrfFormResponse>), ApiError> {
+    require_admin_or_root(&claims)?;
+    let result = state
+        .crf
+        .bulk_create_form(apis::crf::BulkCreateCrfFormRequest {
+            form: apis::crf::CreateCrfFormRequest {
+                version_id,
+                code: req.form.code,
+                name: req.form.name,
+                order: req.form.order,
+                not_submitted: req.form.not_submitted,
+            },
+            items: req
+                .items
+                .into_iter()
+                .map(|bi| apis::crf::BulkCreateCrfItemInput {
+                    item: apis::crf::CreateCrfItemRequest {
+                        form_id: 0,
+                        code: bi.item.code,
+                        name: bi.item.name,
+                        kind: bi.item.kind.into(),
+                        order: bi.item.order,
+                        not_submitted: bi.item.not_submitted,
+                    },
+                    options: bi
+                        .options
+                        .into_iter()
+                        .map(|o| apis::crf::CreateCrfOptionRequest {
+                            item_id: 0,
+                            value: o.value,
+                            not_submitted: o.not_submitted,
+                        })
+                        .collect(),
+                    units: bi
+                        .units
+                        .into_iter()
+                        .map(|u| apis::crf::CreateCrfUnitRequest {
+                            item_id: 0,
+                            value: u.value,
+                            not_submitted: u.not_submitted,
+                        })
+                        .collect(),
+                })
+                .collect(),
+        })
+        .await?;
+    Ok((StatusCode::CREATED, Json(result.into())))
+}
+
 /// `GET /api/crf/versions/{version_id}/forms` — list every CRF form
 /// under the given version, ordered by `order ASC, id ASC`.
 #[utoipa::path(

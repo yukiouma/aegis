@@ -7,14 +7,14 @@
 use std::sync::Arc;
 
 use crf::{
-    Annotation, AnnotationOwner, AnnotationView, CrfForm, CrfFormNew, CrfFormRepository,
-    CrfFormUpdate, CrfFormView, CrfItem, CrfItemKind, CrfItemNew, CrfItemRepository, CrfItemUpdate,
-    CrfItemView, CrfOption, CrfOptionNew, CrfOptionRepository, CrfOptionUpdate, CrfOptionView,
-    CrfUnit, CrfUnitNew, CrfUnitRepository, CrfUnitUpdate, CrfUnitView, CrfUsecase,
-    CrfUsecaseConfig, CrfVersion, CrfVersionNew, CrfVersionRepository, CrfVersionUpdate,
-    CrfVersionView, DomainAnnotation, DomainAnnotationNew, DomainAnnotationRepository,
-    DomainAnnotationUpdate, DomainAnnotationView, DomainError, ProjectLookup, ProjectLookupImpl,
-    UsecaseError,
+    Annotation, AnnotationOwner, AnnotationView, CrfBulkFormRepository, CrfForm, CrfFormNew,
+    CrfFormRepository, CrfFormUpdate, CrfFormView, CrfItem, CrfItemKind, CrfItemNew,
+    CrfItemRepository, CrfItemUpdate, CrfItemView, CrfOption, CrfOptionNew, CrfOptionRepository,
+    CrfOptionUpdate, CrfOptionView, CrfUnit, CrfUnitNew, CrfUnitRepository, CrfUnitUpdate,
+    CrfUnitView, CrfUsecase, CrfUsecaseConfig, CrfVersion, CrfVersionNew, CrfVersionRepository,
+    CrfVersionUpdate, CrfVersionView, DomainAnnotation, DomainAnnotationNew,
+    DomainAnnotationRepository, DomainAnnotationUpdate, DomainAnnotationView, DomainError,
+    ProjectLookup, ProjectLookupImpl, UsecaseError,
 };
 
 use apis::crf::CrfService;
@@ -48,9 +48,13 @@ fn _annotation_repo_new(pool: sqlx::PgPool) -> crf::AnnotationRepoPg {
     crf::AnnotationRepoPg::new(pool)
 }
 
-fn _usecase_new<R, F, I, O, U, Da, A, P>(
-    cfg: CrfUsecaseConfig<R, F, I, O, U, Da, A, P>,
-) -> CrfUsecase<R, F, I, O, U, Da, A, P>
+fn _bulk_form_repo_new(pool: sqlx::PgPool) -> crf::CrfBulkFormRepoPg {
+    crf::CrfBulkFormRepoPg::new(pool)
+}
+
+fn _usecase_new<R, F, I, O, U, Da, A, P, B>(
+    cfg: CrfUsecaseConfig<R, F, I, O, U, Da, A, P, B>,
+) -> CrfUsecase<R, F, I, O, U, Da, A, P, B>
 where
     R: CrfVersionRepository,
     F: CrfFormRepository,
@@ -60,6 +64,7 @@ where
     Da: DomainAnnotationRepository,
     A: crf::AnnotationRepository,
     P: ProjectLookup,
+    B: CrfBulkFormRepository,
 {
     CrfUsecase::new(cfg)
 }

@@ -1629,6 +1629,50 @@ pub struct CreateCrfFormRequest {
     pub not_submitted: bool,
 }
 
+/// Body for `POST /api/crf/versions/{version_id}/forms/bulk`. The
+/// owning `version_id` is supplied via the path segment, so it is
+/// intentionally absent from the body — the request shape mirrors
+/// the single-row `CreateCrfFormRequest` plus a list of items
+/// (each carrying its own options + units).
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkCreateCrfFormRequest {
+    pub form: CreateCrfFormRequest,
+    pub items: Vec<BulkCreateCrfItemInput>,
+}
+
+/// One item under a [`BulkCreateCrfFormRequest`], with its own
+/// options / units subtree. Reuses the single-row
+/// `CreateCrfItemRequest` / `CreateCrfOptionRequest` /
+/// `CreateCrfUnitRequest` shapes; the bulk port stamps
+/// `form_id` / `item_id` at insert time.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkCreateCrfItemInput {
+    pub item: CreateCrfItemRequest,
+    pub options: Vec<CreateCrfOptionRequest>,
+    pub units: Vec<CreateCrfUnitRequest>,
+}
+
+/// Wire projection of
+/// [`apis::crf::BulkCreateCrfFormResult`]. Returns the freshly
+/// created form plus every item's view in input order.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkCreateCrfFormResponse {
+    pub form: CrfFormViewResponse,
+    pub items: Vec<CrfItemViewResponse>,
+}
+
+impl From<apis::crf::BulkCreateCrfFormResult> for BulkCreateCrfFormResponse {
+    fn from(r: apis::crf::BulkCreateCrfFormResult) -> Self {
+        Self {
+            form: r.form.into(),
+            items: r.items.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCrfFormRequest {

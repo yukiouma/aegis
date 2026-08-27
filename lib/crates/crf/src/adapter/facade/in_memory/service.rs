@@ -23,9 +23,9 @@ use apis::crf::{
 };
 
 use crate::domain::{
-    AnnotationOwner, AnnotationRepository, CrfFormRepository, CrfItemRepository,
-    CrfOptionRepository, CrfUnitRepository, CrfVersionRepository, DomainAnnotationRepository,
-    DomainError, ProjectLookup,
+    AnnotationOwner, AnnotationRepository, CrfBulkFormRepository, CrfFormRepository,
+    CrfItemRepository, CrfOptionRepository, CrfUnitRepository, CrfVersionRepository,
+    DomainAnnotationRepository, DomainError, ProjectLookup,
 };
 use crate::usecase::{CrfUsecase, CrfUsecaseConfig, UsecaseError};
 
@@ -38,11 +38,12 @@ pub struct CrfServiceImpl<
     Da: DomainAnnotationRepository,
     A: AnnotationRepository,
     P: ProjectLookup,
+    B: CrfBulkFormRepository,
 > {
-    usecase: CrfUsecase<V, F, I, O, U, Da, A, P>,
+    usecase: CrfUsecase<V, F, I, O, U, Da, A, P, B>,
 }
 
-impl<V, F, I, O, U, Da, A, P> CrfServiceImpl<V, F, I, O, U, Da, A, P>
+impl<V, F, I, O, U, Da, A, P, B> CrfServiceImpl<V, F, I, O, U, Da, A, P, B>
 where
     V: CrfVersionRepository,
     F: CrfFormRepository,
@@ -52,8 +53,9 @@ where
     Da: DomainAnnotationRepository,
     A: AnnotationRepository,
     P: ProjectLookup,
+    B: CrfBulkFormRepository,
 {
-    pub fn from_usecase(usecase: CrfUsecase<V, F, I, O, U, Da, A, P>) -> Self {
+    pub fn from_usecase(usecase: CrfUsecase<V, F, I, O, U, Da, A, P, B>) -> Self {
         Self { usecase }
     }
 
@@ -67,6 +69,7 @@ where
         domain_annotation_repo: Da,
         annotation_repo: A,
         projects: Arc<P>,
+        bulk_form_repo: Arc<B>,
     ) -> Self {
         Self::from_usecase(CrfUsecase::new(CrfUsecaseConfig {
             version_repo,
@@ -77,12 +80,13 @@ where
             domain_annotation_repo,
             annotation_repo,
             projects,
+            bulk_form_repo,
         }))
     }
 }
 
 #[async_trait]
-impl<V, F, I, O, U, Da, A, P> CrfService for CrfServiceImpl<V, F, I, O, U, Da, A, P>
+impl<V, F, I, O, U, Da, A, P, B> CrfService for CrfServiceImpl<V, F, I, O, U, Da, A, P, B>
 where
     V: CrfVersionRepository + 'static,
     F: CrfFormRepository + 'static,
@@ -92,6 +96,7 @@ where
     Da: DomainAnnotationRepository + 'static,
     A: AnnotationRepository + 'static,
     P: ProjectLookup + 'static,
+    B: CrfBulkFormRepository + 'static,
 {
     // ---- CrfVersion ----
 
@@ -162,6 +167,60 @@ where
             })
             .await
             .map(Into::into)
+            .map_err(map_error)
+    }
+
+    async fn bulk_create_form(
+        &self,
+        req: apis::crf::BulkCreateCrfFormRequest,
+    ) -> Result<apis::crf::BulkCreateCrfFormResult, CrfApiError> {
+        self.usecase
+            .create_bulk_form(crate::usecase::CreateCrfBulkForm {
+                form: crate::usecase::CreateCrfForm {
+                    version_id: req.form.version_id,
+                    code: req.form.code,
+                    name: req.form.name,
+                    order: req.form.order,
+                    not_submitted: req.form.not_submitted,
+                },
+                items: req
+                    .items
+                    .into_iter()
+                    .map(|bi| crate::usecase::CreateCrfBulkItem {
+                        item: crate::usecase::CreateCrfItem {
+                            form_id: 0,
+                            code: bi.item.code,
+                            name: bi.item.name,
+                            kind: crate::domain::CrfItemKind::from(bi.item.kind),
+                            order: bi.item.order,
+                            not_submitted: bi.item.not_submitted,
+                        },
+                        options: bi
+                            .options
+                            .into_iter()
+                            .map(|o| crate::usecase::CreateCrfOption {
+                                item_id: 0,
+                                value: o.value,
+                                not_submitted: o.not_submitted,
+                            })
+                            .collect(),
+                        units: bi
+                            .units
+                            .into_iter()
+                            .map(|u| crate::usecase::CreateCrfUnit {
+                                item_id: 0,
+                                value: u.value,
+                                not_submitted: u.not_submitted,
+                            })
+                            .collect(),
+                    })
+                    .collect(),
+            })
+            .await
+            .map(|r| apis::crf::BulkCreateCrfFormResult {
+                form: r.form.into(),
+                items: r.items.into_iter().map(Into::into).collect(),
+            })
             .map_err(map_error)
     }
 

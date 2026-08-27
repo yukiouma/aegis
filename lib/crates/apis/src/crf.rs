@@ -151,6 +151,37 @@ pub struct CreateCrfFormRequest {
     pub not_submitted: bool,
 }
 
+/// Input DTO for [`CrfService::bulk_create_form`].
+///
+/// Atomically inserts a form, every item, and each item's
+/// options + units. The owning version id is supplied by the
+/// caller (path segment) — the body carries the form's own
+/// scalar fields only. Item / option / unit fields use the same
+/// `Create*Request` shapes as the single-row endpoints; the bulk
+/// port stamps the surrogate `form_id` / `item_id` onto each row
+/// at insert time.
+#[derive(Debug, Clone)]
+pub struct BulkCreateCrfFormRequest {
+    pub form: CreateCrfFormRequest,
+    pub items: Vec<BulkCreateCrfItemInput>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BulkCreateCrfItemInput {
+    pub item: CreateCrfItemRequest,
+    pub options: Vec<CreateCrfOptionRequest>,
+    pub units: Vec<CreateCrfUnitRequest>,
+}
+
+/// Return shape for [`CrfService::bulk_create_form`]. Caller can
+/// follow up with `list_options_by_item` / `list_units_by_item`
+/// to fetch the full subtree for any item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BulkCreateCrfFormResult {
+    pub form: CrfFormView,
+    pub items: Vec<CrfItemView>,
+}
+
 /// Input DTO for [`CrfService::update_form`].
 #[derive(Debug, Default, Clone)]
 pub struct UpdateCrfFormRequest {
@@ -503,6 +534,15 @@ pub trait CrfService: Send + Sync {
     async fn update_form(&self, req: UpdateCrfFormRequest) -> Result<CrfFormView, CrfApiError>;
 
     async fn delete_form(&self, id: i64) -> Result<(), CrfApiError>;
+
+    /// Atomically create a form, every item, and each item's
+    /// options + units. All-or-nothing: any error rolls back the
+    /// whole batch. Kind-shape rules are validated up-front so a
+    /// violation never leaves partial state.
+    async fn bulk_create_form(
+        &self,
+        req: BulkCreateCrfFormRequest,
+    ) -> Result<BulkCreateCrfFormResult, CrfApiError>;
 
     // ---- CrfItem ----
 

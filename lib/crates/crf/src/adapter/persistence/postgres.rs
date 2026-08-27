@@ -6,6 +6,7 @@
 // are sufficient and keep the crate reproducible.
 
 pub mod annotation_repo;
+pub mod crf_bulk_form_repo;
 pub mod crf_form_repo;
 pub mod crf_item_repo;
 pub mod crf_option_repo;

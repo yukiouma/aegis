@@ -10,12 +10,12 @@ PostgreSQL.
 ```
 crf crate
 └── adapter
-    ├── facade                  (in-memory, generic over V/F/I/O/U/Da/A/P)
-    ├── persistence             (postgres, sqlx runtime API)
+    ├── facade                  (in-memory, generic over V/F/I/O/U/Da/A/P/B)
+    ├── persistence             (postgres, sqlx runtime API + CrfBulkFormRepoPg)
     └── service                 (project::ProjectLookupImpl bridge)
 usecase
-└── CrfUsecase<V, F, I, O, U, Da, A, P>
-    └── commands / views / UsecaseError
+└── CrfUsecase<V, F, I, O, U, Da, A, P, B>
+    └── commands / views / UsecaseError (incl. CreateCrfBulkForm / CrfBulkFormResult)
 domain
 └── CrfItemKind, AnnotationOwner
     └── CrfVersion, CrfForm, CrfItem, CrfOption, CrfUnit,
@@ -23,13 +23,16 @@ domain
     └── CrfVersionRepository, CrfFormRepository, CrfItemRepository,
         CrfOptionRepository, CrfUnitRepository,
         DomainAnnotationRepository, AnnotationRepository
+    └── CrfBulkFormRepository (transactional form + items + options + units)
     └── ProjectLookup
     └── DomainError
 ```
 
 `adapter::persistence::postgres::*RepoPg` implements the seven
-ports. `adapter::service::project::ProjectLookupImpl` adapts
-`apis::project::ProjectService` to the domain `ProjectLookup`.
+single-aggregate ports plus `CrfBulkFormRepoPg` which owns the
+transaction that atomically inserts a form, every item, and each
+item's options + units. `adapter::service::project::ProjectLookupImpl`
+adapts `apis::project::ProjectService` to the domain `ProjectLookup`.
 `adapter::facade::in_memory::CrfServiceImpl` adapts
 `CrfUsecase` to `apis::crf::CrfService`.
 

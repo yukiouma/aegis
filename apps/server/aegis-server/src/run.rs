@@ -21,8 +21,8 @@ use auth::{
 };
 use auth::{UserService as AuthUserService, UserServiceImpl as AuthUserServiceImpl};
 use crf::{
-    AnnotationRepoPg, CrfFormRepoPg, CrfItemRepoPg, CrfOptionRepoPg, CrfServiceImpl, CrfUnitRepoPg,
-    CrfVersionRepoPg, DomainAnnotationRepoPg, ProjectLookupImpl,
+    AnnotationRepoPg, CrfBulkFormRepoPg, CrfFormRepoPg, CrfItemRepoPg, CrfOptionRepoPg,
+    CrfServiceImpl, CrfUnitRepoPg, CrfVersionRepoPg, DomainAnnotationRepoPg, ProjectLookupImpl,
 };
 use domain_model::{
     DomainModelServiceImpl, DomainModelUsecase, DomainModelUsecaseConfig, SdtmDomainRepoPg,
@@ -255,7 +255,8 @@ fn build_crf_service(
     let option_repo = CrfOptionRepoPg::new(pool.clone());
     let unit_repo = CrfUnitRepoPg::new(pool.clone());
     let domain_annotation_repo = DomainAnnotationRepoPg::new(pool.clone());
-    let annotation_repo = AnnotationRepoPg::new(pool);
+    let annotation_repo = AnnotationRepoPg::new(pool.clone());
+    let bulk_form_repo = CrfBulkFormRepoPg::new(pool.clone());
     let projects = Arc::new(ProjectLookupImpl::new(project));
     Arc::new(CrfServiceImpl::from_repos(
         version_repo,
@@ -266,6 +267,7 @@ fn build_crf_service(
         domain_annotation_repo,
         annotation_repo,
         projects,
+        Arc::new(bulk_form_repo),
     ))
 }
 

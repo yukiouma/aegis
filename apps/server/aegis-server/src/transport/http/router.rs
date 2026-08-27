@@ -693,6 +693,7 @@ mod tests {
             ("patch", "/api/crf/versions/{id}"),
             ("delete", "/api/crf/versions/{id}"),
             ("post", "/api/crf/versions/{version_id}/forms"),
+            ("post", "/api/crf/versions/{version_id}/forms/bulk"),
             ("patch", "/api/crf/forms/{id}"),
             ("delete", "/api/crf/forms/{id}"),
             ("post", "/api/crf/forms/{form_id}/items"),
@@ -1351,6 +1352,12 @@ mod tests {
             &self,
             _req: apis::crf::CreateCrfFormRequest,
         ) -> Result<apis::crf::CrfFormView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn bulk_create_form(
+            &self,
+            _req: apis::crf::BulkCreateCrfFormRequest,
+        ) -> Result<apis::crf::BulkCreateCrfFormResult, apis::crf::CrfApiError> {
             unimplemented!()
         }
         async fn get_form_by_id(
