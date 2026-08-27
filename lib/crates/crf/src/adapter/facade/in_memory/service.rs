@@ -6,20 +6,23 @@ use apis::crf::{
     AnnotationOwner as ApiAnnotationOwner, AnnotationView as ApiAnnotationView,
     CreateAnnotationRequest, CreateCrfFormRequest, CreateCrfItemRequest, CreateCrfOptionRequest,
     CreateCrfUnitRequest, CreateCrfVersionRequest, CreateDomainAnnotationRequest, CrfApiError,
-    CrfFormView as ApiCrfFormView, CrfItemView as ApiCrfItemView,
-    CrfOptionView as ApiCrfOptionView, CrfService, CrfUnitView as ApiCrfUnitView,
+    CrfFormDetailView as ApiCrfFormDetailView, CrfFormView as ApiCrfFormView,
+    CrfItemDetailView as ApiCrfItemDetailView, CrfItemView as ApiCrfItemView,
+    CrfOptionDetailView as ApiCrfOptionDetailView, CrfOptionView as ApiCrfOptionView,
+    CrfService, CrfUnitDetailView as ApiCrfUnitDetailView, CrfUnitView as ApiCrfUnitView,
     CrfVersionView as ApiCrfVersionView, DomainAnnotationView as ApiDomainAnnotationView,
-    GetAnnotationByIdRequest, GetCrfFormByIdRequest, GetCrfItemByIdRequest,
-    GetCrfOptionByIdRequest, GetCrfUnitByIdRequest, GetCrfVersionByIdRequest,
-    GetDomainAnnotationByIdRequest, ListAnnotationsByFormRequest, ListAnnotationsByItemRequest,
-    ListAnnotationsByOptionRequest, ListAnnotationsByUnitRequest, ListCrfFormsByVersionRequest,
-    ListCrfItemsByFormRequest, ListCrfOptionsByItemRequest, ListCrfUnitsByItemRequest,
-    ListCrfVersionsByProjectRequest, ListDomainAnnotationsByFormRequest,
-    SearchAnnotationsByVersionRequest, SearchCrfFormsByVersionRequest,
-    SearchCrfItemsByVersionRequest, SearchCrfOptionsByVersionRequest,
-    SearchCrfUnitsByVersionRequest, SearchDomainAnnotationsByVersionRequest,
-    UpdateAnnotationRequest, UpdateCrfFormRequest, UpdateCrfItemRequest, UpdateCrfOptionRequest,
-    UpdateCrfUnitRequest, UpdateCrfVersionRequest, UpdateDomainAnnotationRequest,
+    GetAnnotationByIdRequest, GetCrfFormByIdRequest, GetCrfFormDetailRequest,
+    GetCrfItemByIdRequest, GetCrfOptionByIdRequest, GetCrfUnitByIdRequest,
+    GetCrfVersionByIdRequest, GetDomainAnnotationByIdRequest, ListAnnotationsByFormRequest,
+    ListAnnotationsByItemRequest, ListAnnotationsByOptionRequest, ListAnnotationsByUnitRequest,
+    ListCrfFormsByVersionRequest, ListCrfItemsByFormRequest, ListCrfOptionsByItemRequest,
+    ListCrfUnitsByItemRequest, ListCrfVersionsByProjectRequest,
+    ListDomainAnnotationsByFormRequest, SearchAnnotationsByVersionRequest,
+    SearchCrfFormsByVersionRequest, SearchCrfItemsByVersionRequest,
+    SearchCrfOptionsByVersionRequest, SearchCrfUnitsByVersionRequest,
+    SearchDomainAnnotationsByVersionRequest, UpdateAnnotationRequest, UpdateCrfFormRequest,
+    UpdateCrfItemRequest, UpdateCrfOptionRequest, UpdateCrfUnitRequest, UpdateCrfVersionRequest,
+    UpdateDomainAnnotationRequest,
 };
 
 use crate::domain::{
@@ -230,6 +233,17 @@ where
     ) -> Result<ApiCrfFormView, CrfApiError> {
         self.usecase
             .get_form_by_id(req.id)
+            .await
+            .map(Into::into)
+            .map_err(map_error)
+    }
+
+    async fn get_form_detail(
+        &self,
+        req: GetCrfFormDetailRequest,
+    ) -> Result<ApiCrfFormDetailView, CrfApiError> {
+        self.usecase
+            .get_form_detail(req.form_id)
             .await
             .map(Into::into)
             .map_err(map_error)
@@ -768,6 +782,46 @@ impl From<crate::usecase::AnnotationView> for ApiAnnotationView {
             owner: annotation_owner_to_api(a.owner),
             created_at: a.created_at,
             updated_at: a.updated_at,
+        }
+    }
+}
+
+impl From<crate::usecase::CrfFormDetailView> for ApiCrfFormDetailView {
+    fn from(v: crate::usecase::CrfFormDetailView) -> Self {
+        Self {
+            form: v.form.into(),
+            form_annotations: v.form_annotations.into_iter().map(Into::into).collect(),
+            items: v.items.into_iter().map(Into::into).collect(),
+            domain_annotations: v.domain_annotations.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<crate::usecase::CrfItemDetailView> for ApiCrfItemDetailView {
+    fn from(v: crate::usecase::CrfItemDetailView) -> Self {
+        Self {
+            item: v.item.into(),
+            options: v.options.into_iter().map(Into::into).collect(),
+            units: v.units.into_iter().map(Into::into).collect(),
+            annotations: v.annotations.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<crate::usecase::CrfOptionDetailView> for ApiCrfOptionDetailView {
+    fn from(v: crate::usecase::CrfOptionDetailView) -> Self {
+        Self {
+            option: v.option.into(),
+            annotations: v.annotations.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<crate::usecase::CrfUnitDetailView> for ApiCrfUnitDetailView {
+    fn from(v: crate::usecase::CrfUnitDetailView) -> Self {
+        Self {
+            unit: v.unit.into(),
+            annotations: v.annotations.into_iter().map(Into::into).collect(),
         }
     }
 }
