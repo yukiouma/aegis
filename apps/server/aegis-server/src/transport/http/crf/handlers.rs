@@ -179,13 +179,13 @@ pub async fn delete_version(
 
 // ---- CrfForm ----
 
-/// `POST /api/crf/versions/{version_id}/forms` — create a CRF form
+/// `POST /api/crf/versions/{id}/forms` — create a CRF form
 /// under a version.
 #[utoipa::path(
-    post, path = "/versions/{version_id}/forms", tag = "crf",
+    post, path = "/versions/{id}/forms", tag = "crf",
     operation_id = "crf_create_form",
     params(
-        ("version_id" = i64, Path, description = "Owning CRF version id"),
+        ("id" = i64, Path, description = "Owning CRF version id"),
     ),
     request_body = dto::CreateCrfFormRequest,
     responses(
@@ -219,17 +219,17 @@ pub async fn create_form(
     Ok((StatusCode::CREATED, Json(view.into())))
 }
 
-/// `POST /api/crf/versions/{version_id}/forms/bulk` — atomically
+/// `POST /api/crf/versions/{id}/forms/bulk` — atomically
 /// create a CRF form along with all of its items, options, and
 /// units in one transactional insert. Owning `version_id` comes
 /// from the path; the body carries the form's own fields plus the
 /// items subtree. The bulk port stamps the surrogate
 /// `form_id` / `item_id` on each row at insert time.
 #[utoipa::path(
-    post, path = "/versions/{version_id}/forms/bulk", tag = "crf",
+    post, path = "/versions/{id}/forms/bulk", tag = "crf",
     operation_id = "crf_bulk_create_form",
     params(
-        ("version_id" = i64, Path, description = "Owning CRF version id"),
+        ("id" = i64, Path, description = "Owning CRF version id"),
     ),
     request_body = dto::BulkCreateCrfFormRequest,
     responses(
@@ -297,13 +297,13 @@ pub async fn bulk_create_form(
     Ok((StatusCode::CREATED, Json(result.into())))
 }
 
-/// `GET /api/crf/versions/{version_id}/forms` — list every CRF form
+/// `GET /api/crf/versions/{id}/forms` — list every CRF form
 /// under the given version, ordered by `order ASC, id ASC`.
 #[utoipa::path(
-    get, path = "/versions/{version_id}/forms", tag = "crf",
+    get, path = "/versions/{id}/forms", tag = "crf",
     operation_id = "crf_list_forms_by_version",
     params(
-        ("version_id" = i64, Path, description = "Owning CRF version id"),
+        ("id" = i64, Path, description = "Owning CRF version id"),
     ),
     responses(
         (status = 200, description = "Forms list", body = dto::CrfFormListResponse),
@@ -325,13 +325,13 @@ pub async fn list_forms_by_version(
     Ok(Json(dto::CrfFormListResponse { forms }))
 }
 
-/// `GET /api/crf/versions/{version_id}/forms/search?fragment=...` —
+/// `GET /api/crf/versions/{id}/forms/search?fragment=...` —
 /// version-scoped substring search on form code / name.
 #[utoipa::path(
-    get, path = "/versions/{version_id}/forms/search", tag = "crf",
+    get, path = "/versions/{id}/forms/search", tag = "crf",
     operation_id = "crf_search_forms_by_version",
     params(
-        ("version_id" = i64, Path, description = "Owning CRF version id"),
+        ("id" = i64, Path, description = "Owning CRF version id"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
@@ -453,13 +453,13 @@ pub async fn delete_form(
 
 // ---- CrfItem ----
 
-/// `POST /api/crf/forms/{form_id}/items` — create a CRF item under a
+/// `POST /api/crf/forms/{id}/items` — create a CRF item under a
 /// form. Kind-shape validation runs at the usecase.
 #[utoipa::path(
-    post, path = "/forms/{form_id}/items", tag = "crf",
+    post, path = "/forms/{id}/items", tag = "crf",
     operation_id = "crf_create_item",
     params(
-        ("form_id" = i64, Path, description = "Owning CRF form id"),
+        ("id" = i64, Path, description = "Owning CRF form id"),
     ),
     request_body = dto::CreateCrfItemRequest,
     responses(
@@ -494,13 +494,13 @@ pub async fn create_item(
     Ok((StatusCode::CREATED, Json(view.into())))
 }
 
-/// `GET /api/crf/forms/{form_id}/items` — list every CRF item under
+/// `GET /api/crf/forms/{id}/items` — list every CRF item under
 /// the given form, ordered by `order ASC, id ASC`.
 #[utoipa::path(
-    get, path = "/forms/{form_id}/items", tag = "crf",
+    get, path = "/forms/{id}/items", tag = "crf",
     operation_id = "crf_list_items_by_form",
     params(
-        ("form_id" = i64, Path, description = "Owning CRF form id"),
+        ("id" = i64, Path, description = "Owning CRF form id"),
     ),
     responses(
         (status = 200, description = "Items list", body = dto::CrfItemListResponse),
@@ -522,14 +522,14 @@ pub async fn list_items_by_form(
     Ok(Json(dto::CrfItemListResponse { items }))
 }
 
-/// `GET /api/crf/forms/{form_id}/items/search?fragment=...` —
+/// `GET /api/crf/forms/{id}/items/search?fragment=...` —
 /// version-scoped substring search on item code / name. The version
 /// is derived from the form at the usecase layer.
 #[utoipa::path(
-    get, path = "/forms/{form_id}/items/search", tag = "crf",
+    get, path = "/forms/{id}/items/search", tag = "crf",
     operation_id = "crf_search_items_by_version",
     params(
-        ("form_id" = i64, Path, description = "Owning CRF form id; the version is derived from this row"),
+        ("id" = i64, Path, description = "Owning CRF form id; the version is derived from this row"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
@@ -656,13 +656,13 @@ pub async fn delete_item(
 
 // ---- CrfOption ----
 
-/// `POST /api/crf/items/{item_id}/options` — create a CRF option
+/// `POST /api/crf/items/{id}/options` — create a CRF option
 /// under an item.
 #[utoipa::path(
-    post, path = "/items/{item_id}/options", tag = "crf",
+    post, path = "/items/{id}/options", tag = "crf",
     operation_id = "crf_create_option",
     params(
-        ("item_id" = i64, Path, description = "Owning CRF item id"),
+        ("id" = i64, Path, description = "Owning CRF item id"),
     ),
     request_body = dto::CreateCrfOptionRequest,
     responses(
@@ -693,13 +693,13 @@ pub async fn create_option(
     Ok((StatusCode::CREATED, Json(view.into())))
 }
 
-/// `GET /api/crf/items/{item_id}/options` — list every CRF option
+/// `GET /api/crf/items/{id}/options` — list every CRF option
 /// under the given item, ordered by id ASC.
 #[utoipa::path(
-    get, path = "/items/{item_id}/options", tag = "crf",
+    get, path = "/items/{id}/options", tag = "crf",
     operation_id = "crf_list_options_by_item",
     params(
-        ("item_id" = i64, Path, description = "Owning CRF item id"),
+        ("id" = i64, Path, description = "Owning CRF item id"),
     ),
     responses(
         (status = 200, description = "Options list", body = dto::CrfOptionListResponse),
@@ -721,14 +721,14 @@ pub async fn list_options_by_item(
     Ok(Json(dto::CrfOptionListResponse { options }))
 }
 
-/// `GET /api/crf/items/{item_id}/options/search?fragment=...` —
+/// `GET /api/crf/items/{id}/options/search?fragment=...` —
 /// version-scoped substring search on option value. The version is
 /// derived from item -> form -> version at the usecase layer.
 #[utoipa::path(
-    get, path = "/items/{item_id}/options/search", tag = "crf",
+    get, path = "/items/{id}/options/search", tag = "crf",
     operation_id = "crf_search_options_by_version",
     params(
-        ("item_id" = i64, Path, description = "Owning CRF item id; the version is derived from this row"),
+        ("id" = i64, Path, description = "Owning CRF item id; the version is derived from this row"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
@@ -855,13 +855,13 @@ pub async fn delete_option(
 
 // ---- CrfUnit ----
 
-/// `POST /api/crf/items/{item_id}/units` — create a CRF unit under
+/// `POST /api/crf/items/{id}/units` — create a CRF unit under
 /// an item.
 #[utoipa::path(
-    post, path = "/items/{item_id}/units", tag = "crf",
+    post, path = "/items/{id}/units", tag = "crf",
     operation_id = "crf_create_unit",
     params(
-        ("item_id" = i64, Path, description = "Owning CRF item id"),
+        ("id" = i64, Path, description = "Owning CRF item id"),
     ),
     request_body = dto::CreateCrfUnitRequest,
     responses(
@@ -892,13 +892,13 @@ pub async fn create_unit(
     Ok((StatusCode::CREATED, Json(view.into())))
 }
 
-/// `GET /api/crf/items/{item_id}/units` — list every CRF unit under
+/// `GET /api/crf/items/{id}/units` — list every CRF unit under
 /// the given item, ordered by id ASC.
 #[utoipa::path(
-    get, path = "/items/{item_id}/units", tag = "crf",
+    get, path = "/items/{id}/units", tag = "crf",
     operation_id = "crf_list_units_by_item",
     params(
-        ("item_id" = i64, Path, description = "Owning CRF item id"),
+        ("id" = i64, Path, description = "Owning CRF item id"),
     ),
     responses(
         (status = 200, description = "Units list", body = dto::CrfUnitListResponse),
@@ -920,14 +920,14 @@ pub async fn list_units_by_item(
     Ok(Json(dto::CrfUnitListResponse { units }))
 }
 
-/// `GET /api/crf/items/{item_id}/units/search?fragment=...` —
+/// `GET /api/crf/items/{id}/units/search?fragment=...` —
 /// version-scoped substring search on unit value. The version is
 /// derived from item -> form -> version at the usecase layer.
 #[utoipa::path(
-    get, path = "/items/{item_id}/units/search", tag = "crf",
+    get, path = "/items/{id}/units/search", tag = "crf",
     operation_id = "crf_search_units_by_version",
     params(
-        ("item_id" = i64, Path, description = "Owning CRF item id; the version is derived from this row"),
+        ("id" = i64, Path, description = "Owning CRF item id; the version is derived from this row"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
@@ -1054,13 +1054,13 @@ pub async fn delete_unit(
 
 // ---- DomainAnnotation ----
 
-/// `POST /api/crf/forms/{form_id}/domain-annotations` — create a
+/// `POST /api/crf/forms/{id}/domain-annotations` — create a
 /// domain annotation under a form.
 #[utoipa::path(
-    post, path = "/forms/{form_id}/domain-annotations", tag = "crf",
+    post, path = "/forms/{id}/domain-annotations", tag = "crf",
     operation_id = "crf_create_domain_annotation",
     params(
-        ("form_id" = i64, Path, description = "Owning CRF form id"),
+        ("id" = i64, Path, description = "Owning CRF form id"),
     ),
     request_body = dto::CreateDomainAnnotationRequest,
     responses(
@@ -1092,13 +1092,13 @@ pub async fn create_domain_annotation(
     Ok((StatusCode::CREATED, Json(view.into())))
 }
 
-/// `GET /api/crf/forms/{form_id}/domain-annotations` — list every
+/// `GET /api/crf/forms/{id}/domain-annotations` — list every
 /// domain annotation attached to the given form.
 #[utoipa::path(
-    get, path = "/forms/{form_id}/domain-annotations", tag = "crf",
+    get, path = "/forms/{id}/domain-annotations", tag = "crf",
     operation_id = "crf_list_domain_annotations_by_form",
     params(
-        ("form_id" = i64, Path, description = "Owning CRF form id"),
+        ("id" = i64, Path, description = "Owning CRF form id"),
     ),
     responses(
         (status = 200, description = "Domain annotations list", body = dto::DomainAnnotationListResponse),
@@ -1122,14 +1122,14 @@ pub async fn list_domain_annotations_by_form(
     }))
 }
 
-/// `GET /api/crf/versions/{version_id}/domain-annotations/search?fragment=...` —
+/// `GET /api/crf/versions/{id}/domain-annotations/search?fragment=...` —
 /// version-scoped substring search on domain annotation name /
 /// description. The search walks every form under the version.
 #[utoipa::path(
-    get, path = "/versions/{version_id}/domain-annotations/search", tag = "crf",
+    get, path = "/versions/{id}/domain-annotations/search", tag = "crf",
     operation_id = "crf_search_domain_annotations_by_version",
     params(
-        ("version_id" = i64, Path, description = "Owning CRF version id"),
+        ("id" = i64, Path, description = "Owning CRF version id"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
@@ -1287,13 +1287,13 @@ pub async fn create_annotation(
     Ok((StatusCode::CREATED, Json(view.into())))
 }
 
-/// `GET /api/crf/forms/{form_id}/annotations` — list every annotation
+/// `GET /api/crf/forms/{id}/annotations` — list every annotation
 /// attached directly to the given form.
 #[utoipa::path(
-    get, path = "/forms/{form_id}/annotations", tag = "crf",
+    get, path = "/forms/{id}/annotations", tag = "crf",
     operation_id = "crf_list_annotations_by_form",
     params(
-        ("form_id" = i64, Path, description = "Owning CRF form id"),
+        ("id" = i64, Path, description = "Owning CRF form id"),
     ),
     responses(
         (status = 200, description = "Annotations list", body = dto::AnnotationListResponse),
@@ -1315,13 +1315,13 @@ pub async fn list_annotations_by_form(
     Ok(Json(dto::AnnotationListResponse { annotations }))
 }
 
-/// `GET /api/crf/items/{item_id}/annotations` — list every annotation
+/// `GET /api/crf/items/{id}/annotations` — list every annotation
 /// attached directly to the given item.
 #[utoipa::path(
-    get, path = "/items/{item_id}/annotations", tag = "crf",
+    get, path = "/items/{id}/annotations", tag = "crf",
     operation_id = "crf_list_annotations_by_item",
     params(
-        ("item_id" = i64, Path, description = "Owning CRF item id"),
+        ("id" = i64, Path, description = "Owning CRF item id"),
     ),
     responses(
         (status = 200, description = "Annotations list", body = dto::AnnotationListResponse),
@@ -1343,13 +1343,13 @@ pub async fn list_annotations_by_item(
     Ok(Json(dto::AnnotationListResponse { annotations }))
 }
 
-/// `GET /api/crf/options/{option_id}/annotations` — list every
+/// `GET /api/crf/options/{id}/annotations` — list every
 /// annotation attached directly to the given option.
 #[utoipa::path(
-    get, path = "/options/{option_id}/annotations", tag = "crf",
+    get, path = "/options/{id}/annotations", tag = "crf",
     operation_id = "crf_list_annotations_by_option",
     params(
-        ("option_id" = i64, Path, description = "Owning CRF option id"),
+        ("id" = i64, Path, description = "Owning CRF option id"),
     ),
     responses(
         (status = 200, description = "Annotations list", body = dto::AnnotationListResponse),
@@ -1371,13 +1371,13 @@ pub async fn list_annotations_by_option(
     Ok(Json(dto::AnnotationListResponse { annotations }))
 }
 
-/// `GET /api/crf/units/{unit_id}/annotations` — list every annotation
+/// `GET /api/crf/units/{id}/annotations` — list every annotation
 /// attached directly to the given unit.
 #[utoipa::path(
-    get, path = "/units/{unit_id}/annotations", tag = "crf",
+    get, path = "/units/{id}/annotations", tag = "crf",
     operation_id = "crf_list_annotations_by_unit",
     params(
-        ("unit_id" = i64, Path, description = "Owning CRF unit id"),
+        ("id" = i64, Path, description = "Owning CRF unit id"),
     ),
     responses(
         (status = 200, description = "Annotations list", body = dto::AnnotationListResponse),
@@ -1399,14 +1399,14 @@ pub async fn list_annotations_by_unit(
     Ok(Json(dto::AnnotationListResponse { annotations }))
 }
 
-/// `GET /api/crf/versions/{version_id}/annotations/search?fragment=...` —
+/// `GET /api/crf/versions/{id}/annotations/search?fragment=...` —
 /// version-scoped substring search on annotation content. The search
 /// UNIONs every annotation chain under the version.
 #[utoipa::path(
-    get, path = "/versions/{version_id}/annotations/search", tag = "crf",
+    get, path = "/versions/{id}/annotations/search", tag = "crf",
     operation_id = "crf_search_annotations_by_version",
     params(
-        ("version_id" = i64, Path, description = "Owning CRF version id"),
+        ("id" = i64, Path, description = "Owning CRF version id"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
