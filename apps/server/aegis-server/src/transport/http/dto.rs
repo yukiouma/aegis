@@ -1673,6 +1673,83 @@ impl From<apis::crf::BulkCreateCrfFormResult> for BulkCreateCrfFormResponse {
     }
 }
 
+/// Wire projection of [`apis::crf::CrfFormDetailView`]. Returned
+/// by `GET /api/crf/forms/{id}/details`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfFormDetailResponse {
+    pub form: CrfFormViewResponse,
+    pub form_annotations: Vec<AnnotationViewResponse>,
+    pub items: Vec<CrfItemDetailResponse>,
+    pub domain_annotations: Vec<DomainAnnotationViewResponse>,
+}
+
+/// Wire projection of [`apis::crf::CrfItemDetailView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfItemDetailResponse {
+    pub item: CrfItemViewResponse,
+    pub options: Vec<CrfOptionDetailResponse>,
+    pub units: Vec<CrfUnitDetailResponse>,
+    pub annotations: Vec<AnnotationViewResponse>,
+}
+
+/// Wire projection of [`apis::crf::CrfOptionDetailView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfOptionDetailResponse {
+    pub option: CrfOptionViewResponse,
+    pub annotations: Vec<AnnotationViewResponse>,
+}
+
+/// Wire projection of [`apis::crf::CrfUnitDetailView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfUnitDetailResponse {
+    pub unit: CrfUnitViewResponse,
+    pub annotations: Vec<AnnotationViewResponse>,
+}
+
+impl From<apis::crf::CrfFormDetailView> for CrfFormDetailResponse {
+    fn from(v: apis::crf::CrfFormDetailView) -> Self {
+        Self {
+            form: v.form.into(),
+            form_annotations: v.form_annotations.into_iter().map(Into::into).collect(),
+            items: v.items.into_iter().map(Into::into).collect(),
+            domain_annotations: v.domain_annotations.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<apis::crf::CrfItemDetailView> for CrfItemDetailResponse {
+    fn from(v: apis::crf::CrfItemDetailView) -> Self {
+        Self {
+            item: v.item.into(),
+            options: v.options.into_iter().map(Into::into).collect(),
+            units: v.units.into_iter().map(Into::into).collect(),
+            annotations: v.annotations.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<apis::crf::CrfOptionDetailView> for CrfOptionDetailResponse {
+    fn from(v: apis::crf::CrfOptionDetailView) -> Self {
+        Self {
+            option: v.option.into(),
+            annotations: v.annotations.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<apis::crf::CrfUnitDetailView> for CrfUnitDetailResponse {
+    fn from(v: apis::crf::CrfUnitDetailView) -> Self {
+        Self {
+            unit: v.unit.into(),
+            annotations: v.annotations.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCrfFormRequest {
