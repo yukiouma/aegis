@@ -178,6 +178,63 @@ impl AnnotationRepository for AnnotationRepoPg {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
+    async fn list_by_items(
+        &self,
+        item_ids: &[i64],
+    ) -> Result<Vec<Annotation>, DomainError> {
+        if item_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows = sqlx::query_as::<_, AnnotationRow>(
+            "SELECT id, domain_annotation_id, content, assign,
+                    form_id, item_id, option_id, unit_id, created_at, updated_at
+             FROM crf_annotations WHERE item_id = ANY($1) ORDER BY id ASC",
+        )
+        .bind(item_ids)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn list_by_options(
+        &self,
+        option_ids: &[i64],
+    ) -> Result<Vec<Annotation>, DomainError> {
+        if option_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows = sqlx::query_as::<_, AnnotationRow>(
+            "SELECT id, domain_annotation_id, content, assign,
+                    form_id, item_id, option_id, unit_id, created_at, updated_at
+             FROM crf_annotations WHERE option_id = ANY($1) ORDER BY id ASC",
+        )
+        .bind(option_ids)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn list_by_units(
+        &self,
+        unit_ids: &[i64],
+    ) -> Result<Vec<Annotation>, DomainError> {
+        if unit_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows = sqlx::query_as::<_, AnnotationRow>(
+            "SELECT id, domain_annotation_id, content, assign,
+                    form_id, item_id, option_id, unit_id, created_at, updated_at
+             FROM crf_annotations WHERE unit_id = ANY($1) ORDER BY id ASC",
+        )
+        .bind(unit_ids)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
     async fn update(&self, input: AnnotationUpdate) -> Result<Annotation, DomainError> {
         let row: AnnotationRow = sqlx::query_as::<_, AnnotationRow>(
             "UPDATE crf_annotations SET

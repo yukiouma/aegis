@@ -201,6 +201,29 @@ pub trait AnnotationRepository: Send + Sync {
     async fn list_by_item(&self, item_id: i64) -> Result<Vec<Annotation>, DomainError>;
     async fn list_by_option(&self, option_id: i64) -> Result<Vec<Annotation>, DomainError>;
     async fn list_by_unit(&self, unit_id: i64) -> Result<Vec<Annotation>, DomainError>;
+    /// Batch-fetch every annotation whose `item_id` is in
+    /// `item_ids` (the other three FK columns null). Returns
+    /// `Ok(Vec::new())` for empty input without hitting the
+    /// DB. Used by the form-detail usecase to hydrate item-
+    /// level annotations in one round-trip.
+    async fn list_by_items(
+        &self,
+        item_ids: &[i64],
+    ) -> Result<Vec<Annotation>, DomainError>;
+    /// Batch-fetch every annotation owned by an option whose
+    /// id is in `option_ids`. Returns `Ok(Vec::new())` for
+    /// empty input.
+    async fn list_by_options(
+        &self,
+        option_ids: &[i64],
+    ) -> Result<Vec<Annotation>, DomainError>;
+    /// Batch-fetch every annotation owned by a unit whose id
+    /// is in `unit_ids`. Returns `Ok(Vec::new())` for empty
+    /// input.
+    async fn list_by_units(
+        &self,
+        unit_ids: &[i64],
+    ) -> Result<Vec<Annotation>, DomainError>;
     async fn update(&self, input: AnnotationUpdate) -> Result<Annotation, DomainError>;
     async fn delete(&self, id: i64) -> Result<(), DomainError>;
     async fn search_by_version(
