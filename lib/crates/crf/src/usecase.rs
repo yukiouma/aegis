@@ -26,6 +26,7 @@ pub use commands::{
 pub use crf_usecase::{CrfUsecase, CrfUsecaseConfig};
 pub use error::UsecaseError;
 pub use views::{
-    AnnotationView, CrfBulkFormResult, CrfFormView, CrfItemView, CrfOptionView, CrfUnitView,
+    AnnotationView, CrfBulkFormResult, CrfFormDetailView, CrfFormView, CrfItemDetailView,
+    CrfItemView, CrfOptionDetailView, CrfOptionView, CrfUnitDetailView, CrfUnitView,
     CrfVersionView, DomainAnnotationView,
 };
