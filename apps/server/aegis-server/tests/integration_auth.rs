@@ -918,6 +918,12 @@ impl apis::crf::CrfService for NullCrfService {
     ) -> Result<apis::crf::CrfFormView, apis::crf::CrfApiError> {
         unimplemented!()
     }
+    async fn get_form_detail(
+        &self,
+        _req: apis::crf::GetCrfFormDetailRequest,
+    ) -> Result<apis::crf::CrfFormDetailView, apis::crf::CrfApiError> {
+        unimplemented!()
+    }
     async fn list_forms_by_version(
         &self,
         _req: apis::crf::ListCrfFormsByVersionRequest,
