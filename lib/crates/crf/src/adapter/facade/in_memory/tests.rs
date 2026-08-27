@@ -456,3 +456,116 @@ async fn facade_bulk_create_form_rejects_text_with_options() {
         .unwrap_err();
     assert!(matches!(err, CrfApiError::KindShapeViolation { .. }));
 }
+
+#[tokio::test]
+async fn facade_get_form_detail_round_trip() {
+    // Drives the public apis wire shape end-to-end and
+    // confirms the projections on the response.
+    let svc = service();
+    let v = svc
+        .create_version(CreateCrfVersionRequest {
+            project_code: "P1".into(),
+            name: "v1".into(),
+        })
+        .await
+        .unwrap();
+    let f = svc
+        .create_form(CreateCrfFormRequest {
+            version_id: v.id,
+            code: "F1".into(),
+            name: "Form 1".into(),
+            order: 0,
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+    let form_id = f.id;
+    let i1 = svc
+        .create_item(CreateCrfItemRequest {
+            form_id,
+            code: "I1".into(),
+            name: "Item 1".into(),
+            kind: apis::crf::CrfItemKind::Text,
+            order: 0,
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+    let item1_id = i1.id;
+    svc.create_option(CreateCrfOptionRequest {
+        item_id: item1_id,
+        value: "yes".into(),
+        not_submitted: false,
+    })
+    .await
+    .unwrap();
+    svc.create_unit(CreateCrfUnitRequest {
+        item_id: item1_id,
+        value: "mg".into(),
+        not_submitted: false,
+    })
+    .await
+    .unwrap();
+    let i2 = svc
+        .create_item(CreateCrfItemRequest {
+            form_id,
+            code: "I2".into(),
+            name: "Item 2".into(),
+            kind: apis::crf::CrfItemKind::Text,
+            order: 1,
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+    let item2_id = i2.id;
+    let d = svc
+        .create_domain_annotation(CreateDomainAnnotationRequest {
+            form_id,
+            name: "Hint".into(),
+            description: "".into(),
+        })
+        .await
+        .unwrap();
+    svc.create_annotation(CreateAnnotationRequest {
+        domain_annotation_id: d.id,
+        content: "form-level".into(),
+        assign: false,
+        owner: AnnotationOwner::Form(form_id),
+    })
+    .await
+    .unwrap();
+    svc.create_annotation(CreateAnnotationRequest {
+        domain_annotation_id: d.id,
+        content: "item-1".into(),
+        assign: false,
+        owner: AnnotationOwner::Item(item1_id),
+    })
+    .await
+    .unwrap();
+
+    let detail = svc
+        .get_form_detail(apis::crf::GetCrfFormDetailRequest { form_id })
+        .await
+        .unwrap();
+
+    assert_eq!(detail.form.id, form_id);
+    assert_eq!(detail.items.len(), 2);
+    assert_eq!(detail.items[0].item.id, item1_id);
+    assert_eq!(detail.items[0].options.len(), 1);
+    assert_eq!(detail.items[0].units.len(), 1);
+    assert_eq!(detail.items[0].annotations.len(), 1);
+    assert_eq!(detail.items[1].item.id, item2_id);
+    assert_eq!(detail.items[1].options.len(), 0);
+    assert_eq!(detail.form_annotations.len(), 1);
+    assert_eq!(detail.domain_annotations.len(), 1);
+}
+
+#[tokio::test]
+async fn facade_get_form_detail_missing_form() {
+    let svc = service();
+    let err = svc
+        .get_form_detail(apis::crf::GetCrfFormDetailRequest { form_id: 9_999_999 })
+        .await
+        .unwrap_err();
+    assert!(matches!(err, CrfApiError::CrfFormNotFound(9_999_999)));
+}
