@@ -829,7 +829,9 @@ In this order, per `lib-crate-development.md` §9:
    - Asserts `Send + Sync` for `Box<dyn CrfService>`
 
 5. **`tests/integration_persistence.rs`** (`#[ignore]`-gated, live DB):
-   - Reads `AEGIS_CRF_DATABASE_URL`; panics with a clear message if missing
+   - Reads `AEGIS_DATABASE_URL` (workspace-shared, same
+     convention as the `auth` and `project` crate tests);
+     panics with a clear message if missing
    - Loads `.env` via `dotenvy::dotenv()`
    - Drops `crf_*` tables + `_sqlx_migrations` before each run
    - Generates unique `(project_code, name)` / `(version_id, code)` via
@@ -918,7 +920,7 @@ Mirrors `domain-model/README.md`:
 - `src/` tree (the one in this spec).
 - Data-model table.
 - Verification block (the §11 gate).
-- Live-DB env var (`AEGIS_CRF_DATABASE_URL`).
+- Live-DB env var (`AEGIS_DATABASE_URL`, workspace-shared).
 - Back-link to `docs/guidelines/lib-crate-development.md`.
 - Spec pointer: this file.
 
@@ -933,7 +935,7 @@ cargo fmt --all -- --check
 cargo clippy -p crf --all-targets --all-features -- -D warnings
 cargo test -p crf
 cargo doc -p crf --no-deps
-cargo test -p crf -- --ignored --test-threads=1   # needs AEGIS_CRF_DATABASE_URL
+cargo test -p crf -- --ignored --test-threads=1   # needs AEGIS_DATABASE_URL
 cargo check --workspace
 ```
 
