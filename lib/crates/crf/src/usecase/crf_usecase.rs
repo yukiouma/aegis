@@ -22,10 +22,11 @@
 use std::sync::Arc;
 
 use crate::domain::{
-    AnnotationNew, AnnotationOwner, AnnotationRepository, AnnotationUpdate, CrfBulkFormRepository,
-    CrfFormNew, CrfFormRepository, CrfFormUpdate, CrfItemNew, CrfItemRepository, CrfItemUpdate,
-    CrfOptionNew, CrfOptionRepository, CrfOptionUpdate, CrfUnitNew, CrfUnitRepository,
-    CrfUnitUpdate, CrfVersionNew, CrfVersionRepository, CrfVersionUpdate, DomainAnnotationNew,
+    Annotation, AnnotationNew, AnnotationOwner, AnnotationRepository, AnnotationUpdate,
+    CrfBulkFormRepository, CrfFormNew, CrfFormRepository, CrfFormUpdate, CrfItem, CrfItemNew,
+    CrfItemRepository, CrfItemUpdate, CrfOption, CrfOptionNew, CrfOptionRepository,
+    CrfOptionUpdate, CrfUnit, CrfUnitNew, CrfUnitRepository, CrfUnitUpdate, CrfVersionNew,
+    CrfVersionRepository, CrfVersionUpdate, DomainAnnotation, DomainAnnotationNew,
     DomainAnnotationRepository, DomainAnnotationUpdate, DomainError, ProjectLookup,
     validate_bulk_create,
 };
@@ -39,7 +40,8 @@ use super::commands::{
 };
 use super::error::UsecaseError;
 use super::views::{
-    AnnotationView, CrfBulkFormResult, CrfFormView, CrfItemView, CrfOptionView, CrfUnitView,
+    AnnotationView, CrfBulkFormResult, CrfFormDetailView, CrfFormView, CrfItemDetailView,
+    CrfItemView, CrfOptionDetailView, CrfOptionView, CrfUnitDetailView, CrfUnitView,
     CrfVersionView, DomainAnnotationView,
 };
 
@@ -232,6 +234,163 @@ impl<
     pub async fn delete_form(&self, id: i64) -> Result<(), UsecaseError> {
         self.form_repo.delete(id).await?;
         Ok(())
+    }
+
+    /// Return every piece of state owned by this form (items
+    /// composed with their options / units / annotations,
+    /// domain annotations, and form-level annotations) in a
+    /// single response. Returns
+    /// `UsecaseError::Repository(CrfFormNotFound)` if the form
+    /// does not exist.
+    ///
+    /// Wave structure: 4 concurrent reads in wave 1, 3 in
+    /// wave 2, 1 each in waves 3 and 4 (9 queries, max 4 in
+    /// flight). Waves 2-4 are skipped entirely when their
+    /// inputs are empty.
+    pub async fn get_form_detail(
+        &self,
+        form_id: i64,
+    ) -> Result<CrfFormDetailView, UsecaseError> {
+        use std::collections::HashMap;
+
+        // Wave 1: form + items + domain_annotations + form-level annotations.
+        let (form, items, domain_annotations, form_annotations) = tokio::try_join!(
+            self.form_repo.find_by_id(form_id),
+            self.item_repo.list_by_form(form_id),
+            self.domain_annotation_repo.list_by_form(form_id),
+            self.annotation_repo.list_by_form(form_id),
+        )?;
+
+        if items.is_empty() {
+            let mut sorted_da = domain_annotations;
+            sorted_da.sort_by_key(|d| d.id);
+            return Ok(CrfFormDetailView {
+                form: form.into(),
+                form_annotations: form_annotations.into_iter().map(Into::into).collect(),
+                items: Vec::new(),
+                domain_annotations: sorted_da.into_iter().map(Into::into).collect(),
+            });
+        }
+
+        let item_ids: Vec<i64> = items.iter().map(|i| i.id).collect();
+
+        // Wave 2: options + units + item-level annotations.
+        let (options, units, item_annotations) = tokio::try_join!(
+            self.option_repo.list_by_items(&item_ids),
+            self.unit_repo.list_by_items(&item_ids),
+            self.annotation_repo.list_by_items(&item_ids),
+        )?;
+
+        // Build maps for O(1) parent lookups during assembly.
+        let mut options_by_item: HashMap<i64, Vec<CrfOption>> = HashMap::new();
+        for o in options {
+            options_by_item.entry(o.item_id).or_default().push(o);
+        }
+        let mut units_by_item: HashMap<i64, Vec<CrfUnit>> = HashMap::new();
+        for u in units {
+            units_by_item.entry(u.item_id).or_default().push(u);
+        }
+        let mut item_anns_by_item: HashMap<i64, Vec<Annotation>> = HashMap::new();
+        for a in item_annotations {
+            if let AnnotationOwner::Item { id } = a.owner {
+                item_anns_by_item.entry(id).or_default().push(a);
+            }
+        }
+
+        // Collect option / unit ids across all items for waves 3 & 4.
+        let option_ids: Vec<i64> = options_by_item
+            .values()
+            .flat_map(|v| v.iter().map(|o| o.id))
+            .collect();
+        let unit_ids: Vec<i64> = units_by_item
+            .values()
+            .flat_map(|v| v.iter().map(|u| u.id))
+            .collect();
+
+        // Wave 3: option-level annotations.
+        let option_anns = if option_ids.is_empty() {
+            Vec::new()
+        } else {
+            self.annotation_repo.list_by_options(&option_ids).await?
+        };
+        let mut option_anns_by_option: HashMap<i64, Vec<Annotation>> = HashMap::new();
+        for a in option_anns {
+            if let AnnotationOwner::Option { id } = a.owner {
+                option_anns_by_option.entry(id).or_default().push(a);
+            }
+        }
+
+        // Wave 4: unit-level annotations.
+        let unit_anns = if unit_ids.is_empty() {
+            Vec::new()
+        } else {
+            self.annotation_repo.list_by_units(&unit_ids).await?
+        };
+        let mut unit_anns_by_unit: HashMap<i64, Vec<Annotation>> = HashMap::new();
+        for a in unit_anns {
+            if let AnnotationOwner::Unit { id } = a.owner {
+                unit_anns_by_unit.entry(id).or_default().push(a);
+            }
+        }
+
+        // Items come back ordered; sort defensively.
+        let mut sorted_items: Vec<CrfItem> = items;
+        sorted_items.sort_by(|a, b| a.order.cmp(&b.order).then(a.id.cmp(&b.id)));
+
+        let item_views: Vec<CrfItemDetailView> = sorted_items
+            .into_iter()
+            .map(|item| {
+                let mut opts = options_by_item.remove(&item.id).unwrap_or_default();
+                opts.sort_by_key(|o| o.id);
+                let mut uns = units_by_item.remove(&item.id).unwrap_or_default();
+                uns.sort_by_key(|u| u.id);
+                let mut item_anns = item_anns_by_item.remove(&item.id).unwrap_or_default();
+                item_anns.sort_by_key(|a| a.id);
+
+                let option_views = opts
+                    .into_iter()
+                    .map(|o| {
+                        let mut anns = option_anns_by_option.remove(&o.id).unwrap_or_default();
+                        anns.sort_by_key(|a| a.id);
+                        CrfOptionDetailView {
+                            option: o.into(),
+                            annotations: anns.into_iter().map(Into::into).collect(),
+                        }
+                    })
+                    .collect();
+                let unit_views = uns
+                    .into_iter()
+                    .map(|u| {
+                        let mut anns = unit_anns_by_unit.remove(&u.id).unwrap_or_default();
+                        anns.sort_by_key(|a| a.id);
+                        CrfUnitDetailView {
+                            unit: u.into(),
+                            annotations: anns.into_iter().map(Into::into).collect(),
+                        }
+                    })
+                    .collect();
+
+                CrfItemDetailView {
+                    item: item.into(),
+                    options: option_views,
+                    units: unit_views,
+                    annotations: item_anns.into_iter().map(Into::into).collect(),
+                }
+            })
+            .collect();
+
+        let mut sorted_domain_annotations: Vec<DomainAnnotation> = domain_annotations;
+        sorted_domain_annotations.sort_by_key(|d| d.id);
+
+        Ok(CrfFormDetailView {
+            form: CrfFormView::from(form),
+            form_annotations: form_annotations.into_iter().map(Into::into).collect(),
+            items: item_views,
+            domain_annotations: sorted_domain_annotations
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        })
     }
 
     /// Atomically create a form, every item, and each item's

@@ -1793,3 +1793,201 @@ async fn bulk_create_form_rejects_missing_parent_version() {
     };
     assert_eq!(id, 9_999_999);
 }
+
+// ---- get_form_detail tests ----
+
+#[tokio::test]
+async fn get_form_detail_assembles_tree_in_id_order() {
+    let uc = usecase();
+
+    let v = uc
+        .create_version(CreateCrfVersion {
+            project_code: "P1".into(),
+            name: "v1".into(),
+        })
+        .await
+        .unwrap();
+    let f = uc
+        .create_form(CreateCrfForm {
+            version_id: v.id,
+            code: "F1".into(),
+            name: "F1".into(),
+            order: 0,
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+    let d = uc
+        .create_domain_annotation(CreateDomainAnnotation {
+            form_id: f.id,
+            name: "Hint".into(),
+            description: "".into(),
+        })
+        .await
+        .unwrap();
+
+    // Item 1: Text with one option, one unit, one item-annotation.
+    let i1 = uc
+        .create_item(CreateCrfItem {
+            form_id: f.id,
+            code: "I1".into(),
+            name: "Item 1".into(),
+            kind: CrfItemKind::Text,
+            order: 0,
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+    let o1 = uc
+        .create_option(CreateCrfOption {
+            item_id: i1.id,
+            value: "yes".into(),
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+    let u1 = uc
+        .create_unit(CreateCrfUnit {
+            item_id: i1.id,
+            value: "mg".into(),
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+
+    // Item 2: Text (kind-shape rule doesn't require options
+    // up-front), one option, no units, no annotations.
+    let i2 = uc
+        .create_item(CreateCrfItem {
+            form_id: f.id,
+            code: "I2".into(),
+            name: "Item 2".into(),
+            kind: CrfItemKind::Text,
+            order: 1,
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+    let o2 = uc
+        .create_option(CreateCrfOption {
+            item_id: i2.id,
+            value: "no".into(),
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+
+    // Annotations at every layer.
+    uc.create_annotation(CreateAnnotation {
+        domain_annotation_id: d.id,
+        content: "form-level".into(),
+        assign: false,
+        owner: AnnotationOwner::Form { id: f.id },
+    })
+    .await
+    .unwrap();
+    uc.create_annotation(CreateAnnotation {
+        domain_annotation_id: d.id,
+        content: "item-1".into(),
+        assign: false,
+        owner: AnnotationOwner::Item { id: i1.id },
+    })
+    .await
+    .unwrap();
+    uc.create_annotation(CreateAnnotation {
+        domain_annotation_id: d.id,
+        content: "option-1".into(),
+        assign: false,
+        owner: AnnotationOwner::Option { id: o1.id },
+    })
+    .await
+    .unwrap();
+    uc.create_annotation(CreateAnnotation {
+        domain_annotation_id: d.id,
+        content: "unit-1".into(),
+        assign: false,
+        owner: AnnotationOwner::Unit { id: u1.id },
+    })
+    .await
+    .unwrap();
+
+    let detail = uc.get_form_detail(f.id).await.unwrap();
+
+    assert_eq!(detail.form.id, f.id);
+    assert_eq!(detail.form_annotations.len(), 1);
+    assert_eq!(
+        detail.form_annotations[0].owner,
+        AnnotationOwner::Form { id: f.id }
+    );
+    assert_eq!(detail.domain_annotations.len(), 1);
+    assert_eq!(detail.domain_annotations[0].id, d.id);
+
+    assert_eq!(detail.items.len(), 2);
+
+    // Items are returned in `order ASC, id ASC`.
+    assert_eq!(detail.items[0].item.id, i1.id);
+    assert_eq!(detail.items[0].options.len(), 1);
+    assert_eq!(detail.items[0].options[0].option.id, o1.id);
+    assert_eq!(detail.items[0].options[0].annotations.len(), 1);
+    assert_eq!(
+        detail.items[0].options[0].annotations[0].owner,
+        AnnotationOwner::Option { id: o1.id }
+    );
+    assert_eq!(detail.items[0].units.len(), 1);
+    assert_eq!(detail.items[0].units[0].unit.id, u1.id);
+    assert_eq!(detail.items[0].units[0].annotations.len(), 1);
+    assert_eq!(
+        detail.items[0].units[0].annotations[0].owner,
+        AnnotationOwner::Unit { id: u1.id }
+    );
+    assert_eq!(detail.items[0].annotations.len(), 1);
+    assert_eq!(
+        detail.items[0].annotations[0].owner,
+        AnnotationOwner::Item { id: i1.id }
+    );
+
+    assert_eq!(detail.items[1].item.id, i2.id);
+    assert_eq!(detail.items[1].options.len(), 1);
+    assert_eq!(detail.items[1].options[0].option.id, o2.id);
+    assert_eq!(detail.items[1].options[0].annotations.len(), 0);
+    assert_eq!(detail.items[1].units.len(), 0);
+    assert_eq!(detail.items[1].annotations.len(), 0);
+}
+
+#[tokio::test]
+async fn get_form_detail_empty_form_returns_empty_items() {
+    let uc = usecase();
+    let v = uc
+        .create_version(CreateCrfVersion {
+            project_code: "P1".into(),
+            name: "v1".into(),
+        })
+        .await
+        .unwrap();
+    let f = uc
+        .create_form(CreateCrfForm {
+            version_id: v.id,
+            code: "F_E".into(),
+            name: "Empty".into(),
+            order: 0,
+            not_submitted: false,
+        })
+        .await
+        .unwrap();
+
+    let detail = uc.get_form_detail(f.id).await.unwrap();
+    assert_eq!(detail.form.id, f.id);
+    assert!(detail.items.is_empty());
+    assert!(detail.form_annotations.is_empty());
+    assert!(detail.domain_annotations.is_empty());
+}
+
+#[tokio::test]
+async fn get_form_detail_missing_form_returns_not_found() {
+    let uc = usecase();
+    let err = uc.get_form_detail(9_999_999).await.unwrap_err();
+    assert!(matches!(
+        err,
+        UsecaseError::Repository(DomainError::CrfFormNotFound(9_999_999))
+    ));
+}
