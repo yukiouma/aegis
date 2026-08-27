@@ -71,6 +71,10 @@ terminology = { path = "../../../lib/crates/terminology" }
 # the DomainModelUsecase, and the apis::DomainModelService adapter
 # that the HTTP layer consumes through AppState.
 domain-model = { path = "../../../lib/crates/domain-model" }
+# crf provides the Case Report Form Postgres repositories, the
+# CrfUsecase, and the apis::crf::CrfService adapter that the HTTP
+# layer consumes through AppState.
+crf = { path = "../../../lib/crates/crf" }
 
 [dev-dependencies]
 # `argon2` is used by `tests/integration_auth.rs` to seed a real

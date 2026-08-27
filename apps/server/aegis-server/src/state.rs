@@ -13,6 +13,7 @@ pub struct AppState {
     pub project: Arc<dyn apis::project::ProjectService>,
     pub terminology: Arc<dyn apis::terminology::TerminologyService>,
     pub domain_model: Arc<dyn apis::domain_model::DomainModelService>,
+    pub crf: Arc<dyn apis::crf::CrfService>,
 }
 
 #[cfg(test)]
@@ -257,6 +258,274 @@ pub(crate) mod test_support {
             &self,
             _id: i64,
         ) -> Result<(), apis::domain_model::DomainModelApiError> {
+            unimplemented!()
+        }
+    }
+
+    /// Null CRF service for tests that don't exercise the
+    /// Case Report Form surface. Every method panics with
+    /// `unimplemented!()` — the corresponding handler is never
+    /// reached because the test either uses a different route or
+    /// short-circuits on auth / role checks before the usecase is
+    /// invoked.
+    #[derive(Clone)]
+    pub(crate) struct NullCrfService;
+
+    #[async_trait]
+    impl apis::crf::CrfService for NullCrfService {
+        async fn create_version(
+            &self,
+            _req: apis::crf::CreateCrfVersionRequest,
+        ) -> Result<apis::crf::CrfVersionView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn get_version_by_id(
+            &self,
+            _req: apis::crf::GetCrfVersionByIdRequest,
+        ) -> Result<apis::crf::CrfVersionView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn list_versions_by_project(
+            &self,
+            _req: apis::crf::ListCrfVersionsByProjectRequest,
+        ) -> Result<Vec<apis::crf::CrfVersionView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn update_version(
+            &self,
+            _req: apis::crf::UpdateCrfVersionRequest,
+        ) -> Result<apis::crf::CrfVersionView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn delete_version(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn create_form(
+            &self,
+            _req: apis::crf::CreateCrfFormRequest,
+        ) -> Result<apis::crf::CrfFormView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn get_form_by_id(
+            &self,
+            _req: apis::crf::GetCrfFormByIdRequest,
+        ) -> Result<apis::crf::CrfFormView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn get_form_detail(
+            &self,
+            _req: apis::crf::GetCrfFormDetailRequest,
+        ) -> Result<apis::crf::CrfFormDetailView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn list_forms_by_version(
+            &self,
+            _req: apis::crf::ListCrfFormsByVersionRequest,
+        ) -> Result<Vec<apis::crf::CrfFormView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn update_form(
+            &self,
+            _req: apis::crf::UpdateCrfFormRequest,
+        ) -> Result<apis::crf::CrfFormView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn delete_form(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn bulk_create_form(
+            &self,
+            _req: apis::crf::BulkCreateCrfFormRequest,
+        ) -> Result<apis::crf::BulkCreateCrfFormResult, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn create_item(
+            &self,
+            _req: apis::crf::CreateCrfItemRequest,
+        ) -> Result<apis::crf::CrfItemView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn get_item_by_id(
+            &self,
+            _req: apis::crf::GetCrfItemByIdRequest,
+        ) -> Result<apis::crf::CrfItemView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn list_items_by_form(
+            &self,
+            _req: apis::crf::ListCrfItemsByFormRequest,
+        ) -> Result<Vec<apis::crf::CrfItemView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn update_item(
+            &self,
+            _req: apis::crf::UpdateCrfItemRequest,
+        ) -> Result<apis::crf::CrfItemView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn delete_item(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn create_option(
+            &self,
+            _req: apis::crf::CreateCrfOptionRequest,
+        ) -> Result<apis::crf::CrfOptionView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn get_option_by_id(
+            &self,
+            _req: apis::crf::GetCrfOptionByIdRequest,
+        ) -> Result<apis::crf::CrfOptionView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn list_options_by_item(
+            &self,
+            _req: apis::crf::ListCrfOptionsByItemRequest,
+        ) -> Result<Vec<apis::crf::CrfOptionView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn update_option(
+            &self,
+            _req: apis::crf::UpdateCrfOptionRequest,
+        ) -> Result<apis::crf::CrfOptionView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn delete_option(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn create_unit(
+            &self,
+            _req: apis::crf::CreateCrfUnitRequest,
+        ) -> Result<apis::crf::CrfUnitView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn get_unit_by_id(
+            &self,
+            _req: apis::crf::GetCrfUnitByIdRequest,
+        ) -> Result<apis::crf::CrfUnitView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn list_units_by_item(
+            &self,
+            _req: apis::crf::ListCrfUnitsByItemRequest,
+        ) -> Result<Vec<apis::crf::CrfUnitView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn update_unit(
+            &self,
+            _req: apis::crf::UpdateCrfUnitRequest,
+        ) -> Result<apis::crf::CrfUnitView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn delete_unit(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn create_domain_annotation(
+            &self,
+            _req: apis::crf::CreateDomainAnnotationRequest,
+        ) -> Result<apis::crf::DomainAnnotationView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn get_domain_annotation_by_id(
+            &self,
+            _req: apis::crf::GetDomainAnnotationByIdRequest,
+        ) -> Result<apis::crf::DomainAnnotationView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn list_domain_annotations_by_form(
+            &self,
+            _req: apis::crf::ListDomainAnnotationsByFormRequest,
+        ) -> Result<Vec<apis::crf::DomainAnnotationView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn update_domain_annotation(
+            &self,
+            _req: apis::crf::UpdateDomainAnnotationRequest,
+        ) -> Result<apis::crf::DomainAnnotationView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn delete_domain_annotation(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn create_annotation(
+            &self,
+            _req: apis::crf::CreateAnnotationRequest,
+        ) -> Result<apis::crf::AnnotationView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn get_annotation_by_id(
+            &self,
+            _req: apis::crf::GetAnnotationByIdRequest,
+        ) -> Result<apis::crf::AnnotationView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn list_annotations_by_form(
+            &self,
+            _req: apis::crf::ListAnnotationsByFormRequest,
+        ) -> Result<Vec<apis::crf::AnnotationView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn list_annotations_by_item(
+            &self,
+            _req: apis::crf::ListAnnotationsByItemRequest,
+        ) -> Result<Vec<apis::crf::AnnotationView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn list_annotations_by_option(
+            &self,
+            _req: apis::crf::ListAnnotationsByOptionRequest,
+        ) -> Result<Vec<apis::crf::AnnotationView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn list_annotations_by_unit(
+            &self,
+            _req: apis::crf::ListAnnotationsByUnitRequest,
+        ) -> Result<Vec<apis::crf::AnnotationView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn update_annotation(
+            &self,
+            _req: apis::crf::UpdateAnnotationRequest,
+        ) -> Result<apis::crf::AnnotationView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn delete_annotation(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn search_forms_by_version(
+            &self,
+            _req: apis::crf::SearchCrfFormsByVersionRequest,
+        ) -> Result<Vec<apis::crf::CrfFormView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn search_items_by_version(
+            &self,
+            _req: apis::crf::SearchCrfItemsByVersionRequest,
+        ) -> Result<Vec<apis::crf::CrfItemView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn search_options_by_version(
+            &self,
+            _req: apis::crf::SearchCrfOptionsByVersionRequest,
+        ) -> Result<Vec<apis::crf::CrfOptionView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn search_units_by_version(
+            &self,
+            _req: apis::crf::SearchCrfUnitsByVersionRequest,
+        ) -> Result<Vec<apis::crf::CrfUnitView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn search_domain_annotations_by_version(
+            &self,
+            _req: apis::crf::SearchDomainAnnotationsByVersionRequest,
+        ) -> Result<Vec<apis::crf::DomainAnnotationView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn search_annotations_by_version(
+            &self,
+            _req: apis::crf::SearchAnnotationsByVersionRequest,
+        ) -> Result<Vec<apis::crf::AnnotationView>, apis::crf::CrfApiError> {
             unimplemented!()
         }
     }

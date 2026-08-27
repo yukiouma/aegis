@@ -118,7 +118,9 @@ mod tests {
     use axum::routing::post;
     use std::sync::{Arc, Mutex};
 
-    use crate::state::test_support::{NullDomainModelService, NullTerminologyService};
+    use crate::state::test_support::{
+        NullCrfService, NullDomainModelService, NullTerminologyService,
+    };
     use tower::ServiceExt;
 
     use apis::auth::{
@@ -310,6 +312,7 @@ mod tests {
             project: Arc::new(NullProjectService) as Arc<dyn apis::project::ProjectService>,
             terminology: Arc::new(NullTerminologyService)
                 as Arc<dyn apis::terminology::TerminologyService>,
+            crf: Arc::new(NullCrfService) as Arc<dyn apis::crf::CrfService>,
             domain_model: Arc::new(NullDomainModelService)
                 as Arc<dyn apis::domain_model::DomainModelService>,
         }

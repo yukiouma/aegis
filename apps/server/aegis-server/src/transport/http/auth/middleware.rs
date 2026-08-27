@@ -103,7 +103,9 @@ mod tests {
     use std::sync::Arc;
     use tower::ServiceExt;
 
-    use crate::state::test_support::{NullDomainModelService, NullTerminologyService};
+    use crate::state::test_support::{
+        NullCrfService, NullDomainModelService, NullTerminologyService,
+    };
 
     use apis::auth::{
         AuthApiError, AuthClaims as ApiAuthClaims, AuthService, CreateUserCredentialRequest,
@@ -265,6 +267,7 @@ mod tests {
                 as Arc<dyn apis::terminology::TerminologyService>,
             domain_model: Arc::new(NullDomainModelService)
                 as Arc<dyn apis::domain_model::DomainModelService>,
+            crf: Arc::new(NullCrfService) as Arc<dyn apis::crf::CrfService>,
         }
     }
 

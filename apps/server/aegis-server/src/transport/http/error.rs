@@ -51,6 +51,9 @@ pub enum ApiError {
     #[error("{0}")]
     DomainModel(#[from] apis::domain_model::DomainModelApiError),
 
+    #[error("{0}")]
+    Crf(#[from] apis::crf::CrfApiError),
+
     #[error("admin or root role required")]
     Forbidden,
 }
@@ -64,6 +67,7 @@ impl ApiError {
             Self::Project(e) => project_status(e),
             Self::Terminology(e) => terminology_status(e),
             Self::DomainModel(e) => domain_model_status(e),
+            Self::Crf(e) => crf_status(e),
             Self::Forbidden => StatusCode::FORBIDDEN,
         }
     }
@@ -76,6 +80,7 @@ impl ApiError {
             Self::Project(e) => project_code(e),
             Self::Terminology(e) => terminology_code(e),
             Self::DomainModel(e) => domain_model_code(e),
+            Self::Crf(e) => crf_code(e),
             Self::Forbidden => "forbidden",
         }
     }
@@ -207,6 +212,63 @@ fn domain_model_code(e: &apis::domain_model::DomainModelApiError) -> &'static st
         DomainModelApiError::FkSdtmVersionNotFound(_) => "fk_sdtm_version_not_found",
         DomainModelApiError::FkSdtmDomainNotFound(_) => "fk_sdtm_domain_not_found",
         DomainModelApiError::Repository(_) => "repository_error",
+    }
+}
+
+fn crf_status(e: &apis::crf::CrfApiError) -> StatusCode {
+    use apis::crf::CrfApiError;
+    match e {
+        CrfApiError::Validation(_) | CrfApiError::EmptySearchFragment => StatusCode::BAD_REQUEST,
+        CrfApiError::NotFound
+        | CrfApiError::ProjectNotFound(_)
+        | CrfApiError::CrfVersionNotFound(_)
+        | CrfApiError::CrfFormNotFound(_)
+        | CrfApiError::CrfItemNotFound(_)
+        | CrfApiError::CrfOptionNotFound(_)
+        | CrfApiError::CrfUnitNotFound(_)
+        | CrfApiError::DomainAnnotationNotFound(_)
+        | CrfApiError::AnnotationNotFound(_) => StatusCode::NOT_FOUND,
+        CrfApiError::DuplicateCrfVersion { .. }
+        | CrfApiError::DuplicateCrfForm { .. }
+        | CrfApiError::DuplicateCrfItem { .. }
+        | CrfApiError::DuplicateDomainAnnotation { .. } => StatusCode::CONFLICT,
+        CrfApiError::KindShapeViolation { .. } => StatusCode::BAD_REQUEST,
+        CrfApiError::FkCrfVersionNotFound(_)
+        | CrfApiError::FkCrfFormNotFound(_)
+        | CrfApiError::FkCrfItemNotFound(_)
+        | CrfApiError::FkCrfOptionNotFound(_)
+        | CrfApiError::FkCrfUnitNotFound(_)
+        | CrfApiError::FkDomainAnnotationNotFound(_) => StatusCode::BAD_REQUEST,
+        CrfApiError::Repository(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn crf_code(e: &apis::crf::CrfApiError) -> &'static str {
+    use apis::crf::CrfApiError;
+    match e {
+        CrfApiError::Validation(_) => "validation_failed",
+        CrfApiError::NotFound => "not_found",
+        CrfApiError::ProjectNotFound(_) => "project_not_found",
+        CrfApiError::CrfVersionNotFound(_) => "crf_version_not_found",
+        CrfApiError::CrfFormNotFound(_) => "crf_form_not_found",
+        CrfApiError::CrfItemNotFound(_) => "crf_item_not_found",
+        CrfApiError::CrfOptionNotFound(_) => "crf_option_not_found",
+        CrfApiError::CrfUnitNotFound(_) => "crf_unit_not_found",
+        CrfApiError::DomainAnnotationNotFound(_) => "domain_annotation_not_found",
+        CrfApiError::AnnotationNotFound(_) => "annotation_not_found",
+        CrfApiError::DuplicateCrfVersion { .. } => "duplicate_crf_version",
+        CrfApiError::DuplicateCrfForm { .. } => "duplicate_crf_form",
+        CrfApiError::DuplicateCrfItem { .. } => "duplicate_crf_item",
+        CrfApiError::DuplicateDomainAnnotation { .. } => "duplicate_domain_annotation",
+        CrfApiError::FkCrfVersionNotFound(_) => "fk_crf_version_not_found",
+        CrfApiError::FkCrfFormNotFound(_) => "fk_crf_form_not_found",
+        CrfApiError::FkCrfItemNotFound(_) => "fk_crf_item_not_found",
+        CrfApiError::FkCrfOptionNotFound(_) => "fk_crf_option_not_found",
+        CrfApiError::FkCrfUnitNotFound(_) => "fk_crf_unit_not_found",
+        CrfApiError::FkDomainAnnotationNotFound(_) => "fk_domain_annotation_not_found",
+        CrfApiError::EmptySearchFragment => "empty_search_fragment",
+        CrfApiError::KindShapeViolation { .. } => "kind_shape_violation",
+        CrfApiError::Repository(_) => "repository_error",
     }
 }
 
@@ -551,10 +613,9 @@ mod tests {
 
     #[tokio::test]
     async fn domain_model_sdtm_version_not_found_maps_to_404() {
-        let (status, body) = render_domain_model(
-            apis::domain_model::DomainModelApiError::SdtmVersionNotFound(42),
-        )
-        .await;
+        let (status, body) =
+            render_domain_model(apis::domain_model::DomainModelApiError::SdtmVersionNotFound(42))
+                .await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(body.code, "sdtm_version_not_found");
     }
@@ -571,10 +632,9 @@ mod tests {
 
     #[tokio::test]
     async fn domain_model_sdtm_variable_not_found_maps_to_404() {
-        let (status, body) = render_domain_model(
-            apis::domain_model::DomainModelApiError::SdtmVariableNotFound(42),
-        )
-        .await;
+        let (status, body) =
+            render_domain_model(apis::domain_model::DomainModelApiError::SdtmVariableNotFound(42))
+                .await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(body.code, "sdtm_variable_not_found");
     }
@@ -617,20 +677,18 @@ mod tests {
 
     #[tokio::test]
     async fn domain_model_fk_sdtm_version_not_found_maps_to_400() {
-        let (status, body) = render_domain_model(
-            apis::domain_model::DomainModelApiError::FkSdtmVersionNotFound(99),
-        )
-        .await;
+        let (status, body) =
+            render_domain_model(apis::domain_model::DomainModelApiError::FkSdtmVersionNotFound(99))
+                .await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert_eq!(body.code, "fk_sdtm_version_not_found");
     }
 
     #[tokio::test]
     async fn domain_model_fk_sdtm_domain_not_found_maps_to_400() {
-        let (status, body) = render_domain_model(
-            apis::domain_model::DomainModelApiError::FkSdtmDomainNotFound(99),
-        )
-        .await;
+        let (status, body) =
+            render_domain_model(apis::domain_model::DomainModelApiError::FkSdtmDomainNotFound(99))
+                .await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
         assert_eq!(body.code, "fk_sdtm_domain_not_found");
     }
@@ -641,6 +699,108 @@ mod tests {
             apis::domain_model::DomainModelApiError::Repository("db".into()),
         )
         .await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body.code, "repository_error");
+    }
+
+    // ---- CrfApiError mapping -----
+
+    async fn render_crf(err: apis::crf::CrfApiError) -> (StatusCode, ErrorBody) {
+        let api = ApiError::from(err);
+        let response = api.into_response();
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap();
+        let parsed: ErrorBody = serde_json::from_slice(&body).unwrap();
+        (status, parsed)
+    }
+
+    #[tokio::test]
+    async fn crf_validation_maps_to_400() {
+        let (status, body) = render_crf(apis::crf::CrfApiError::Validation("bad".into())).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body.code, "validation_failed");
+    }
+
+    #[tokio::test]
+    async fn crf_empty_search_fragment_maps_to_400() {
+        let (status, body) = render_crf(apis::crf::CrfApiError::EmptySearchFragment).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body.code, "empty_search_fragment");
+    }
+
+    #[tokio::test]
+    async fn crf_kind_shape_violation_maps_to_400() {
+        let (status, body) = render_crf(apis::crf::CrfApiError::KindShapeViolation {
+            kind: apis::crf::CrfItemKind::Selection,
+            field: "options".into(),
+        })
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body.code, "kind_shape_violation");
+    }
+
+    #[tokio::test]
+    async fn crf_not_found_maps_to_404() {
+        let (status, body) = render_crf(apis::crf::CrfApiError::NotFound).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "not_found");
+    }
+
+    #[tokio::test]
+    async fn crf_project_not_found_maps_to_404() {
+        let (status, body) = render_crf(apis::crf::CrfApiError::ProjectNotFound("P1".into())).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "project_not_found");
+    }
+
+    #[tokio::test]
+    async fn crf_version_not_found_maps_to_404() {
+        let (status, body) = render_crf(apis::crf::CrfApiError::CrfVersionNotFound(7)).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "crf_version_not_found");
+    }
+
+    #[tokio::test]
+    async fn crf_form_not_found_maps_to_404() {
+        let (status, body) = render_crf(apis::crf::CrfApiError::CrfFormNotFound(7)).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "crf_form_not_found");
+    }
+
+    #[tokio::test]
+    async fn crf_duplicate_version_maps_to_409() {
+        let (status, body) = render_crf(apis::crf::CrfApiError::DuplicateCrfVersion {
+            project_code: "P1".into(),
+            name: "v1".into(),
+        })
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body.code, "duplicate_crf_version");
+    }
+
+    #[tokio::test]
+    async fn crf_duplicate_form_maps_to_409() {
+        let (status, body) = render_crf(apis::crf::CrfApiError::DuplicateCrfForm {
+            version_id: 1,
+            code: "F1".into(),
+        })
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body.code, "duplicate_crf_form");
+    }
+
+    #[tokio::test]
+    async fn crf_fk_version_not_found_maps_to_400() {
+        let (status, body) = render_crf(apis::crf::CrfApiError::FkCrfVersionNotFound(99)).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body.code, "fk_crf_version_not_found");
+    }
+
+    #[tokio::test]
+    async fn crf_repository_maps_to_500() {
+        let (status, body) = render_crf(apis::crf::CrfApiError::Repository("db down".into())).await;
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
         assert_eq!(body.code, "repository_error");
     }
