@@ -206,11 +206,10 @@ pub async fn create_form(
     Json(req): Json<dto::CreateCrfFormRequest>,
 ) -> Result<(StatusCode, Json<dto::CrfFormViewResponse>), ApiError> {
     require_admin_or_root(&claims)?;
-    let _ = version_id; // path version_id is unused; the request body carries it
     let view = state
         .crf
         .create_form(apis::crf::CreateCrfFormRequest {
-            version_id: req.version_id,
+            version_id,
             code: req.code,
             name: req.name,
             order: req.order,
@@ -403,11 +402,10 @@ pub async fn create_item(
     Json(req): Json<dto::CreateCrfItemRequest>,
 ) -> Result<(StatusCode, Json<dto::CrfItemViewResponse>), ApiError> {
     require_admin_or_root(&claims)?;
-    let _ = form_id; // path form_id is unused; the request body carries it
     let view = state
         .crf
         .create_item(apis::crf::CreateCrfItemRequest {
-            form_id: req.form_id,
+            form_id,
             code: req.code,
             name: req.name,
             kind: req.kind.into(),
@@ -606,11 +604,10 @@ pub async fn create_option(
     Json(req): Json<dto::CreateCrfOptionRequest>,
 ) -> Result<(StatusCode, Json<dto::CrfOptionViewResponse>), ApiError> {
     require_admin_or_root(&claims)?;
-    let _ = item_id; // path item_id is unused; the request body carries it
     let view = state
         .crf
         .create_option(apis::crf::CreateCrfOptionRequest {
-            item_id: req.item_id,
+            item_id,
             value: req.value,
             not_submitted: req.not_submitted,
         })
@@ -806,11 +803,10 @@ pub async fn create_unit(
     Json(req): Json<dto::CreateCrfUnitRequest>,
 ) -> Result<(StatusCode, Json<dto::CrfUnitViewResponse>), ApiError> {
     require_admin_or_root(&claims)?;
-    let _ = item_id; // path item_id is unused; the request body carries it
     let view = state
         .crf
         .create_unit(apis::crf::CreateCrfUnitRequest {
-            item_id: req.item_id,
+            item_id,
             value: req.value,
             not_submitted: req.not_submitted,
         })
@@ -1007,11 +1003,10 @@ pub async fn create_domain_annotation(
     Json(req): Json<dto::CreateDomainAnnotationRequest>,
 ) -> Result<(StatusCode, Json<dto::DomainAnnotationViewResponse>), ApiError> {
     require_admin_or_root(&claims)?;
-    let _ = form_id; // path form_id is unused; the request body carries it
     let view = state
         .crf
         .create_domain_annotation(apis::crf::CreateDomainAnnotationRequest {
-            form_id: req.form_id,
+            form_id,
             name: req.name,
             description: req.description,
         })

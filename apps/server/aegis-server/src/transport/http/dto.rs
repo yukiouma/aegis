@@ -1608,7 +1608,6 @@ pub struct AnnotationListResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateCrfVersionRequest {
-    pub project_code: String,
     pub name: String,
 }
 
@@ -1622,7 +1621,6 @@ pub struct UpdateCrfVersionRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateCrfFormRequest {
-    pub version_id: i32,
     pub code: String,
     pub name: String,
     pub order: i32,
@@ -1645,7 +1643,6 @@ pub struct UpdateCrfFormRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateCrfItemRequest {
-    pub form_id: i32,
     pub code: String,
     pub name: String,
     pub kind: CrfItemKind,
@@ -1671,7 +1668,6 @@ pub struct UpdateCrfItemRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateCrfOptionRequest {
-    pub item_id: i32,
     pub value: String,
     pub not_submitted: bool,
 }
@@ -1688,7 +1684,6 @@ pub struct UpdateCrfOptionRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateCrfUnitRequest {
-    pub item_id: i32,
     pub value: String,
     pub not_submitted: bool,
 }
@@ -1705,7 +1700,6 @@ pub struct UpdateCrfUnitRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateDomainAnnotationRequest {
-    pub form_id: i32,
     pub name: String,
     pub description: String,
 }
