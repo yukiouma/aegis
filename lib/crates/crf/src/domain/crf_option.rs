@@ -89,6 +89,14 @@ pub trait CrfOptionRepository: Send + Sync {
     async fn create(&self, input: CrfOptionNew) -> Result<CrfOption, DomainError>;
     async fn find_by_id(&self, id: i64) -> Result<CrfOption, DomainError>;
     async fn list_by_item(&self, item_id: i64) -> Result<Vec<CrfOption>, DomainError>;
+    /// Batch-fetch every option whose `item_id` is in
+    /// `item_ids`. Returns `Ok(Vec::new())` for empty input
+    /// without hitting the DB. Used by the form-detail usecase
+    /// to hydrate the items subtree in one round-trip.
+    async fn list_by_items(
+        &self,
+        item_ids: &[i64],
+    ) -> Result<Vec<CrfOption>, DomainError>;
     async fn update(&self, input: CrfOptionUpdate) -> Result<CrfOption, DomainError>;
     async fn delete(&self, id: i64) -> Result<(), DomainError>;
     /// Count options on an item. Used by the kind-shape

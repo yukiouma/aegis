@@ -80,6 +80,24 @@ impl CrfOptionRepository for CrfOptionRepoPg {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
+    async fn list_by_items(
+        &self,
+        item_ids: &[i64],
+    ) -> Result<Vec<CrfOption>, DomainError> {
+        if item_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows = sqlx::query_as::<_, CrfOptionRow>(
+            "SELECT id, item_id, value, not_submitted, created_at, updated_at
+             FROM crf_options WHERE item_id = ANY($1) ORDER BY id ASC",
+        )
+        .bind(item_ids)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(map_db_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
     async fn update(&self, input: CrfOptionUpdate) -> Result<CrfOption, DomainError> {
         let row: CrfOptionRow = sqlx::query_as::<_, CrfOptionRow>(
             "UPDATE crf_options SET

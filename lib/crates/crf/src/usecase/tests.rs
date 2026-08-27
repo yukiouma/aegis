@@ -324,6 +324,20 @@ impl CrfOptionRepository for InMemoryOptions {
             .cloned()
             .collect())
     }
+    async fn list_by_items(
+        &self,
+        item_ids: &[i64],
+    ) -> Result<Vec<CrfOption>, DomainError> {
+        if item_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows = self.rows.lock().unwrap();
+        Ok(rows
+            .values()
+            .filter(|o| item_ids.contains(&o.item_id))
+            .cloned()
+            .collect())
+    }
     async fn update(&self, input: CrfOptionUpdate) -> Result<CrfOption, DomainError> {
         let mut rows = self.rows.lock().unwrap();
         let o = rows
