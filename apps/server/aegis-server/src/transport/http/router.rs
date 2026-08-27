@@ -1299,7 +1299,7 @@ mod tests {
     #[derive(Clone)]
     struct StubCrfService;
 
-    fn sample_crf_version_view(id: i32, project_code: &str) -> apis::crf::CrfVersionView {
+    fn sample_crf_version_view(id: i64, project_code: &str) -> apis::crf::CrfVersionView {
         apis::crf::CrfVersionView {
             id,
             project_code: project_code.to_string(),
@@ -1339,7 +1339,7 @@ mod tests {
         ) -> Result<apis::crf::CrfVersionView, apis::crf::CrfApiError> {
             Ok(sample_crf_version_view(req.id, "pr1"))
         }
-        async fn delete_version(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+        async fn delete_version(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
             Ok(())
         }
         // Everything else panics — the per-handler tests in
@@ -1384,7 +1384,7 @@ mod tests {
         ) -> Result<apis::crf::CrfFormView, apis::crf::CrfApiError> {
             unimplemented!()
         }
-        async fn delete_form(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+        async fn delete_form(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
             Ok(())
         }
         async fn create_item(
@@ -1425,7 +1425,7 @@ mod tests {
         ) -> Result<apis::crf::CrfItemView, apis::crf::CrfApiError> {
             unimplemented!()
         }
-        async fn delete_item(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+        async fn delete_item(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
             Ok(())
         }
         async fn create_option(
@@ -1463,7 +1463,7 @@ mod tests {
         ) -> Result<apis::crf::CrfOptionView, apis::crf::CrfApiError> {
             unimplemented!()
         }
-        async fn delete_option(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+        async fn delete_option(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
             Ok(())
         }
         async fn create_unit(
@@ -1501,7 +1501,7 @@ mod tests {
         ) -> Result<apis::crf::CrfUnitView, apis::crf::CrfApiError> {
             unimplemented!()
         }
-        async fn delete_unit(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+        async fn delete_unit(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
             Ok(())
         }
         async fn create_domain_annotation(
@@ -1539,7 +1539,7 @@ mod tests {
         ) -> Result<apis::crf::DomainAnnotationView, apis::crf::CrfApiError> {
             unimplemented!()
         }
-        async fn delete_domain_annotation(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+        async fn delete_domain_annotation(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
             Ok(())
         }
         async fn create_annotation(
@@ -1596,7 +1596,7 @@ mod tests {
         ) -> Result<apis::crf::AnnotationView, apis::crf::CrfApiError> {
             unimplemented!()
         }
-        async fn delete_annotation(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+        async fn delete_annotation(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
             Ok(())
         }
         async fn search_forms_by_version(

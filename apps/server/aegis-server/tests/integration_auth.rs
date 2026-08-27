@@ -903,7 +903,7 @@ impl apis::crf::CrfService for NullCrfService {
     ) -> Result<apis::crf::CrfVersionView, apis::crf::CrfApiError> {
         unimplemented!()
     }
-    async fn delete_version(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+    async fn delete_version(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
         unimplemented!()
     }
     async fn create_form(
@@ -930,7 +930,7 @@ impl apis::crf::CrfService for NullCrfService {
     ) -> Result<apis::crf::CrfFormView, apis::crf::CrfApiError> {
         unimplemented!()
     }
-    async fn delete_form(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+    async fn delete_form(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
         unimplemented!()
     }
     async fn create_item(
@@ -957,7 +957,7 @@ impl apis::crf::CrfService for NullCrfService {
     ) -> Result<apis::crf::CrfItemView, apis::crf::CrfApiError> {
         unimplemented!()
     }
-    async fn delete_item(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+    async fn delete_item(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
         unimplemented!()
     }
     async fn create_option(
@@ -984,7 +984,7 @@ impl apis::crf::CrfService for NullCrfService {
     ) -> Result<apis::crf::CrfOptionView, apis::crf::CrfApiError> {
         unimplemented!()
     }
-    async fn delete_option(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+    async fn delete_option(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
         unimplemented!()
     }
     async fn create_unit(
@@ -1011,7 +1011,7 @@ impl apis::crf::CrfService for NullCrfService {
     ) -> Result<apis::crf::CrfUnitView, apis::crf::CrfApiError> {
         unimplemented!()
     }
-    async fn delete_unit(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+    async fn delete_unit(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
         unimplemented!()
     }
     async fn create_domain_annotation(
@@ -1038,7 +1038,7 @@ impl apis::crf::CrfService for NullCrfService {
     ) -> Result<apis::crf::DomainAnnotationView, apis::crf::CrfApiError> {
         unimplemented!()
     }
-    async fn delete_domain_annotation(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+    async fn delete_domain_annotation(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
         unimplemented!()
     }
     async fn create_annotation(
@@ -1083,7 +1083,7 @@ impl apis::crf::CrfService for NullCrfService {
     ) -> Result<apis::crf::AnnotationView, apis::crf::CrfApiError> {
         unimplemented!()
     }
-    async fn delete_annotation(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+    async fn delete_annotation(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
         unimplemented!()
     }
     async fn search_forms_by_version(

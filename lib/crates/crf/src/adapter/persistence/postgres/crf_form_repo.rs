@@ -6,8 +6,8 @@ use crate::domain::{CrfForm, CrfFormNew, CrfFormRepository, CrfFormUpdate, Domai
 
 #[derive(FromRow)]
 struct CrfFormRow {
-    id: i32,
-    version_id: i32,
+    id: i64,
+    version_id: i64,
     code: String,
     name: String,
     order: i32,
@@ -61,7 +61,7 @@ impl CrfFormRepository for CrfFormRepoPg {
         Ok(row.into())
     }
 
-    async fn find_by_id(&self, id: i32) -> Result<CrfForm, DomainError> {
+    async fn find_by_id(&self, id: i64) -> Result<CrfForm, DomainError> {
         let row: CrfFormRow = sqlx::query_as::<_, CrfFormRow>(
             "SELECT id, version_id, code, name, \"order\", not_submitted, created_at, updated_at
              FROM crf_forms WHERE id = $1",
@@ -74,7 +74,7 @@ impl CrfFormRepository for CrfFormRepoPg {
         Ok(row.into())
     }
 
-    async fn list_by_version(&self, version_id: i32) -> Result<Vec<CrfForm>, DomainError> {
+    async fn list_by_version(&self, version_id: i64) -> Result<Vec<CrfForm>, DomainError> {
         let rows = sqlx::query_as::<_, CrfFormRow>(
             "SELECT id, version_id, code, name, \"order\", not_submitted, created_at, updated_at
              FROM crf_forms WHERE version_id = $1
@@ -109,7 +109,7 @@ impl CrfFormRepository for CrfFormRepoPg {
         Ok(row.into())
     }
 
-    async fn delete(&self, id: i32) -> Result<(), DomainError> {
+    async fn delete(&self, id: i64) -> Result<(), DomainError> {
         let res = sqlx::query("DELETE FROM crf_forms WHERE id = $1")
             .bind(id)
             .execute(&self.pool)
@@ -123,7 +123,7 @@ impl CrfFormRepository for CrfFormRepoPg {
 
     async fn search_by_version(
         &self,
-        version_id: i32,
+        version_id: i64,
         fragment: &str,
     ) -> Result<Vec<CrfForm>, DomainError> {
         let pat = format!("%{fragment}%");

@@ -13,7 +13,7 @@
 //! Run with:
 //!   `cargo test -p crf --test integration_persistence -- --ignored --test-threads=1`
 
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::{AtomicI64, Ordering};
 
 use crf::{
     Annotation, AnnotationOwner, CrfFormNew, CrfFormRepoPg, CrfFormRepository, CrfItemKind,
@@ -23,7 +23,7 @@ use crf::{
     DomainAnnotationRepository, DomainError,
 };
 
-static ID_GEN: AtomicI32 = AtomicI32::new(0);
+static ID_GEN: AtomicI64 = AtomicI64::new(0);
 
 fn unique_suffix() -> String {
     let n = ID_GEN.fetch_add(1, Ordering::SeqCst);
@@ -179,7 +179,7 @@ async fn polymorphic_owner_check_rejects_two_owners() {
 
     // Try to insert an annotation with TWO owners via direct SQL —
     // the CHECK constraint must reject this.
-    let res: Result<(i32,), _> = sqlx::query_as(
+    let res: Result<(i64,), _> = sqlx::query_as(
         "INSERT INTO crf_annotations \
          (domain_annotation_id, content, assign, form_id, item_id) \
          VALUES ($1, $2, $3, $4, $5) RETURNING id",
@@ -194,7 +194,7 @@ async fn polymorphic_owner_check_rejects_two_owners() {
     assert!(res.is_err(), "CHECK constraint should reject two owners");
 
     // Valid case: insert with exactly one owner.
-    let a: (i32,) = sqlx::query_as(
+    let a: (i64,) = sqlx::query_as(
         "INSERT INTO crf_annotations \
          (domain_annotation_id, content, assign, form_id) \
          VALUES ($1, $2, $3, $4) RETURNING id",
@@ -415,7 +415,7 @@ async fn polymorphic_owner_round_trip() {
         };
         assert!(annotation.is_ok(), "polymorphic constructor should succeed");
 
-        let inserted: (i32,) = match owner_kind {
+        let inserted: (i64,) = match owner_kind {
             AnnotationOwner::Form { .. } => sqlx::query_as(
                 "INSERT INTO crf_annotations (domain_annotation_id, content, assign, form_id) \
                  VALUES ($1, $2, $3, $4) RETURNING id",

@@ -8,14 +8,14 @@ use crate::domain::{
 
 #[derive(FromRow)]
 struct AnnotationRow {
-    id: i32,
-    domain_annotation_id: i32,
+    id: i64,
+    domain_annotation_id: i64,
     content: String,
     assign: bool,
-    form_id: Option<i32>,
-    item_id: Option<i32>,
-    option_id: Option<i32>,
-    unit_id: Option<i32>,
+    form_id: Option<i64>,
+    item_id: Option<i64>,
+    option_id: Option<i64>,
+    unit_id: Option<i64>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -112,7 +112,7 @@ impl AnnotationRepository for AnnotationRepoPg {
         Ok(row.into())
     }
 
-    async fn find_by_id(&self, id: i32) -> Result<Annotation, DomainError> {
+    async fn find_by_id(&self, id: i64) -> Result<Annotation, DomainError> {
         let row: AnnotationRow = sqlx::query_as::<_, AnnotationRow>(
             "SELECT id, domain_annotation_id, content, assign,
                     form_id, item_id, option_id, unit_id, created_at, updated_at
@@ -126,7 +126,7 @@ impl AnnotationRepository for AnnotationRepoPg {
         Ok(row.into())
     }
 
-    async fn list_by_form(&self, form_id: i32) -> Result<Vec<Annotation>, DomainError> {
+    async fn list_by_form(&self, form_id: i64) -> Result<Vec<Annotation>, DomainError> {
         let rows = sqlx::query_as::<_, AnnotationRow>(
             "SELECT id, domain_annotation_id, content, assign,
                     form_id, item_id, option_id, unit_id, created_at, updated_at
@@ -139,7 +139,7 @@ impl AnnotationRepository for AnnotationRepoPg {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    async fn list_by_item(&self, item_id: i32) -> Result<Vec<Annotation>, DomainError> {
+    async fn list_by_item(&self, item_id: i64) -> Result<Vec<Annotation>, DomainError> {
         let rows = sqlx::query_as::<_, AnnotationRow>(
             "SELECT id, domain_annotation_id, content, assign,
                     form_id, item_id, option_id, unit_id, created_at, updated_at
@@ -152,7 +152,7 @@ impl AnnotationRepository for AnnotationRepoPg {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    async fn list_by_option(&self, option_id: i32) -> Result<Vec<Annotation>, DomainError> {
+    async fn list_by_option(&self, option_id: i64) -> Result<Vec<Annotation>, DomainError> {
         let rows = sqlx::query_as::<_, AnnotationRow>(
             "SELECT id, domain_annotation_id, content, assign,
                     form_id, item_id, option_id, unit_id, created_at, updated_at
@@ -165,7 +165,7 @@ impl AnnotationRepository for AnnotationRepoPg {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    async fn list_by_unit(&self, unit_id: i32) -> Result<Vec<Annotation>, DomainError> {
+    async fn list_by_unit(&self, unit_id: i64) -> Result<Vec<Annotation>, DomainError> {
         let rows = sqlx::query_as::<_, AnnotationRow>(
             "SELECT id, domain_annotation_id, content, assign,
                     form_id, item_id, option_id, unit_id, created_at, updated_at
@@ -197,7 +197,7 @@ impl AnnotationRepository for AnnotationRepoPg {
         Ok(row.into())
     }
 
-    async fn delete(&self, id: i32) -> Result<(), DomainError> {
+    async fn delete(&self, id: i64) -> Result<(), DomainError> {
         let res = sqlx::query("DELETE FROM crf_annotations WHERE id = $1")
             .bind(id)
             .execute(&self.pool)
@@ -211,7 +211,7 @@ impl AnnotationRepository for AnnotationRepoPg {
 
     async fn search_by_version(
         &self,
-        version_id: i32,
+        version_id: i64,
         fragment: &str,
     ) -> Result<Vec<Annotation>, DomainError> {
         let pat = format!("%{fragment}%");

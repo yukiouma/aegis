@@ -9,8 +9,8 @@ use crate::domain::{
 
 #[derive(FromRow)]
 struct DomainAnnotationRow {
-    id: i32,
-    form_id: i32,
+    id: i64,
+    form_id: i64,
     name: String,
     description: String,
     created_at: DateTime<Utc>,
@@ -58,7 +58,7 @@ impl DomainAnnotationRepository for DomainAnnotationRepoPg {
         Ok(row.into())
     }
 
-    async fn find_by_id(&self, id: i32) -> Result<DomainAnnotation, DomainError> {
+    async fn find_by_id(&self, id: i64) -> Result<DomainAnnotation, DomainError> {
         let row: DomainAnnotationRow = sqlx::query_as::<_, DomainAnnotationRow>(
             "SELECT id, form_id, name, description, created_at, updated_at
              FROM crf_domain_annotations WHERE id = $1",
@@ -71,7 +71,7 @@ impl DomainAnnotationRepository for DomainAnnotationRepoPg {
         Ok(row.into())
     }
 
-    async fn list_by_form(&self, form_id: i32) -> Result<Vec<DomainAnnotation>, DomainError> {
+    async fn list_by_form(&self, form_id: i64) -> Result<Vec<DomainAnnotation>, DomainError> {
         let rows = sqlx::query_as::<_, DomainAnnotationRow>(
             "SELECT id, form_id, name, description, created_at, updated_at
              FROM crf_domain_annotations WHERE form_id = $1 ORDER BY id ASC",
@@ -101,7 +101,7 @@ impl DomainAnnotationRepository for DomainAnnotationRepoPg {
         Ok(row.into())
     }
 
-    async fn delete(&self, id: i32) -> Result<(), DomainError> {
+    async fn delete(&self, id: i64) -> Result<(), DomainError> {
         let res = sqlx::query("DELETE FROM crf_domain_annotations WHERE id = $1")
             .bind(id)
             .execute(&self.pool)
@@ -115,7 +115,7 @@ impl DomainAnnotationRepository for DomainAnnotationRepoPg {
 
     async fn search_by_version(
         &self,
-        version_id: i32,
+        version_id: i64,
         fragment: &str,
     ) -> Result<Vec<DomainAnnotation>, DomainError> {
         let pat = format!("%{fragment}%");

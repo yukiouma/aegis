@@ -10,7 +10,7 @@ use super::error::DomainError;
 /// non-date name round-trips intact).
 #[derive(Clone, PartialEq, Eq)]
 pub struct CrfVersion {
-    pub id: i32,
+    pub id: i64,
     pub project_code: String,
     pub name: String,
     pub created_at: DateTime<Utc>,
@@ -51,7 +51,7 @@ impl CrfVersion {
     /// Bypasses validation. Reserved for the adapter layer when
     /// materialising rows from persistence.
     pub(crate) fn for_repository(
-        id: i32,
+        id: i64,
         project_code: String,
         name: String,
         created_at: DateTime<Utc>,
@@ -78,7 +78,7 @@ pub struct CrfVersionNew {
 /// is mutable on a version; `id` identifies the row.
 #[derive(Debug, Clone, Default)]
 pub struct CrfVersionUpdate {
-    pub id: i32,
+    pub id: i64,
     pub name: Option<String>,
 }
 
@@ -86,10 +86,10 @@ pub struct CrfVersionUpdate {
 #[async_trait]
 pub trait CrfVersionRepository: Send + Sync {
     async fn create(&self, input: CrfVersionNew) -> Result<CrfVersion, DomainError>;
-    async fn find_by_id(&self, id: i32) -> Result<CrfVersion, DomainError>;
+    async fn find_by_id(&self, id: i64) -> Result<CrfVersion, DomainError>;
     async fn list_by_project(&self, project_code: &str) -> Result<Vec<CrfVersion>, DomainError>;
     async fn update(&self, input: CrfVersionUpdate) -> Result<CrfVersion, DomainError>;
-    async fn delete(&self, id: i32) -> Result<(), DomainError>;
+    async fn delete(&self, id: i64) -> Result<(), DomainError>;
     async fn search_by_version(
         &self,
         project_code: &str,

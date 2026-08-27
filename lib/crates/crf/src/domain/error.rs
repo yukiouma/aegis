@@ -28,41 +28,41 @@ pub enum DomainError {
     #[error("project not found: {0}")]
     ProjectNotFound(String),
     #[error("crf version not found: {0}")]
-    CrfVersionNotFound(i32),
+    CrfVersionNotFound(i64),
     #[error("crf form not found: {0}")]
-    CrfFormNotFound(i32),
+    CrfFormNotFound(i64),
     #[error("crf item not found: {0}")]
-    CrfItemNotFound(i32),
+    CrfItemNotFound(i64),
     #[error("crf option not found: {0}")]
-    CrfOptionNotFound(i32),
+    CrfOptionNotFound(i64),
     #[error("crf unit not found: {0}")]
-    CrfUnitNotFound(i32),
+    CrfUnitNotFound(i64),
     #[error("domain annotation not found: {0}")]
-    DomainAnnotationNotFound(i32),
+    DomainAnnotationNotFound(i64),
     #[error("annotation not found: {0}")]
-    AnnotationNotFound(i32),
+    AnnotationNotFound(i64),
 
     #[error("crf version already exists: {project_code} / {name}")]
     DuplicateCrfVersion { project_code: String, name: String },
     #[error("crf form already exists: version {version_id} / {code}")]
-    DuplicateCrfForm { version_id: i32, code: String },
+    DuplicateCrfForm { version_id: i64, code: String },
     #[error("crf item already exists: form {form_id} / {code}")]
-    DuplicateCrfItem { form_id: i32, code: String },
+    DuplicateCrfItem { form_id: i64, code: String },
     #[error("domain annotation already exists: form {form_id} / {name}")]
-    DuplicateDomainAnnotation { form_id: i32, name: String },
+    DuplicateDomainAnnotation { form_id: i64, name: String },
 
     #[error("referenced crf version not found: {0}")]
-    FkCrfVersionNotFound(i32),
+    FkCrfVersionNotFound(i64),
     #[error("referenced crf form not found: {0}")]
-    FkCrfFormNotFound(i32),
+    FkCrfFormNotFound(i64),
     #[error("referenced crf item not found: {0}")]
-    FkCrfItemNotFound(i32),
+    FkCrfItemNotFound(i64),
     #[error("referenced crf option not found: {0}")]
-    FkCrfOptionNotFound(i32),
+    FkCrfOptionNotFound(i64),
     #[error("referenced crf unit not found: {0}")]
-    FkCrfUnitNotFound(i32),
+    FkCrfUnitNotFound(i64),
     #[error("referenced domain annotation not found: {0}")]
-    FkDomainAnnotationNotFound(i32),
+    FkDomainAnnotationNotFound(i64),
 
     #[error("not found")]
     NotFound,

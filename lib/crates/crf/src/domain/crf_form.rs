@@ -8,8 +8,8 @@ use super::error::DomainError;
 /// annotations. Cascade-deleted with their parent version.
 #[derive(Clone, PartialEq, Eq)]
 pub struct CrfForm {
-    pub id: i32,
-    pub version_id: i32,
+    pub id: i64,
+    pub version_id: i64,
     pub code: String,
     pub name: String,
     pub order: i32,
@@ -37,7 +37,7 @@ impl CrfForm {
     /// Validating constructor used by the domain layer.
     /// Rejects empty / whitespace `code` and `name`.
     pub fn new(
-        version_id: i32,
+        version_id: i64,
         code: String,
         name: String,
         order: i32,
@@ -65,8 +65,8 @@ impl CrfForm {
     /// when materialising rows from persistence.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn for_repository(
-        id: i32,
-        version_id: i32,
+        id: i64,
+        version_id: i64,
         code: String,
         name: String,
         order: i32,
@@ -90,7 +90,7 @@ impl CrfForm {
 /// Input DTO for `CrfFormRepository::create`.
 #[derive(Debug, Clone)]
 pub struct CrfFormNew {
-    pub version_id: i32,
+    pub version_id: i64,
     pub code: String,
     pub name: String,
     pub order: i32,
@@ -101,7 +101,7 @@ pub struct CrfFormNew {
 /// except `id` is optional.
 #[derive(Debug, Clone, Default)]
 pub struct CrfFormUpdate {
-    pub id: i32,
+    pub id: i64,
     pub code: Option<String>,
     pub name: Option<String>,
     pub order: Option<i32>,
@@ -112,13 +112,13 @@ pub struct CrfFormUpdate {
 #[async_trait]
 pub trait CrfFormRepository: Send + Sync {
     async fn create(&self, input: CrfFormNew) -> Result<CrfForm, DomainError>;
-    async fn find_by_id(&self, id: i32) -> Result<CrfForm, DomainError>;
-    async fn list_by_version(&self, version_id: i32) -> Result<Vec<CrfForm>, DomainError>;
+    async fn find_by_id(&self, id: i64) -> Result<CrfForm, DomainError>;
+    async fn list_by_version(&self, version_id: i64) -> Result<Vec<CrfForm>, DomainError>;
     async fn update(&self, input: CrfFormUpdate) -> Result<CrfForm, DomainError>;
-    async fn delete(&self, id: i32) -> Result<(), DomainError>;
+    async fn delete(&self, id: i64) -> Result<(), DomainError>;
     async fn search_by_version(
         &self,
-        version_id: i32,
+        version_id: i64,
         fragment: &str,
     ) -> Result<Vec<CrfForm>, DomainError>;
 }

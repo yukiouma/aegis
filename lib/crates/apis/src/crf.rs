@@ -35,10 +35,10 @@ pub enum CrfItemKind {
 /// Mirrors `crf::domain::AnnotationOwner`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AnnotationOwner {
-    Form(i32),
-    Item(i32),
-    Option(i32),
-    Unit(i32),
+    Form(i64),
+    Item(i64),
+    Option(i64),
+    Unit(i64),
 }
 
 // ---- view projections ----
@@ -46,7 +46,7 @@ pub enum AnnotationOwner {
 /// Safe projection of a `CrfVersion` aggregate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrfVersionView {
-    pub id: i32,
+    pub id: i64,
     pub project_code: String,
     pub name: String,
     pub created_at: DateTime<Utc>,
@@ -56,8 +56,8 @@ pub struct CrfVersionView {
 /// Safe projection of a `CrfForm` aggregate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrfFormView {
-    pub id: i32,
-    pub version_id: i32,
+    pub id: i64,
+    pub version_id: i64,
     pub code: String,
     pub name: String,
     pub order: i32,
@@ -69,8 +69,8 @@ pub struct CrfFormView {
 /// Safe projection of a `CrfItem` aggregate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrfItemView {
-    pub id: i32,
-    pub form_id: i32,
+    pub id: i64,
+    pub form_id: i64,
     pub code: String,
     pub name: String,
     pub kind: CrfItemKind,
@@ -83,8 +83,8 @@ pub struct CrfItemView {
 /// Safe projection of a `CrfOption` aggregate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrfOptionView {
-    pub id: i32,
-    pub item_id: i32,
+    pub id: i64,
+    pub item_id: i64,
     pub value: String,
     pub not_submitted: bool,
     pub created_at: DateTime<Utc>,
@@ -94,8 +94,8 @@ pub struct CrfOptionView {
 /// Safe projection of a `CrfUnit` aggregate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrfUnitView {
-    pub id: i32,
-    pub item_id: i32,
+    pub id: i64,
+    pub item_id: i64,
     pub value: String,
     pub not_submitted: bool,
     pub created_at: DateTime<Utc>,
@@ -105,8 +105,8 @@ pub struct CrfUnitView {
 /// Safe projection of a `DomainAnnotation` aggregate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DomainAnnotationView {
-    pub id: i32,
-    pub form_id: i32,
+    pub id: i64,
+    pub form_id: i64,
     pub name: String,
     pub description: String,
     pub created_at: DateTime<Utc>,
@@ -116,8 +116,8 @@ pub struct DomainAnnotationView {
 /// Safe projection of an `Annotation` aggregate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnnotationView {
-    pub id: i32,
-    pub domain_annotation_id: i32,
+    pub id: i64,
+    pub domain_annotation_id: i64,
     pub content: String,
     pub assign: bool,
     pub owner: AnnotationOwner,
@@ -137,14 +137,14 @@ pub struct CreateCrfVersionRequest {
 /// Input DTO for [`CrfService::update_version`].
 #[derive(Debug, Default, Clone)]
 pub struct UpdateCrfVersionRequest {
-    pub id: i32,
+    pub id: i64,
     pub name: Option<String>,
 }
 
 /// Input DTO for [`CrfService::create_form`].
 #[derive(Debug, Clone)]
 pub struct CreateCrfFormRequest {
-    pub version_id: i32,
+    pub version_id: i64,
     pub code: String,
     pub name: String,
     pub order: i32,
@@ -154,7 +154,7 @@ pub struct CreateCrfFormRequest {
 /// Input DTO for [`CrfService::update_form`].
 #[derive(Debug, Default, Clone)]
 pub struct UpdateCrfFormRequest {
-    pub id: i32,
+    pub id: i64,
     pub code: Option<String>,
     pub name: Option<String>,
     pub order: Option<i32>,
@@ -164,7 +164,7 @@ pub struct UpdateCrfFormRequest {
 /// Input DTO for [`CrfService::create_item`].
 #[derive(Debug, Clone)]
 pub struct CreateCrfItemRequest {
-    pub form_id: i32,
+    pub form_id: i64,
     pub code: String,
     pub name: String,
     pub kind: CrfItemKind,
@@ -175,7 +175,7 @@ pub struct CreateCrfItemRequest {
 /// Input DTO for [`CrfService::update_item`].
 #[derive(Debug, Default, Clone)]
 pub struct UpdateCrfItemRequest {
-    pub id: i32,
+    pub id: i64,
     pub code: Option<String>,
     pub name: Option<String>,
     pub kind: Option<CrfItemKind>,
@@ -186,7 +186,7 @@ pub struct UpdateCrfItemRequest {
 /// Input DTO for [`CrfService::create_option`].
 #[derive(Debug, Clone)]
 pub struct CreateCrfOptionRequest {
-    pub item_id: i32,
+    pub item_id: i64,
     pub value: String,
     pub not_submitted: bool,
 }
@@ -194,7 +194,7 @@ pub struct CreateCrfOptionRequest {
 /// Input DTO for [`CrfService::update_option`].
 #[derive(Debug, Default, Clone)]
 pub struct UpdateCrfOptionRequest {
-    pub id: i32,
+    pub id: i64,
     pub value: Option<String>,
     pub not_submitted: Option<bool>,
 }
@@ -202,7 +202,7 @@ pub struct UpdateCrfOptionRequest {
 /// Input DTO for [`CrfService::create_unit`].
 #[derive(Debug, Clone)]
 pub struct CreateCrfUnitRequest {
-    pub item_id: i32,
+    pub item_id: i64,
     pub value: String,
     pub not_submitted: bool,
 }
@@ -210,7 +210,7 @@ pub struct CreateCrfUnitRequest {
 /// Input DTO for [`CrfService::update_unit`].
 #[derive(Debug, Default, Clone)]
 pub struct UpdateCrfUnitRequest {
-    pub id: i32,
+    pub id: i64,
     pub value: Option<String>,
     pub not_submitted: Option<bool>,
 }
@@ -218,7 +218,7 @@ pub struct UpdateCrfUnitRequest {
 /// Input DTO for [`CrfService::create_domain_annotation`].
 #[derive(Debug, Clone)]
 pub struct CreateDomainAnnotationRequest {
-    pub form_id: i32,
+    pub form_id: i64,
     pub name: String,
     pub description: String,
 }
@@ -226,7 +226,7 @@ pub struct CreateDomainAnnotationRequest {
 /// Input DTO for [`CrfService::update_domain_annotation`].
 #[derive(Debug, Default, Clone)]
 pub struct UpdateDomainAnnotationRequest {
-    pub id: i32,
+    pub id: i64,
     pub name: Option<String>,
     pub description: Option<String>,
 }
@@ -234,7 +234,7 @@ pub struct UpdateDomainAnnotationRequest {
 /// Input DTO for [`CrfService::create_annotation`].
 #[derive(Debug, Clone)]
 pub struct CreateAnnotationRequest {
-    pub domain_annotation_id: i32,
+    pub domain_annotation_id: i64,
     pub content: String,
     pub assign: bool,
     pub owner: AnnotationOwner,
@@ -243,7 +243,7 @@ pub struct CreateAnnotationRequest {
 /// Input DTO for [`CrfService::update_annotation`].
 #[derive(Debug, Default, Clone)]
 pub struct UpdateAnnotationRequest {
-    pub id: i32,
+    pub id: i64,
     pub content: Option<String>,
     pub assign: Option<bool>,
 }
@@ -251,31 +251,31 @@ pub struct UpdateAnnotationRequest {
 /// Input DTO for [`CrfService::get_*_by_id`] (id-only requests).
 #[derive(Debug, Clone)]
 pub struct GetCrfVersionByIdRequest {
-    pub id: i32,
+    pub id: i64,
 }
 #[derive(Debug, Clone)]
 pub struct GetCrfFormByIdRequest {
-    pub id: i32,
+    pub id: i64,
 }
 #[derive(Debug, Clone)]
 pub struct GetCrfItemByIdRequest {
-    pub id: i32,
+    pub id: i64,
 }
 #[derive(Debug, Clone)]
 pub struct GetCrfOptionByIdRequest {
-    pub id: i32,
+    pub id: i64,
 }
 #[derive(Debug, Clone)]
 pub struct GetCrfUnitByIdRequest {
-    pub id: i32,
+    pub id: i64,
 }
 #[derive(Debug, Clone)]
 pub struct GetDomainAnnotationByIdRequest {
-    pub id: i32,
+    pub id: i64,
 }
 #[derive(Debug, Clone)]
 pub struct GetAnnotationByIdRequest {
-    pub id: i32,
+    pub id: i64,
 }
 
 /// Input DTO for [`CrfService::list_versions_by_project`].
@@ -287,87 +287,87 @@ pub struct ListCrfVersionsByProjectRequest {
 /// Input DTO for [`CrfService::list_forms_by_version`].
 #[derive(Debug, Clone)]
 pub struct ListCrfFormsByVersionRequest {
-    pub version_id: i32,
+    pub version_id: i64,
 }
 
 /// Input DTO for [`CrfService::list_items_by_form`].
 #[derive(Debug, Clone)]
 pub struct ListCrfItemsByFormRequest {
-    pub form_id: i32,
+    pub form_id: i64,
 }
 
 /// Input DTO for [`CrfService::list_options_by_item`].
 #[derive(Debug, Clone)]
 pub struct ListCrfOptionsByItemRequest {
-    pub item_id: i32,
+    pub item_id: i64,
 }
 
 /// Input DTO for [`CrfService::list_units_by_item`].
 #[derive(Debug, Clone)]
 pub struct ListCrfUnitsByItemRequest {
-    pub item_id: i32,
+    pub item_id: i64,
 }
 
 /// Input DTO for [`CrfService::list_domain_annotations_by_form`].
 #[derive(Debug, Clone)]
 pub struct ListDomainAnnotationsByFormRequest {
-    pub form_id: i32,
+    pub form_id: i64,
 }
 
 /// Input DTO for [`CrfService::list_annotations_by_form`].
 #[derive(Debug, Clone)]
 pub struct ListAnnotationsByFormRequest {
-    pub form_id: i32,
+    pub form_id: i64,
 }
 
 /// Input DTO for [`CrfService::list_annotations_by_item`].
 #[derive(Debug, Clone)]
 pub struct ListAnnotationsByItemRequest {
-    pub item_id: i32,
+    pub item_id: i64,
 }
 
 /// Input DTO for [`CrfService::list_annotations_by_option`].
 #[derive(Debug, Clone)]
 pub struct ListAnnotationsByOptionRequest {
-    pub option_id: i32,
+    pub option_id: i64,
 }
 
 /// Input DTO for [`CrfService::list_annotations_by_unit`].
 #[derive(Debug, Clone)]
 pub struct ListAnnotationsByUnitRequest {
-    pub unit_id: i32,
+    pub unit_id: i64,
 }
 
 /// Input DTOs for the search endpoints. The fragment is
 /// required and non-empty.
 #[derive(Debug, Clone)]
 pub struct SearchCrfFormsByVersionRequest {
-    pub version_id: i32,
+    pub version_id: i64,
     pub fragment: String,
 }
 #[derive(Debug, Clone)]
 pub struct SearchCrfItemsByVersionRequest {
-    pub version_id: i32,
+    pub version_id: i64,
     pub fragment: String,
 }
 #[derive(Debug, Clone)]
 pub struct SearchCrfOptionsByVersionRequest {
-    pub version_id: i32,
+    pub version_id: i64,
     pub fragment: String,
 }
 #[derive(Debug, Clone)]
 pub struct SearchCrfUnitsByVersionRequest {
-    pub version_id: i32,
+    pub version_id: i64,
     pub fragment: String,
 }
 #[derive(Debug, Clone)]
 pub struct SearchDomainAnnotationsByVersionRequest {
-    pub version_id: i32,
+    pub version_id: i64,
     pub fragment: String,
 }
 #[derive(Debug, Clone)]
 pub struct SearchAnnotationsByVersionRequest {
-    pub version_id: i32,
+    pub version_id: i64,
     pub fragment: String,
 }
 
@@ -390,41 +390,41 @@ pub enum CrfApiError {
     ProjectNotFound(String),
 
     #[error("crf version not found: {0}")]
-    CrfVersionNotFound(i32),
+    CrfVersionNotFound(i64),
     #[error("crf form not found: {0}")]
-    CrfFormNotFound(i32),
+    CrfFormNotFound(i64),
     #[error("crf item not found: {0}")]
-    CrfItemNotFound(i32),
+    CrfItemNotFound(i64),
     #[error("crf option not found: {0}")]
-    CrfOptionNotFound(i32),
+    CrfOptionNotFound(i64),
     #[error("crf unit not found: {0}")]
-    CrfUnitNotFound(i32),
+    CrfUnitNotFound(i64),
     #[error("domain annotation not found: {0}")]
-    DomainAnnotationNotFound(i32),
+    DomainAnnotationNotFound(i64),
     #[error("annotation not found: {0}")]
-    AnnotationNotFound(i32),
+    AnnotationNotFound(i64),
 
     #[error("crf version already exists: {project_code} / {name}")]
     DuplicateCrfVersion { project_code: String, name: String },
     #[error("crf form already exists: version {version_id} / {code}")]
-    DuplicateCrfForm { version_id: i32, code: String },
+    DuplicateCrfForm { version_id: i64, code: String },
     #[error("crf item already exists: form {form_id} / {code}")]
-    DuplicateCrfItem { form_id: i32, code: String },
+    DuplicateCrfItem { form_id: i64, code: String },
     #[error("domain annotation already exists: form {form_id} / {name}")]
-    DuplicateDomainAnnotation { form_id: i32, name: String },
+    DuplicateDomainAnnotation { form_id: i64, name: String },
 
     #[error("referenced crf version not found: {0}")]
-    FkCrfVersionNotFound(i32),
+    FkCrfVersionNotFound(i64),
     #[error("referenced crf form not found: {0}")]
-    FkCrfFormNotFound(i32),
+    FkCrfFormNotFound(i64),
     #[error("referenced crf item not found: {0}")]
-    FkCrfItemNotFound(i32),
+    FkCrfItemNotFound(i64),
     #[error("referenced crf option not found: {0}")]
-    FkCrfOptionNotFound(i32),
+    FkCrfOptionNotFound(i64),
     #[error("referenced crf unit not found: {0}")]
-    FkCrfUnitNotFound(i32),
+    FkCrfUnitNotFound(i64),
     #[error("referenced domain annotation not found: {0}")]
-    FkDomainAnnotationNotFound(i32),
+    FkDomainAnnotationNotFound(i64),
 
     #[error("search fragment cannot be empty")]
     EmptySearchFragment,
@@ -484,7 +484,7 @@ pub trait CrfService: Send + Sync {
     /// Hard delete the version identified by `id`. Cascades to
     /// child forms (and via them to items, options, units,
     /// annotations) at the backend.
-    async fn delete_version(&self, id: i32) -> Result<(), CrfApiError>;
+    async fn delete_version(&self, id: i64) -> Result<(), CrfApiError>;
 
     // ---- CrfForm ----
 
@@ -502,7 +502,7 @@ pub trait CrfService: Send + Sync {
 
     async fn update_form(&self, req: UpdateCrfFormRequest) -> Result<CrfFormView, CrfApiError>;
 
-    async fn delete_form(&self, id: i32) -> Result<(), CrfApiError>;
+    async fn delete_form(&self, id: i64) -> Result<(), CrfApiError>;
 
     // ---- CrfItem ----
 
@@ -526,7 +526,7 @@ pub trait CrfService: Send + Sync {
 
     async fn update_item(&self, req: UpdateCrfItemRequest) -> Result<CrfItemView, CrfApiError>;
 
-    async fn delete_item(&self, id: i32) -> Result<(), CrfApiError>;
+    async fn delete_item(&self, id: i64) -> Result<(), CrfApiError>;
 
     // ---- CrfOption ----
 
@@ -550,7 +550,7 @@ pub trait CrfService: Send + Sync {
         req: UpdateCrfOptionRequest,
     ) -> Result<CrfOptionView, CrfApiError>;
 
-    async fn delete_option(&self, id: i32) -> Result<(), CrfApiError>;
+    async fn delete_option(&self, id: i64) -> Result<(), CrfApiError>;
 
     // ---- CrfUnit ----
 
@@ -565,7 +565,7 @@ pub trait CrfService: Send + Sync {
 
     async fn update_unit(&self, req: UpdateCrfUnitRequest) -> Result<CrfUnitView, CrfApiError>;
 
-    async fn delete_unit(&self, id: i32) -> Result<(), CrfApiError>;
+    async fn delete_unit(&self, id: i64) -> Result<(), CrfApiError>;
 
     // ---- DomainAnnotation ----
 
@@ -589,7 +589,7 @@ pub trait CrfService: Send + Sync {
         req: UpdateDomainAnnotationRequest,
     ) -> Result<DomainAnnotationView, CrfApiError>;
 
-    async fn delete_domain_annotation(&self, id: i32) -> Result<(), CrfApiError>;
+    async fn delete_domain_annotation(&self, id: i64) -> Result<(), CrfApiError>;
 
     // ---- Annotation ----
 
@@ -628,7 +628,7 @@ pub trait CrfService: Send + Sync {
         req: UpdateAnnotationRequest,
     ) -> Result<AnnotationView, CrfApiError>;
 
-    async fn delete_annotation(&self, id: i32) -> Result<(), CrfApiError>;
+    async fn delete_annotation(&self, id: i64) -> Result<(), CrfApiError>;
 
     // ---- Search ----
 

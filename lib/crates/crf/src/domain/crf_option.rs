@@ -8,8 +8,8 @@ use super::error::DomainError;
 /// options; the DB schema carries no per-item uniqueness.
 #[derive(Clone, PartialEq, Eq)]
 pub struct CrfOption {
-    pub id: i32,
-    pub item_id: i32,
+    pub id: i64,
+    pub item_id: i64,
     pub value: String,
     pub not_submitted: bool,
     pub created_at: DateTime<Utc>,
@@ -32,7 +32,7 @@ impl std::fmt::Debug for CrfOption {
 impl CrfOption {
     /// Validating constructor used by the domain layer.
     /// Rejects empty / whitespace `value`.
-    pub fn new(item_id: i32, value: String, not_submitted: bool) -> Result<Self, DomainError> {
+    pub fn new(item_id: i64, value: String, not_submitted: bool) -> Result<Self, DomainError> {
         if value.trim().is_empty() {
             return Err(DomainError::EmptyValue);
         }
@@ -49,8 +49,8 @@ impl CrfOption {
     /// Bypasses validation. Reserved for the adapter layer
     /// when materialising rows from persistence.
     pub(crate) fn for_repository(
-        id: i32,
-        item_id: i32,
+        id: i64,
+        item_id: i64,
         value: String,
         not_submitted: bool,
         created_at: DateTime<Utc>,
@@ -70,7 +70,7 @@ impl CrfOption {
 /// Input DTO for `CrfOptionRepository::create`.
 #[derive(Debug, Clone)]
 pub struct CrfOptionNew {
-    pub item_id: i32,
+    pub item_id: i64,
     pub value: String,
     pub not_submitted: bool,
 }
@@ -78,7 +78,7 @@ pub struct CrfOptionNew {
 /// Input DTO for `CrfOptionRepository::update`.
 #[derive(Debug, Clone, Default)]
 pub struct CrfOptionUpdate {
-    pub id: i32,
+    pub id: i64,
     pub value: Option<String>,
     pub not_submitted: Option<bool>,
 }
@@ -87,16 +87,16 @@ pub struct CrfOptionUpdate {
 #[async_trait]
 pub trait CrfOptionRepository: Send + Sync {
     async fn create(&self, input: CrfOptionNew) -> Result<CrfOption, DomainError>;
-    async fn find_by_id(&self, id: i32) -> Result<CrfOption, DomainError>;
-    async fn list_by_item(&self, item_id: i32) -> Result<Vec<CrfOption>, DomainError>;
+    async fn find_by_id(&self, id: i64) -> Result<CrfOption, DomainError>;
+    async fn list_by_item(&self, item_id: i64) -> Result<Vec<CrfOption>, DomainError>;
     async fn update(&self, input: CrfOptionUpdate) -> Result<CrfOption, DomainError>;
-    async fn delete(&self, id: i32) -> Result<(), DomainError>;
+    async fn delete(&self, id: i64) -> Result<(), DomainError>;
     /// Count options on an item. Used by the kind-shape
     /// validation in the usecase.
-    async fn count_by_item(&self, item_id: i32) -> Result<i64, DomainError>;
+    async fn count_by_item(&self, item_id: i64) -> Result<i64, DomainError>;
     async fn search_by_version(
         &self,
-        version_id: i32,
+        version_id: i64,
         fragment: &str,
     ) -> Result<Vec<CrfOption>, DomainError>;
 }

@@ -14,14 +14,14 @@ pub struct CreateCrfVersion {
 
 #[derive(Default)]
 pub struct UpdateCrfVersion {
-    pub id: i32,
+    pub id: i64,
     pub name: Option<String>,
 }
 
 // ---- CrfForm ----
 
 pub struct CreateCrfForm {
-    pub version_id: i32,
+    pub version_id: i64,
     pub code: String,
     pub name: String,
     pub order: i32,
@@ -30,7 +30,7 @@ pub struct CreateCrfForm {
 
 #[derive(Default)]
 pub struct UpdateCrfForm {
-    pub id: i32,
+    pub id: i64,
     pub code: Option<String>,
     pub name: Option<String>,
     pub order: Option<i32>,
@@ -40,7 +40,7 @@ pub struct UpdateCrfForm {
 // ---- CrfItem ----
 
 pub struct CreateCrfItem {
-    pub form_id: i32,
+    pub form_id: i64,
     pub code: String,
     pub name: String,
     pub kind: CrfItemKind,
@@ -50,7 +50,7 @@ pub struct CreateCrfItem {
 
 #[derive(Default)]
 pub struct UpdateCrfItem {
-    pub id: i32,
+    pub id: i64,
     pub code: Option<String>,
     pub name: Option<String>,
     pub kind: Option<CrfItemKind>,
@@ -76,14 +76,14 @@ impl UpdateCrfItem {
 // ---- CrfOption ----
 
 pub struct CreateCrfOption {
-    pub item_id: i32,
+    pub item_id: i64,
     pub value: String,
     pub not_submitted: bool,
 }
 
 #[derive(Default)]
 pub struct UpdateCrfOption {
-    pub id: i32,
+    pub id: i64,
     pub value: Option<String>,
     pub not_submitted: Option<bool>,
 }
@@ -91,14 +91,14 @@ pub struct UpdateCrfOption {
 // ---- CrfUnit ----
 
 pub struct CreateCrfUnit {
-    pub item_id: i32,
+    pub item_id: i64,
     pub value: String,
     pub not_submitted: bool,
 }
 
 #[derive(Default)]
 pub struct UpdateCrfUnit {
-    pub id: i32,
+    pub id: i64,
     pub value: Option<String>,
     pub not_submitted: Option<bool>,
 }
@@ -106,14 +106,14 @@ pub struct UpdateCrfUnit {
 // ---- DomainAnnotation ----
 
 pub struct CreateDomainAnnotation {
-    pub form_id: i32,
+    pub form_id: i64,
     pub name: String,
     pub description: String,
 }
 
 #[derive(Default)]
 pub struct UpdateDomainAnnotation {
-    pub id: i32,
+    pub id: i64,
     pub name: Option<String>,
     pub description: Option<String>,
 }
@@ -121,7 +121,7 @@ pub struct UpdateDomainAnnotation {
 // ---- Annotation ----
 
 pub struct CreateAnnotation {
-    pub domain_annotation_id: i32,
+    pub domain_annotation_id: i64,
     pub content: String,
     pub assign: bool,
     pub owner: AnnotationOwner,
@@ -129,7 +129,7 @@ pub struct CreateAnnotation {
 
 #[derive(Default)]
 pub struct UpdateAnnotation {
-    pub id: i32,
+    pub id: i64,
     pub content: Option<String>,
     pub assign: Option<bool>,
 }
@@ -137,26 +137,26 @@ pub struct UpdateAnnotation {
 // ---- Search ----
 
 pub struct SearchCrfFormsByVersion {
-    pub version_id: i32,
+    pub version_id: i64,
     pub fragment: String,
 }
 pub struct SearchCrfItemsByVersion {
-    pub version_id: i32,
+    pub version_id: i64,
     pub fragment: String,
 }
 pub struct SearchCrfOptionsByVersion {
-    pub version_id: i32,
+    pub version_id: i64,
     pub fragment: String,
 }
 pub struct SearchCrfUnitsByVersion {
-    pub version_id: i32,
+    pub version_id: i64,
     pub fragment: String,
 }
 pub struct SearchDomainAnnotationsByVersion {
-    pub version_id: i32,
+    pub version_id: i64,
     pub fragment: String,
 }
 pub struct SearchAnnotationsByVersion {
-    pub version_id: i32,
+    pub version_id: i64,
     pub fragment: String,
 }

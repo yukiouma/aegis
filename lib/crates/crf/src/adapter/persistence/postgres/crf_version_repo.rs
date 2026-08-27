@@ -8,7 +8,7 @@ use crate::domain::{
 
 #[derive(FromRow)]
 struct CrfVersionRow {
-    id: i32,
+    id: i64,
     project_code: String,
     name: String,
     created_at: DateTime<Utc>,
@@ -47,7 +47,7 @@ impl CrfVersionRepository for CrfVersionRepoPg {
         Ok(row.into())
     }
 
-    async fn find_by_id(&self, id: i32) -> Result<CrfVersion, DomainError> {
+    async fn find_by_id(&self, id: i64) -> Result<CrfVersion, DomainError> {
         let row: CrfVersionRow = sqlx::query_as::<_, CrfVersionRow>(
             "SELECT id, project_code, name, created_at, updated_at
              FROM crf_versions WHERE id = $1",
@@ -87,7 +87,7 @@ impl CrfVersionRepository for CrfVersionRepoPg {
         Ok(row.into())
     }
 
-    async fn delete(&self, id: i32) -> Result<(), DomainError> {
+    async fn delete(&self, id: i64) -> Result<(), DomainError> {
         let res = sqlx::query("DELETE FROM crf_versions WHERE id = $1")
             .bind(id)
             .execute(&self.pool)

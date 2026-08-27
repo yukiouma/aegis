@@ -9,8 +9,8 @@ use super::error::DomainError;
 /// options; `Label` carries nothing).
 #[derive(Clone, PartialEq, Eq)]
 pub struct CrfItem {
-    pub id: i32,
-    pub form_id: i32,
+    pub id: i64,
+    pub form_id: i64,
     pub code: String,
     pub name: String,
     pub kind: CrfItemKind,
@@ -40,7 +40,7 @@ impl CrfItem {
     /// Validating constructor used by the domain layer.
     /// Rejects empty / whitespace `code` and `name`.
     pub fn new(
-        form_id: i32,
+        form_id: i64,
         code: String,
         name: String,
         kind: CrfItemKind,
@@ -70,8 +70,8 @@ impl CrfItem {
     /// when materialising rows from persistence.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn for_repository(
-        id: i32,
-        form_id: i32,
+        id: i64,
+        form_id: i64,
         code: String,
         name: String,
         kind: CrfItemKind,
@@ -97,7 +97,7 @@ impl CrfItem {
 /// Input DTO for `CrfItemRepository::create`.
 #[derive(Debug, Clone)]
 pub struct CrfItemNew {
-    pub form_id: i32,
+    pub form_id: i64,
     pub code: String,
     pub name: String,
     pub kind: CrfItemKind,
@@ -109,7 +109,7 @@ pub struct CrfItemNew {
 /// except `id` is optional.
 #[derive(Debug, Clone, Default)]
 pub struct CrfItemUpdate {
-    pub id: i32,
+    pub id: i64,
     pub code: Option<String>,
     pub name: Option<String>,
     pub order: Option<i32>,
@@ -120,16 +120,16 @@ pub struct CrfItemUpdate {
 #[async_trait]
 pub trait CrfItemRepository: Send + Sync {
     async fn create(&self, input: CrfItemNew) -> Result<CrfItem, DomainError>;
-    async fn find_by_id(&self, id: i32) -> Result<CrfItem, DomainError>;
-    async fn list_by_form(&self, form_id: i32) -> Result<Vec<CrfItem>, DomainError>;
+    async fn find_by_id(&self, id: i64) -> Result<CrfItem, DomainError>;
+    async fn list_by_form(&self, form_id: i64) -> Result<Vec<CrfItem>, DomainError>;
     async fn update(&self, input: CrfItemUpdate) -> Result<CrfItem, DomainError>;
-    async fn delete(&self, id: i32) -> Result<(), DomainError>;
+    async fn delete(&self, id: i64) -> Result<(), DomainError>;
     /// Search by code/name through the version chain. The
     /// caller must already have validated that the fragment is
     /// non-empty (the usecase does this).
     async fn search_by_version(
         &self,
-        version_id: i32,
+        version_id: i64,
         fragment: &str,
     ) -> Result<Vec<CrfItem>, DomainError>;
 }

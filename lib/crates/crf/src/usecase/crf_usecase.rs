@@ -138,7 +138,7 @@ impl<
         Ok(v.into())
     }
 
-    pub async fn get_version_by_id(&self, id: i32) -> Result<CrfVersionView, UsecaseError> {
+    pub async fn get_version_by_id(&self, id: i64) -> Result<CrfVersionView, UsecaseError> {
         let v = self.version_repo.find_by_id(id).await?;
         Ok(v.into())
     }
@@ -166,7 +166,7 @@ impl<
         Ok(v.into())
     }
 
-    pub async fn delete_version(&self, id: i32) -> Result<(), UsecaseError> {
+    pub async fn delete_version(&self, id: i64) -> Result<(), UsecaseError> {
         self.version_repo.delete(id).await?;
         Ok(())
     }
@@ -192,14 +192,14 @@ impl<
         Ok(f.into())
     }
 
-    pub async fn get_form_by_id(&self, id: i32) -> Result<CrfFormView, UsecaseError> {
+    pub async fn get_form_by_id(&self, id: i64) -> Result<CrfFormView, UsecaseError> {
         let f = self.form_repo.find_by_id(id).await?;
         Ok(f.into())
     }
 
     pub async fn list_forms_by_version(
         &self,
-        version_id: i32,
+        version_id: i64,
     ) -> Result<Vec<CrfFormView>, UsecaseError> {
         let fs = self.form_repo.list_by_version(version_id).await?;
         Ok(fs.into_iter().map(Into::into).collect())
@@ -220,7 +220,7 @@ impl<
         Ok(f.into())
     }
 
-    pub async fn delete_form(&self, id: i32) -> Result<(), UsecaseError> {
+    pub async fn delete_form(&self, id: i64) -> Result<(), UsecaseError> {
         self.form_repo.delete(id).await?;
         Ok(())
     }
@@ -267,12 +267,12 @@ impl<
         Ok(i.into())
     }
 
-    pub async fn get_item_by_id(&self, id: i32) -> Result<CrfItemView, UsecaseError> {
+    pub async fn get_item_by_id(&self, id: i64) -> Result<CrfItemView, UsecaseError> {
         let i = self.item_repo.find_by_id(id).await?;
         Ok(i.into())
     }
 
-    pub async fn list_items_by_form(&self, form_id: i32) -> Result<Vec<CrfItemView>, UsecaseError> {
+    pub async fn list_items_by_form(&self, form_id: i64) -> Result<Vec<CrfItemView>, UsecaseError> {
         let its = self.item_repo.list_by_form(form_id).await?;
         Ok(its.into_iter().map(Into::into).collect())
     }
@@ -307,7 +307,7 @@ impl<
         Ok(updated.into())
     }
 
-    pub async fn delete_item(&self, id: i32) -> Result<(), UsecaseError> {
+    pub async fn delete_item(&self, id: i64) -> Result<(), UsecaseError> {
         self.item_repo.delete(id).await?;
         Ok(())
     }
@@ -329,14 +329,14 @@ impl<
         Ok(o.into())
     }
 
-    pub async fn get_option_by_id(&self, id: i32) -> Result<CrfOptionView, UsecaseError> {
+    pub async fn get_option_by_id(&self, id: i64) -> Result<CrfOptionView, UsecaseError> {
         let o = self.option_repo.find_by_id(id).await?;
         Ok(o.into())
     }
 
     pub async fn list_options_by_item(
         &self,
-        item_id: i32,
+        item_id: i64,
     ) -> Result<Vec<CrfOptionView>, UsecaseError> {
         let os = self.option_repo.list_by_item(item_id).await?;
         Ok(os.into_iter().map(Into::into).collect())
@@ -355,7 +355,7 @@ impl<
         Ok(o.into())
     }
 
-    pub async fn delete_option(&self, id: i32) -> Result<(), UsecaseError> {
+    pub async fn delete_option(&self, id: i64) -> Result<(), UsecaseError> {
         self.option_repo.delete(id).await?;
         Ok(())
     }
@@ -377,12 +377,12 @@ impl<
         Ok(u.into())
     }
 
-    pub async fn get_unit_by_id(&self, id: i32) -> Result<CrfUnitView, UsecaseError> {
+    pub async fn get_unit_by_id(&self, id: i64) -> Result<CrfUnitView, UsecaseError> {
         let u = self.unit_repo.find_by_id(id).await?;
         Ok(u.into())
     }
 
-    pub async fn list_units_by_item(&self, item_id: i32) -> Result<Vec<CrfUnitView>, UsecaseError> {
+    pub async fn list_units_by_item(&self, item_id: i64) -> Result<Vec<CrfUnitView>, UsecaseError> {
         let us = self.unit_repo.list_by_item(item_id).await?;
         Ok(us.into_iter().map(Into::into).collect())
     }
@@ -400,7 +400,7 @@ impl<
         Ok(u.into())
     }
 
-    pub async fn delete_unit(&self, id: i32) -> Result<(), UsecaseError> {
+    pub async fn delete_unit(&self, id: i64) -> Result<(), UsecaseError> {
         self.unit_repo.delete(id).await?;
         Ok(())
     }
@@ -427,7 +427,7 @@ impl<
 
     pub async fn get_domain_annotation_by_id(
         &self,
-        id: i32,
+        id: i64,
     ) -> Result<DomainAnnotationView, UsecaseError> {
         let d = self.domain_annotation_repo.find_by_id(id).await?;
         Ok(d.into())
@@ -435,7 +435,7 @@ impl<
 
     pub async fn list_domain_annotations_by_form(
         &self,
-        form_id: i32,
+        form_id: i64,
     ) -> Result<Vec<DomainAnnotationView>, UsecaseError> {
         let ds = self.domain_annotation_repo.list_by_form(form_id).await?;
         Ok(ds.into_iter().map(Into::into).collect())
@@ -457,7 +457,7 @@ impl<
         Ok(d.into())
     }
 
-    pub async fn delete_domain_annotation(&self, id: i32) -> Result<(), UsecaseError> {
+    pub async fn delete_domain_annotation(&self, id: i64) -> Result<(), UsecaseError> {
         self.domain_annotation_repo.delete(id).await?;
         Ok(())
     }
@@ -496,14 +496,14 @@ impl<
         Ok(a.into())
     }
 
-    pub async fn get_annotation_by_id(&self, id: i32) -> Result<AnnotationView, UsecaseError> {
+    pub async fn get_annotation_by_id(&self, id: i64) -> Result<AnnotationView, UsecaseError> {
         let a = self.annotation_repo.find_by_id(id).await?;
         Ok(a.into())
     }
 
     pub async fn list_annotations_by_form(
         &self,
-        form_id: i32,
+        form_id: i64,
     ) -> Result<Vec<AnnotationView>, UsecaseError> {
         let as_ = self.annotation_repo.list_by_form(form_id).await?;
         Ok(as_.into_iter().map(Into::into).collect())
@@ -511,7 +511,7 @@ impl<
 
     pub async fn list_annotations_by_item(
         &self,
-        item_id: i32,
+        item_id: i64,
     ) -> Result<Vec<AnnotationView>, UsecaseError> {
         let as_ = self.annotation_repo.list_by_item(item_id).await?;
         Ok(as_.into_iter().map(Into::into).collect())
@@ -519,7 +519,7 @@ impl<
 
     pub async fn list_annotations_by_option(
         &self,
-        option_id: i32,
+        option_id: i64,
     ) -> Result<Vec<AnnotationView>, UsecaseError> {
         let as_ = self.annotation_repo.list_by_option(option_id).await?;
         Ok(as_.into_iter().map(Into::into).collect())
@@ -527,7 +527,7 @@ impl<
 
     pub async fn list_annotations_by_unit(
         &self,
-        unit_id: i32,
+        unit_id: i64,
     ) -> Result<Vec<AnnotationView>, UsecaseError> {
         let as_ = self.annotation_repo.list_by_unit(unit_id).await?;
         Ok(as_.into_iter().map(Into::into).collect())
@@ -549,7 +549,7 @@ impl<
         Ok(a.into())
     }
 
-    pub async fn delete_annotation(&self, id: i32) -> Result<(), UsecaseError> {
+    pub async fn delete_annotation(&self, id: i64) -> Result<(), UsecaseError> {
         self.annotation_repo.delete(id).await?;
         Ok(())
     }

@@ -8,8 +8,8 @@ use crate::domain::{
 
 #[derive(FromRow)]
 struct CrfItemRow {
-    id: i32,
-    form_id: i32,
+    id: i64,
+    form_id: i64,
     code: String,
     name: String,
     kind: String,
@@ -66,7 +66,7 @@ impl CrfItemRepository for CrfItemRepoPg {
         Ok(row.into())
     }
 
-    async fn find_by_id(&self, id: i32) -> Result<CrfItem, DomainError> {
+    async fn find_by_id(&self, id: i64) -> Result<CrfItem, DomainError> {
         let row: CrfItemRow = sqlx::query_as::<_, CrfItemRow>(
             "SELECT id, form_id, code, name, kind, \"order\", not_submitted, created_at, updated_at
              FROM crf_items WHERE id = $1",
@@ -79,7 +79,7 @@ impl CrfItemRepository for CrfItemRepoPg {
         Ok(row.into())
     }
 
-    async fn list_by_form(&self, form_id: i32) -> Result<Vec<CrfItem>, DomainError> {
+    async fn list_by_form(&self, form_id: i64) -> Result<Vec<CrfItem>, DomainError> {
         let rows = sqlx::query_as::<_, CrfItemRow>(
             "SELECT id, form_id, code, name, kind, \"order\", not_submitted, created_at, updated_at
              FROM crf_items WHERE form_id = $1
@@ -114,7 +114,7 @@ impl CrfItemRepository for CrfItemRepoPg {
         Ok(row.into())
     }
 
-    async fn delete(&self, id: i32) -> Result<(), DomainError> {
+    async fn delete(&self, id: i64) -> Result<(), DomainError> {
         let res = sqlx::query("DELETE FROM crf_items WHERE id = $1")
             .bind(id)
             .execute(&self.pool)
@@ -128,7 +128,7 @@ impl CrfItemRepository for CrfItemRepoPg {
 
     async fn search_by_version(
         &self,
-        version_id: i32,
+        version_id: i64,
         fragment: &str,
     ) -> Result<Vec<CrfItem>, DomainError> {
         let pat = format!("%{fragment}%");

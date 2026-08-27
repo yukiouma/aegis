@@ -11,8 +11,8 @@ use super::error::DomainError;
 /// "label names are unique within a form".
 #[derive(Clone, PartialEq, Eq)]
 pub struct DomainAnnotation {
-    pub id: i32,
-    pub form_id: i32,
+    pub id: i64,
+    pub form_id: i64,
     pub name: String,
     pub description: String,
     pub created_at: DateTime<Utc>,
@@ -35,7 +35,7 @@ impl std::fmt::Debug for DomainAnnotation {
 impl DomainAnnotation {
     /// Validating constructor used by the domain layer.
     /// Rejects empty / whitespace `name`.
-    pub fn new(form_id: i32, name: String, description: String) -> Result<Self, DomainError> {
+    pub fn new(form_id: i64, name: String, description: String) -> Result<Self, DomainError> {
         if name.trim().is_empty() {
             return Err(DomainError::EmptyName);
         }
@@ -52,8 +52,8 @@ impl DomainAnnotation {
     /// Bypasses validation. Reserved for the adapter layer
     /// when materialising rows from persistence.
     pub(crate) fn for_repository(
-        id: i32,
-        form_id: i32,
+        id: i64,
+        form_id: i64,
         name: String,
         description: String,
         created_at: DateTime<Utc>,
@@ -73,7 +73,7 @@ impl DomainAnnotation {
 /// Input DTO for `DomainAnnotationRepository::create`.
 #[derive(Debug, Clone)]
 pub struct DomainAnnotationNew {
-    pub form_id: i32,
+    pub form_id: i64,
     pub name: String,
     pub description: String,
 }
@@ -81,7 +81,7 @@ pub struct DomainAnnotationNew {
 /// Input DTO for `DomainAnnotationRepository::update`.
 #[derive(Debug, Clone, Default)]
 pub struct DomainAnnotationUpdate {
-    pub id: i32,
+    pub id: i64,
     pub name: Option<String>,
     pub description: Option<String>,
 }
@@ -90,13 +90,13 @@ pub struct DomainAnnotationUpdate {
 #[async_trait]
 pub trait DomainAnnotationRepository: Send + Sync {
     async fn create(&self, input: DomainAnnotationNew) -> Result<DomainAnnotation, DomainError>;
-    async fn find_by_id(&self, id: i32) -> Result<DomainAnnotation, DomainError>;
-    async fn list_by_form(&self, form_id: i32) -> Result<Vec<DomainAnnotation>, DomainError>;
+    async fn find_by_id(&self, id: i64) -> Result<DomainAnnotation, DomainError>;
+    async fn list_by_form(&self, form_id: i64) -> Result<Vec<DomainAnnotation>, DomainError>;
     async fn update(&self, input: DomainAnnotationUpdate) -> Result<DomainAnnotation, DomainError>;
-    async fn delete(&self, id: i32) -> Result<(), DomainError>;
+    async fn delete(&self, id: i64) -> Result<(), DomainError>;
     async fn search_by_version(
         &self,
-        version_id: i32,
+        version_id: i64,
         fragment: &str,
     ) -> Result<Vec<DomainAnnotation>, DomainError>;
 }

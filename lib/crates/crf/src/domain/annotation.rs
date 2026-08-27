@@ -10,14 +10,14 @@ use super::error::DomainError;
 /// Mirrors `apis::crf::AnnotationOwner`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum AnnotationOwner {
-    Form { id: i32 },
-    Item { id: i32 },
-    Option { id: i32 },
-    Unit { id: i32 },
+    Form { id: i64 },
+    Item { id: i64 },
+    Option { id: i64 },
+    Unit { id: i64 },
 }
 
 impl AnnotationOwner {
-    pub fn id(&self) -> i32 {
+    pub fn id(&self) -> i64 {
         match self {
             Self::Form { id } | Self::Item { id } | Self::Option { id } | Self::Unit { id } => *id,
         }
@@ -39,8 +39,8 @@ impl AnnotationOwner {
 /// to one specific owner (form / item / option / unit).
 #[derive(Clone, PartialEq, Eq)]
 pub struct Annotation {
-    pub id: i32,
-    pub domain_annotation_id: i32,
+    pub id: i64,
+    pub domain_annotation_id: i64,
     pub content: String,
     pub assign: bool,
     pub owner: AnnotationOwner,
@@ -65,10 +65,10 @@ impl std::fmt::Debug for Annotation {
 impl Annotation {
     /// Construct an annotation owned by a form.
     pub fn for_form(
-        domain_annotation_id: i32,
+        domain_annotation_id: i64,
         content: String,
         assign: bool,
-        form_id: i32,
+        form_id: i64,
     ) -> Result<Self, DomainError> {
         Self::new(
             domain_annotation_id,
@@ -80,10 +80,10 @@ impl Annotation {
 
     /// Construct an annotation owned by an item.
     pub fn for_item(
-        domain_annotation_id: i32,
+        domain_annotation_id: i64,
         content: String,
         assign: bool,
-        item_id: i32,
+        item_id: i64,
     ) -> Result<Self, DomainError> {
         Self::new(
             domain_annotation_id,
@@ -95,10 +95,10 @@ impl Annotation {
 
     /// Construct an annotation owned by an option.
     pub fn for_option(
-        domain_annotation_id: i32,
+        domain_annotation_id: i64,
         content: String,
         assign: bool,
-        option_id: i32,
+        option_id: i64,
     ) -> Result<Self, DomainError> {
         Self::new(
             domain_annotation_id,
@@ -110,10 +110,10 @@ impl Annotation {
 
     /// Construct an annotation owned by a unit.
     pub fn for_unit(
-        domain_annotation_id: i32,
+        domain_annotation_id: i64,
         content: String,
         assign: bool,
-        unit_id: i32,
+        unit_id: i64,
     ) -> Result<Self, DomainError> {
         Self::new(
             domain_annotation_id,
@@ -124,7 +124,7 @@ impl Annotation {
     }
 
     fn new(
-        domain_annotation_id: i32,
+        domain_annotation_id: i64,
         content: String,
         assign: bool,
         owner: AnnotationOwner,
@@ -151,8 +151,8 @@ impl Annotation {
     /// Bypasses validation. Reserved for the adapter layer
     /// when materialising rows from persistence.
     pub(crate) fn for_repository(
-        id: i32,
-        domain_annotation_id: i32,
+        id: i64,
+        domain_annotation_id: i64,
         content: String,
         assign: bool,
         owner: AnnotationOwner,
@@ -174,7 +174,7 @@ impl Annotation {
 /// Input DTO for `AnnotationRepository::create`.
 #[derive(Debug, Clone)]
 pub struct AnnotationNew {
-    pub domain_annotation_id: i32,
+    pub domain_annotation_id: i64,
     pub content: String,
     pub assign: bool,
     pub owner: AnnotationOwner,
@@ -185,7 +185,7 @@ pub struct AnnotationNew {
 /// owner is fixed at create time.
 #[derive(Debug, Clone, Default)]
 pub struct AnnotationUpdate {
-    pub id: i32,
+    pub id: i64,
     pub content: Option<String>,
     pub assign: Option<bool>,
 }
@@ -196,16 +196,16 @@ pub struct AnnotationUpdate {
 #[async_trait]
 pub trait AnnotationRepository: Send + Sync {
     async fn create(&self, input: AnnotationNew) -> Result<Annotation, DomainError>;
-    async fn find_by_id(&self, id: i32) -> Result<Annotation, DomainError>;
-    async fn list_by_form(&self, form_id: i32) -> Result<Vec<Annotation>, DomainError>;
-    async fn list_by_item(&self, item_id: i32) -> Result<Vec<Annotation>, DomainError>;
-    async fn list_by_option(&self, option_id: i32) -> Result<Vec<Annotation>, DomainError>;
-    async fn list_by_unit(&self, unit_id: i32) -> Result<Vec<Annotation>, DomainError>;
+    async fn find_by_id(&self, id: i64) -> Result<Annotation, DomainError>;
+    async fn list_by_form(&self, form_id: i64) -> Result<Vec<Annotation>, DomainError>;
+    async fn list_by_item(&self, item_id: i64) -> Result<Vec<Annotation>, DomainError>;
+    async fn list_by_option(&self, option_id: i64) -> Result<Vec<Annotation>, DomainError>;
+    async fn list_by_unit(&self, unit_id: i64) -> Result<Vec<Annotation>, DomainError>;
     async fn update(&self, input: AnnotationUpdate) -> Result<Annotation, DomainError>;
-    async fn delete(&self, id: i32) -> Result<(), DomainError>;
+    async fn delete(&self, id: i64) -> Result<(), DomainError>;
     async fn search_by_version(
         &self,
-        version_id: i32,
+        version_id: i64,
         fragment: &str,
     ) -> Result<Vec<Annotation>, DomainError>;
 }

@@ -4,7 +4,7 @@
 //! view projections, validation errors, and kind-shape rules.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -31,9 +31,9 @@ use super::commands::{
 
 // ---- shared counter for unique surrogate ids ----
 
-static NEXT_ID: AtomicI32 = AtomicI32::new(1);
+static NEXT_ID: AtomicI64 = AtomicI64::new(1);
 
-fn next_id() -> i32 {
+fn next_id() -> i64 {
     NEXT_ID.fetch_add(1, Ordering::SeqCst)
 }
 
@@ -59,7 +59,7 @@ impl ProjectLookup for RejectProject {
 
 #[derive(Default)]
 pub(crate) struct InMemoryVersions {
-    rows: Mutex<HashMap<i32, CrfVersion>>,
+    rows: Mutex<HashMap<i64, CrfVersion>>,
 }
 
 #[async_trait]
@@ -76,7 +76,7 @@ impl CrfVersionRepository for InMemoryVersions {
         self.rows.lock().unwrap().insert(id, v.clone());
         Ok(v)
     }
-    async fn find_by_id(&self, id: i32) -> Result<CrfVersion, DomainError> {
+    async fn find_by_id(&self, id: i64) -> Result<CrfVersion, DomainError> {
         self.rows
             .lock()
             .unwrap()
@@ -103,7 +103,7 @@ impl CrfVersionRepository for InMemoryVersions {
         v.updated_at = chrono::Utc::now();
         Ok(v.clone())
     }
-    async fn delete(&self, id: i32) -> Result<(), DomainError> {
+    async fn delete(&self, id: i64) -> Result<(), DomainError> {
         self.rows
             .lock()
             .unwrap()
@@ -122,7 +122,7 @@ impl CrfVersionRepository for InMemoryVersions {
 
 #[derive(Default)]
 pub(crate) struct InMemoryForms {
-    rows: Mutex<HashMap<i32, CrfForm>>,
+    rows: Mutex<HashMap<i64, CrfForm>>,
 }
 
 #[async_trait]
@@ -142,7 +142,7 @@ impl CrfFormRepository for InMemoryForms {
         self.rows.lock().unwrap().insert(id, f.clone());
         Ok(f)
     }
-    async fn find_by_id(&self, id: i32) -> Result<CrfForm, DomainError> {
+    async fn find_by_id(&self, id: i64) -> Result<CrfForm, DomainError> {
         self.rows
             .lock()
             .unwrap()
@@ -150,7 +150,7 @@ impl CrfFormRepository for InMemoryForms {
             .cloned()
             .ok_or(DomainError::CrfFormNotFound(id))
     }
-    async fn list_by_version(&self, version_id: i32) -> Result<Vec<CrfForm>, DomainError> {
+    async fn list_by_version(&self, version_id: i64) -> Result<Vec<CrfForm>, DomainError> {
         let rows = self.rows.lock().unwrap();
         Ok(rows
             .values()
@@ -178,7 +178,7 @@ impl CrfFormRepository for InMemoryForms {
         f.updated_at = chrono::Utc::now();
         Ok(f.clone())
     }
-    async fn delete(&self, id: i32) -> Result<(), DomainError> {
+    async fn delete(&self, id: i64) -> Result<(), DomainError> {
         self.rows
             .lock()
             .unwrap()
@@ -188,7 +188,7 @@ impl CrfFormRepository for InMemoryForms {
     }
     async fn search_by_version(
         &self,
-        version_id: i32,
+        version_id: i64,
         fragment: &str,
     ) -> Result<Vec<CrfForm>, DomainError> {
         let rows = self.rows.lock().unwrap();
@@ -205,7 +205,7 @@ impl CrfFormRepository for InMemoryForms {
 
 #[derive(Default)]
 pub(crate) struct InMemoryItems {
-    rows: Mutex<HashMap<i32, CrfItem>>,
+    rows: Mutex<HashMap<i64, CrfItem>>,
 }
 
 #[async_trait]
@@ -226,7 +226,7 @@ impl CrfItemRepository for InMemoryItems {
         self.rows.lock().unwrap().insert(id, i.clone());
         Ok(i)
     }
-    async fn find_by_id(&self, id: i32) -> Result<CrfItem, DomainError> {
+    async fn find_by_id(&self, id: i64) -> Result<CrfItem, DomainError> {
         self.rows
             .lock()
             .unwrap()
@@ -234,7 +234,7 @@ impl CrfItemRepository for InMemoryItems {
             .cloned()
             .ok_or(DomainError::CrfItemNotFound(id))
     }
-    async fn list_by_form(&self, form_id: i32) -> Result<Vec<CrfItem>, DomainError> {
+    async fn list_by_form(&self, form_id: i64) -> Result<Vec<CrfItem>, DomainError> {
         let rows = self.rows.lock().unwrap();
         Ok(rows
             .values()
@@ -262,7 +262,7 @@ impl CrfItemRepository for InMemoryItems {
         i.updated_at = chrono::Utc::now();
         Ok(i.clone())
     }
-    async fn delete(&self, id: i32) -> Result<(), DomainError> {
+    async fn delete(&self, id: i64) -> Result<(), DomainError> {
         self.rows
             .lock()
             .unwrap()
@@ -272,7 +272,7 @@ impl CrfItemRepository for InMemoryItems {
     }
     async fn search_by_version(
         &self,
-        _version_id: i32,
+        _version_id: i64,
         fragment: &str,
     ) -> Result<Vec<CrfItem>, DomainError> {
         // In-memory fake — the form-id → version chain isn't
@@ -288,7 +288,7 @@ impl CrfItemRepository for InMemoryItems {
 
 #[derive(Default)]
 pub(crate) struct InMemoryOptions {
-    rows: Mutex<HashMap<i32, CrfOption>>,
+    rows: Mutex<HashMap<i64, CrfOption>>,
 }
 
 #[async_trait]
@@ -306,7 +306,7 @@ impl CrfOptionRepository for InMemoryOptions {
         self.rows.lock().unwrap().insert(id, o.clone());
         Ok(o)
     }
-    async fn find_by_id(&self, id: i32) -> Result<CrfOption, DomainError> {
+    async fn find_by_id(&self, id: i64) -> Result<CrfOption, DomainError> {
         self.rows
             .lock()
             .unwrap()
@@ -314,7 +314,7 @@ impl CrfOptionRepository for InMemoryOptions {
             .cloned()
             .ok_or(DomainError::CrfOptionNotFound(id))
     }
-    async fn list_by_item(&self, item_id: i32) -> Result<Vec<CrfOption>, DomainError> {
+    async fn list_by_item(&self, item_id: i64) -> Result<Vec<CrfOption>, DomainError> {
         let rows = self.rows.lock().unwrap();
         Ok(rows
             .values()
@@ -336,7 +336,7 @@ impl CrfOptionRepository for InMemoryOptions {
         o.updated_at = chrono::Utc::now();
         Ok(o.clone())
     }
-    async fn delete(&self, id: i32) -> Result<(), DomainError> {
+    async fn delete(&self, id: i64) -> Result<(), DomainError> {
         self.rows
             .lock()
             .unwrap()
@@ -344,13 +344,13 @@ impl CrfOptionRepository for InMemoryOptions {
             .ok_or(DomainError::CrfOptionNotFound(id))?;
         Ok(())
     }
-    async fn count_by_item(&self, item_id: i32) -> Result<i64, DomainError> {
+    async fn count_by_item(&self, item_id: i64) -> Result<i64, DomainError> {
         let rows = self.rows.lock().unwrap();
         Ok(rows.values().filter(|o| o.item_id == item_id).count() as i64)
     }
     async fn search_by_version(
         &self,
-        _version_id: i32,
+        _version_id: i64,
         fragment: &str,
     ) -> Result<Vec<CrfOption>, DomainError> {
         let rows = self.rows.lock().unwrap();
@@ -364,7 +364,7 @@ impl CrfOptionRepository for InMemoryOptions {
 
 #[derive(Default)]
 pub(crate) struct InMemoryUnits {
-    rows: Mutex<HashMap<i32, CrfUnit>>,
+    rows: Mutex<HashMap<i64, CrfUnit>>,
 }
 
 #[async_trait]
@@ -382,7 +382,7 @@ impl CrfUnitRepository for InMemoryUnits {
         self.rows.lock().unwrap().insert(id, u.clone());
         Ok(u)
     }
-    async fn find_by_id(&self, id: i32) -> Result<CrfUnit, DomainError> {
+    async fn find_by_id(&self, id: i64) -> Result<CrfUnit, DomainError> {
         self.rows
             .lock()
             .unwrap()
@@ -390,7 +390,7 @@ impl CrfUnitRepository for InMemoryUnits {
             .cloned()
             .ok_or(DomainError::CrfUnitNotFound(id))
     }
-    async fn list_by_item(&self, item_id: i32) -> Result<Vec<CrfUnit>, DomainError> {
+    async fn list_by_item(&self, item_id: i64) -> Result<Vec<CrfUnit>, DomainError> {
         let rows = self.rows.lock().unwrap();
         Ok(rows
             .values()
@@ -412,7 +412,7 @@ impl CrfUnitRepository for InMemoryUnits {
         u.updated_at = chrono::Utc::now();
         Ok(u.clone())
     }
-    async fn delete(&self, id: i32) -> Result<(), DomainError> {
+    async fn delete(&self, id: i64) -> Result<(), DomainError> {
         self.rows
             .lock()
             .unwrap()
@@ -422,7 +422,7 @@ impl CrfUnitRepository for InMemoryUnits {
     }
     async fn search_by_version(
         &self,
-        _version_id: i32,
+        _version_id: i64,
         fragment: &str,
     ) -> Result<Vec<CrfUnit>, DomainError> {
         let rows = self.rows.lock().unwrap();
@@ -436,7 +436,7 @@ impl CrfUnitRepository for InMemoryUnits {
 
 #[derive(Default)]
 pub(crate) struct InMemoryDomainAnnotations {
-    rows: Mutex<HashMap<i32, DomainAnnotation>>,
+    rows: Mutex<HashMap<i64, DomainAnnotation>>,
 }
 
 #[async_trait]
@@ -454,7 +454,7 @@ impl DomainAnnotationRepository for InMemoryDomainAnnotations {
         self.rows.lock().unwrap().insert(id, d.clone());
         Ok(d)
     }
-    async fn find_by_id(&self, id: i32) -> Result<DomainAnnotation, DomainError> {
+    async fn find_by_id(&self, id: i64) -> Result<DomainAnnotation, DomainError> {
         self.rows
             .lock()
             .unwrap()
@@ -462,7 +462,7 @@ impl DomainAnnotationRepository for InMemoryDomainAnnotations {
             .cloned()
             .ok_or(DomainError::DomainAnnotationNotFound(id))
     }
-    async fn list_by_form(&self, form_id: i32) -> Result<Vec<DomainAnnotation>, DomainError> {
+    async fn list_by_form(&self, form_id: i64) -> Result<Vec<DomainAnnotation>, DomainError> {
         let rows = self.rows.lock().unwrap();
         Ok(rows
             .values()
@@ -484,7 +484,7 @@ impl DomainAnnotationRepository for InMemoryDomainAnnotations {
         d.updated_at = chrono::Utc::now();
         Ok(d.clone())
     }
-    async fn delete(&self, id: i32) -> Result<(), DomainError> {
+    async fn delete(&self, id: i64) -> Result<(), DomainError> {
         self.rows
             .lock()
             .unwrap()
@@ -494,7 +494,7 @@ impl DomainAnnotationRepository for InMemoryDomainAnnotations {
     }
     async fn search_by_version(
         &self,
-        _version_id: i32,
+        _version_id: i64,
         _fragment: &str,
     ) -> Result<Vec<DomainAnnotation>, DomainError> {
         Ok(vec![])
@@ -503,7 +503,7 @@ impl DomainAnnotationRepository for InMemoryDomainAnnotations {
 
 #[derive(Default)]
 pub(crate) struct InMemoryAnnotations {
-    rows: Mutex<HashMap<i32, Annotation>>,
+    rows: Mutex<HashMap<i64, Annotation>>,
 }
 
 #[async_trait]
@@ -522,7 +522,7 @@ impl AnnotationRepository for InMemoryAnnotations {
         self.rows.lock().unwrap().insert(id, a.clone());
         Ok(a)
     }
-    async fn find_by_id(&self, id: i32) -> Result<Annotation, DomainError> {
+    async fn find_by_id(&self, id: i64) -> Result<Annotation, DomainError> {
         self.rows
             .lock()
             .unwrap()
@@ -530,7 +530,7 @@ impl AnnotationRepository for InMemoryAnnotations {
             .cloned()
             .ok_or(DomainError::AnnotationNotFound(id))
     }
-    async fn list_by_form(&self, form_id: i32) -> Result<Vec<Annotation>, DomainError> {
+    async fn list_by_form(&self, form_id: i64) -> Result<Vec<Annotation>, DomainError> {
         let rows = self.rows.lock().unwrap();
         Ok(rows
             .values()
@@ -538,7 +538,7 @@ impl AnnotationRepository for InMemoryAnnotations {
             .cloned()
             .collect())
     }
-    async fn list_by_item(&self, item_id: i32) -> Result<Vec<Annotation>, DomainError> {
+    async fn list_by_item(&self, item_id: i64) -> Result<Vec<Annotation>, DomainError> {
         let rows = self.rows.lock().unwrap();
         Ok(rows
             .values()
@@ -546,7 +546,7 @@ impl AnnotationRepository for InMemoryAnnotations {
             .cloned()
             .collect())
     }
-    async fn list_by_option(&self, option_id: i32) -> Result<Vec<Annotation>, DomainError> {
+    async fn list_by_option(&self, option_id: i64) -> Result<Vec<Annotation>, DomainError> {
         let rows = self.rows.lock().unwrap();
         Ok(rows
             .values()
@@ -554,7 +554,7 @@ impl AnnotationRepository for InMemoryAnnotations {
             .cloned()
             .collect())
     }
-    async fn list_by_unit(&self, unit_id: i32) -> Result<Vec<Annotation>, DomainError> {
+    async fn list_by_unit(&self, unit_id: i64) -> Result<Vec<Annotation>, DomainError> {
         let rows = self.rows.lock().unwrap();
         Ok(rows
             .values()
@@ -576,7 +576,7 @@ impl AnnotationRepository for InMemoryAnnotations {
         a.updated_at = chrono::Utc::now();
         Ok(a.clone())
     }
-    async fn delete(&self, id: i32) -> Result<(), DomainError> {
+    async fn delete(&self, id: i64) -> Result<(), DomainError> {
         self.rows
             .lock()
             .unwrap()
@@ -586,7 +586,7 @@ impl AnnotationRepository for InMemoryAnnotations {
     }
     async fn search_by_version(
         &self,
-        _version_id: i32,
+        _version_id: i64,
         fragment: &str,
     ) -> Result<Vec<Annotation>, DomainError> {
         let rows = self.rows.lock().unwrap();
@@ -774,7 +774,7 @@ async fn delete_version_removes_row() {
 
 // ---- CrfForm tests ----
 
-async fn make_form(uc: &TestUsecase) -> i32 {
+async fn make_form(uc: &TestUsecase) -> i64 {
     let v = uc
         .create_version(CreateCrfVersion {
             project_code: "P1".into(),
@@ -880,7 +880,7 @@ async fn list_forms_by_version_returns_only_that_version() {
 
 // ---- CrfItem tests ----
 
-async fn make_form_with_item(uc: &TestUsecase, kind: CrfItemKind) -> (i32, i32) {
+async fn make_form_with_item(uc: &TestUsecase, kind: CrfItemKind) -> (i64, i64) {
     let fid = make_form(uc).await;
     let it = uc
         .create_item(CreateCrfItem {

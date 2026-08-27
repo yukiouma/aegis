@@ -11,7 +11,7 @@ use crate::domain::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrfVersionView {
-    pub id: i32,
+    pub id: i64,
     pub project_code: String,
     pub name: String,
     pub created_at: DateTime<Utc>,
@@ -32,8 +32,8 @@ impl From<CrfVersion> for CrfVersionView {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrfFormView {
-    pub id: i32,
-    pub version_id: i32,
+    pub id: i64,
+    pub version_id: i64,
     pub code: String,
     pub name: String,
     pub order: i32,
@@ -59,8 +59,8 @@ impl From<CrfForm> for CrfFormView {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrfItemView {
-    pub id: i32,
-    pub form_id: i32,
+    pub id: i64,
+    pub form_id: i64,
     pub code: String,
     pub name: String,
     pub kind: CrfItemKind,
@@ -88,8 +88,8 @@ impl From<CrfItem> for CrfItemView {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrfOptionView {
-    pub id: i32,
-    pub item_id: i32,
+    pub id: i64,
+    pub item_id: i64,
     pub value: String,
     pub not_submitted: bool,
     pub created_at: DateTime<Utc>,
@@ -111,8 +111,8 @@ impl From<CrfOption> for CrfOptionView {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CrfUnitView {
-    pub id: i32,
-    pub item_id: i32,
+    pub id: i64,
+    pub item_id: i64,
     pub value: String,
     pub not_submitted: bool,
     pub created_at: DateTime<Utc>,
@@ -134,8 +134,8 @@ impl From<CrfUnit> for CrfUnitView {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DomainAnnotationView {
-    pub id: i32,
-    pub form_id: i32,
+    pub id: i64,
+    pub form_id: i64,
     pub name: String,
     pub description: String,
     pub created_at: DateTime<Utc>,
@@ -157,8 +157,8 @@ impl From<DomainAnnotation> for DomainAnnotationView {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnnotationView {
-    pub id: i32,
-    pub domain_annotation_id: i32,
+    pub id: i64,
+    pub domain_annotation_id: i64,
     pub content: String,
     pub assign: bool,
     pub owner: AnnotationOwner,

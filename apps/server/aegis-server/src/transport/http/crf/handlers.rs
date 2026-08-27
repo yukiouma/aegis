@@ -97,7 +97,7 @@ pub async fn list_versions_by_project(
     get, path = "/versions/{id}", tag = "crf",
     operation_id = "crf_get_version_by_id",
     params(
-        ("id" = i32, Path, description = "CRF version id"),
+        ("id" = i64, Path, description = "CRF version id"),
     ),
     responses(
         (status = 200, description = "Version found", body = dto::CrfVersionViewResponse),
@@ -124,7 +124,7 @@ pub async fn get_version_by_id(
     patch, path = "/versions/{id}", tag = "crf",
     operation_id = "crf_update_version",
     params(
-        ("id" = i32, Path, description = "CRF version id"),
+        ("id" = i64, Path, description = "CRF version id"),
     ),
     request_body = dto::UpdateCrfVersionRequest,
     responses(
@@ -156,7 +156,7 @@ pub async fn update_version(
     delete, path = "/versions/{id}", tag = "crf",
     operation_id = "crf_delete_version",
     params(
-        ("id" = i32, Path, description = "CRF version id"),
+        ("id" = i64, Path, description = "CRF version id"),
     ),
     responses(
         (status = 204, description = "Version deleted"),
@@ -185,7 +185,7 @@ pub async fn delete_version(
     post, path = "/versions/{version_id}/forms", tag = "crf",
     operation_id = "crf_create_form",
     params(
-        ("version_id" = i32, Path, description = "Owning CRF version id"),
+        ("version_id" = i64, Path, description = "Owning CRF version id"),
     ),
     request_body = dto::CreateCrfFormRequest,
     responses(
@@ -225,7 +225,7 @@ pub async fn create_form(
     get, path = "/versions/{version_id}/forms", tag = "crf",
     operation_id = "crf_list_forms_by_version",
     params(
-        ("version_id" = i32, Path, description = "Owning CRF version id"),
+        ("version_id" = i64, Path, description = "Owning CRF version id"),
     ),
     responses(
         (status = 200, description = "Forms list", body = dto::CrfFormListResponse),
@@ -253,7 +253,7 @@ pub async fn list_forms_by_version(
     get, path = "/versions/{version_id}/forms/search", tag = "crf",
     operation_id = "crf_search_forms_by_version",
     params(
-        ("version_id" = i32, Path, description = "Owning CRF version id"),
+        ("version_id" = i64, Path, description = "Owning CRF version id"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
@@ -286,7 +286,7 @@ pub async fn search_forms_by_version(
     get, path = "/forms/{id}", tag = "crf",
     operation_id = "crf_get_form_by_id",
     params(
-        ("id" = i32, Path, description = "CRF form id"),
+        ("id" = i64, Path, description = "CRF form id"),
     ),
     responses(
         (status = 200, description = "Form found", body = dto::CrfFormViewResponse),
@@ -313,7 +313,7 @@ pub async fn get_form_by_id(
     patch, path = "/forms/{id}", tag = "crf",
     operation_id = "crf_update_form",
     params(
-        ("id" = i32, Path, description = "CRF form id"),
+        ("id" = i64, Path, description = "CRF form id"),
     ),
     request_body = dto::UpdateCrfFormRequest,
     responses(
@@ -352,7 +352,7 @@ pub async fn update_form(
     delete, path = "/forms/{id}", tag = "crf",
     operation_id = "crf_delete_form",
     params(
-        ("id" = i32, Path, description = "CRF form id"),
+        ("id" = i64, Path, description = "CRF form id"),
     ),
     responses(
         (status = 204, description = "Form deleted"),
@@ -381,7 +381,7 @@ pub async fn delete_form(
     post, path = "/forms/{form_id}/items", tag = "crf",
     operation_id = "crf_create_item",
     params(
-        ("form_id" = i32, Path, description = "Owning CRF form id"),
+        ("form_id" = i64, Path, description = "Owning CRF form id"),
     ),
     request_body = dto::CreateCrfItemRequest,
     responses(
@@ -422,7 +422,7 @@ pub async fn create_item(
     get, path = "/forms/{form_id}/items", tag = "crf",
     operation_id = "crf_list_items_by_form",
     params(
-        ("form_id" = i32, Path, description = "Owning CRF form id"),
+        ("form_id" = i64, Path, description = "Owning CRF form id"),
     ),
     responses(
         (status = 200, description = "Items list", body = dto::CrfItemListResponse),
@@ -451,7 +451,7 @@ pub async fn list_items_by_form(
     get, path = "/forms/{form_id}/items/search", tag = "crf",
     operation_id = "crf_search_items_by_version",
     params(
-        ("form_id" = i32, Path, description = "Owning CRF form id; the version is derived from this row"),
+        ("form_id" = i64, Path, description = "Owning CRF form id; the version is derived from this row"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
@@ -489,7 +489,7 @@ pub async fn search_items_by_version(
     get, path = "/items/{id}", tag = "crf",
     operation_id = "crf_get_item_by_id",
     params(
-        ("id" = i32, Path, description = "CRF item id"),
+        ("id" = i64, Path, description = "CRF item id"),
     ),
     responses(
         (status = 200, description = "Item found", body = dto::CrfItemViewResponse),
@@ -516,7 +516,7 @@ pub async fn get_item_by_id(
     patch, path = "/items/{id}", tag = "crf",
     operation_id = "crf_update_item",
     params(
-        ("id" = i32, Path, description = "CRF item id"),
+        ("id" = i64, Path, description = "CRF item id"),
     ),
     request_body = dto::UpdateCrfItemRequest,
     responses(
@@ -555,7 +555,7 @@ pub async fn update_item(
     delete, path = "/items/{id}", tag = "crf",
     operation_id = "crf_delete_item",
     params(
-        ("id" = i32, Path, description = "CRF item id"),
+        ("id" = i64, Path, description = "CRF item id"),
     ),
     responses(
         (status = 204, description = "Item deleted"),
@@ -584,7 +584,7 @@ pub async fn delete_item(
     post, path = "/items/{item_id}/options", tag = "crf",
     operation_id = "crf_create_option",
     params(
-        ("item_id" = i32, Path, description = "Owning CRF item id"),
+        ("item_id" = i64, Path, description = "Owning CRF item id"),
     ),
     request_body = dto::CreateCrfOptionRequest,
     responses(
@@ -621,7 +621,7 @@ pub async fn create_option(
     get, path = "/items/{item_id}/options", tag = "crf",
     operation_id = "crf_list_options_by_item",
     params(
-        ("item_id" = i32, Path, description = "Owning CRF item id"),
+        ("item_id" = i64, Path, description = "Owning CRF item id"),
     ),
     responses(
         (status = 200, description = "Options list", body = dto::CrfOptionListResponse),
@@ -650,7 +650,7 @@ pub async fn list_options_by_item(
     get, path = "/items/{item_id}/options/search", tag = "crf",
     operation_id = "crf_search_options_by_version",
     params(
-        ("item_id" = i32, Path, description = "Owning CRF item id; the version is derived from this row"),
+        ("item_id" = i64, Path, description = "Owning CRF item id; the version is derived from this row"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
@@ -691,7 +691,7 @@ pub async fn search_options_by_version(
     get, path = "/options/{id}", tag = "crf",
     operation_id = "crf_get_option_by_id",
     params(
-        ("id" = i32, Path, description = "CRF option id"),
+        ("id" = i64, Path, description = "CRF option id"),
     ),
     responses(
         (status = 200, description = "Option found", body = dto::CrfOptionViewResponse),
@@ -718,7 +718,7 @@ pub async fn get_option_by_id(
     patch, path = "/options/{id}", tag = "crf",
     operation_id = "crf_update_option",
     params(
-        ("id" = i32, Path, description = "CRF option id"),
+        ("id" = i64, Path, description = "CRF option id"),
     ),
     request_body = dto::UpdateCrfOptionRequest,
     responses(
@@ -754,7 +754,7 @@ pub async fn update_option(
     delete, path = "/options/{id}", tag = "crf",
     operation_id = "crf_delete_option",
     params(
-        ("id" = i32, Path, description = "CRF option id"),
+        ("id" = i64, Path, description = "CRF option id"),
     ),
     responses(
         (status = 204, description = "Option deleted"),
@@ -783,7 +783,7 @@ pub async fn delete_option(
     post, path = "/items/{item_id}/units", tag = "crf",
     operation_id = "crf_create_unit",
     params(
-        ("item_id" = i32, Path, description = "Owning CRF item id"),
+        ("item_id" = i64, Path, description = "Owning CRF item id"),
     ),
     request_body = dto::CreateCrfUnitRequest,
     responses(
@@ -820,7 +820,7 @@ pub async fn create_unit(
     get, path = "/items/{item_id}/units", tag = "crf",
     operation_id = "crf_list_units_by_item",
     params(
-        ("item_id" = i32, Path, description = "Owning CRF item id"),
+        ("item_id" = i64, Path, description = "Owning CRF item id"),
     ),
     responses(
         (status = 200, description = "Units list", body = dto::CrfUnitListResponse),
@@ -849,7 +849,7 @@ pub async fn list_units_by_item(
     get, path = "/items/{item_id}/units/search", tag = "crf",
     operation_id = "crf_search_units_by_version",
     params(
-        ("item_id" = i32, Path, description = "Owning CRF item id; the version is derived from this row"),
+        ("item_id" = i64, Path, description = "Owning CRF item id; the version is derived from this row"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
@@ -890,7 +890,7 @@ pub async fn search_units_by_version(
     get, path = "/units/{id}", tag = "crf",
     operation_id = "crf_get_unit_by_id",
     params(
-        ("id" = i32, Path, description = "CRF unit id"),
+        ("id" = i64, Path, description = "CRF unit id"),
     ),
     responses(
         (status = 200, description = "Unit found", body = dto::CrfUnitViewResponse),
@@ -917,7 +917,7 @@ pub async fn get_unit_by_id(
     patch, path = "/units/{id}", tag = "crf",
     operation_id = "crf_update_unit",
     params(
-        ("id" = i32, Path, description = "CRF unit id"),
+        ("id" = i64, Path, description = "CRF unit id"),
     ),
     request_body = dto::UpdateCrfUnitRequest,
     responses(
@@ -953,7 +953,7 @@ pub async fn update_unit(
     delete, path = "/units/{id}", tag = "crf",
     operation_id = "crf_delete_unit",
     params(
-        ("id" = i32, Path, description = "CRF unit id"),
+        ("id" = i64, Path, description = "CRF unit id"),
     ),
     responses(
         (status = 204, description = "Unit deleted"),
@@ -982,7 +982,7 @@ pub async fn delete_unit(
     post, path = "/forms/{form_id}/domain-annotations", tag = "crf",
     operation_id = "crf_create_domain_annotation",
     params(
-        ("form_id" = i32, Path, description = "Owning CRF form id"),
+        ("form_id" = i64, Path, description = "Owning CRF form id"),
     ),
     request_body = dto::CreateDomainAnnotationRequest,
     responses(
@@ -1020,7 +1020,7 @@ pub async fn create_domain_annotation(
     get, path = "/forms/{form_id}/domain-annotations", tag = "crf",
     operation_id = "crf_list_domain_annotations_by_form",
     params(
-        ("form_id" = i32, Path, description = "Owning CRF form id"),
+        ("form_id" = i64, Path, description = "Owning CRF form id"),
     ),
     responses(
         (status = 200, description = "Domain annotations list", body = dto::DomainAnnotationListResponse),
@@ -1051,7 +1051,7 @@ pub async fn list_domain_annotations_by_form(
     get, path = "/versions/{version_id}/domain-annotations/search", tag = "crf",
     operation_id = "crf_search_domain_annotations_by_version",
     params(
-        ("version_id" = i32, Path, description = "Owning CRF version id"),
+        ("version_id" = i64, Path, description = "Owning CRF version id"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
@@ -1086,7 +1086,7 @@ pub async fn search_domain_annotations_by_version(
     get, path = "/domain-annotations/{id}", tag = "crf",
     operation_id = "crf_get_domain_annotation_by_id",
     params(
-        ("id" = i32, Path, description = "Domain annotation id"),
+        ("id" = i64, Path, description = "Domain annotation id"),
     ),
     responses(
         (status = 200, description = "Domain annotation found", body = dto::DomainAnnotationViewResponse),
@@ -1114,7 +1114,7 @@ pub async fn get_domain_annotation_by_id(
     patch, path = "/domain-annotations/{id}", tag = "crf",
     operation_id = "crf_update_domain_annotation",
     params(
-        ("id" = i32, Path, description = "Domain annotation id"),
+        ("id" = i64, Path, description = "Domain annotation id"),
     ),
     request_body = dto::UpdateDomainAnnotationRequest,
     responses(
@@ -1152,7 +1152,7 @@ pub async fn update_domain_annotation(
     delete, path = "/domain-annotations/{id}", tag = "crf",
     operation_id = "crf_delete_domain_annotation",
     params(
-        ("id" = i32, Path, description = "Domain annotation id"),
+        ("id" = i64, Path, description = "Domain annotation id"),
     ),
     responses(
         (status = 204, description = "Domain annotation deleted"),
@@ -1215,7 +1215,7 @@ pub async fn create_annotation(
     get, path = "/forms/{form_id}/annotations", tag = "crf",
     operation_id = "crf_list_annotations_by_form",
     params(
-        ("form_id" = i32, Path, description = "Owning CRF form id"),
+        ("form_id" = i64, Path, description = "Owning CRF form id"),
     ),
     responses(
         (status = 200, description = "Annotations list", body = dto::AnnotationListResponse),
@@ -1243,7 +1243,7 @@ pub async fn list_annotations_by_form(
     get, path = "/items/{item_id}/annotations", tag = "crf",
     operation_id = "crf_list_annotations_by_item",
     params(
-        ("item_id" = i32, Path, description = "Owning CRF item id"),
+        ("item_id" = i64, Path, description = "Owning CRF item id"),
     ),
     responses(
         (status = 200, description = "Annotations list", body = dto::AnnotationListResponse),
@@ -1271,7 +1271,7 @@ pub async fn list_annotations_by_item(
     get, path = "/options/{option_id}/annotations", tag = "crf",
     operation_id = "crf_list_annotations_by_option",
     params(
-        ("option_id" = i32, Path, description = "Owning CRF option id"),
+        ("option_id" = i64, Path, description = "Owning CRF option id"),
     ),
     responses(
         (status = 200, description = "Annotations list", body = dto::AnnotationListResponse),
@@ -1299,7 +1299,7 @@ pub async fn list_annotations_by_option(
     get, path = "/units/{unit_id}/annotations", tag = "crf",
     operation_id = "crf_list_annotations_by_unit",
     params(
-        ("unit_id" = i32, Path, description = "Owning CRF unit id"),
+        ("unit_id" = i64, Path, description = "Owning CRF unit id"),
     ),
     responses(
         (status = 200, description = "Annotations list", body = dto::AnnotationListResponse),
@@ -1328,7 +1328,7 @@ pub async fn list_annotations_by_unit(
     get, path = "/versions/{version_id}/annotations/search", tag = "crf",
     operation_id = "crf_search_annotations_by_version",
     params(
-        ("version_id" = i32, Path, description = "Owning CRF version id"),
+        ("version_id" = i64, Path, description = "Owning CRF version id"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
@@ -1361,7 +1361,7 @@ pub async fn search_annotations_by_version(
     get, path = "/annotations/{id}", tag = "crf",
     operation_id = "crf_get_annotation_by_id",
     params(
-        ("id" = i32, Path, description = "Annotation id"),
+        ("id" = i64, Path, description = "Annotation id"),
     ),
     responses(
         (status = 200, description = "Annotation found", body = dto::AnnotationViewResponse),
@@ -1390,7 +1390,7 @@ pub async fn get_annotation_by_id(
     patch, path = "/annotations/{id}", tag = "crf",
     operation_id = "crf_update_annotation",
     params(
-        ("id" = i32, Path, description = "Annotation id"),
+        ("id" = i64, Path, description = "Annotation id"),
     ),
     request_body = dto::UpdateAnnotationRequest,
     responses(
@@ -1426,7 +1426,7 @@ pub async fn update_annotation(
     delete, path = "/annotations/{id}", tag = "crf",
     operation_id = "crf_delete_annotation",
     params(
-        ("id" = i32, Path, description = "Annotation id"),
+        ("id" = i64, Path, description = "Annotation id"),
     ),
     responses(
         (status = 204, description = "Annotation deleted"),

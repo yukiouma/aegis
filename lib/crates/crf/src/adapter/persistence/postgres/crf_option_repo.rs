@@ -6,8 +6,8 @@ use crate::domain::{CrfOption, CrfOptionNew, CrfOptionRepository, CrfOptionUpdat
 
 #[derive(FromRow)]
 struct CrfOptionRow {
-    id: i32,
-    item_id: i32,
+    id: i64,
+    item_id: i64,
     value: String,
     not_submitted: bool,
     created_at: DateTime<Utc>,
@@ -55,7 +55,7 @@ impl CrfOptionRepository for CrfOptionRepoPg {
         Ok(row.into())
     }
 
-    async fn find_by_id(&self, id: i32) -> Result<CrfOption, DomainError> {
+    async fn find_by_id(&self, id: i64) -> Result<CrfOption, DomainError> {
         let row: CrfOptionRow = sqlx::query_as::<_, CrfOptionRow>(
             "SELECT id, item_id, value, not_submitted, created_at, updated_at
              FROM crf_options WHERE id = $1",
@@ -68,7 +68,7 @@ impl CrfOptionRepository for CrfOptionRepoPg {
         Ok(row.into())
     }
 
-    async fn list_by_item(&self, item_id: i32) -> Result<Vec<CrfOption>, DomainError> {
+    async fn list_by_item(&self, item_id: i64) -> Result<Vec<CrfOption>, DomainError> {
         let rows = sqlx::query_as::<_, CrfOptionRow>(
             "SELECT id, item_id, value, not_submitted, created_at, updated_at
              FROM crf_options WHERE item_id = $1 ORDER BY id ASC",
@@ -98,7 +98,7 @@ impl CrfOptionRepository for CrfOptionRepoPg {
         Ok(row.into())
     }
 
-    async fn delete(&self, id: i32) -> Result<(), DomainError> {
+    async fn delete(&self, id: i64) -> Result<(), DomainError> {
         let res = sqlx::query("DELETE FROM crf_options WHERE id = $1")
             .bind(id)
             .execute(&self.pool)
@@ -110,7 +110,7 @@ impl CrfOptionRepository for CrfOptionRepoPg {
         Ok(())
     }
 
-    async fn count_by_item(&self, item_id: i32) -> Result<i64, DomainError> {
+    async fn count_by_item(&self, item_id: i64) -> Result<i64, DomainError> {
         let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM crf_options WHERE item_id = $1")
             .bind(item_id)
             .fetch_one(&self.pool)
@@ -121,7 +121,7 @@ impl CrfOptionRepository for CrfOptionRepoPg {
 
     async fn search_by_version(
         &self,
-        version_id: i32,
+        version_id: i64,
         fragment: &str,
     ) -> Result<Vec<CrfOption>, DomainError> {
         let pat = format!("%{fragment}%");

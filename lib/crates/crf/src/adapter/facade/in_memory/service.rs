@@ -145,7 +145,7 @@ where
             .map_err(map_error)
     }
 
-    async fn delete_version(&self, id: i32) -> Result<(), CrfApiError> {
+    async fn delete_version(&self, id: i64) -> Result<(), CrfApiError> {
         self.usecase.delete_version(id).await.map_err(map_error)
     }
 
@@ -201,7 +201,7 @@ where
             .map_err(map_error)
     }
 
-    async fn delete_form(&self, id: i32) -> Result<(), CrfApiError> {
+    async fn delete_form(&self, id: i64) -> Result<(), CrfApiError> {
         self.usecase.delete_form(id).await.map_err(map_error)
     }
 
@@ -259,7 +259,7 @@ where
             .map_err(map_error)
     }
 
-    async fn delete_item(&self, id: i32) -> Result<(), CrfApiError> {
+    async fn delete_item(&self, id: i64) -> Result<(), CrfApiError> {
         self.usecase.delete_item(id).await.map_err(map_error)
     }
 
@@ -317,7 +317,7 @@ where
             .map_err(map_error)
     }
 
-    async fn delete_option(&self, id: i32) -> Result<(), CrfApiError> {
+    async fn delete_option(&self, id: i64) -> Result<(), CrfApiError> {
         self.usecase.delete_option(id).await.map_err(map_error)
     }
 
@@ -369,7 +369,7 @@ where
             .map_err(map_error)
     }
 
-    async fn delete_unit(&self, id: i32) -> Result<(), CrfApiError> {
+    async fn delete_unit(&self, id: i64) -> Result<(), CrfApiError> {
         self.usecase.delete_unit(id).await.map_err(map_error)
     }
 
@@ -427,7 +427,7 @@ where
             .map_err(map_error)
     }
 
-    async fn delete_domain_annotation(&self, id: i32) -> Result<(), CrfApiError> {
+    async fn delete_domain_annotation(&self, id: i64) -> Result<(), CrfApiError> {
         self.usecase
             .delete_domain_annotation(id)
             .await
@@ -522,7 +522,7 @@ where
             .map_err(map_error)
     }
 
-    async fn delete_annotation(&self, id: i32) -> Result<(), CrfApiError> {
+    async fn delete_annotation(&self, id: i64) -> Result<(), CrfApiError> {
         self.usecase.delete_annotation(id).await.map_err(map_error)
     }
 

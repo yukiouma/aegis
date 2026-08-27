@@ -1322,17 +1322,17 @@ impl From<CrfItemKind> for apis::crf::CrfItemKind {
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum AnnotationOwner {
     Form {
-        id: i32,
+        id: i64,
     },
     Item {
-        id: i32,
+        id: i64,
     },
     #[serde(rename = "option")]
     Option {
-        id: i32,
+        id: i64,
     },
     Unit {
-        id: i32,
+        id: i64,
     },
 }
 
@@ -1358,11 +1358,13 @@ impl From<AnnotationOwner> for apis::crf::AnnotationOwner {
     }
 }
 
-/// Path parameter for CRF routes. CRF uses `i32` ids (terminology
-/// uses `i64`); kept as its own type to avoid a footgun.
+/// Path parameter for CRF routes. CRF uses `i64` ids to match the
+/// underlying Postgres BIGSERIAL/BIGINT columns; kept as its own
+/// type to avoid a footgun against the `i64`-based terminology
+/// routes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct CrfPathId {
-    pub id: i32,
+    pub id: i64,
 }
 
 /// Wire-level extractor for the `{project_code}` URL parameter
@@ -1378,7 +1380,7 @@ pub struct ProjectPathCode {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CrfVersionViewResponse {
-    pub id: i32,
+    pub id: i64,
     pub project_code: String,
     pub name: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -1401,8 +1403,8 @@ impl From<apis::crf::CrfVersionView> for CrfVersionViewResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CrfFormViewResponse {
-    pub id: i32,
-    pub version_id: i32,
+    pub id: i64,
+    pub version_id: i64,
     pub code: String,
     pub name: String,
     pub order: i32,
@@ -1430,8 +1432,8 @@ impl From<apis::crf::CrfFormView> for CrfFormViewResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CrfItemViewResponse {
-    pub id: i32,
-    pub form_id: i32,
+    pub id: i64,
+    pub form_id: i64,
     pub code: String,
     pub name: String,
     pub kind: CrfItemKind,
@@ -1461,8 +1463,8 @@ impl From<apis::crf::CrfItemView> for CrfItemViewResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CrfOptionViewResponse {
-    pub id: i32,
-    pub item_id: i32,
+    pub id: i64,
+    pub item_id: i64,
     pub value: String,
     pub not_submitted: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -1486,8 +1488,8 @@ impl From<apis::crf::CrfOptionView> for CrfOptionViewResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CrfUnitViewResponse {
-    pub id: i32,
-    pub item_id: i32,
+    pub id: i64,
+    pub item_id: i64,
     pub value: String,
     pub not_submitted: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -1511,8 +1513,8 @@ impl From<apis::crf::CrfUnitView> for CrfUnitViewResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DomainAnnotationViewResponse {
-    pub id: i32,
-    pub form_id: i32,
+    pub id: i64,
+    pub form_id: i64,
     pub name: String,
     pub description: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -1536,8 +1538,8 @@ impl From<apis::crf::DomainAnnotationView> for DomainAnnotationViewResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct AnnotationViewResponse {
-    pub id: i32,
-    pub domain_annotation_id: i32,
+    pub id: i64,
+    pub domain_annotation_id: i64,
     pub content: String,
     pub assign: bool,
     pub owner: AnnotationOwner,
@@ -1716,7 +1718,7 @@ pub struct UpdateDomainAnnotationRequest {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateAnnotationRequest {
-    pub domain_annotation_id: i32,
+    pub domain_annotation_id: i64,
     pub content: String,
     pub assign: bool,
     pub owner: AnnotationOwner,
