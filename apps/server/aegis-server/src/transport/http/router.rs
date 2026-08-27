@@ -10,6 +10,7 @@
 //! - `/api/user/{code}`
 //! - `/api/terminology/*`                terminology CRUD
 //! - `/api/domain-model/*`               SDTM domain model CRUD
+//! - `/api/crf/*`                        Case Report Form CRUD
 //! - `/healthz`                         liveness probe
 //! - `/swagger-ui/`                      swagger-ui HTML
 //! - `/swagger-ui/{*rest}`               swagger-ui assets
@@ -24,6 +25,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::state::AppState;
 use crate::transport::http::auth;
+use crate::transport::http::crf::router as crf_router;
 use crate::transport::http::domain_model::router as domain_model_router;
 use crate::transport::http::healthz;
 use crate::transport::http::openapi::ApiDoc;
@@ -43,12 +45,14 @@ pub fn router(state: AppState) -> axum::Router {
     let project_routes = project_router::router();
     let terminology_routes = terminology_router::router();
     let domain_model_routes = domain_model_router::router();
+    let crf_routes = crf_router::router();
     let api_routers = OpenApiRouter::new()
         .nest("/auth", auth::router())
         .nest("/user", user::router())
         .nest("/project", project_routes)
         .nest("/terminology", terminology_routes)
-        .nest("/domain-model", domain_model_routes);
+        .nest("/domain-model", domain_model_routes)
+        .nest("/crf", crf_routes);
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/api", api_routers)
@@ -326,6 +330,8 @@ mod tests {
                 as Arc<dyn apis::terminology::TerminologyService>,
             domain_model: Arc::new(crate::state::test_support::NullDomainModelService)
                 as Arc<dyn apis::domain_model::DomainModelService>,
+            crf: Arc::new(crate::state::test_support::NullCrfService)
+                as Arc<dyn apis::crf::CrfService>,
         }
     }
 
@@ -341,6 +347,8 @@ mod tests {
                 as Arc<dyn apis::terminology::TerminologyService>,
             domain_model: Arc::new(crate::state::test_support::NullDomainModelService)
                 as Arc<dyn apis::domain_model::DomainModelService>,
+            crf: Arc::new(crate::state::test_support::NullCrfService)
+                as Arc<dyn apis::crf::CrfService>,
         }
     }
 
@@ -355,6 +363,8 @@ mod tests {
                 as Arc<dyn apis::terminology::TerminologyService>,
             domain_model: Arc::new(crate::state::test_support::NullDomainModelService)
                 as Arc<dyn apis::domain_model::DomainModelService>,
+            crf: Arc::new(crate::state::test_support::NullCrfService)
+                as Arc<dyn apis::crf::CrfService>,
         }
     }
 
@@ -642,6 +652,87 @@ mod tests {
             serde_json::json!([]),
             "POST /api/auth/user-credential must require BearerAuth",
         );
+
+        // /api/crf namespace advertises every verb with the
+        // BearerAuth requirement. The CRF surface mirrors the
+        // terminology role policy: read routes (GET) are open to any
+        // authenticated caller, write routes (POST / PATCH / DELETE)
+        // additionally advertise a 403 response because the shared
+        // `require_admin_or_root` helper rejects general callers
+        // before the usecase is invoked.
+        let crf_reads = [
+            ("get", "/api/crf/projects/{project_code}/versions"),
+            ("get", "/api/crf/versions/{id}"),
+            ("get", "/api/crf/versions/{version_id}/forms"),
+            ("get", "/api/crf/versions/{version_id}/forms/search"),
+            ("get", "/api/crf/forms/{id}"),
+            ("get", "/api/crf/forms/{form_id}/items"),
+            ("get", "/api/crf/forms/{form_id}/items/search"),
+            ("get", "/api/crf/items/{id}"),
+            ("get", "/api/crf/items/{item_id}/options"),
+            ("get", "/api/crf/items/{item_id}/options/search"),
+            ("get", "/api/crf/options/{id}"),
+            ("get", "/api/crf/items/{item_id}/units"),
+            ("get", "/api/crf/items/{item_id}/units/search"),
+            ("get", "/api/crf/units/{id}"),
+            ("get", "/api/crf/forms/{form_id}/domain-annotations"),
+            (
+                "get",
+                "/api/crf/versions/{version_id}/domain-annotations/search",
+            ),
+            ("get", "/api/crf/domain-annotations/{id}"),
+            ("get", "/api/crf/forms/{form_id}/annotations"),
+            ("get", "/api/crf/items/{item_id}/annotations"),
+            ("get", "/api/crf/options/{option_id}/annotations"),
+            ("get", "/api/crf/units/{unit_id}/annotations"),
+            ("get", "/api/crf/versions/{version_id}/annotations/search"),
+            ("get", "/api/crf/annotations/{id}"),
+        ];
+        let crf_writes = [
+            ("post", "/api/crf/projects/{project_code}/versions"),
+            ("patch", "/api/crf/versions/{id}"),
+            ("delete", "/api/crf/versions/{id}"),
+            ("post", "/api/crf/versions/{version_id}/forms"),
+            ("patch", "/api/crf/forms/{id}"),
+            ("delete", "/api/crf/forms/{id}"),
+            ("post", "/api/crf/forms/{form_id}/items"),
+            ("patch", "/api/crf/items/{id}"),
+            ("delete", "/api/crf/items/{id}"),
+            ("post", "/api/crf/items/{item_id}/options"),
+            ("patch", "/api/crf/options/{id}"),
+            ("delete", "/api/crf/options/{id}"),
+            ("post", "/api/crf/items/{item_id}/units"),
+            ("patch", "/api/crf/units/{id}"),
+            ("delete", "/api/crf/units/{id}"),
+            ("post", "/api/crf/forms/{form_id}/domain-annotations"),
+            ("patch", "/api/crf/domain-annotations/{id}"),
+            ("delete", "/api/crf/domain-annotations/{id}"),
+            ("post", "/api/crf/annotations"),
+            ("patch", "/api/crf/annotations/{id}"),
+            ("delete", "/api/crf/annotations/{id}"),
+        ];
+        for (method, path) in crf_reads.iter().chain(crf_writes.iter()) {
+            let op = &doc["paths"][path][method];
+            assert!(op.is_object(), "missing {method} {path} in openapi");
+            assert_eq!(
+                op["security"][0]["BearerAuth"],
+                serde_json::json!([]),
+                "{method} {path} must require BearerAuth",
+            );
+        }
+        for (method, path) in crf_writes.iter() {
+            let op = &doc["paths"][path][method];
+            let response_keys: Vec<&str> = op["responses"]
+                .as_object()
+                .expect("responses object")
+                .keys()
+                .map(|s| s.as_str())
+                .collect();
+            assert!(
+                response_keys.contains(&"403"),
+                "{method} {path} must advertise a 403 response (got {response_keys:?})",
+            );
+        }
     }
 
     // ---- /api/user integration --------------------------------------
@@ -1066,8 +1157,10 @@ mod tests {
         async fn batch_create_code_items(
             &self,
             _req: apis::terminology::BatchCreateCodeItemsRequest,
-        ) -> Result<apis::terminology::BatchCreateCodeItemsResponse, apis::terminology::TerminologyApiError>
-        {
+        ) -> Result<
+            apis::terminology::BatchCreateCodeItemsResponse,
+            apis::terminology::TerminologyApiError,
+        > {
             unimplemented!()
         }
     }
@@ -1085,6 +1178,8 @@ mod tests {
                 as Arc<dyn apis::terminology::TerminologyService>,
             domain_model: Arc::new(crate::state::test_support::NullDomainModelService)
                 as Arc<dyn apis::domain_model::DomainModelService>,
+            crf: Arc::new(crate::state::test_support::NullCrfService)
+                as Arc<dyn apis::crf::CrfService>,
         }
     }
 
@@ -1191,8 +1286,457 @@ mod tests {
     }
 
     // Note: validation of reserved `tsquery` characters in `fragment`
-// is exercised at the usecase layer (see
-// `terminology::usecase::tests::list_code_lists_rejects_fragment_with_reserved_tsquery_chars`).
-// The router-level `StubTerminologyService` skips the usecase so the
-// handler cannot observe validation here.
+    // is exercised at the usecase layer (see
+    // `terminology::usecase::tests::list_code_lists_rejects_fragment_with_reserved_tsquery_chars`).
+    // The router-level `StubTerminologyService` skips the usecase so the
+    // handler cannot observe validation here.
+
+    // ---- /api/crf integration ----------------------------------------
+
+    /// Stub that returns a single version from `list_versions_by_project`
+    /// / `get_version_by_id` and panics on every other call.
+    /// Mirrors the terminology stub.
+    #[derive(Clone)]
+    struct StubCrfService;
+
+    fn sample_crf_version_view(id: i32, project_code: &str) -> apis::crf::CrfVersionView {
+        apis::crf::CrfVersionView {
+            id,
+            project_code: project_code.to_string(),
+            name: format!("v{id}"),
+            created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+            updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        }
+    }
+
+    #[async_trait]
+    impl apis::crf::CrfService for StubCrfService {
+        async fn create_version(
+            &self,
+            req: apis::crf::CreateCrfVersionRequest,
+        ) -> Result<apis::crf::CrfVersionView, apis::crf::CrfApiError> {
+            Ok(sample_crf_version_view(1, &req.project_code))
+        }
+        async fn get_version_by_id(
+            &self,
+            req: apis::crf::GetCrfVersionByIdRequest,
+        ) -> Result<apis::crf::CrfVersionView, apis::crf::CrfApiError> {
+            Ok(sample_crf_version_view(req.id, "pr1"))
+        }
+        async fn list_versions_by_project(
+            &self,
+            req: apis::crf::ListCrfVersionsByProjectRequest,
+        ) -> Result<Vec<apis::crf::CrfVersionView>, apis::crf::CrfApiError> {
+            Ok(vec![sample_crf_version_view(1, &req.project_code)])
+        }
+        async fn update_version(
+            &self,
+            req: apis::crf::UpdateCrfVersionRequest,
+        ) -> Result<apis::crf::CrfVersionView, apis::crf::CrfApiError> {
+            Ok(sample_crf_version_view(req.id, "pr1"))
+        }
+        async fn delete_version(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+            Ok(())
+        }
+        // Everything else panics — the per-handler tests in
+        // `crf::handlers::tests` cover the translation surface in
+        // detail; the router-level test only needs one wired route
+        // per aggregate to prove the routes are mounted under
+        // `/api/crf`.
+        async fn create_form(
+            &self,
+            _req: apis::crf::CreateCrfFormRequest,
+        ) -> Result<apis::crf::CrfFormView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn get_form_by_id(
+            &self,
+            req: apis::crf::GetCrfFormByIdRequest,
+        ) -> Result<apis::crf::CrfFormView, apis::crf::CrfApiError> {
+            Ok(apis::crf::CrfFormView {
+                id: req.id,
+                version_id: 1,
+                code: format!("F{}", req.id),
+                name: format!("Form {}", req.id),
+                order: 1,
+                not_submitted: false,
+                created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+                updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+            })
+        }
+        async fn list_forms_by_version(
+            &self,
+            _req: apis::crf::ListCrfFormsByVersionRequest,
+        ) -> Result<Vec<apis::crf::CrfFormView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn update_form(
+            &self,
+            _req: apis::crf::UpdateCrfFormRequest,
+        ) -> Result<apis::crf::CrfFormView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn delete_form(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+            Ok(())
+        }
+        async fn create_item(
+            &self,
+            _req: apis::crf::CreateCrfItemRequest,
+        ) -> Result<apis::crf::CrfItemView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn get_item_by_id(
+            &self,
+            req: apis::crf::GetCrfItemByIdRequest,
+        ) -> Result<apis::crf::CrfItemView, apis::crf::CrfApiError> {
+            Ok(apis::crf::CrfItemView {
+                id: req.id,
+                form_id: 1,
+                code: format!("I{}", req.id),
+                name: format!("Item {}", req.id),
+                kind: apis::crf::CrfItemKind::Text,
+                order: 1,
+                not_submitted: false,
+                created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+                updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+            })
+        }
+        async fn list_items_by_form(
+            &self,
+            _req: apis::crf::ListCrfItemsByFormRequest,
+        ) -> Result<Vec<apis::crf::CrfItemView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn update_item(
+            &self,
+            _req: apis::crf::UpdateCrfItemRequest,
+        ) -> Result<apis::crf::CrfItemView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn delete_item(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+            Ok(())
+        }
+        async fn create_option(
+            &self,
+            _req: apis::crf::CreateCrfOptionRequest,
+        ) -> Result<apis::crf::CrfOptionView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn get_option_by_id(
+            &self,
+            req: apis::crf::GetCrfOptionByIdRequest,
+        ) -> Result<apis::crf::CrfOptionView, apis::crf::CrfApiError> {
+            Ok(apis::crf::CrfOptionView {
+                id: req.id,
+                item_id: 1,
+                value: format!("O{}", req.id),
+                not_submitted: false,
+                created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+                updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+            })
+        }
+        async fn list_options_by_item(
+            &self,
+            _req: apis::crf::ListCrfOptionsByItemRequest,
+        ) -> Result<Vec<apis::crf::CrfOptionView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn update_option(
+            &self,
+            _req: apis::crf::UpdateCrfOptionRequest,
+        ) -> Result<apis::crf::CrfOptionView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn delete_option(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+            Ok(())
+        }
+        async fn create_unit(
+            &self,
+            _req: apis::crf::CreateCrfUnitRequest,
+        ) -> Result<apis::crf::CrfUnitView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn get_unit_by_id(
+            &self,
+            req: apis::crf::GetCrfUnitByIdRequest,
+        ) -> Result<apis::crf::CrfUnitView, apis::crf::CrfApiError> {
+            Ok(apis::crf::CrfUnitView {
+                id: req.id,
+                item_id: 1,
+                value: format!("U{}", req.id),
+                not_submitted: false,
+                created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+                updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+            })
+        }
+        async fn list_units_by_item(
+            &self,
+            _req: apis::crf::ListCrfUnitsByItemRequest,
+        ) -> Result<Vec<apis::crf::CrfUnitView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn update_unit(
+            &self,
+            _req: apis::crf::UpdateCrfUnitRequest,
+        ) -> Result<apis::crf::CrfUnitView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn delete_unit(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+            Ok(())
+        }
+        async fn create_domain_annotation(
+            &self,
+            _req: apis::crf::CreateDomainAnnotationRequest,
+        ) -> Result<apis::crf::DomainAnnotationView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn get_domain_annotation_by_id(
+            &self,
+            req: apis::crf::GetDomainAnnotationByIdRequest,
+        ) -> Result<apis::crf::DomainAnnotationView, apis::crf::CrfApiError> {
+            Ok(apis::crf::DomainAnnotationView {
+                id: req.id,
+                form_id: 1,
+                name: format!("DA{}", req.id),
+                description: String::new(),
+                created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+                updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+            })
+        }
+        async fn list_domain_annotations_by_form(
+            &self,
+            _req: apis::crf::ListDomainAnnotationsByFormRequest,
+        ) -> Result<Vec<apis::crf::DomainAnnotationView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn update_domain_annotation(
+            &self,
+            _req: apis::crf::UpdateDomainAnnotationRequest,
+        ) -> Result<apis::crf::DomainAnnotationView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn delete_domain_annotation(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+            Ok(())
+        }
+        async fn create_annotation(
+            &self,
+            _req: apis::crf::CreateAnnotationRequest,
+        ) -> Result<apis::crf::AnnotationView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn get_annotation_by_id(
+            &self,
+            req: apis::crf::GetAnnotationByIdRequest,
+        ) -> Result<apis::crf::AnnotationView, apis::crf::CrfApiError> {
+            Ok(apis::crf::AnnotationView {
+                id: req.id,
+                domain_annotation_id: 1,
+                content: format!("A{}", req.id),
+                assign: false,
+                owner: apis::crf::AnnotationOwner::Form(1),
+                created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+                updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+            })
+        }
+        async fn list_annotations_by_form(
+            &self,
+            _req: apis::crf::ListAnnotationsByFormRequest,
+        ) -> Result<Vec<apis::crf::AnnotationView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn list_annotations_by_item(
+            &self,
+            _req: apis::crf::ListAnnotationsByItemRequest,
+        ) -> Result<Vec<apis::crf::AnnotationView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn list_annotations_by_option(
+            &self,
+            _req: apis::crf::ListAnnotationsByOptionRequest,
+        ) -> Result<Vec<apis::crf::AnnotationView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn list_annotations_by_unit(
+            &self,
+            _req: apis::crf::ListAnnotationsByUnitRequest,
+        ) -> Result<Vec<apis::crf::AnnotationView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn update_annotation(
+            &self,
+            _req: apis::crf::UpdateAnnotationRequest,
+        ) -> Result<apis::crf::AnnotationView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn delete_annotation(&self, _id: i32) -> Result<(), apis::crf::CrfApiError> {
+            Ok(())
+        }
+        async fn search_forms_by_version(
+            &self,
+            _req: apis::crf::SearchCrfFormsByVersionRequest,
+        ) -> Result<Vec<apis::crf::CrfFormView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn search_items_by_version(
+            &self,
+            _req: apis::crf::SearchCrfItemsByVersionRequest,
+        ) -> Result<Vec<apis::crf::CrfItemView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn search_options_by_version(
+            &self,
+            _req: apis::crf::SearchCrfOptionsByVersionRequest,
+        ) -> Result<Vec<apis::crf::CrfOptionView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn search_units_by_version(
+            &self,
+            _req: apis::crf::SearchCrfUnitsByVersionRequest,
+        ) -> Result<Vec<apis::crf::CrfUnitView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn search_domain_annotations_by_version(
+            &self,
+            _req: apis::crf::SearchDomainAnnotationsByVersionRequest,
+        ) -> Result<Vec<apis::crf::DomainAnnotationView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+        async fn search_annotations_by_version(
+            &self,
+            _req: apis::crf::SearchAnnotationsByVersionRequest,
+        ) -> Result<Vec<apis::crf::AnnotationView>, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
+    }
+
+    fn test_state_with_crf() -> AppState {
+        AppState {
+            auth: Arc::new(MockAuth) as Arc<dyn AuthService>,
+            user: Arc::new(NullUserService) as Arc<dyn apis::user::UserService>,
+            project: Arc::new(NullProjectService) as Arc<dyn apis::project::ProjectService>,
+            terminology: Arc::new(crate::state::test_support::NullTerminologyService)
+                as Arc<dyn apis::terminology::TerminologyService>,
+            domain_model: Arc::new(crate::state::test_support::NullDomainModelService)
+                as Arc<dyn apis::domain_model::DomainModelService>,
+            crf: Arc::new(StubCrfService) as Arc<dyn apis::crf::CrfService>,
+        }
+    }
+
+    /// `GET /api/crf/projects/{project_code}/versions` round-trips
+    /// through the top-level router and returns 200 OK with the
+    /// projected body.
+    #[tokio::test]
+    async fn crf_list_versions_by_project_route_is_wired() {
+        let app = router(test_state_with_crf());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/crf/projects/pr1/versions")
+                    .header("authorization", "Bearer good")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::OK);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        let versions = value["versions"].as_array().expect("versions array");
+        assert_eq!(versions.len(), 1);
+        assert_eq!(versions[0]["projectCode"], "pr1");
+        assert_eq!(versions[0]["name"], "v1");
+    }
+
+    /// `GET /api/crf/versions/{id}` round-trips through the
+    /// top-level router and returns 200 OK with the projected body.
+    #[tokio::test]
+    async fn crf_get_version_by_id_route_is_wired() {
+        let app = router(test_state_with_crf());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/crf/versions/7")
+                    .header("authorization", "Bearer good")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::OK);
+        let body = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(value["id"], 7);
+        assert_eq!(value["projectCode"], "pr1");
+    }
+
+    /// No bearer: every `/api/crf/*` route must reject the
+    /// request with 401. Sample one read route (GET).
+    #[tokio::test]
+    async fn crf_route_without_authorization_returns_401() {
+        let app = router(test_state_with_crf());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/api/crf/versions/1")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::UNAUTHORIZED);
+    }
+
+    /// `DELETE /api/crf/versions/{id}` round-trips through the
+    /// router: 204 No Content.
+    #[tokio::test]
+    async fn crf_delete_version_route_is_wired() {
+        let app = router(test_state_with_crf());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("DELETE")
+                    .uri("/api/crf/versions/1")
+                    .header("authorization", "Bearer good")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::NO_CONTENT);
+    }
 }

@@ -11,6 +11,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use apis::auth::AuthService;
+use apis::crf::CrfService;
 use apis::domain_model::DomainModelService;
 use apis::terminology::TerminologyService;
 use apis::user::UserService;
@@ -19,6 +20,10 @@ use auth::{
     TokenVersionCache, UserCredentialsRepo,
 };
 use auth::{UserService as AuthUserService, UserServiceImpl as AuthUserServiceImpl};
+use crf::{
+    AnnotationRepoPg, CrfFormRepoPg, CrfItemRepoPg, CrfOptionRepoPg, CrfServiceImpl, CrfUnitRepoPg,
+    CrfVersionRepoPg, DomainAnnotationRepoPg, ProjectLookupImpl,
+};
 use domain_model::{
     DomainModelServiceImpl, DomainModelUsecase, DomainModelUsecaseConfig, SdtmDomainRepoPg,
     SdtmVariableRepoPg, SdtmVersionRepoPg,
@@ -51,7 +56,8 @@ pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send 
     let user = build_user_service(pool.clone());
     let project = build_project_service(pool.clone(), user.clone());
     let terminology = build_terminology_service(pool.clone());
-    let domain_model = build_domain_model_service(pool);
+    let domain_model = build_domain_model_service(pool.clone());
+    let crf = build_crf_service(pool, project.clone());
 
     let state = AppState {
         auth,
@@ -59,6 +65,7 @@ pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send 
         project,
         terminology,
         domain_model,
+        crf,
     };
     let app = transport::http::router(state);
 
@@ -231,6 +238,35 @@ fn build_domain_model_service(pool: PgPool) -> Arc<dyn DomainModelService> {
         variable_repo,
     });
     Arc::new(DomainModelServiceImpl::new(usecase))
+}
+
+/// Wire the crf crate's adapters into the apis `CrfService` trait
+/// object. The seven Postgres repos share the same pool as the rest
+/// of the server; the project lookup is bridged off the shared
+/// `ProjectService` so foreign-key existence checks against
+/// `crf_versions` reuse the canonical project table.
+fn build_crf_service(
+    pool: PgPool,
+    project: Arc<dyn apis::project::ProjectService>,
+) -> Arc<dyn CrfService> {
+    let version_repo = CrfVersionRepoPg::new(pool.clone());
+    let form_repo = CrfFormRepoPg::new(pool.clone());
+    let item_repo = CrfItemRepoPg::new(pool.clone());
+    let option_repo = CrfOptionRepoPg::new(pool.clone());
+    let unit_repo = CrfUnitRepoPg::new(pool.clone());
+    let domain_annotation_repo = DomainAnnotationRepoPg::new(pool.clone());
+    let annotation_repo = AnnotationRepoPg::new(pool);
+    let projects = Arc::new(ProjectLookupImpl::new(project));
+    Arc::new(CrfServiceImpl::from_repos(
+        version_repo,
+        form_repo,
+        item_repo,
+        option_repo,
+        unit_repo,
+        domain_annotation_repo,
+        annotation_repo,
+        projects,
+    ))
 }
 
 #[cfg(test)]

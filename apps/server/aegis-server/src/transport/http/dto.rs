@@ -752,10 +752,10 @@ pub struct BatchCreateCodeItemsResponse {
 
 /// Query string for `GET /api/terminology/code-lists`. Unified list
 /// + search: `fragment = None` (or empty) yields a plain
-/// `ORDER BY id ASC` list; `fragment = Some(_)` runs the FTS
-/// prefix-match path with `ts_rank DESC, id ASC` ordering.
-/// `offset` / `limit` are clamped by the backend (default 50,
-/// max 500).
+///   `ORDER BY id ASC` list; `fragment = Some(_)` runs the FTS
+///   prefix-match path with `ts_rank DESC, id ASC` ordering.
+///   `offset` / `limit` are clamped by the backend (default 50,
+///   max 500).
 #[derive(Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CodeListListQuery {
@@ -1271,6 +1271,484 @@ impl From<CreateSdtmVariableRequest> for apis::domain_model::CreateSdtmVariableR
             descriptions: r.descriptions.into_iter().map(Into::into).collect(),
         }
     }
+}
+
+// ===========================================================================
+// CRF (Case Report Form) wire DTOs
+// ===========================================================================
+
+/// Wire projection of [`apis::crf::CrfItemKind`]. Flat enum — the
+/// server side carries the same discriminant set; `From`/`Into`
+/// conversions between the two layers are lossless.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum CrfItemKind {
+    Text,
+    Selection,
+    Checkbox,
+    Datetime,
+    Label,
+}
+
+impl From<apis::crf::CrfItemKind> for CrfItemKind {
+    fn from(k: apis::crf::CrfItemKind) -> Self {
+        match k {
+            apis::crf::CrfItemKind::Text => Self::Text,
+            apis::crf::CrfItemKind::Selection => Self::Selection,
+            apis::crf::CrfItemKind::Checkbox => Self::Checkbox,
+            apis::crf::CrfItemKind::Datetime => Self::Datetime,
+            apis::crf::CrfItemKind::Label => Self::Label,
+        }
+    }
+}
+
+impl From<CrfItemKind> for apis::crf::CrfItemKind {
+    fn from(k: CrfItemKind) -> Self {
+        match k {
+            CrfItemKind::Text => Self::Text,
+            CrfItemKind::Selection => Self::Selection,
+            CrfItemKind::Checkbox => Self::Checkbox,
+            CrfItemKind::Datetime => Self::Datetime,
+            CrfItemKind::Label => Self::Label,
+        }
+    }
+}
+
+/// Wire projection of [`apis::crf::AnnotationOwner`]. The DB-side
+/// tuple variant `Form(i32)` becomes a struct-shaped variant so the
+/// TS client can `switch (owner.kind)` cleanly. Each variant carries
+/// the owning row's id under `id`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum AnnotationOwner {
+    Form {
+        id: i32,
+    },
+    Item {
+        id: i32,
+    },
+    #[serde(rename = "option")]
+    Option {
+        id: i32,
+    },
+    Unit {
+        id: i32,
+    },
+}
+
+impl From<apis::crf::AnnotationOwner> for AnnotationOwner {
+    fn from(o: apis::crf::AnnotationOwner) -> Self {
+        match o {
+            apis::crf::AnnotationOwner::Form(id) => Self::Form { id },
+            apis::crf::AnnotationOwner::Item(id) => Self::Item { id },
+            apis::crf::AnnotationOwner::Option(id) => Self::Option { id },
+            apis::crf::AnnotationOwner::Unit(id) => Self::Unit { id },
+        }
+    }
+}
+
+impl From<AnnotationOwner> for apis::crf::AnnotationOwner {
+    fn from(o: AnnotationOwner) -> Self {
+        match o {
+            AnnotationOwner::Form { id } => Self::Form(id),
+            AnnotationOwner::Item { id } => Self::Item(id),
+            AnnotationOwner::Option { id } => Self::Option(id),
+            AnnotationOwner::Unit { id } => Self::Unit(id),
+        }
+    }
+}
+
+/// Path parameter for CRF routes. CRF uses `i32` ids (terminology
+/// uses `i64`); kept as its own type to avoid a footgun.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct CrfPathId {
+    pub id: i32,
+}
+
+/// Wire-level extractor for the `{project_code}` URL parameter
+/// used by `/api/crf/projects/{project_code}/versions` and friends.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ProjectPathCode {
+    pub project_code: String,
+}
+
+// ---- view projections ----
+
+/// Wire projection of [`apis::crf::CrfVersionView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfVersionViewResponse {
+    pub id: i32,
+    pub project_code: String,
+    pub name: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::crf::CrfVersionView> for CrfVersionViewResponse {
+    fn from(v: apis::crf::CrfVersionView) -> Self {
+        Self {
+            id: v.id,
+            project_code: v.project_code,
+            name: v.name,
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+/// Wire projection of [`apis::crf::CrfFormView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfFormViewResponse {
+    pub id: i32,
+    pub version_id: i32,
+    pub code: String,
+    pub name: String,
+    pub order: i32,
+    pub not_submitted: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::crf::CrfFormView> for CrfFormViewResponse {
+    fn from(v: apis::crf::CrfFormView) -> Self {
+        Self {
+            id: v.id,
+            version_id: v.version_id,
+            code: v.code,
+            name: v.name,
+            order: v.order,
+            not_submitted: v.not_submitted,
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+/// Wire projection of [`apis::crf::CrfItemView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfItemViewResponse {
+    pub id: i32,
+    pub form_id: i32,
+    pub code: String,
+    pub name: String,
+    pub kind: CrfItemKind,
+    pub order: i32,
+    pub not_submitted: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::crf::CrfItemView> for CrfItemViewResponse {
+    fn from(v: apis::crf::CrfItemView) -> Self {
+        Self {
+            id: v.id,
+            form_id: v.form_id,
+            code: v.code,
+            name: v.name,
+            kind: v.kind.into(),
+            order: v.order,
+            not_submitted: v.not_submitted,
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+/// Wire projection of [`apis::crf::CrfOptionView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfOptionViewResponse {
+    pub id: i32,
+    pub item_id: i32,
+    pub value: String,
+    pub not_submitted: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::crf::CrfOptionView> for CrfOptionViewResponse {
+    fn from(v: apis::crf::CrfOptionView) -> Self {
+        Self {
+            id: v.id,
+            item_id: v.item_id,
+            value: v.value,
+            not_submitted: v.not_submitted,
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+/// Wire projection of [`apis::crf::CrfUnitView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfUnitViewResponse {
+    pub id: i32,
+    pub item_id: i32,
+    pub value: String,
+    pub not_submitted: bool,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::crf::CrfUnitView> for CrfUnitViewResponse {
+    fn from(v: apis::crf::CrfUnitView) -> Self {
+        Self {
+            id: v.id,
+            item_id: v.item_id,
+            value: v.value,
+            not_submitted: v.not_submitted,
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+/// Wire projection of [`apis::crf::DomainAnnotationView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainAnnotationViewResponse {
+    pub id: i32,
+    pub form_id: i32,
+    pub name: String,
+    pub description: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::crf::DomainAnnotationView> for DomainAnnotationViewResponse {
+    fn from(v: apis::crf::DomainAnnotationView) -> Self {
+        Self {
+            id: v.id,
+            form_id: v.form_id,
+            name: v.name,
+            description: v.description,
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+/// Wire projection of [`apis::crf::AnnotationView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationViewResponse {
+    pub id: i32,
+    pub domain_annotation_id: i32,
+    pub content: String,
+    pub assign: bool,
+    pub owner: AnnotationOwner,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::crf::AnnotationView> for AnnotationViewResponse {
+    fn from(v: apis::crf::AnnotationView) -> Self {
+        Self {
+            id: v.id,
+            domain_annotation_id: v.domain_annotation_id,
+            content: v.content,
+            assign: v.assign,
+            owner: v.owner.into(),
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+// ---- list response wrappers ----
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfVersionListResponse {
+    pub versions: Vec<CrfVersionViewResponse>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfFormListResponse {
+    pub forms: Vec<CrfFormViewResponse>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfItemListResponse {
+    pub items: Vec<CrfItemViewResponse>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfOptionListResponse {
+    pub options: Vec<CrfOptionViewResponse>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfUnitListResponse {
+    pub units: Vec<CrfUnitViewResponse>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainAnnotationListResponse {
+    pub domain_annotations: Vec<DomainAnnotationViewResponse>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationListResponse {
+    pub annotations: Vec<AnnotationViewResponse>,
+}
+
+// ---- request DTOs ----
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCrfVersionRequest {
+    pub project_code: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCrfVersionRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCrfFormRequest {
+    pub version_id: i32,
+    pub code: String,
+    pub name: String,
+    pub order: i32,
+    pub not_submitted: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCrfFormRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub not_submitted: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCrfItemRequest {
+    pub form_id: i32,
+    pub code: String,
+    pub name: String,
+    pub kind: CrfItemKind,
+    pub order: i32,
+    pub not_submitted: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCrfItemRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub kind: Option<CrfItemKind>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub not_submitted: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCrfOptionRequest {
+    pub item_id: i32,
+    pub value: String,
+    pub not_submitted: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCrfOptionRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub not_submitted: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCrfUnitRequest {
+    pub item_id: i32,
+    pub value: String,
+    pub not_submitted: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCrfUnitRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub not_submitted: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateDomainAnnotationRequest {
+    pub form_id: i32,
+    pub name: String,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateDomainAnnotationRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateAnnotationRequest {
+    pub domain_annotation_id: i32,
+    pub content: String,
+    pub assign: bool,
+    pub owner: AnnotationOwner,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateAnnotationRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assign: Option<bool>,
+}
+
+// ---- search query DTOs ----
+//
+// Each search endpoint takes a `versionId` from the URL path (the
+// owning version is required for version-scoped substring search)
+// and a `fragment` query parameter. The fragment is required — an
+// empty / whitespace-only fragment is rejected at the usecase layer
+// with `EmptySearchFragment`.
+
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfFragmentQuery {
+    pub fragment: String,
 }
 
 #[cfg(test)]
