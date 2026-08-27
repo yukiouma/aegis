@@ -7,6 +7,7 @@
 //! own types to the ones defined here.
 
 pub mod auth;
+pub mod crf;
 pub mod domain_model;
 pub mod project;
 pub mod terminology;

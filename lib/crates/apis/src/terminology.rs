@@ -107,8 +107,8 @@ pub struct Page<T> {
 
 /// Query for [`TerminologyService::list_code_lists`]. Unified list
 /// + search under a single signature: `fragment = None` is a plain
-/// `ORDER BY id ASC` list; `fragment = Some(_)` is a FTS query with
-/// `ts_rank DESC, id ASC` ordering.
+///   `ORDER BY id ASC` list; `fragment = Some(_)` is a FTS query with
+///   `ts_rank DESC, id ASC` ordering.
 #[derive(Debug, Clone)]
 pub struct CodeListListQuery {
     pub version_id: i64,
