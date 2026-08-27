@@ -7,14 +7,14 @@
 use std::sync::Arc;
 
 use crf::{
-    Annotation, AnnotationOwner, AnnotationView, CrfBulkFormRepository, CrfForm, CrfFormNew,
-    CrfFormRepository, CrfFormUpdate, CrfFormView, CrfItem, CrfItemKind, CrfItemNew,
-    CrfItemRepository, CrfItemUpdate, CrfItemView, CrfOption, CrfOptionNew, CrfOptionRepository,
-    CrfOptionUpdate, CrfOptionView, CrfUnit, CrfUnitNew, CrfUnitRepository, CrfUnitUpdate,
-    CrfUnitView, CrfUsecase, CrfUsecaseConfig, CrfVersion, CrfVersionNew, CrfVersionRepository,
-    CrfVersionUpdate, CrfVersionView, DomainAnnotation, DomainAnnotationNew,
-    DomainAnnotationRepository, DomainAnnotationUpdate, DomainAnnotationView, DomainError,
-    ProjectLookup, ProjectLookupImpl, UsecaseError,
+    Annotation, AnnotationOwner, AnnotationView, CrfBulkFormRepository, CrfForm, CrfFormDetailView,
+    CrfFormNew, CrfFormRepository, CrfFormUpdate, CrfFormView, CrfItem, CrfItemDetailView,
+    CrfItemKind, CrfItemNew, CrfItemRepository, CrfItemUpdate, CrfItemView, CrfOption, CrfOptionDetailView,
+    CrfOptionNew, CrfOptionRepository, CrfOptionUpdate, CrfOptionView, CrfUnit, CrfUnitDetailView,
+    CrfUnitNew, CrfUnitRepository, CrfUnitUpdate, CrfUnitView, CrfUsecase, CrfUsecaseConfig,
+    CrfVersion, CrfVersionNew, CrfVersionRepository, CrfVersionUpdate, CrfVersionView,
+    DomainAnnotation, DomainAnnotationNew, DomainAnnotationRepository, DomainAnnotationUpdate,
+    DomainAnnotationView, DomainError, ProjectLookup, ProjectLookupImpl, UsecaseError,
 };
 
 use apis::crf::CrfService;
@@ -96,6 +96,10 @@ fn view_dtos_are_send_and_sync() {
     _assert_send_sync::<CrfUnitView>();
     _assert_send_sync::<DomainAnnotationView>();
     _assert_send_sync::<AnnotationView>();
+    _assert_send_sync::<CrfFormDetailView>();
+    _assert_send_sync::<CrfItemDetailView>();
+    _assert_send_sync::<CrfOptionDetailView>();
+    _assert_send_sync::<CrfUnitDetailView>();
 }
 
 // ProjectLookupImpl constructor compiles with the expected
