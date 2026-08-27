@@ -48,7 +48,8 @@ pub use domain::{
 pub use usecase::{
     AnnotationView, CreateAnnotation, CreateCrfBulkForm, CreateCrfBulkItem, CreateCrfForm,
     CreateCrfItem, CreateCrfOption, CreateCrfUnit, CreateCrfVersion, CreateDomainAnnotation,
-    CrfBulkFormResult, CrfFormView, CrfItemView, CrfOptionView, CrfUnitView, CrfUsecase,
+    CrfBulkFormResult, CrfFormDetailView, CrfFormView, CrfItemDetailView, CrfItemView,
+    CrfOptionDetailView, CrfOptionView, CrfUnitDetailView, CrfUnitView, CrfUsecase,
     CrfUsecaseConfig, CrfVersionView, DomainAnnotationView, SearchAnnotationsByVersion,
     SearchCrfFormsByVersion, SearchCrfItemsByVersion, SearchCrfOptionsByVersion,
     SearchCrfUnitsByVersion, SearchDomainAnnotationsByVersion, UpdateAnnotation, UpdateCrfForm,

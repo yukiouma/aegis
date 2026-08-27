@@ -188,3 +188,48 @@ pub struct CrfBulkFormResult {
     pub form: CrfFormView,
     pub items: Vec<CrfItemView>,
 }
+
+/// Composed view for `CrfUsecase::get_form_detail`. Returns the
+/// form together with every piece of state owned by it:
+/// items composed with their options, units, and per-layer
+/// annotations; the form's domain annotations; and form-level
+/// annotations.
+///
+/// Mirrors `apis::crf::CrfFormDetailView`. Annotations are
+/// nested under their owner: form-level annotations live next
+/// to the form; item/option/unit-level annotations live inside
+/// their parent. Empty subtrees return an empty vec (never
+/// `None`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrfFormDetailView {
+    pub form: CrfFormView,
+    pub form_annotations: Vec<AnnotationView>,
+    pub items: Vec<CrfItemDetailView>,
+    pub domain_annotations: Vec<DomainAnnotationView>,
+}
+
+/// One item in `CrfFormDetailView::items`, composed with its
+/// options, units, and item-level annotations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrfItemDetailView {
+    pub item: CrfItemView,
+    pub options: Vec<CrfOptionDetailView>,
+    pub units: Vec<CrfUnitDetailView>,
+    pub annotations: Vec<AnnotationView>,
+}
+
+/// One option in `CrfItemDetailView::options`, composed with
+/// its option-level annotations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrfOptionDetailView {
+    pub option: CrfOptionView,
+    pub annotations: Vec<AnnotationView>,
+}
+
+/// One unit in `CrfItemDetailView::units`, composed with its
+/// unit-level annotations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CrfUnitDetailView {
+    pub unit: CrfUnitView,
+    pub annotations: Vec<AnnotationView>,
+}
