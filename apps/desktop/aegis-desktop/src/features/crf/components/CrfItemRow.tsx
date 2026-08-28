@@ -60,7 +60,11 @@ export function CrfItemRow({
         >
           {item.name}
         </Typography>
-        <Stack direction="row" flexWrap="wrap" gap={1} sx={{ flexGrow: 1 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ flexWrap: "wrap", flexGrow: 1 }}
+        >
           {annotations.map((a) => (
             <AnnotationChip
               key={a.id}
@@ -79,7 +83,7 @@ export function CrfItemRow({
             key={u.unit.id}
             sx={{ display: "flex", alignItems: "center", gap: 1 }}
           >
-            <Stack direction="row" flexWrap="wrap" gap={1}>
+            <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
               {u.annotations.map((a) => (
                 <AnnotationChip
                   key={a.id}
@@ -132,7 +136,7 @@ export function CrfItemRow({
               >
                 {t("crf.detail.optionLabel", { value: o.option.value })}
               </Typography>
-              <Stack direction="row" flexWrap="wrap" gap={1}>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
                 {o.annotations.map((a) => (
                   <AnnotationChip
                     key={a.id}

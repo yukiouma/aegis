@@ -346,4 +346,9 @@ export const zhCN = {
   "crf.detail.optionsHeading": "选项",
   "crf.detail.optionLabel": "选项 {value}",
   "crf.detail.unitLabel": "单位：{value}",
+  "crf.detail.menu.newDomain": "新建域注释",
+  "crf.detail.menu.newAnnotation": "新建注释",
+  "crf.detail.domainChip.label": "{name}（{description}）",
+  "crf.detail.empty": "暂无项目",
+  "crf.detail.loadFailed": "加载表单详情失败：{message}",
 } satisfies Record<keyof typeof en, string>;

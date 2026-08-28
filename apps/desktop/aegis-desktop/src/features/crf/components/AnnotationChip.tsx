@@ -1,5 +1,5 @@
 import { Chip } from "@aegis/ui/mui";
-import type { ChipProps } from "@mui/material/Chip";
+import type { ChipProps } from "@aegis/ui/mui";
 import type { Annotation } from "../../../shared/api";
 
 /**

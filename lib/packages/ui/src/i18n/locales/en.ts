@@ -356,4 +356,9 @@ export const en = {
   "crf.detail.optionsHeading": "Options",
   "crf.detail.optionLabel": "Option {value}",
   "crf.detail.unitLabel": "Unit: {value}",
+  "crf.detail.menu.newDomain": "New domain",
+  "crf.detail.menu.newAnnotation": "New annotation",
+  "crf.detail.domainChip.label": "{name} ({description})",
+  "crf.detail.empty": "No items yet",
+  "crf.detail.loadFailed": "Failed to load form detail: {message}",
 } as const;

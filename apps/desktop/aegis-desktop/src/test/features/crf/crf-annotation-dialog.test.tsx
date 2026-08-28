@@ -55,7 +55,7 @@ function renderDialog(
 
 describe("AnnotationDialog", () => {
   it("submit is disabled until content is non-empty", () => {
-    const { onSubmit } = renderDialog();
+    renderDialog();
     const submit = screen.getByRole("button", { name: /Create/i });
     expect(submit).toBeDisabled();
     fireEvent.change(screen.getByLabelText(/Content/i), {
@@ -65,8 +65,7 @@ describe("AnnotationDialog", () => {
   });
 
   it("edit mode disables the domain annotation select and preserves assign", () => {
-    const onSubmit = vi.fn();
-    renderDialog({
+    const { onSubmit } = renderDialog({
       mode: "edit",
       row: {
         id: 100,
@@ -77,7 +76,6 @@ describe("AnnotationDialog", () => {
         createdAt: "",
         updatedAt: "",
       },
-      onSubmit,
     });
     // Domain annotation Select is disabled in edit mode (MUI uses
     // aria-disabled on the combobox role when FormControl is disabled).

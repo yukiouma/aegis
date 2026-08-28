@@ -21,9 +21,7 @@ import type {
   Annotation,
   AnnotationOwner,
   ApiError,
-  CreateAnnotationInput,
   DomainAnnotation,
-  UpdateAnnotationInput,
 } from "../../../shared/api";
 
 export interface AnnotationDialogBody {
