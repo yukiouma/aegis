@@ -389,3 +389,46 @@ export interface CreateSdtmDomainInput {
   category: DomainCategory;
   descriptions: SdtmDomainDescription[];
 }
+
+// CRF
+
+export interface CrfVersion {
+  id: number;
+  projectCode: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CrfVersionListResponse {
+  versions: CrfVersion[];
+}
+
+export interface CrfForm {
+  id: number;
+  versionId: number;
+  code: string;
+  name: string;
+  order: number;
+  notSubmitted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CrfFormListResponse {
+  forms: CrfForm[];
+}
+
+export interface CreateCrfFormInput {
+  code: string;
+  name: string;
+  order: number;
+  notSubmitted: boolean;
+}
+
+export interface UpdateCrfFormInput {
+  code?: string;
+  name?: string;
+  order?: number;
+  notSubmitted?: boolean;
+}

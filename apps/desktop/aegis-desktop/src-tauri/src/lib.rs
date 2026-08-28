@@ -75,6 +75,13 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::domain_model::variable::get_sdtm_variable_by_id,
             commands::domain_model::variable::update_sdtm_variable,
             commands::domain_model::variable::delete_sdtm_variable,
+            // crf
+            commands::crf::version::list_crf_versions,
+            commands::crf::form::list_crf_forms_by_version,
+            commands::crf::form::create_crf_form,
+            commands::crf::form::update_crf_form,
+            commands::crf::form::delete_crf_form,
+            commands::crf::form::get_crf_form_by_id,
             // health
             commands::healthz::healthz,
             // legacy greet (kept for the existing test)

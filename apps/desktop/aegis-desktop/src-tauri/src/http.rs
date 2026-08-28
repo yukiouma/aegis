@@ -6,6 +6,7 @@
 pub mod auth;
 pub mod client;
 pub mod config;
+pub mod crf;
 pub mod domain_model;
 pub mod dto;
 pub mod healthz;
