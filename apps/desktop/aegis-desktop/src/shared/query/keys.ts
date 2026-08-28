@@ -51,5 +51,7 @@ export const queryKeys = {
       ["crf", "formsByVersion", versionId] as const,
     form: (id: number) =>
       ["crf", "form", id] as const,
+    formDetail: (id: number) =>
+      ["crf", "formDetail", id] as const,
   },
 } as const;
