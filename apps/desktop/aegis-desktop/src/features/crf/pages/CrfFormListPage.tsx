@@ -4,7 +4,6 @@ import {
   Box,
   CircularProgress,
 } from "@aegis/ui/mui";
-import { useI18n } from "@aegis/ui/i18n";
 import {
   useNavigate,
   useParams,
@@ -38,7 +37,6 @@ type DrawerState =
   | null;
 
 export function CrfFormListPage() {
-  const { t } = useI18n();
   const { projectCode } = useParams({ strict: false }) as {
     projectCode: string;
   };
@@ -180,6 +178,7 @@ export function CrfFormListPage() {
         onClose={() => setDrawer(null)}
         onCreate={(input) => {
           if (selectedVersionId == null) return;
+          input.order = allRows.length + 1;
           createMutation.mutate(
             { versionId: selectedVersionId, body: input },
             { onSuccess: () => setDrawer(null) },
