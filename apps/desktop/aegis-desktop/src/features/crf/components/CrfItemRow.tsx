@@ -1,0 +1,154 @@
+import { Box, Chip, Stack, Typography } from "@aegis/ui/mui";
+import { useI18n } from "@aegis/ui/i18n";
+
+import type { Annotation, CrfItemDetail } from "../../../shared/api";
+import { AnnotationChip } from "./AnnotationChip";
+
+interface Props {
+  itemDetail: CrfItemDetail;
+  colorByDomainAnnotationId: Map<number, number>;
+  /**
+   * Open the new-annotation dialog for the given owner. The page
+   * holds the dialog state so the caller's owner kind/id stays in
+   * one place.
+   */
+  onCreateAnnotation: (owner: Annotation["owner"]) => void;
+  onEditAnnotation: (annotation: Annotation) => void;
+  onDeleteAnnotation: (annotation: Annotation) => void;
+}
+
+export function CrfItemRow({
+  itemDetail,
+  colorByDomainAnnotationId,
+  onCreateAnnotation,
+  onEditAnnotation,
+  onDeleteAnnotation,
+}: Props) {
+  const { t } = useI18n();
+  const { item, options, units, annotations } = itemDetail;
+  return (
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 1,
+        p: 2,
+        border: 1,
+        borderColor: "divider",
+        borderRadius: 1,
+      }}
+      data-testid={`crf-item-row-${item.id}`}
+    >
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 1,
+          flexWrap: "wrap",
+        }}
+      >
+        <Chip label={item.code} variant="outlined" size="small" />
+        <Typography
+          variant="subtitle1"
+          sx={{
+            cursor: "pointer",
+            "&:hover": { textDecoration: "underline" },
+          }}
+          onClick={() => onCreateAnnotation({ kind: "item", id: item.id })}
+          data-testid={`crf-item-name-${item.id}`}
+        >
+          {item.name}
+        </Typography>
+        <Stack direction="row" flexWrap="wrap" gap={1} sx={{ flexGrow: 1 }}>
+          {annotations.map((a) => (
+            <AnnotationChip
+              key={a.id}
+              annotation={a}
+              colorIndex={
+                colorByDomainAnnotationId.get(a.domainAnnotationId) ?? -1
+              }
+              onEdit={() => onEditAnnotation(a)}
+              onDelete={() => onDeleteAnnotation(a)}
+            />
+          ))}
+        </Stack>
+        {/* Unit on the right side */}
+        {units.map((u) => (
+          <Box
+            key={u.unit.id}
+            sx={{ display: "flex", alignItems: "center", gap: 1 }}
+          >
+            <Stack direction="row" flexWrap="wrap" gap={1}>
+              {u.annotations.map((a) => (
+                <AnnotationChip
+                  key={a.id}
+                  annotation={a}
+                  colorIndex={
+                    colorByDomainAnnotationId.get(a.domainAnnotationId) ?? -1
+                  }
+                  onEdit={() => onEditAnnotation(a)}
+                  onDelete={() => onDeleteAnnotation(a)}
+                />
+              ))}
+            </Stack>
+            <Typography
+              variant="body2"
+              sx={{
+                cursor: "pointer",
+                "&:hover": { textDecoration: "underline" },
+              }}
+              onClick={() =>
+                onCreateAnnotation({ kind: "unit", id: u.unit.id })
+              }
+              data-testid={`crf-unit-${u.unit.id}`}
+            >
+              {t("crf.detail.unitLabel", { value: u.unit.value })}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+      {options.length > 0 && (
+        <Box sx={{ pl: 4, display: "flex", flexDirection: "column", gap: 1 }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            {t("crf.detail.optionsHeading")}
+          </Typography>
+          {options.map((o) => (
+            <Box
+              key={o.option.id}
+              sx={{ display: "flex", alignItems: "center", gap: 1 }}
+            >
+              <Typography
+                variant="body2"
+                sx={{
+                  flexGrow: 1,
+                  cursor: "pointer",
+                  "&:hover": { textDecoration: "underline" },
+                }}
+                onClick={() =>
+                  onCreateAnnotation({ kind: "option", id: o.option.id })
+                }
+                data-testid={`crf-option-${o.option.id}`}
+              >
+                {t("crf.detail.optionLabel", { value: o.option.value })}
+              </Typography>
+              <Stack direction="row" flexWrap="wrap" gap={1}>
+                {o.annotations.map((a) => (
+                  <AnnotationChip
+                    key={a.id}
+                    annotation={a}
+                    colorIndex={
+                      colorByDomainAnnotationId.get(a.domainAnnotationId) ?? -1
+                    }
+                    onEdit={() => onEditAnnotation(a)}
+                    onDelete={() => onDeleteAnnotation(a)}
+                  />
+                ))}
+              </Stack>
+            </Box>
+          ))}
+        </Box>
+      )}
+    </Box>
+  );
+}

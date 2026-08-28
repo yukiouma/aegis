@@ -343,4 +343,7 @@ export const zhCN = {
   "crf.deleteAnnotation.message": "删除此注释？此操作不可撤销。",
   "crf.deleteAnnotation.submit": "删除",
   "crf.detail.formAnnotationsHeading": "表单级注释",
+  "crf.detail.optionsHeading": "选项",
+  "crf.detail.optionLabel": "选项 {value}",
+  "crf.detail.unitLabel": "单位：{value}",
 } satisfies Record<keyof typeof en, string>;

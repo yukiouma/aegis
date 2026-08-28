@@ -353,4 +353,7 @@ export const en = {
   "crf.deleteAnnotation.message": "Delete this annotation? This cannot be undone.",
   "crf.deleteAnnotation.submit": "Delete",
   "crf.detail.formAnnotationsHeading": "Form annotations",
+  "crf.detail.optionsHeading": "Options",
+  "crf.detail.optionLabel": "Option {value}",
+  "crf.detail.unitLabel": "Unit: {value}",
 } as const;
