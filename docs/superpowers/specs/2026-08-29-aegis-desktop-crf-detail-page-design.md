@@ -34,12 +34,11 @@ fields, so **no schema migration is required**.
 ## 2. Goals
 
 1. Replace the `CrfDetailPage` placeholder with the spec'd layout:
-   - Header (existing back / code chip / name / tools menu) +
-     hover-popup menu on the form name with **New Domain** /
-     **New Annotation** entries.
-   - Row of **domain-annotation chips** (`name(description)`),
-     closable, each opens an edit dialog; closing one confirms before
-     deleting (cascades to its annotations server-side).
+   - Header: back btn | code chip | form name (hover-popup menu with
+     **New Domain** / **New Annotation**) | **domain-annotation
+     chips** (`name(description)`, closable, click → edit, close →
+     confirm delete) | (flex spacer) | tools menu. Chips wrap when
+     the name is long.
    - **Form annotation chips** for form-level annotations, each
      closable; click opens edit dialog, close opens a confirm dialog.
    - **Item rows**: code chip, clickable item name (opens *new*
@@ -295,7 +294,7 @@ Layout:
 
 ```
 <Box>
-  <Header>
+  <Header>  // flex row, flexWrap="wrap", gap 2
     <IconButton back />
     {data?.form.code && <Chip label={data.form.code} variant="outlined" />}
     <Typography
@@ -305,19 +304,19 @@ Layout:
     >
       {data?.form.name ?? t("crf.detail.title")}
     </Typography>
-    <Menu open={Boolean(anchor)} anchorEl={anchor} onClose={…}> // swapped to Popover at impl time, see §12
+    <Popover open={Boolean(anchor)} anchorEl={anchor} onClose={…}> // see §12
       <MenuItem onClick={() => { setFormNameMenuAnchor(null); setDomainDialog({ mode: "create" }); }}>
         {t("crf.detail.menu.newDomain")}
       </MenuItem>
       <MenuItem onClick={() => { setFormNameMenuAnchor(null); setAnnotationDialog({ mode: "create", owner: { kind: "form", id } }); }}>
         {t("crf.detail.menu.newAnnotation")}
       </MenuItem>
-    </Menu>
+    </Popover>
+    <DomainAnnotationChipRow>…</DomainAnnotationChipRow>     // sits right of name, wraps within header
     <Box flexGrow />
     <CrfToolsMenu />
   </Header>
 
-  <DomainAnnotationChipsRow>…</DomainAnnotationChipsRow>     // name(description), closable, click → edit
   <FormAnnotationArea>…</FormAnnotationArea>                  // closable annotation chips
   <ItemList>…</ItemList>                                      // CrfItemRow per item
 
