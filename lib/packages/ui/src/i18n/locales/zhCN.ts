@@ -336,4 +336,10 @@ export const zhCN = {
   "crf.annotationDialog.submit.create": "创建",
   "crf.annotationDialog.submit.save": "保存",
   "crf.annotationDialog.domainAnnotation.none": "该表单暂无域注释",
+  "crf.deleteDomain.title": "删除域注释",
+  "crf.deleteDomain.message": "删除域注释 \"{name}\" 及其所有关联注释？此操作不可撤销。",
+  "crf.deleteDomain.submit": "删除",
+  "crf.deleteAnnotation.title": "删除注释",
+  "crf.deleteAnnotation.message": "删除此注释？此操作不可撤销。",
+  "crf.deleteAnnotation.submit": "删除",
 } satisfies Record<keyof typeof en, string>;

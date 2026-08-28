@@ -345,4 +345,11 @@ export const en = {
   "crf.annotationDialog.submit.create": "Create",
   "crf.annotationDialog.submit.save": "Save",
   "crf.annotationDialog.domainAnnotation.none": "No domain annotations on this form",
+  "crf.deleteDomain.title": "Delete domain annotation",
+  "crf.deleteDomain.message":
+    "Delete domain annotation \"{name}\" and all annotations using it? This cannot be undone.",
+  "crf.deleteDomain.submit": "Delete",
+  "crf.deleteAnnotation.title": "Delete annotation",
+  "crf.deleteAnnotation.message": "Delete this annotation? This cannot be undone.",
+  "crf.deleteAnnotation.submit": "Delete",
 } as const;
