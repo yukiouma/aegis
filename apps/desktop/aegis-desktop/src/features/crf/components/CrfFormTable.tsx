@@ -50,6 +50,34 @@ export function computeReorder(
   return next;
 }
 
+/**
+ * Adapter from a `@dnd-kit/react` `dragend` event to `computeReorder`.
+ *
+ * Reads the dragged row from `event.operation.source` — NOT
+ * `event.operation.target`, which is the drop slot. Respecting
+ * `event.canceled` keeps the table stable when the drag is aborted.
+ * Returns `null` when there is nothing to reorder.
+ */
+export function applyReorder(
+  orderedIds: readonly number[],
+  event: {
+    canceled: boolean;
+    operation: {
+      source: { id: string | number } | null;
+      target: { id: string | number } | null;
+    };
+  },
+): number[] | null {
+  if (event.canceled) return null;
+  const source = event.operation.source;
+  const target = event.operation.target;
+  if (source == null || target == null) return null;
+  const sourceId = Number(source.id);
+  const targetId = Number(target.id);
+  if (!Number.isFinite(sourceId) || !Number.isFinite(targetId)) return null;
+  return computeReorder(orderedIds, sourceId, targetId);
+}
+
 interface Props {
   rows: CrfForm[];
   loading: boolean;

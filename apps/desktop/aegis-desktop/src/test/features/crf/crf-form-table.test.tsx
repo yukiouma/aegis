@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { computeReorder } from "../../../features/crf/components/CrfFormTable";
+import { applyReorder, computeReorder } from "../../../features/crf/components/CrfFormTable";
 
 describe("computeReorder", () => {
   afterEach(() => {
@@ -40,5 +40,48 @@ describe("computeReorder", () => {
     const input = [1, 2, 3, 4];
     computeReorder(input, 1, 3);
     expect(input).toEqual([1, 2, 3, 4]);
+  });
+});
+
+describe("applyReorder", () => {
+  const event = (
+    sourceId: string | number | null,
+    targetId: string | number | null,
+    canceled = false,
+  ) => ({
+    canceled,
+    operation: {
+      source: sourceId == null ? null : { id: sourceId },
+      target: targetId == null ? null : { id: targetId },
+    },
+  });
+
+  it("reads source.id (the dragged row) — moves the source to the target's slot", () => {
+    expect(applyReorder([1, 2, 3], event("1", "3"))).toEqual([2, 3, 1]);
+    expect(applyReorder([1, 2, 3], event("3", "1"))).toEqual([3, 1, 2]);
+  });
+
+  it("returns null when the drag was canceled", () => {
+    expect(applyReorder([1, 2, 3], event("1", "3", true))).toBeNull();
+  });
+
+  it("returns null when source is missing (drop outside any draggable)", () => {
+    expect(applyReorder([1, 2, 3], event(null, "1"))).toBeNull();
+  });
+
+  it("returns null when target is missing (drop outside any droppable)", () => {
+    expect(applyReorder([1, 2, 3], event("1", null))).toBeNull();
+  });
+
+  it("returns null when source equals target", () => {
+    expect(applyReorder([1, 2, 3], event("2", "2"))).toBeNull();
+  });
+
+  it("coerces string ids to numbers before indexing", () => {
+    expect(applyReorder([1, 2, 3, 4], event("1", "3"))).toEqual([2, 3, 1, 4]);
+  });
+
+  it("returns null when either id fails to coerce to a finite number", () => {
+    expect(applyReorder([1, 2, 3], event("abc", "1"))).toBeNull();
   });
 });
