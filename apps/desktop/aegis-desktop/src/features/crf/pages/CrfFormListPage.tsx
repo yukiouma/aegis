@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -148,6 +148,19 @@ export function CrfFormListPage() {
     updateMutation.isPending ||
     deleteMutation.isPending;
 
+  const handleReorder = useCallback(
+    (newVisibleIds: number[]) => {
+      const oldFullIds = allRows.map((r) => r.id);
+      const newFullIds = computeNewFullOrder(allRows, newVisibleIds, filteredRows);
+      newFullIds.forEach((id, newIndex) => {
+        if (oldFullIds.indexOf(id) !== newIndex) {
+          updateMutation.mutate({ id, body: { order: newIndex + 1 } });
+        }
+      });
+    },
+    [allRows, filteredRows, updateMutation],
+  );
+
   return (
     <Box sx={{ p: 4, display: "flex", flexDirection: "column", gap: 2 }}><Box
       sx={{
@@ -203,6 +216,7 @@ export function CrfFormListPage() {
             params: { projectCode, formId: String(row.id) },
           })
         }
+        onReorder={handleReorder}
       />
 
       <CrfFormDrawer
