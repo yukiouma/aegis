@@ -322,4 +322,10 @@ export const zhCN = {
   "crf.delete.submit": "删除",
   "crf.assignTakers.title": "分配填写人",
   "crf.assignTakers.placeholder": "填写人界面即将上线",
+  "crf.domainDialog.create.title": "创建域注释",
+  "crf.domainDialog.edit.title": "编辑域注释",
+  "crf.domainDialog.field.name": "名称",
+  "crf.domainDialog.field.description": "描述",
+  "crf.domainDialog.submit.create": "创建",
+  "crf.domainDialog.submit.save": "保存",
 } satisfies Record<keyof typeof en, string>;

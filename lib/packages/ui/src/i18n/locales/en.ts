@@ -331,4 +331,10 @@ export const en = {
   "crf.delete.submit": "Delete",
   "crf.assignTakers.title": "Assign Takers",
   "crf.assignTakers.placeholder": "Takers UI coming soon",
+  "crf.domainDialog.create.title": "Create domain annotation",
+  "crf.domainDialog.edit.title": "Edit domain annotation",
+  "crf.domainDialog.field.name": "Name",
+  "crf.domainDialog.field.description": "Description",
+  "crf.domainDialog.submit.create": "Create",
+  "crf.domainDialog.submit.save": "Save",
 } as const;
