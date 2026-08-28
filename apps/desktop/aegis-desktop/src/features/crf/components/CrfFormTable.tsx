@@ -23,6 +23,33 @@ import {
 import { useI18n } from "@aegis/ui/i18n";
 import type { CrfForm } from "../../../shared/api";
 
+/**
+ * Move `sourceId` to `targetId`'s slot in the ordered id sequence, shifting
+ * the target and other rows as needed. Returns `null` when the move is a
+ * no-op (source === target, or either id is missing from the sequence).
+ *
+ * The insertion index is the *original* index of the target (computed before
+ * source is removed). That index lands on the source in the post-removal
+ * array regardless of which side of the target the source started on, so this
+ * works for both "drag down" and "drag up" cases:
+ *   [1, 2, 3, 4], src=1, tgt=3 → [2, 3, 1, 4]  (target shifts right)
+ *   [1, 2, 3, 4], src=4, tgt=2 → [1, 4, 2, 3]  (target stays put)
+ */
+export function computeReorder(
+  orderedIds: readonly number[],
+  sourceId: number,
+  targetId: number,
+): number[] | null {
+  if (sourceId === targetId) return null;
+  const next = [...orderedIds];
+  const srcIdx = next.indexOf(sourceId);
+  const tgtIdx = next.indexOf(targetId);
+  if (srcIdx < 0 || tgtIdx < 0) return null;
+  const [moved] = next.splice(srcIdx, 1);
+  next.splice(tgtIdx, 0, moved);
+  return next;
+}
+
 interface Props {
   rows: CrfForm[];
   loading: boolean;
