@@ -260,10 +260,19 @@ export const api = {
     call<void>("delete_sdtm_variable", { id }),
 
   // CRF
-  listCrfVersions: (projectCode: string): Promise<CrfVersion[]> =>
-    call<CrfVersion[]>("list_crf_versions", { projectCode }),
-  listCrfFormsByVersion: (versionId: number): Promise<CrfForm[]> =>
-    call<CrfForm[]>("list_crf_forms_by_version", { versionId }),
+  listCrfVersions: async (projectCode: string): Promise<CrfVersion[]> => {
+    const resp = await call<CrfVersionListResponse>("list_crf_versions", {
+      projectCode,
+    });
+    return resp.versions;
+  },
+  listCrfFormsByVersion: async (versionId: number): Promise<CrfForm[]> => {
+    const resp = await call<CrfFormListResponse>(
+      "list_crf_forms_by_version",
+      { versionId },
+    );
+    return resp.forms;
+  },
   getCrfFormById: (id: number): Promise<CrfForm> =>
     call<CrfForm>("get_crf_form_by_id", { id }),
   createCrfForm: (

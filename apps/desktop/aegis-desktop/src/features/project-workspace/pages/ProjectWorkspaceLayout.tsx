@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useParams } from "@tanstack/react-router";
 import { Box, Button, IconButton } from "@aegis/ui/mui";
 import { Sidebar, type MenuItem, type SidebarProps } from "@aegis/ui";
 import {
+  Assignment as AssignmentIcon,
   Dashboard as DashboardIcon,
   Launch as LaunchIcon,
   Settings as SettingsIcon,
@@ -12,6 +13,7 @@ import { getAllWebviewWindows } from "@tauri-apps/api/webviewWindow";
 
 const DashboardMenuIcon = () => <DashboardIcon />;
 const ConfigMenuIcon = () => <SettingsIcon />;
+const CrfMenuIcon = () => <AssignmentIcon />;
 
 /**
  * Workspace window shell. Sidebar header is the project code; menu
@@ -32,6 +34,11 @@ export function ProjectWorkspaceLayout() {
       link: `/project/${projectCode}/dashboard`,
       title: t("workspace.menu.dashboard"),
       icon: DashboardMenuIcon,
+    },
+    {
+      link: `/project/${projectCode}/crf`,
+      title: t("workspace.menu.crf"),
+      icon: CrfMenuIcon,
     },
     {
       link: `/project/${projectCode}/configuration`,

@@ -30,6 +30,9 @@ import { Route as AuthedProjectProjectCodeDashboardRouteImport } from './_authed
 import { Route as AuthedLayoutDomainModelSdtmIndexRouteImport } from './_authed/_layout/domain-model/sdtm/index'
 import { Route as AuthedLayoutDomainModelSdtmDomainIdRouteImport } from './_authed/_layout/domain-model/sdtm/$domainId'
 import { Route as AuthedLayoutTerminologyKindSearchRouteImport } from './_authed/_layout/terminology/$kind/search'
+import { Route as AuthedProjectProjectCodeCrfIndexRouteImport } from './_authed/project/$projectCode/crf/index'
+import { Route as AuthedProjectProjectCodeCrfFormIdRouteImport } from './_authed/project/$projectCode/crf/$formId'
+import { Route as AuthedProjectProjectCodeCrfSearchRouteImport } from './_authed/project/$projectCode/crf/search'
 import { Route as AuthedLayoutTerminologyKindCodelistsCodelistIdRouteImport } from './_authed/_layout/terminology/$kind/codelists/$codelistId'
 
 const AuthedRouteRoute = AuthedRouteRouteImport.update({
@@ -147,6 +150,24 @@ const AuthedLayoutTerminologyKindSearchRoute =
     path: '/terminology/$kind/search',
     getParentRoute: () => AuthedLayoutRouteRoute,
   } as any)
+const AuthedProjectProjectCodeCrfIndexRoute =
+  AuthedProjectProjectCodeCrfIndexRouteImport.update({
+    id: '/crf/',
+    path: '/crf/',
+    getParentRoute: () => AuthedProjectProjectCodeRouteRoute,
+  } as any)
+const AuthedProjectProjectCodeCrfFormIdRoute =
+  AuthedProjectProjectCodeCrfFormIdRouteImport.update({
+    id: '/crf/$formId',
+    path: '/crf/$formId',
+    getParentRoute: () => AuthedProjectProjectCodeRouteRoute,
+  } as any)
+const AuthedProjectProjectCodeCrfSearchRoute =
+  AuthedProjectProjectCodeCrfSearchRouteImport.update({
+    id: '/crf/search',
+    path: '/crf/search',
+    getParentRoute: () => AuthedProjectProjectCodeRouteRoute,
+  } as any)
 const AuthedLayoutTerminologyKindCodelistsCodelistIdRoute =
   AuthedLayoutTerminologyKindCodelistsCodelistIdRouteImport.update({
     id: '/terminology/$kind/codelists/$codelistId',
@@ -173,7 +194,10 @@ export interface FileRoutesByFullPath {
   '/project/$projectCode/': typeof AuthedProjectProjectCodeIndexRoute
   '/domain-model/sdtm/$domainId': typeof AuthedLayoutDomainModelSdtmDomainIdRoute
   '/terminology/$kind/search': typeof AuthedLayoutTerminologyKindSearchRoute
+  '/project/$projectCode/crf/$formId': typeof AuthedProjectProjectCodeCrfFormIdRoute
+  '/project/$projectCode/crf/search': typeof AuthedProjectProjectCodeCrfSearchRoute
   '/domain-model/sdtm/': typeof AuthedLayoutDomainModelSdtmIndexRoute
+  '/project/$projectCode/crf/': typeof AuthedProjectProjectCodeCrfIndexRoute
   '/terminology/$kind/codelists/$codelistId': typeof AuthedLayoutTerminologyKindCodelistsCodelistIdRoute
 }
 export interface FileRoutesByTo {
@@ -194,7 +218,10 @@ export interface FileRoutesByTo {
   '/project/$projectCode': typeof AuthedProjectProjectCodeIndexRoute
   '/domain-model/sdtm/$domainId': typeof AuthedLayoutDomainModelSdtmDomainIdRoute
   '/terminology/$kind/search': typeof AuthedLayoutTerminologyKindSearchRoute
+  '/project/$projectCode/crf/$formId': typeof AuthedProjectProjectCodeCrfFormIdRoute
+  '/project/$projectCode/crf/search': typeof AuthedProjectProjectCodeCrfSearchRoute
   '/domain-model/sdtm': typeof AuthedLayoutDomainModelSdtmIndexRoute
+  '/project/$projectCode/crf': typeof AuthedProjectProjectCodeCrfIndexRoute
   '/terminology/$kind/codelists/$codelistId': typeof AuthedLayoutTerminologyKindCodelistsCodelistIdRoute
 }
 export interface FileRoutesById {
@@ -219,7 +246,10 @@ export interface FileRoutesById {
   '/_authed/project/$projectCode/': typeof AuthedProjectProjectCodeIndexRoute
   '/_authed/_layout/domain-model/sdtm/$domainId': typeof AuthedLayoutDomainModelSdtmDomainIdRoute
   '/_authed/_layout/terminology/$kind/search': typeof AuthedLayoutTerminologyKindSearchRoute
+  '/_authed/project/$projectCode/crf/$formId': typeof AuthedProjectProjectCodeCrfFormIdRoute
+  '/_authed/project/$projectCode/crf/search': typeof AuthedProjectProjectCodeCrfSearchRoute
   '/_authed/_layout/domain-model/sdtm/': typeof AuthedLayoutDomainModelSdtmIndexRoute
+  '/_authed/project/$projectCode/crf/': typeof AuthedProjectProjectCodeCrfIndexRoute
   '/_authed/_layout/terminology/$kind/codelists/$codelistId': typeof AuthedLayoutTerminologyKindCodelistsCodelistIdRoute
 }
 export interface FileRouteTypes {
@@ -243,7 +273,10 @@ export interface FileRouteTypes {
     | '/project/$projectCode/'
     | '/domain-model/sdtm/$domainId'
     | '/terminology/$kind/search'
+    | '/project/$projectCode/crf/$formId'
+    | '/project/$projectCode/crf/search'
     | '/domain-model/sdtm/'
+    | '/project/$projectCode/crf/'
     | '/terminology/$kind/codelists/$codelistId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -264,7 +297,10 @@ export interface FileRouteTypes {
     | '/project/$projectCode'
     | '/domain-model/sdtm/$domainId'
     | '/terminology/$kind/search'
+    | '/project/$projectCode/crf/$formId'
+    | '/project/$projectCode/crf/search'
     | '/domain-model/sdtm'
+    | '/project/$projectCode/crf'
     | '/terminology/$kind/codelists/$codelistId'
   id:
     | '__root__'
@@ -288,7 +324,10 @@ export interface FileRouteTypes {
     | '/_authed/project/$projectCode/'
     | '/_authed/_layout/domain-model/sdtm/$domainId'
     | '/_authed/_layout/terminology/$kind/search'
+    | '/_authed/project/$projectCode/crf/$formId'
+    | '/_authed/project/$projectCode/crf/search'
     | '/_authed/_layout/domain-model/sdtm/'
+    | '/_authed/project/$projectCode/crf/'
     | '/_authed/_layout/terminology/$kind/codelists/$codelistId'
   fileRoutesById: FileRoutesById
 }
@@ -448,6 +487,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthedLayoutTerminologyKindSearchRouteImport
       parentRoute: typeof AuthedLayoutRouteRoute
     }
+    '/_authed/project/$projectCode/crf/': {
+      id: '/_authed/project/$projectCode/crf/'
+      path: '/crf'
+      fullPath: '/project/$projectCode/crf/'
+      preLoaderRoute: typeof AuthedProjectProjectCodeCrfIndexRouteImport
+      parentRoute: typeof AuthedProjectProjectCodeRouteRoute
+    }
+    '/_authed/project/$projectCode/crf/$formId': {
+      id: '/_authed/project/$projectCode/crf/$formId'
+      path: '/crf/$formId'
+      fullPath: '/project/$projectCode/crf/$formId'
+      preLoaderRoute: typeof AuthedProjectProjectCodeCrfFormIdRouteImport
+      parentRoute: typeof AuthedProjectProjectCodeRouteRoute
+    }
+    '/_authed/project/$projectCode/crf/search': {
+      id: '/_authed/project/$projectCode/crf/search'
+      path: '/crf/search'
+      fullPath: '/project/$projectCode/crf/search'
+      preLoaderRoute: typeof AuthedProjectProjectCodeCrfSearchRouteImport
+      parentRoute: typeof AuthedProjectProjectCodeRouteRoute
+    }
     '/_authed/_layout/terminology/$kind/codelists/$codelistId': {
       id: '/_authed/_layout/terminology/$kind/codelists/$codelistId'
       path: '/terminology/$kind/codelists/$codelistId'
@@ -513,6 +573,9 @@ interface AuthedProjectProjectCodeRouteRouteChildren {
   AuthedProjectProjectCodeConfigurationRoute: typeof AuthedProjectProjectCodeConfigurationRoute
   AuthedProjectProjectCodeDashboardRoute: typeof AuthedProjectProjectCodeDashboardRoute
   AuthedProjectProjectCodeIndexRoute: typeof AuthedProjectProjectCodeIndexRoute
+  AuthedProjectProjectCodeCrfFormIdRoute: typeof AuthedProjectProjectCodeCrfFormIdRoute
+  AuthedProjectProjectCodeCrfSearchRoute: typeof AuthedProjectProjectCodeCrfSearchRoute
+  AuthedProjectProjectCodeCrfIndexRoute: typeof AuthedProjectProjectCodeCrfIndexRoute
 }
 
 const AuthedProjectProjectCodeRouteRouteChildren: AuthedProjectProjectCodeRouteRouteChildren =
@@ -522,6 +585,12 @@ const AuthedProjectProjectCodeRouteRouteChildren: AuthedProjectProjectCodeRouteR
     AuthedProjectProjectCodeDashboardRoute:
       AuthedProjectProjectCodeDashboardRoute,
     AuthedProjectProjectCodeIndexRoute: AuthedProjectProjectCodeIndexRoute,
+    AuthedProjectProjectCodeCrfFormIdRoute:
+      AuthedProjectProjectCodeCrfFormIdRoute,
+    AuthedProjectProjectCodeCrfSearchRoute:
+      AuthedProjectProjectCodeCrfSearchRoute,
+    AuthedProjectProjectCodeCrfIndexRoute:
+      AuthedProjectProjectCodeCrfIndexRoute,
   }
 
 const AuthedProjectProjectCodeRouteRouteWithChildren =
