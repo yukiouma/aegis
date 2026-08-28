@@ -26,7 +26,7 @@ import type { CrfForm } from "../../../shared/api";
 interface Props {
   rows: CrfForm[];
   loading: boolean;
-  error: Error | null;
+  error: unknown;
   canAddFilter: boolean;
   onAdd: () => void;
   onFilter: () => void;
