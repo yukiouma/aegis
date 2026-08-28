@@ -301,7 +301,7 @@ export const en = {
   "crf.globalSearch.col.annotation": "Annotation",
   "crf.toolbar.statusPending": "Pending",
   "crf.toolbar.globalSearch": "Global Search",
-  "crf.toolbar.globalSearchHint": "Open the global CRF search",
+  "crf.toolbar.toolsMenuHint": "Open CRF tools",
   "crf.table.column.code": "Form Code",
   "crf.table.column.name": "Form Name",
   "crf.table.column.taker": "Taker",

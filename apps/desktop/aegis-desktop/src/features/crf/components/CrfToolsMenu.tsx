@@ -15,13 +15,14 @@ import { useI18n } from "@aegis/ui/i18n";
 import { useNavigate } from "@tanstack/react-router";
 
 /**
- * IconButton that opens a floating menu. The single menu item
- * navigates to the CRF Global Search page for the current
- * project. Used in the form-list toolbar and the detail page
- * header — the global-search page itself renders no second
- * copy of this control.
+ * IconButton that opens a floating menu of CRF helper pages (a
+ * "tools" / "utilities" menu). Today the menu has a single entry:
+ * the CRF Global Search page for the current project. New helper
+ * entries land here as the feature grows. Used in the form-list
+ * toolbar and the detail page header — the global-search page
+ * itself renders no second copy of this control.
  */
-export function CrfGlobalSearchButton({
+export function CrfToolsMenu({
   projectCode,
 }: {
   projectCode: string;
@@ -33,10 +34,10 @@ export function CrfGlobalSearchButton({
 
   return (
     <>
-      <Tooltip title={t("crf.toolbar.globalSearchHint")}>
+      <Tooltip title={t("crf.toolbar.toolsMenuHint")}>
         <IconButton
-          aria-label={t("crf.toolbar.globalSearchHint")}
-          aria-controls={open ? "crf-float-menu" : undefined}
+          aria-label={t("crf.toolbar.toolsMenuHint")}
+          aria-controls={open ? "crf-tools-menu" : undefined}
           aria-haspopup="true"
           aria-expanded={open ? "true" : undefined}
           onClick={(e) => setAnchorEl(e.currentTarget)}
@@ -46,7 +47,7 @@ export function CrfGlobalSearchButton({
         </IconButton>
       </Tooltip>
       <Menu
-        id="crf-float-menu"
+        id="crf-tools-menu"
         anchorEl={anchorEl}
         open={open}
         onClose={() => setAnchorEl(null)}

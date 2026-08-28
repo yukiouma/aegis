@@ -16,7 +16,7 @@ import {
   CrfFormFilterDrawer,
   type CrfStatusFilter,
   CrfFormTable,
-  CrfGlobalSearchButton,
+  CrfToolsMenu,
   CrfStatusChip,
   CrfVersionDropdown,
   DeleteCrfFormDialog,
@@ -185,7 +185,7 @@ export function CrfFormListPage() {
       />
       <CrfStatusChip />
       <Box sx={{ flexGrow: 1 }} />
-      <CrfGlobalSearchButton projectCode={projectCode} />
+      <CrfToolsMenu projectCode={projectCode} />
     </Box>
 
       {versionsQuery.isError && (

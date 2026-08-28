@@ -292,7 +292,7 @@ export const zhCN = {
   "crf.globalSearch.col.annotation": "批注",
   "crf.toolbar.statusPending": "待处理",
   "crf.toolbar.globalSearch": "全局搜索",
-  "crf.toolbar.globalSearchHint": "打开 CRF 全局搜索",
+  "crf.toolbar.toolsMenuHint": "Open CRF tools",
   "crf.table.column.code": "表单编码",
   "crf.table.column.name": "表单名称",
   "crf.table.column.taker": "填写人",

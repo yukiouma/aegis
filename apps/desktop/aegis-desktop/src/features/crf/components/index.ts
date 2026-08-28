@@ -1,5 +1,5 @@
 export * from "./CrfStatusChip";
-export * from "./CrfGlobalSearchButton";
+export * from "./CrfToolsMenu";
 export * from "./CrfVersionDropdown";
 export * from "./CrfFormDrawer";
 export * from "./DeleteCrfFormDialog";

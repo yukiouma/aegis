@@ -16,7 +16,7 @@ import { ArrowBack as ArrowBackIcon } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
 import { useNavigate, useParams } from "@tanstack/react-router";
 
-import { CrfGlobalSearchButton } from "../components";
+import { CrfToolsMenu } from "../components";
 
 export function CrfGlobalSearchPage() {
   const { t } = useI18n();
@@ -52,7 +52,7 @@ export function CrfGlobalSearchPage() {
           {t("crf.globalSearch.heading", { projectCode })}
         </Typography>
         <Box sx={{ flexGrow: 1 }} />
-        <CrfGlobalSearchButton projectCode={projectCode} />
+        <CrfToolsMenu projectCode={projectCode} />
       </Box>
 
       <TextField
