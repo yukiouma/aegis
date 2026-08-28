@@ -44,4 +44,12 @@ export const queryKeys = {
     sdtmVariables: (domainId: number) =>
       ["domainModel", "sdtmVariables", domainId] as const,
   },
+  crf: {
+    versionsByProject: (projectCode: string) =>
+      ["crf", "versionsByProject", projectCode] as const,
+    formsByVersion: (versionId: number) =>
+      ["crf", "formsByVersion", versionId] as const,
+    form: (id: number) =>
+      ["crf", "form", id] as const,
+  },
 } as const;

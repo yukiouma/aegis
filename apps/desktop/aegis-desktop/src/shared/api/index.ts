@@ -9,11 +9,14 @@ import type {
   CodeListView,
   CreateCodeItemInput,
   CreateCodeListInput,
+  CreateCrfFormInput,
   CreateProjectInput,
   CreateSdtmDomainInput,
   CreateSdtmVariableInput,
   CreateTerminologyVersionInput,
   CreateUserInput,
+  CrfForm,
+  CrfVersion,
   Identity,
   PagedCodeItemListResponse,
   PagedCodeListListResponse,
@@ -30,6 +33,7 @@ import type {
   TerminologyVersionView,
   UpdateCodeItemInput,
   UpdateCodeListInput,
+  UpdateCrfFormInput,
   UpdateProjectBody,
   UpdateSdtmDomainInput,
   UpdateSdtmVariableInput,
@@ -254,6 +258,26 @@ export const api = {
 
   deleteSdtmVariable: (id: number): Promise<void> =>
     call<void>("delete_sdtm_variable", { id }),
+
+  // CRF
+  listCrfVersions: (projectCode: string): Promise<CrfVersion[]> =>
+    call<CrfVersion[]>("list_crf_versions", { projectCode }),
+  listCrfFormsByVersion: (versionId: number): Promise<CrfForm[]> =>
+    call<CrfForm[]>("list_crf_forms_by_version", { versionId }),
+  getCrfFormById: (id: number): Promise<CrfForm> =>
+    call<CrfForm>("get_crf_form_by_id", { id }),
+  createCrfForm: (
+    versionId: number,
+    body: CreateCrfFormInput,
+  ): Promise<CrfForm> =>
+    call<CrfForm>("create_crf_form", { versionId, body: { ...body } }),
+  updateCrfForm: (
+    id: number,
+    body: UpdateCrfFormInput,
+  ): Promise<CrfForm> =>
+    call<CrfForm>("update_crf_form", { id, body: { ...body } }),
+  deleteCrfForm: (id: number): Promise<void> =>
+    call<void>("delete_crf_form", { id }),
 } as const;
 
 export type { ApiError } from "./types";
@@ -266,11 +290,16 @@ export type {
   CodeListView,
   CreateCodeItemInput,
   CreateCodeListInput,
+  CreateCrfFormInput,
   CreateProjectInput,
   CreateSdtmDomainInput,
   CreateSdtmVariableInput,
   CreateTerminologyVersionInput,
   CreateUserInput,
+  CrfForm,
+  CrfFormListResponse,
+  CrfVersion,
+  CrfVersionListResponse,
   DomainCategory,
   Identity,
   PagedCodeItemListResponse,
@@ -300,6 +329,7 @@ export type {
   TerminologyVersionView,
   UpdateCodeItemInput,
   UpdateCodeListInput,
+  UpdateCrfFormInput,
   UpdateProjectBody,
   UpdateSdtmDomainInput,
   UpdateSdtmVariableInput,
