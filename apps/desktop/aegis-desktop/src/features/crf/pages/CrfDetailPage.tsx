@@ -6,6 +6,7 @@ import {
   CircularProgress,
   IconButton,
   MenuItem,
+  MenuList,
   Popover,
   Stack,
   Typography,
@@ -174,22 +175,28 @@ export function CrfDetailPage() {
             },
           }}
         >
-          <MenuItem
-            onClick={() => {
-              setFormNameMenuAnchor(null);
-              setDomainDialog({ mode: "create" });
-            }}
-          >
-            {t("crf.detail.menu.newDomain")}
-          </MenuItem>
-          <MenuItem
-            onClick={() => {
-              setFormNameMenuAnchor(null);
-              openCreateAnnotation({ kind: "form", id });
-            }}
-          >
-            {t("crf.detail.menu.newAnnotation")}
-          </MenuItem>
+          {/* `MenuItem` requires a `MenuListContext` to register itself
+              for keyboard navigation. Wrap in `MenuList` so MUI doesn't
+              warn in development and the Popover behaves as a real menu
+              for assistive tech. */}
+          <MenuList>
+            <MenuItem
+              onClick={() => {
+                setFormNameMenuAnchor(null);
+                setDomainDialog({ mode: "create" });
+              }}
+            >
+              {t("crf.detail.menu.newDomain")}
+            </MenuItem>
+            <MenuItem
+              onClick={() => {
+                setFormNameMenuAnchor(null);
+                openCreateAnnotation({ kind: "form", id });
+              }}
+            >
+              {t("crf.detail.menu.newAnnotation")}
+            </MenuItem>
+          </MenuList>
         </Popover>
         {/* Domain annotation chips, right of name */}
         {detail && detail.domainAnnotations.length > 0 && (
