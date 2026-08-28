@@ -432,3 +432,113 @@ export interface UpdateCrfFormInput {
   order?: number;
   notSubmitted?: boolean;
 }
+
+// ---- CRF detail / items / options / units ----
+
+export type CrfItemKind =
+  | "text"
+  | "selection"
+  | "checkbox"
+  | "datetime"
+  | "label";
+
+export interface CrfItem {
+  id: number;
+  formId: number;
+  code: string;
+  name: string;
+  kind: CrfItemKind;
+  order: number;
+  notSubmitted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CrfOption {
+  id: number;
+  itemId: number;
+  value: string;
+  notSubmitted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CrfUnit {
+  id: number;
+  itemId: number;
+  value: string;
+  notSubmitted: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DomainAnnotation {
+  id: number;
+  formId: number;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type AnnotationOwner =
+  | { kind: "form"; id: number }
+  | { kind: "item"; id: number }
+  | { kind: "option"; id: number }
+  | { kind: "unit"; id: number };
+
+export interface Annotation {
+  id: number;
+  domainAnnotationId: number;
+  content: string;
+  assign: boolean;
+  owner: AnnotationOwner;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CrfOptionDetail {
+  option: CrfOption;
+  annotations: Annotation[];
+}
+
+export interface CrfUnitDetail {
+  unit: CrfUnit;
+  annotations: Annotation[];
+}
+
+export interface CrfItemDetail {
+  item: CrfItem;
+  options: CrfOptionDetail[];
+  units: CrfUnitDetail[];
+  annotations: Annotation[];
+}
+
+export interface CrfFormDetail {
+  form: CrfForm;
+  formAnnotations: Annotation[];
+  items: CrfItemDetail[];
+  domainAnnotations: DomainAnnotation[];
+}
+
+export interface CreateDomainAnnotationInput {
+  name: string;
+  description: string;
+}
+
+export interface UpdateDomainAnnotationInput {
+  name?: string;
+  description?: string;
+}
+
+export interface CreateAnnotationInput {
+  domainAnnotationId: number;
+  content: string;
+  assign: boolean;
+  owner: AnnotationOwner;
+}
+
+export interface UpdateAnnotationInput {
+  content?: string;
+  assign?: boolean;
+}
