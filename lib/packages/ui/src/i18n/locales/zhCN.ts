@@ -304,6 +304,7 @@ export const zhCN = {
   "crf.table.action.openDetail": "打开表单详情",
   "crf.table.action.addForm": "新增表单",
   "crf.table.action.filter": "筛选表单",
+  "crf.table.dragHandle": "Drag to reorder",
   "crf.drawer.create.title": "新建 CRF 表单",
   "crf.drawer.edit.title": "编辑 CRF 表单",
   "crf.drawer.field.code": "表单编码",

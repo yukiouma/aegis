@@ -313,6 +313,7 @@ export const en = {
   "crf.table.action.openDetail": "Open form detail",
   "crf.table.action.addForm": "Add form",
   "crf.table.action.filter": "Filter forms",
+  "crf.table.dragHandle": "Drag to reorder",
   "crf.drawer.create.title": "Create CRF Form",
   "crf.drawer.edit.title": "Edit CRF Form",
   "crf.drawer.field.code": "Form Code",
