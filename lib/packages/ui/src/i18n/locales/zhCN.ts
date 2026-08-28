@@ -328,4 +328,12 @@ export const zhCN = {
   "crf.domainDialog.field.description": "描述",
   "crf.domainDialog.submit.create": "创建",
   "crf.domainDialog.submit.save": "保存",
+  "crf.annotationDialog.create.title": "创建注释",
+  "crf.annotationDialog.edit.title": "编辑注释",
+  "crf.annotationDialog.field.domainAnnotation": "域注释",
+  "crf.annotationDialog.field.content": "内容",
+  "crf.annotationDialog.field.assign": "已分配",
+  "crf.annotationDialog.submit.create": "创建",
+  "crf.annotationDialog.submit.save": "保存",
+  "crf.annotationDialog.domainAnnotation.none": "该表单暂无域注释",
 } satisfies Record<keyof typeof en, string>;

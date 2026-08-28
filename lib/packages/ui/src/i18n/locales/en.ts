@@ -337,4 +337,12 @@ export const en = {
   "crf.domainDialog.field.description": "Description",
   "crf.domainDialog.submit.create": "Create",
   "crf.domainDialog.submit.save": "Save",
+  "crf.annotationDialog.create.title": "Create annotation",
+  "crf.annotationDialog.edit.title": "Edit annotation",
+  "crf.annotationDialog.field.domainAnnotation": "Domain annotation",
+  "crf.annotationDialog.field.content": "Content",
+  "crf.annotationDialog.field.assign": "Assigned",
+  "crf.annotationDialog.submit.create": "Create",
+  "crf.annotationDialog.submit.save": "Save",
+  "crf.annotationDialog.domainAnnotation.none": "No domain annotations on this form",
 } as const;
