@@ -82,6 +82,16 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::crf::form::update_crf_form,
             commands::crf::form::delete_crf_form,
             commands::crf::form::get_crf_form_by_id,
+            commands::crf::form::get_crf_form_details,
+            commands::crf::item::list_crf_items_by_form,
+            commands::crf::item::get_crf_item_by_id,
+            commands::crf::annotation::create_crf_annotation,
+            commands::crf::annotation::update_crf_annotation,
+            commands::crf::annotation::delete_crf_annotation,
+            commands::crf::domain_annotation::create_crf_domain_annotation,
+            commands::crf::domain_annotation::list_crf_domain_annotations_by_form,
+            commands::crf::domain_annotation::update_crf_domain_annotation,
+            commands::crf::domain_annotation::delete_crf_domain_annotation,
             // health
             commands::healthz::healthz,
             // legacy greet (kept for the existing test)

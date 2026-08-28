@@ -4,8 +4,8 @@ use tauri::State;
 
 use crate::http::client::HttpClient;
 use crate::http::crf::form::{
-    self, CreateCrfFormRequest, CrfFormListResponse, CrfFormViewResponse,
-    UpdateCrfFormRequest,
+    self, CreateCrfFormRequest, CrfFormDetailResponse, CrfFormListResponse,
+    CrfFormViewResponse, UpdateCrfFormRequest,
 };
 use crate::http::dto::ApiError;
 
@@ -46,4 +46,12 @@ pub async fn get_crf_form_by_id(
     id: i64,
 ) -> Result<CrfFormViewResponse, ApiError> {
     form::get_by_id(&client, id).await
+}
+
+#[tauri::command]
+pub async fn get_crf_form_details(
+    client: State<'_, HttpClient>,
+    id: i64,
+) -> Result<CrfFormDetailResponse, ApiError> {
+    form::details(&client, id).await
 }
