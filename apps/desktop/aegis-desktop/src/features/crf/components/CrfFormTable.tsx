@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import {
   Box,
   Chip,
@@ -15,11 +16,17 @@ import {
   Add as AddIcon,
   AssignmentInd as AssignmentIndIcon,
   Delete as DeleteIcon,
+  DragIndicator as DragIndicatorIcon,
   Edit as EditIcon,
   FilterList as FilterListIcon,
   Launch as LaunchIcon,
   PendingActions as PendingActionsIcon,
 } from "@aegis/ui/icons";
+import {
+  DragDropProvider,
+  useDraggable,
+  useDroppable,
+} from "@aegis/ui/dnd";
 import { useI18n } from "@aegis/ui/i18n";
 import type { CrfForm } from "../../../shared/api";
 
@@ -89,6 +96,98 @@ interface Props {
   onEdit: (row: CrfForm) => void;
   onDelete: (row: CrfForm) => void;
   onOpenDetail: (row: CrfForm) => void;
+  onReorder: (orderedIds: number[]) => void;
+}
+
+interface DraggableRowProps {
+  row: CrfForm;
+  showHandle: boolean;
+  onAssignTakers: (row: CrfForm) => void;
+  onEdit: (row: CrfForm) => void;
+  onDelete: (row: CrfForm) => void;
+  onOpenDetail: (row: CrfForm) => void;
+}
+
+function DraggableRow({
+  row,
+  showHandle,
+  onAssignTakers,
+  onEdit,
+  onDelete,
+  onOpenDetail,
+}: DraggableRowProps) {
+  const { t } = useI18n();
+  const draggable = useDraggable({ id: String(row.id), type: "crfForm" });
+  const droppable = useDroppable({ id: String(row.id), accept: "crfForm" });
+  return (
+    <TableRow
+      hover
+      ref={(el: HTMLTableRowElement | null) => {
+        if (el && draggable.ref) draggable.ref(el);
+        if (el && droppable.ref) droppable.ref(el);
+      }}
+    >
+      <TableCell sx={{ width: 40 }}>
+        {showHandle && (
+          <DragIndicatorIcon
+            fontSize="small"
+            sx={{ cursor: "grab", opacity: 0.6 }}
+            aria-label={t("crf.table.dragHandle")}
+          />
+        )}
+      </TableCell>
+      <TableCell>{row.code}</TableCell>
+      <TableCell>{row.name}</TableCell>
+      <TableCell />
+      <TableCell>
+        <Chip
+          icon={<PendingActionsIcon />}
+          label={t("crf.toolbar.statusPending")}
+          size="small"
+          color="warning"
+          variant="outlined"
+        />
+      </TableCell>
+      <TableCell align="right">
+        <Tooltip title={t("crf.table.action.assignTakers")}>
+          <IconButton
+            size="small"
+            aria-label={t("crf.table.action.assignTakers")}
+            onClick={() => onAssignTakers(row)}
+          >
+            <AssignmentIndIcon />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title={t("crf.table.action.edit")}>
+          <IconButton
+            size="small"
+            aria-label={t("crf.table.action.edit")}
+            onClick={() => onEdit(row)}
+          >
+            <EditIcon />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title={t("crf.table.action.delete")}>
+          <IconButton
+            size="small"
+            aria-label={t("crf.table.action.delete")}
+            onClick={() => onDelete(row)}
+          >
+            <DeleteIcon />
+          </IconButton>
+        </Tooltip>
+        <Tooltip title={t("crf.table.action.openDetail")}>
+          <IconButton
+            size="small"
+            aria-label={t("crf.table.action.openDetail")}
+            onClick={() => onOpenDetail(row)}
+          >
+            <LaunchIcon />
+          </IconButton>
+        </Tooltip>
+      </TableCell>
+    </TableRow>
+  );
 }
 
 export function CrfFormTable({
@@ -102,106 +201,97 @@ export function CrfFormTable({
   onEdit,
   onDelete,
   onOpenDetail,
+  onReorder,
 }: Props) {
   const { t } = useI18n();
+  const [internalOrder, setInternalOrder] = useState<number[] | null>(null);
+
+  const orderedIds = useMemo(() => {
+    if (internalOrder) return internalOrder;
+    return rows.map((r) => r.id);
+  }, [rows, internalOrder]);
+
+  // Map id -> row so render order is driven by orderedIds, but we still
+  // pass the full row object down to DraggableRow.
+  const rowById = useMemo(() => {
+    const m = new Map<number, CrfForm>();
+    for (const r of rows) m.set(r.id, r);
+    return m;
+  }, [rows]);
+
+  // Show the drag indicator only when there's something to drag into.
+  // With a single row there's no drop target, so the cell renders empty.
+  const showHandle = orderedIds.length >= 2;
+
   return (
-    <TableContainer component={Paper}>
-      <Table size="small">
-        <TableHead>
-          <TableRow>
-            <TableCell>{t("crf.table.column.code")}</TableCell>
-            <TableCell>{t("crf.table.column.name")}</TableCell>
-            <TableCell>{t("crf.table.column.taker")}</TableCell>
-            <TableCell>{t("crf.table.column.status")}</TableCell>
-            <TableCell align="right">
-              <Tooltip title={t("crf.table.action.addForm")}>
-                <IconButton
-                  size="small"
-                  aria-label={t("crf.table.action.addForm")}
-                  onClick={onAdd}
-                >
-                  <AddIcon />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title={t("crf.table.action.filter")}>
-                <IconButton
-                  size="small"
-                  aria-label={t("crf.table.action.filter")}
-                  onClick={onFilter}
-                  disabled={!canAddFilter}
-                >
-                  <FilterListIcon />
-                </IconButton>
-              </Tooltip>
-            </TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.length === 0 && !loading && !error && (
+    <DragDropProvider
+      onDragEnd={(event) => {
+        const next = applyReorder(orderedIds, event);
+        if (next == null) return;
+        setInternalOrder(next);
+        onReorder(next);
+      }}
+    >
+      <TableContainer component={Paper}>
+        <Table size="small">
+          <TableHead>
             <TableRow>
-              <TableCell colSpan={5} align="center">
-                <Box sx={{ py: 3, color: "text.secondary" }}>
-                  {t("common.noData")}
-                </Box>
-              </TableCell>
-            </TableRow>
-          )}
-          {rows.map((row) => (
-            <TableRow key={row.id} hover>
-              <TableCell>{row.code}</TableCell>
-              <TableCell>{row.name}</TableCell>
-              <TableCell />
-              <TableCell>
-                <Chip
-                  icon={<PendingActionsIcon />}
-                  label={t("crf.toolbar.statusPending")}
-                  size="small"
-                  color="warning"
-                  variant="outlined"
-                />
-              </TableCell>
+              <TableCell sx={{ width: 40 }} />
+              <TableCell>{t("crf.table.column.code")}</TableCell>
+              <TableCell>{t("crf.table.column.name")}</TableCell>
+              <TableCell>{t("crf.table.column.taker")}</TableCell>
+              <TableCell>{t("crf.table.column.status")}</TableCell>
               <TableCell align="right">
-                <Tooltip title={t("crf.table.action.assignTakers")}>
+                <Tooltip title={t("crf.table.action.addForm")}>
                   <IconButton
                     size="small"
-                    aria-label={t("crf.table.action.assignTakers")}
-                    onClick={() => onAssignTakers(row)}
+                    aria-label={t("crf.table.action.addForm")}
+                    onClick={onAdd}
                   >
-                    <AssignmentIndIcon />
+                    <AddIcon />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title={t("crf.table.action.edit")}>
+                <Tooltip title={t("crf.table.action.filter")}>
                   <IconButton
                     size="small"
-                    aria-label={t("crf.table.action.edit")}
-                    onClick={() => onEdit(row)}
+                    aria-label={t("crf.table.action.filter")}
+                    onClick={onFilter}
+                    disabled={!canAddFilter}
                   >
-                    <EditIcon />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title={t("crf.table.action.delete")}>
-                  <IconButton
-                    size="small"
-                    aria-label={t("crf.table.action.delete")}
-                    onClick={() => onDelete(row)}
-                  >
-                    <DeleteIcon />
-                  </IconButton>
-                </Tooltip>
-                <Tooltip title={t("crf.table.action.openDetail")}>
-                  <IconButton
-                    size="small"
-                    aria-label={t("crf.table.action.openDetail")}
-                    onClick={() => onOpenDetail(row)}
-                  >
-                    <LaunchIcon />
+                    <FilterListIcon />
                   </IconButton>
                 </Tooltip>
               </TableCell>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableContainer>
+          </TableHead>
+          <TableBody>
+            {rows.length === 0 && !loading && !error && (
+              <TableRow>
+                <TableCell colSpan={6} align="center">
+                  <Box sx={{ py: 3, color: "text.secondary" }}>
+                    {t("common.noData")}
+                  </Box>
+                </TableCell>
+              </TableRow>
+            )}
+            {orderedIds.map((id) => {
+              const row = rowById.get(id);
+              if (!row) return null;
+              return (
+                <DraggableRow
+                  key={row.id}
+                  row={row}
+                  showHandle={showHandle}
+                  onAssignTakers={onAssignTakers}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  onOpenDetail={onOpenDetail}
+                />
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </DragDropProvider>
   );
 }
