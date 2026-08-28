@@ -4,7 +4,8 @@ use tauri::State;
 
 use crate::http::client::HttpClient;
 use crate::http::crf::form::{
-    self, CreateCrfFormRequest, CrfFormViewResponse, UpdateCrfFormRequest,
+    self, CreateCrfFormRequest, CrfFormListResponse, CrfFormViewResponse,
+    UpdateCrfFormRequest,
 };
 use crate::http::dto::ApiError;
 
@@ -12,7 +13,7 @@ use crate::http::dto::ApiError;
 pub async fn list_crf_forms_by_version(
     client: State<'_, HttpClient>,
     version_id: i64,
-) -> Result<Vec<CrfFormViewResponse>, ApiError> {
+) -> Result<CrfFormListResponse, ApiError> {
     form::list_by_version(&client, version_id).await
 }
 

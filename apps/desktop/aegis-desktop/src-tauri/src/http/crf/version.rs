@@ -25,15 +25,13 @@ pub struct CrfVersionListResponse {
 pub async fn list_by_project(
     c: &HttpClient,
     project_code: &str,
-) -> Result<Vec<CrfVersionViewResponse>, ApiError> {
-    let resp: CrfVersionListResponse = c
-        .request(
-            reqwest::Method::GET,
-            &format!("/api/crf/projects/{project_code}/versions"),
-            None::<&()>,
-        )
-        .await?;
-    Ok(resp.versions)
+) -> Result<CrfVersionListResponse, ApiError> {
+    c.request(
+        reqwest::Method::GET,
+        &format!("/api/crf/projects/{project_code}/versions"),
+        None::<&()>,
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -67,13 +65,13 @@ mod tests {
             })))
             .mount(&server)
             .await;
-        let versions = list_by_project(&client(&server), "abc").await.unwrap();
-        assert_eq!(versions.len(), 1);
-        assert_eq!(versions[0].id, 1);
-        assert_eq!(versions[0].project_code, "abc");
-        assert_eq!(versions[0].name, "v1");
+        let resp = list_by_project(&client(&server), "abc").await.unwrap();
+        assert_eq!(resp.versions.len(), 1);
+        assert_eq!(resp.versions[0].id, 1);
+        assert_eq!(resp.versions[0].project_code, "abc");
+        assert_eq!(resp.versions[0].name, "v1");
         assert_eq!(
-            versions[0].created_at,
+            resp.versions[0].created_at,
             Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()
         );
     }

@@ -51,15 +51,13 @@ pub struct UpdateCrfFormRequest {
 pub async fn list_by_version(
     c: &HttpClient,
     version_id: i64,
-) -> Result<Vec<CrfFormViewResponse>, ApiError> {
-    let resp: CrfFormListResponse = c
-        .request(
-            reqwest::Method::GET,
-            &format!("/api/crf/versions/{version_id}/forms"),
-            None::<&()>,
-        )
-        .await?;
-    Ok(resp.forms)
+) -> Result<CrfFormListResponse, ApiError> {
+    c.request(
+        reqwest::Method::GET,
+        &format!("/api/crf/versions/{version_id}/forms"),
+        None::<&()>,
+    )
+    .await
 }
 
 pub async fn create(
@@ -151,12 +149,12 @@ mod tests {
             })))
             .mount(&server)
             .await;
-        let forms = list_by_version(&client(&server), 7).await.unwrap();
-        assert_eq!(forms.len(), 1);
-        assert_eq!(forms[0].id, 11);
-        assert_eq!(forms[0].version_id, 7);
-        assert_eq!(forms[0].code, "AE");
-        assert_eq!(forms[0].name, "Adverse Events");
+        let resp = list_by_version(&client(&server), 7).await.unwrap();
+        assert_eq!(resp.forms.len(), 1);
+        assert_eq!(resp.forms[0].id, 11);
+        assert_eq!(resp.forms[0].version_id, 7);
+        assert_eq!(resp.forms[0].code, "AE");
+        assert_eq!(resp.forms[0].name, "Adverse Events");
     }
 
     #[tokio::test]
