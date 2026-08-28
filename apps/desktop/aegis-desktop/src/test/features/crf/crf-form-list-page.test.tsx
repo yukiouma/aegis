@@ -6,6 +6,8 @@ import { AegisThemeProvider } from "@aegis/ui/theme";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
+import type { CrfForm } from "../../../shared/api";
+import { computeNewFullOrder } from "../../../features/crf/pages/CrfFormListPage";
 import { renderWithFullRouter } from "../../helpers/file-route-utils";
 import { mockCommands, mockInvoke } from "../../helpers/tauri-mock";
 import { TestQueryProvider } from "../../helpers/test-query-provider";
@@ -71,5 +73,66 @@ describe("CrfFormListPage", () => {
 
     expect(await screen.findByText("Adverse Events")).toBeInTheDocument();
     expect(screen.getByText("AE")).toBeInTheDocument();
+  });
+});
+
+describe("computeNewFullOrder", () => {
+  const row = (id: number, code: string): CrfForm => ({
+    id,
+    versionId: 7,
+    code,
+    name: `Form ${code}`,
+    order: id,
+    notSubmitted: false,
+    createdAt: "",
+    updatedAt: "",
+  });
+
+  it("returns an empty array when allRows is empty", () => {
+    expect(computeNewFullOrder([], [], [])).toEqual([]);
+  });
+
+  it("returns newVisibleIds unchanged when filteredRows equals allRows", () => {
+    const allRows = [row(1, "AE"), row(2, "VS"), row(3, "LB")];
+    const newOrder = computeNewFullOrder(allRows, [3, 1, 2], allRows);
+    expect(newOrder).toEqual([3, 1, 2]);
+  });
+
+  it("splices the new visible order into the original full order, keeping hidden rows at their original slots", () => {
+    // full = [A, B, C, D, E]; visible = [A, C, E]; newVisible = [E, A, C]
+    // expected full = [E, B, A, D, C]
+    const allRows = [
+      row(1, "A"),
+      row(2, "B"),
+      row(3, "C"),
+      row(4, "D"),
+      row(5, "E"),
+    ];
+    const visibleRows = [allRows[0]!, allRows[2]!, allRows[4]!];
+    expect(computeNewFullOrder(allRows, [5, 1, 3], visibleRows)).toEqual([
+      5, 2, 1, 4, 3,
+    ]);
+  });
+
+  it("falls back to the original id at a visible slot when newVisibleIds runs short", () => {
+    // Defensive: cursor exhausted → preserve original id.
+    const allRows = [row(1, "A"), row(2, "B"), row(3, "C")];
+    const visibleRows = [allRows[0]!, allRows[2]!];
+    const out = computeNewFullOrder(allRows, [1], visibleRows);
+    // The visible set in allRows is [A, C]; cursor consumes newVisibleIds[0]=1 → A;
+    // then C slot — cursor >= 1 → fall back to original id 3.
+    expect(out).toEqual([1, 2, 3]);
+  });
+
+  it("ignores a newVisibleIds tail beyond visibleRows.length", () => {
+    const allRows = [row(1, "A"), row(2, "B"), row(3, "C")];
+    const visibleRows = [allRows[0]!];
+    const out = computeNewFullOrder(allRows, [1, 99, 99], visibleRows);
+    expect(out).toEqual([1, 2, 3]);
+  });
+
+  it("produces a full-length output regardless of input edge cases", () => {
+    const allRows = [row(1, "A"), row(2, "B"), row(3, "C"), row(4, "D")];
+    expect(computeNewFullOrder(allRows, [], [])).toEqual([1, 2, 3, 4]);
   });
 });

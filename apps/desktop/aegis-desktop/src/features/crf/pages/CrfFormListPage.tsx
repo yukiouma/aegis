@@ -36,6 +36,40 @@ type DrawerState =
   | { mode: "edit"; row: CrfForm }
   | null;
 
+/**
+ * Splice a new visible-row order into the full row order, preserving the
+ * position of rows that aren't in the visible set. Used by `handleReorder`
+ * so that dropping a row on a filtered list only repositions the rows the
+ * user can see.
+ *
+ * Defensive guards:
+ *   - if `newVisibleIds` runs short of `visibleRows`, the missing slots fall
+ *     back to the original row id at that position.
+ *   - if `newVisibleIds` is longer than `visibleRows`, only the first
+ *     `visibleRows.length` entries are consumed.
+ */
+export function computeNewFullOrder(
+  allRows: CrfForm[],
+  newVisibleIds: number[],
+  visibleRows: CrfForm[],
+): number[] {
+  const visibleIds = new Set(visibleRows.map((r) => r.id));
+  const out: number[] = [];
+  let cursor = 0;
+  for (const row of allRows) {
+    if (visibleIds.has(row.id)) {
+      const id =
+        cursor < newVisibleIds.length
+          ? newVisibleIds[cursor++]
+          : row.id;
+      out.push(id);
+    } else {
+      out.push(row.id);
+    }
+  }
+  return out;
+}
+
 export function CrfFormListPage() {
   const { projectCode } = useParams({ strict: false }) as {
     projectCode: string;
