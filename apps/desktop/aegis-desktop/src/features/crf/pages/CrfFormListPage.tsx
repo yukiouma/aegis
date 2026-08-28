@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   CircularProgress,
-  Typography,
 } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
 import {
@@ -118,36 +117,31 @@ export function CrfFormListPage() {
     deleteMutation.isPending;
 
   return (
-    <Box sx={{ p: 4, display: "flex", flexDirection: "column", gap: 2 }}>
-      <Typography variant="h4">
-        {t("crf.formList.heading", { projectCode })}
-      </Typography>
-
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: 2,
-        }}
-      >
-        <CrfVersionDropdown
-          versions={versions}
-          value={selectedVersionId}
-          onChange={(versionId) =>
-            navigate({
-              to: "/project/$projectCode/crf",
-              params: { projectCode },
-              search: { versionId },
-            })
-          }
-          disabled={versions.length === 0}
-        />
-        <CrfStatusChip />
-        <Box sx={{ flexGrow: 1 }} />
-        <CrfGlobalSearchButton projectCode={projectCode} />
-      </Box>
+    <Box sx={{ p: 4, display: "flex", flexDirection: "column", gap: 2 }}><Box
+      sx={{
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "center",
+        flexWrap: "wrap",
+        gap: 2,
+      }}
+    >
+      <CrfVersionDropdown
+        versions={versions}
+        value={selectedVersionId}
+        onChange={(versionId) =>
+          navigate({
+            to: "/project/$projectCode/crf",
+            params: { projectCode },
+            search: { versionId },
+          })
+        }
+        disabled={versions.length === 0}
+      />
+      <CrfStatusChip />
+      <Box sx={{ flexGrow: 1 }} />
+      <CrfGlobalSearchButton projectCode={projectCode} />
+    </Box>
 
       {versionsQuery.isError && (
         <Alert severity="error">{errorMessage(versionsQuery.error)}</Alert>

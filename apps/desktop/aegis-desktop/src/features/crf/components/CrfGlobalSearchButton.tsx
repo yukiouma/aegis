@@ -8,7 +8,7 @@ import {
   Tooltip,
 } from "@aegis/ui/mui";
 import {
-  MoreVert as MoreVertIcon,
+  Widgets as WidgetsIcon,
   Search as SearchIcon,
 } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
@@ -42,7 +42,7 @@ export function CrfGlobalSearchButton({
           onClick={(e) => setAnchorEl(e.currentTarget)}
           size="small"
         >
-          <MoreVertIcon />
+          <WidgetsIcon />
         </IconButton>
       </Tooltip>
       <Menu
