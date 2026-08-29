@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
 import {
   Alert,
-  Box,
   Button,
   Checkbox,
-  Drawer,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   FormControlLabel,
   InputLabel,
   MenuItem,
   Select,
-  Stack,
   TextField,
-  Typography,
 } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
 
@@ -98,92 +98,92 @@ export function AnnotationDialog({
   }
 
   return (
-    <Drawer
-      anchor="right"
+    <Dialog
       open={open}
       onClose={onClose}
-      slotProps={{ paper: { sx: { width: 480 } } }}
+      maxWidth="sm"
+      fullWidth
     >
-      <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}>
-        <Typography variant="h6">
-          {t(
-            mode === "create"
-              ? "crf.annotationDialog.create.title"
-              : "crf.annotationDialog.edit.title",
-          )}
-        </Typography>
-        <Stack spacing={2}>
-          <FormControl size="small" disabled={mode === "edit"}>
-            <InputLabel id="annotation-domain-annotation-label">
-              {t("crf.annotationDialog.field.domainAnnotation")}
-            </InputLabel>
-            <Select
-              labelId="annotation-domain-annotation-label"
-              label={t("crf.annotationDialog.field.domainAnnotation")}
-              value={body.domainAnnotationId || ""}
-              onChange={(e) =>
-                setBody((b) => ({
-                  ...b,
-                  domainAnnotationId: Number(e.target.value) || 0,
-                }))
-              }
-              required
-            >
-              {availableDomainAnnotations.length === 0 && (
-                <MenuItem value="" disabled>
-                  {t("crf.annotationDialog.domainAnnotation.none")}
-                </MenuItem>
-              )}
-              {availableDomainAnnotations.map((d) => (
-                <MenuItem key={d.id} value={d.id}>
-                  {d.name}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-          <TextField
-            size="small"
-            label={t("crf.annotationDialog.field.content")}
-            value={body.content}
+      <DialogTitle>
+        {t(
+          mode === "create"
+            ? "crf.annotationDialog.create.title"
+            : "crf.annotationDialog.edit.title",
+        )}
+      </DialogTitle>
+      <DialogContent
+        sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 2 }}
+      >
+        <FormControl size="small" disabled={mode === "edit"}>
+          <InputLabel id="annotation-domain-annotation-label">
+            {t("crf.annotationDialog.field.domainAnnotation")}
+          </InputLabel>
+          <Select
+            labelId="annotation-domain-annotation-label"
+            label={t("crf.annotationDialog.field.domainAnnotation")}
+            value={body.domainAnnotationId || ""}
             onChange={(e) =>
-              setBody((b) => ({ ...b, content: e.target.value }))
+              setBody((b) => ({
+                ...b,
+                domainAnnotationId: Number(e.target.value) || 0,
+              }))
             }
-            multiline
-            minRows={3}
             required
-          />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={body.assign}
-                onChange={(e) =>
-                  setBody((b) => ({ ...b, assign: e.target.checked }))
-                }
-              />
-            }
-            label={t("crf.annotationDialog.field.assign")}
-          />
-        </Stack>
+          >
+            {availableDomainAnnotations.length === 0 && (
+              <MenuItem value="" disabled>
+                {t("crf.annotationDialog.domainAnnotation.none")}
+              </MenuItem>
+            )}
+            {availableDomainAnnotations.map((d) => (
+              <MenuItem key={d.id} value={d.id}>
+                {d.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <TextField
+          size="small"
+          label={t("crf.annotationDialog.field.content")}
+          value={body.content}
+          onChange={(e) =>
+            setBody((b) => ({ ...b, content: e.target.value }))
+          }
+          multiline
+          minRows={3}
+          required
+        />
+        <FormControlLabel
+          control={
+            <Checkbox
+              checked={body.assign}
+              onChange={(e) =>
+                setBody((b) => ({ ...b, assign: e.target.checked }))
+              }
+            />
+          }
+          label={t("crf.annotationDialog.field.assign")}
+        />
         {mutationError && (
           <Alert severity="error">{errorMessage(mutationError)}</Alert>
         )}
-        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-          <Button onClick={onClose} disabled={mutationPending}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleSubmit}
-            disabled={submitDisabled}
-          >
-            {t(
-              mode === "create"
-                ? "crf.annotationDialog.submit.create"
-                : "crf.annotationDialog.submit.save",
-            )}
-          </Button>
-        </Box>
-      </Box>
-    </Drawer>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={mutationPending}>
+          {t("common.cancel")}
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handleSubmit}
+          disabled={submitDisabled}
+        >
+          {t(
+            mode === "create"
+              ? "crf.annotationDialog.submit.create"
+              : "crf.annotationDialog.submit.save",
+          )}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
