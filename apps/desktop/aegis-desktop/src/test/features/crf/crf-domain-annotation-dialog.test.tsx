@@ -86,4 +86,26 @@ describe("DomainAnnotationDialog", () => {
       screen.queryByTestId("crf-domain-dialog-not-submit"),
     ).not.toBeInTheDocument();
   });
+
+  it("hides the Not submit button in edit mode", () => {
+    // The Not submit action is a "decide whether the form needs
+    // the flag" affordance. In edit mode the user is changing an
+    // existing domain annotation's name / description, not making
+    // that decision — so the button must be hidden even when the
+    // form is currently submitted.
+    renderDialog({
+      mode: "edit",
+      row: {
+        id: 50,
+        formId: 11,
+        name: "AE",
+        description: "Adverse Events",
+        createdAt: "",
+        updatedAt: "",
+      },
+    });
+    expect(
+      screen.queryByTestId("crf-domain-dialog-not-submit"),
+    ).not.toBeInTheDocument();
+  });
 });

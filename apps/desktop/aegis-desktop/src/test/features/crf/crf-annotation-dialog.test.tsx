@@ -113,4 +113,27 @@ describe("AnnotationDialog", () => {
       screen.queryByTestId("crf-annotation-dialog-not-submit"),
     ).not.toBeInTheDocument();
   });
+
+  it("hides the Not submit button in edit mode", () => {
+    // The Not submit action is a "decide whether this owner needs
+    // the flag" affordance. In edit mode the user is changing an
+    // existing annotation's content / assign, not making that
+    // decision — so the button must be hidden even when the
+    // owner is currently submitted.
+    renderDialog({
+      mode: "edit",
+      row: {
+        id: 100,
+        domainAnnotationId: 50,
+        content: "old note",
+        assign: true,
+        owner,
+        createdAt: "",
+        updatedAt: "",
+      },
+    });
+    expect(
+      screen.queryByTestId("crf-annotation-dialog-not-submit"),
+    ).not.toBeInTheDocument();
+  });
 });

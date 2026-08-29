@@ -109,9 +109,12 @@ export function AnnotationDialog({
     mutationPending ||
     body.content.trim() === "" ||
     body.domainAnnotationId === 0;
-  // The Not submit action is one-way: only show it when the
-  // owner is currently submitted (notSubmitted === false).
-  const markVisible = !ownerNotSubmitted;
+  // The Not submit action is one-way and only meaningful when
+  // creating a fresh annotation. Hide it in edit mode — the user
+  // is editing an existing row, not deciding whether the owner
+  // needs a flag — and hide it once the owner is already
+  // not-submitted.
+  const markVisible = mode === "create" && !ownerNotSubmitted;
   const markDisabled =
     markNotSubmittedPending || mutationPending;
 

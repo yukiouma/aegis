@@ -82,11 +82,12 @@ export function DomainAnnotationDialog({
   }, [open, mode, row]);
 
   const submitDisabled = mutationPending || body.name.trim() === "";
-  // The Not submit action is one-way: only show it when the form
-  // is currently submitted (notSubmitted === false). Once the form
-  // is marked not-submitted the user can no longer toggle it from
-  // this dialog.
-  const markVisible = !formNotSubmitted;
+  // The Not submit action is one-way and only meaningful when
+  // creating a fresh domain annotation. Hide it in edit mode —
+  // the user is editing an existing row, not deciding whether the
+  // form needs a flag — and hide it once the form is already
+  // not-submitted.
+  const markVisible = mode === "create" && !formNotSubmitted;
   const markDisabled =
     markNotSubmittedPending || mutationPending;
 

@@ -34,6 +34,24 @@ interface Props {
    * step so the row doesn't advertise a click that won't fire.
    */
   formNotSubmitted: boolean;
+  /**
+   * The item's own `notSubmitted` flag. When the item itself is
+   * marked not-submitted the cascade has already wiped the
+   * item's annotations AND the annotations on its options and
+   * units, so every create-annotation entry point in this row
+   * must be blocked. The page surfaces the same flag on the
+   * `NotSubmittedChip` so the user can flip the item back to
+   * submitted without going through the form-level chip.
+   */
+  itemNotSubmitted: boolean;
+  /**
+   * Whether the form has any domain annotations at all. An
+   * annotation needs a domain annotation to belong to, so when
+   * the form has none, every create-annotation entry point must
+   * be blocked. The page also gates the `New annotation` menu
+   * item on the same condition; this prop keeps the row in sync.
+   */
+  noDomainAnnotations: boolean;
 }
 
 export function CrfItemRow({
@@ -44,19 +62,29 @@ export function CrfItemRow({
   onDeleteAnnotation,
   onClearNotSubmitted,
   formNotSubmitted,
+  itemNotSubmitted,
+  noDomainAnnotations,
 }: Props) {
   const { t } = useI18n();
   const { item, options, units, annotations } = itemDetail;
+  // Collapse the three "no new annotations" guards into one. When
+  // any of these is true every create-annotation entry point on
+  // this row must short-circuit — the form cascade has wiped
+  // every annotation, the item cascade has wiped this row's
+  // annotations, or there is no domain annotation to assign a
+  // new annotation to.
+  const rowBlocked =
+    formNotSubmitted || itemNotSubmitted || noDomainAnnotations;
   // Build the create-annotation handler once per row so the click
-  // short-circuits under a single readable guard instead of repeating
-  // `if (formNotSubmitted) return` at every call site.
+  // short-circuits under a single readable guard instead of
+  // repeating the conditions at every call site.
   const createFor = (owner: AnnotationOwner) => {
-    if (formNotSubmitted) return;
+    if (rowBlocked) return;
     onCreateAnnotation(owner);
   };
   // Match MUI's disabled-MenuItem look: drop the pointer cursor and
   // the hover underline so the row doesn't lie about being clickable.
-  const clickableSx = formNotSubmitted
+  const clickableSx = rowBlocked
     ? undefined
     : {
         cursor: "pointer" as const,

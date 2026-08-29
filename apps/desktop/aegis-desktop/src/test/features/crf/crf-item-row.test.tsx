@@ -64,6 +64,8 @@ function renderRow(overrides: Partial<React.ComponentProps<typeof CrfItemRow>> =
         onDeleteAnnotation={onDeleteAnnotation}
         onClearNotSubmitted={onClearNotSubmitted}
         formNotSubmitted={false}
+        itemNotSubmitted={false}
+        noDomainAnnotations={false}
         {...overrides}
       />
     </AegisI18nProvider>,
@@ -181,6 +183,86 @@ describe("CrfItemRow", () => {
       expect(onClearNotSubmitted).toHaveBeenCalledWith({
         kind: "item",
         id: 21,
+      });
+    });
+  });
+
+  // When the item itself is marked not-submitted, the item-level
+  // cascade has wiped the item's annotations AND the annotations
+  // on its options and units, so every create-annotation entry
+  // point on the row must short-circuit — not just the item.
+  describe("when itemNotSubmitted=true", () => {
+    it("ignores clicks on the item name", () => {
+      const { onCreateAnnotation } = renderRow({ itemNotSubmitted: true });
+      fireEvent.click(screen.getByTestId("crf-item-name-21"));
+      expect(onCreateAnnotation).not.toHaveBeenCalled();
+    });
+
+    it("ignores clicks on the option value (cascade wiped option annotations)", () => {
+      const { onCreateAnnotation } = renderRow({ itemNotSubmitted: true });
+      fireEvent.click(screen.getByTestId("crf-option-31"));
+      expect(onCreateAnnotation).not.toHaveBeenCalled();
+    });
+
+    it("ignores clicks on the unit value (cascade wiped unit annotations)", () => {
+      const { onCreateAnnotation } = renderRow({ itemNotSubmitted: true });
+      fireEvent.click(screen.getByTestId("crf-unit-41"));
+      expect(onCreateAnnotation).not.toHaveBeenCalled();
+    });
+
+    it("drops the pointer cursor on the clickable labels", () => {
+      renderRow({ itemNotSubmitted: true });
+      expect(screen.getByTestId("crf-item-name-21")).not.toHaveStyle({
+        cursor: "pointer",
+      });
+      expect(screen.getByTestId("crf-option-31")).not.toHaveStyle({
+        cursor: "pointer",
+      });
+      expect(screen.getByTestId("crf-unit-41")).not.toHaveStyle({
+        cursor: "pointer",
+      });
+    });
+  });
+
+  // An annotation needs a domain annotation to belong to. When the
+  // form has none, every create-annotation entry point on the row
+  // must short-circuit — the page also gates the form-level
+  // `New annotation` menu item on the same condition.
+  describe("when noDomainAnnotations=true", () => {
+    it("ignores clicks on the item name", () => {
+      const { onCreateAnnotation } = renderRow({
+        noDomainAnnotations: true,
+      });
+      fireEvent.click(screen.getByTestId("crf-item-name-21"));
+      expect(onCreateAnnotation).not.toHaveBeenCalled();
+    });
+
+    it("ignores clicks on the option value", () => {
+      const { onCreateAnnotation } = renderRow({
+        noDomainAnnotations: true,
+      });
+      fireEvent.click(screen.getByTestId("crf-option-31"));
+      expect(onCreateAnnotation).not.toHaveBeenCalled();
+    });
+
+    it("ignores clicks on the unit value", () => {
+      const { onCreateAnnotation } = renderRow({
+        noDomainAnnotations: true,
+      });
+      fireEvent.click(screen.getByTestId("crf-unit-41"));
+      expect(onCreateAnnotation).not.toHaveBeenCalled();
+    });
+
+    it("drops the pointer cursor on the clickable labels", () => {
+      renderRow({ noDomainAnnotations: true });
+      expect(screen.getByTestId("crf-item-name-21")).not.toHaveStyle({
+        cursor: "pointer",
+      });
+      expect(screen.getByTestId("crf-option-31")).not.toHaveStyle({
+        cursor: "pointer",
+      });
+      expect(screen.getByTestId("crf-unit-41")).not.toHaveStyle({
+        cursor: "pointer",
       });
     });
   });

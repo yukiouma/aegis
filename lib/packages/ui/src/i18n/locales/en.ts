@@ -362,6 +362,8 @@ export const en = {
   "crf.detail.menu.newAnnotation": "New annotation",
   "crf.detail.menu.disabledWhenNotSubmitted":
     "The form is marked not submitted; clear the flag to create new annotations.",
+  "crf.detail.menu.disabledWhenNoDomainAnnotations":
+    "Create a domain annotation first; annotations must belong to a domain annotation.",
   "crf.detail.itemRow.disabledWhenNotSubmitted":
     "The form is marked not submitted; clear the flag to add annotations.",
   "crf.detail.domainChip.label": "{name} ({description})",

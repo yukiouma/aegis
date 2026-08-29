@@ -178,6 +178,12 @@ export function CrfDetailPage() {
 
   const form = query.data;
   const detail = detailQuery.data;
+  // An annotation needs a domain annotation to belong to, so when
+  // the form has none, every create-annotation entry point must
+  // be blocked. The "New domain annotation" path stays open — it's
+  // how the first one is created.
+  const noDomainAnnotations =
+    (detail?.domainAnnotations.length ?? 0) === 0;
 
   const activeDomainMutation =
     createDomain.error ?? updateDomain.error ?? deleteDomain.error ?? null;
@@ -202,6 +208,11 @@ export function CrfDetailPage() {
     // option click handlers also gate themselves, but a future caller
     // (or a hot-reload flicker) shouldn't be able to slip through.
     if (form?.notSubmitted) return;
+    // An annotation needs a domain annotation to belong to, so
+    // block creation until at least one exists. The "New domain
+    // annotation" path stays open — that's how the first one is
+    // created.
+    if (noDomainAnnotations) return;
     setAnnotationDialog({ mode: "create", owner });
   };
 
@@ -293,15 +304,25 @@ export function CrfDetailPage() {
               title={
                 form?.notSubmitted
                   ? t("crf.detail.menu.disabledWhenNotSubmitted")
-                  : ""
+                  : noDomainAnnotations
+                    ? t("crf.detail.menu.disabledWhenNoDomainAnnotations")
+                    : ""
               }
-              disableHoverListener={!form?.notSubmitted}
-              disableFocusListener={!form?.notSubmitted}
-              disableTouchListener={!form?.notSubmitted}
+              disableHoverListener={
+                !form?.notSubmitted && !noDomainAnnotations
+              }
+              disableFocusListener={
+                !form?.notSubmitted && !noDomainAnnotations
+              }
+              disableTouchListener={
+                !form?.notSubmitted && !noDomainAnnotations
+              }
             >
               <span>
                 <MenuItem
-                  disabled={Boolean(form?.notSubmitted)}
+                  disabled={
+                    Boolean(form?.notSubmitted) || noDomainAnnotations
+                  }
                   onClick={() => {
                     setFormNameMenuAnchor(null);
                     openCreateAnnotation({ kind: "form", id });
@@ -419,6 +440,8 @@ export function CrfDetailPage() {
                   })
                 }
                 formNotSubmitted={Boolean(form?.notSubmitted)}
+                itemNotSubmitted={Boolean(itemDetail.item.notSubmitted)}
+                noDomainAnnotations={noDomainAnnotations}
               />
             ))
           )}

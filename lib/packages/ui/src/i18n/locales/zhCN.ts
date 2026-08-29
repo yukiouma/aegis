@@ -352,6 +352,8 @@ export const zhCN = {
   "crf.detail.menu.newAnnotation": "新建注释",
   "crf.detail.menu.disabledWhenNotSubmitted":
     "表单已标记为未提交，请清除该标记后再新建。",
+  "crf.detail.menu.disabledWhenNoDomainAnnotations":
+    "请先创建域注释，再新建注释（注释必须归属于某个域注释）。",
   "crf.detail.itemRow.disabledWhenNotSubmitted":
     "表单已标记为未提交，请清除该标记后再添加注释。",
   "crf.detail.domainChip.label": "{name}（{description}）",

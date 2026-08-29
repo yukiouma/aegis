@@ -554,9 +554,10 @@ describe("CrfDetailPage", () => {
     ).toBe(false);
   });
 
-  it("cascades annotations and domain annotations when clicking `Not submit` in the DomainAnnotationDialog", async () => {
-    // Open the DomainAnnotationDialog for the AE domain annotation
-    // and click the dialog's `Not submit` button. The page must:
+  it("cascades annotations and domain annotations when clicking `Not submit` in the create-annotation dialog", async () => {
+    // Open the AnnotationDialog for the form in CREATE mode
+    // (via the form-name hover menu's `New annotation` entry) and
+    // click the dialog's `Not submit` button. The page must:
     //   1. delete every annotation attached to the form (here:
     //      form 100 + item 110),
     //   2. delete every domain annotation in the form (here: AE id 50),
@@ -564,6 +565,12 @@ describe("CrfDetailPage", () => {
     // Order matters: annotations → domain annotations → form PATCH,
     // so a halfway failure surfaces rather than leaving the form in a
     // half-cleared state.
+    //
+    // We use the AnnotationDialog in create mode rather than the
+    // DomainAnnotationDialog in edit mode because the form-level
+    // `Not submit` action is now only exposed while creating a new
+    // annotation / domain annotation. Editing an existing row is
+    // a name / content change, not a form-level flag decision.
     mockCommands({
       is_logged_in: () => true,
       current_user: () => fakeUser,
@@ -576,14 +583,32 @@ describe("CrfDetailPage", () => {
 
     renderPage(["/project/abc/crf/11"]);
 
-    // Open the domain annotation dialog by clicking the chip.
-    const chip = await screen.findByTestId("domain-annotation-chip-50");
-    fireEvent.click(chip);
+    // Open the form-name hover menu and click `New annotation`.
+    // Double-click pattern matches the menu-disable tests above —
+    // the first click after the menu mount is occasionally
+    // swallowed by React 18's microtask batching.
+    const formName = await screen.findByTestId("crf-form-name");
+    fireEvent.click(formName);
+    fireEvent.click(formName);
+    await waitFor(() => {
+      expect(
+        document.querySelectorAll(".MuiMenuItem-root").length,
+      ).toBeGreaterThanOrEqual(2);
+    });
+    const menuItems = Array.from(
+      document.querySelectorAll<HTMLElement>(".MuiMenuItem-root"),
+    );
+    const newAnnotation = menuItems.find(
+      (el) => el.textContent?.trim() === "New annotation",
+    );
+    expect(newAnnotation).toBeDefined();
+    fireEvent.click(newAnnotation!);
 
     // The dialog should expose a `Not submit` action button (the
-    // form is currently submitted, i.e. notSubmitted === false).
+    // form is currently submitted, i.e. notSubmitted === false,
+    // and the dialog is in create mode).
     const notSubmit = await screen.findByTestId(
-      "crf-domain-dialog-not-submit",
+      "crf-annotation-dialog-not-submit",
     );
     expect(notSubmit).toBeInTheDocument();
     fireEvent.click(notSubmit);
@@ -671,11 +696,30 @@ describe("CrfDetailPage", () => {
     // Sanity: header starts without the chip — form is submitted.
     expect(screen.queryByTestId("not-submitted-chip")).not.toBeInTheDocument();
 
-    // Open the dialog and click `Not submit`.
-    const chip = await screen.findByTestId("domain-annotation-chip-50");
-    fireEvent.click(chip);
+    // Open the form-name hover menu and click `New annotation`
+    // to open the AnnotationDialog in create mode. The
+    // `Not submit` action is now only exposed while creating a
+    // new annotation / domain annotation, so we use the create
+    // path to trigger the form-level cascade.
+    const formName = await screen.findByTestId("crf-form-name");
+    fireEvent.click(formName);
+    fireEvent.click(formName);
+    await waitFor(() => {
+      expect(
+        document.querySelectorAll(".MuiMenuItem-root").length,
+      ).toBeGreaterThanOrEqual(2);
+    });
+    const menuItems = Array.from(
+      document.querySelectorAll<HTMLElement>(".MuiMenuItem-root"),
+    );
+    const newAnnotation = menuItems.find(
+      (el) => el.textContent?.trim() === "New annotation",
+    );
+    expect(newAnnotation).toBeDefined();
+    fireEvent.click(newAnnotation!);
+
     const notSubmit = await screen.findByTestId(
-      "crf-domain-dialog-not-submit",
+      "crf-annotation-dialog-not-submit",
     );
     fireEvent.click(notSubmit);
 
@@ -822,5 +866,143 @@ describe("CrfDetailPage", () => {
     expect(item).not.toHaveStyle({ cursor: "pointer" });
     expect(option).not.toHaveStyle({ cursor: "pointer" });
     expect(unit).not.toHaveStyle({ cursor: "pointer" });
+  });
+
+  it("ignores clicks on item / option / unit when the item itself is marked not submitted", async () => {
+    // When an item is marked not-submitted, the item-level cascade
+    // wipes the item's annotations AND the annotations on its
+    // options and units — so every create-annotation entry point
+    // on this row must short-circuit, not just the item. The
+    // form-level state stays submitted (notSubmitted=false) so
+    // the form chip / menu are unaffected; only this row is gated.
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => fakeForm,
+      get_crf_form_details: () => ({
+        ...fakeDetail,
+        items: [
+          {
+            ...fakeDetail.items[0]!,
+            item: { ...fakeDetail.items[0]!.item, notSubmitted: true },
+          },
+        ],
+      }),
+    });
+
+    renderPage(["/project/abc/crf/11"]);
+
+    // The per-row chip on the item is the visible signal that
+    // we're testing the item-not-submitted branch. Wait on it so
+    // the row has mounted before clicking.
+    const itemName = await screen.findByTestId("crf-item-name-21");
+    await screen.findByTestId("not-submitted-chip");
+    const option = screen.getByTestId("crf-option-31");
+    const unit = screen.getByTestId("crf-unit-41");
+
+    fireEvent.click(itemName);
+    fireEvent.click(option);
+    fireEvent.click(unit);
+
+    expect(
+      screen.queryByRole("heading", { name: /Create annotation/i }),
+    ).not.toBeInTheDocument();
+
+    // Same affordance drop as the form-not-submitted branch —
+    // the row is no longer advertised as clickable.
+    expect(itemName).not.toHaveStyle({ cursor: "pointer" });
+    expect(option).not.toHaveStyle({ cursor: "pointer" });
+    expect(unit).not.toHaveStyle({ cursor: "pointer" });
+  });
+
+  it("ignores clicks on item / option / unit when the form has no domain annotations", async () => {
+    // An annotation needs a domain annotation to belong to. While
+    // the form has none, every create-annotation entry point on
+    // the row must short-circuit. The form-level `New domain`
+    // menu item stays open — that's how the first one is created.
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => fakeForm,
+      get_crf_form_details: () => ({
+        ...fakeDetail,
+        // No domain annotation means no annotation can be created.
+        // Keep the existing form / item annotations so we know
+        // they don't influence the gating.
+        domainAnnotations: [],
+      }),
+    });
+
+    renderPage(["/project/abc/crf/11"]);
+
+    const item = await screen.findByTestId("crf-item-name-21");
+    const option = screen.getByTestId("crf-option-31");
+    const unit = screen.getByTestId("crf-unit-41");
+
+    fireEvent.click(item);
+    fireEvent.click(option);
+    fireEvent.click(unit);
+
+    expect(
+      screen.queryByRole("heading", { name: /Create annotation/i }),
+    ).not.toBeInTheDocument();
+    expect(item).not.toHaveStyle({ cursor: "pointer" });
+    expect(option).not.toHaveStyle({ cursor: "pointer" });
+    expect(unit).not.toHaveStyle({ cursor: "pointer" });
+  });
+
+  it("disables the New annotation menu item when the form has no domain annotations", async () => {
+    // The form-name hover menu's `New annotation` item is
+    // disabled (with a tooltip) when there are no domain
+    // annotations to assign to. `New domain` stays open — that's
+    // the path to creating the first one.
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => fakeForm,
+      get_crf_form_details: () => ({
+        ...fakeDetail,
+        domainAnnotations: [],
+      }),
+    });
+
+    renderPage(["/project/abc/crf/11"]);
+
+    const formName = await screen.findByTestId("crf-form-name");
+    // Same microtask-race workaround as the form-not-submitted
+    // test: the first click after `findByTestId` is occasionally
+    // swallowed by React 18 batching.
+    fireEvent.click(formName);
+    fireEvent.click(formName);
+    await waitFor(() => {
+      expect(
+        document.querySelectorAll(".MuiMenuItem-root").length,
+      ).toBeGreaterThanOrEqual(2);
+    });
+    const menuItems = Array.from(
+      document.querySelectorAll<HTMLElement>(".MuiMenuItem-root"),
+    );
+    const newDomain = menuItems.find(
+      (el) => el.textContent?.trim() === "New domain",
+    );
+    const newAnnotation = menuItems.find(
+      (el) => el.textContent?.trim() === "New annotation",
+    );
+    expect(newDomain).toBeDefined();
+    expect(newAnnotation).toBeDefined();
+
+    // Only the `New annotation` entry is gated; `New domain`
+    // stays enabled so the user can create the first one.
+    expect(newDomain).not.toHaveAttribute("aria-disabled", "true");
+    expect(newDomain).not.toHaveClass("Mui-disabled");
+    expect(newAnnotation).toHaveAttribute("aria-disabled", "true");
+    expect(newAnnotation).toHaveClass("Mui-disabled");
+
+    // Force-click past the disabled flag to prove the
+    // page-level guard also kicks in.
+    fireEvent.click(newAnnotation!);
+    expect(
+      screen.queryByRole("heading", { name: /Create annotation/i }),
+    ).not.toBeInTheDocument();
   });
 });
