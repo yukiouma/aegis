@@ -114,7 +114,7 @@ export function CrfItemRow({
         ))}
       </Box>
       {options.length > 0 && (
-        <Box sx={{ mt: 3, ml: 3, display: "flex", flexDirection: "column", gap: 1 }}>
+        <Box sx={{ mt: 3, display: "flex", flexDirection: "column", gap: 1 }}>
           {options.map((o) => (
             <Box
               key={o.option.id}
@@ -134,7 +134,7 @@ export function CrfItemRow({
               >
                 {o.option.value}
               </Typography>
-              <Stack direction="row">
+              <Stack direction="row" spacing={1}>
                 {o.annotations.map((a) => (
                   <AnnotationChip
                     key={a.id}
