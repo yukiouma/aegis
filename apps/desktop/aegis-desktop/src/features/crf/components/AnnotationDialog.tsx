@@ -151,8 +151,6 @@ export function AnnotationDialog({
             onChange={(e) =>
               setBody((b) => ({ ...b, content: e.target.value }))
             }
-            multiline
-            minRows={3}
             required
           />
           <FormControlLabel

@@ -94,8 +94,6 @@ export function DomainAnnotationDialog({
             label={t("crf.domainDialog.field.description")}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            multiline
-            minRows={2}
           />
           {mutationError && (
             <Alert severity="error">{errorMessage(mutationError)}</Alert>
