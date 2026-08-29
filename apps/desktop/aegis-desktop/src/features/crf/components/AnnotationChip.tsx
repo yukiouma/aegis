@@ -38,11 +38,6 @@ export function AnnotationChip({
       color={annotationColor(colorIndex)}
       onClick={onEdit}
       onDelete={onDelete}
-      deleteIcon={
-        <span data-testid="annotation-chip-delete" aria-hidden>
-          ×
-        </span>
-      }
       size="small"
       variant="outlined"
       // `assign: true` flips the chip border to a dotted line so the
@@ -50,7 +45,7 @@ export function AnnotationChip({
       // (vs. just describing the field). MUI's outlined Chip already
       // supplies border-color from the active colour and a 1px width;
       // overriding only `borderStyle` keeps the colour theming intact.
-      sx={annotation.assign ? { borderStyle: "dotted" } : undefined}
+      sx={annotation.assign ? { borderStyle: "dashed" } : undefined}
     />
   );
 }

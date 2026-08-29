@@ -59,7 +59,7 @@ describe("AnnotationChip", () => {
 
   it("clicking the delete icon calls onDelete", () => {
     const onDelete = vi.fn();
-    render(
+    const { container } = render(
       <AnnotationChip
         annotation={baseAnnotation}
         colorIndex={0}
@@ -67,7 +67,12 @@ describe("AnnotationChip", () => {
         onDelete={onDelete}
       />,
     );
-    fireEvent.click(screen.getByTestId("annotation-chip-delete"));
+    // MUI's Chip renders its delete affordance as an element with the
+    // `.MuiChip-deleteIcon` class — that's the only deleteIcon prop
+    // we override here is the default MUI icon.
+    const deleteIcon = container.querySelector(".MuiChip-deleteIcon");
+    expect(deleteIcon).not.toBeNull();
+    fireEvent.click(deleteIcon!);
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
 
@@ -98,7 +103,7 @@ describe("AnnotationChip", () => {
     }
   });
 
-  it("uses a solid border when assign is false and a dotted border when assign is true", () => {
+  it("uses a solid border when assign is false and a dashed border when assign is true", () => {
     const { rerender, unmount } = render(
       <AnnotationChip
         annotation={{ ...baseAnnotation, assign: false }}
@@ -123,7 +128,7 @@ describe("AnnotationChip", () => {
     expect(
       getComputedStyle(screen.getByText("form-level note").closest(".MuiChip-root") as Element)
         .borderStyle,
-    ).toBe("dotted");
+    ).toBe("dashed");
     unmount();
   });
 });
