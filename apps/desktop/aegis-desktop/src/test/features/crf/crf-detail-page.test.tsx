@@ -359,4 +359,72 @@ describe("CrfDetailPage", () => {
     const itemOrder = chipPositionsInDoc(["item-AE", "item-VS", "item-LB"]);
     expect(itemOrder).toEqual([0, 1, 2]);
   });
+
+  it("cascades a domain-annotation delete: deletes every annotation first, then the domain annotation", async () => {
+    // Fixture has 1 form-level annotation, 1 item-level annotation,
+    // and 1 option-level annotation — all linked to domainAnnotationId 50.
+    // A second domain annotation 99 has no annotations, so only 50
+    // should trigger the cascade.
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => fakeForm,
+      get_crf_form_details: () => fakeDetail,
+      // The cascade delete runs `delete_crf_annotation` once per
+      // linked annotation, then `delete_crf_domain_annotation` last.
+      // Both succeed silently.
+      delete_crf_annotation: () => undefined,
+      delete_crf_domain_annotation: () => undefined,
+    });
+
+    renderPage(["/project/abc/crf/11"]);
+
+    // The domain-annotation chip is the first chip in the header.
+    // MUI Chip renders its delete affordance as a button with the
+    // `.MuiChip-deleteIcon` class.
+    const chip = await screen.findByTestId("domain-annotation-chip-50");
+    const chipRoot = chip.closest(".MuiChip-root")!;
+    const deleteIcon = chipRoot.querySelector(".MuiChip-deleteIcon");
+    expect(deleteIcon).not.toBeNull();
+    fireEvent.click(deleteIcon!);
+
+    // Confirmation dialog appears.
+    const confirmButton = await screen.findByRole("button", {
+      name: /Delete/i,
+    });
+    fireEvent.click(confirmButton);
+
+    // After confirmation, the cascade must run:
+    //   1. delete every annotation that pointed at domain 50
+    //      (here: form 100, item 110 — option has no annotations
+    //       linked to 50 in the base fixture, so just those two)
+    //   2. then delete the domain annotation 50 itself
+    await waitFor(() => {
+      const calls = mockInvoke.mock.calls.map((c) => c[0]);
+      expect(calls).toContain("delete_crf_annotation");
+      expect(calls).toContain("delete_crf_domain_annotation");
+    });
+
+    const calls = mockInvoke.mock.calls;
+    const deleteAnnCalls = calls
+      .filter((c) => c[0] === "delete_crf_annotation")
+      .map((c) => c[1]?.id);
+    const deleteDomainCalls = calls
+      .filter((c) => c[0] === "delete_crf_domain_annotation")
+      .map((c) => c[1]?.id);
+
+    expect(deleteAnnCalls).toEqual(expect.arrayContaining([100, 110]));
+    expect(deleteDomainCalls).toEqual([50]);
+
+    // The annotation deletes must precede the domain delete — the
+    // mutation is sequential so a halfway failure surfaces to the user
+    // rather than corrupting the cache with a half-deleted cascade.
+    const lastAnnotationIdx = calls
+      .map((c) => c[0])
+      .lastIndexOf("delete_crf_annotation");
+    const firstDomainIdx = calls.findIndex(
+      (c) => c[0] === "delete_crf_domain_annotation",
+    );
+    expect(lastAnnotationIdx).toBeLessThan(firstDomainIdx);
+  });
 });
