@@ -23,6 +23,7 @@ import {
   DeleteAnnotationDialog,
   DeleteDomainAnnotationDialog,
   DomainAnnotationDialog,
+  NotSubmittedChip,
 } from "../components";
 import { annotationColor } from "../components/AnnotationChip";
 import { useGetCrfForm } from "../data/list";
@@ -227,11 +228,14 @@ export function CrfDetailPage() {
           {form?.name ?? t("crf.detail.title")}
         </Typography>
         {form?.notSubmitted && (
-          <Chip
-            label="[NOT SUBMITTED]"
-            variant="outlined"
-            size="small"
-            data-testid="not-submitted-chip"
+          <NotSubmittedChip
+            onDelete={() =>
+              updateOwnerNotSubmitted.mutate({
+                formId: id,
+                owner: { kind: "form", id },
+                notSubmitted: false,
+              })
+            }
           />
         )}
         <Popover
@@ -366,6 +370,13 @@ export function CrfDetailPage() {
                   openEditAnnotation(a, owner);
                 }}
                 onDeleteAnnotation={(a) => setConfirmDeleteAnnotation(a)}
+                onClearNotSubmitted={(owner) =>
+                  updateOwnerNotSubmitted.mutate({
+                    formId: id,
+                    owner,
+                    notSubmitted: false,
+                  })
+                }
               />
             ))
           )}

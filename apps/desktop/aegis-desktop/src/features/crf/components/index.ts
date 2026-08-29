@@ -13,3 +13,4 @@ export * from "./DeleteAnnotationDialog";
 export * from "./DeleteCrfFormDialog";
 export * from "./DeleteDomainAnnotationDialog";
 export * from "./DomainAnnotationDialog";
+export * from "./NotSubmittedChip";

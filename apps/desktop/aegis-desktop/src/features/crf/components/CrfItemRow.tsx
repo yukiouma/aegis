@@ -1,26 +1,10 @@
 import { Box, Chip, Stack, Typography } from "@aegis/ui/mui";
 import { RadioButtonUnchecked as RadioButtonUncheckedIcon } from "@aegis/ui/icons";
 
-import type { Annotation, CrfItemDetail } from "../../../shared/api";
+import type { Annotation, AnnotationOwner, CrfItemDetail } from "../../../shared/api";
 import { useI18n } from "@aegis/ui/i18n";
 import { AnnotationChip } from "./AnnotationChip";
-
-/**
- * Tag rendered next to a form / item / option / unit name when
- * its `notSubmitted` flag is true. The label is hard-coded English
- * (no Chinese localisation) per the spec — the chip is meant to
- * read as a system flag, not user-facing copy.
- */
-function NotSubmittedChip() {
-  return (
-    <Chip
-      label="[NOT SUBMITTED]"
-      variant="outlined"
-      size="small"
-      data-testid="not-submitted-chip"
-    />
-  );
-}
+import { NotSubmittedChip } from "./NotSubmittedChip";
 
 interface Props {
   itemDetail: CrfItemDetail;
@@ -33,6 +17,13 @@ interface Props {
   onCreateAnnotation: (owner: Annotation["owner"]) => void;
   onEditAnnotation: (annotation: Annotation) => void;
   onDeleteAnnotation: (annotation: Annotation) => void;
+  /**
+   * Clear the owner-level `notSubmitted` flag back to `false`.
+   * Wired by the page to `useUpdateOwnerNotSubmitted`. No
+   * cascade — only the `false → true` transition deletes
+   * annotations; going back to `false` just lifts the flag.
+   */
+  onClearNotSubmitted: (owner: AnnotationOwner) => void;
 }
 
 export function CrfItemRow({
@@ -41,6 +32,7 @@ export function CrfItemRow({
   onCreateAnnotation,
   onEditAnnotation,
   onDeleteAnnotation,
+  onClearNotSubmitted,
 }: Props) {
   const { t } = useI18n();
   const { item, options, units, annotations } = itemDetail;
@@ -78,7 +70,13 @@ export function CrfItemRow({
         >
           {item.name}
         </Typography>
-        {item.notSubmitted && <NotSubmittedChip />}
+        {item.notSubmitted && (
+          <NotSubmittedChip
+            onDelete={() =>
+              onClearNotSubmitted({ kind: "item", id: item.id })
+            }
+          />
+        )}
         <Stack
           direction="row"
           spacing={1}
@@ -128,7 +126,13 @@ export function CrfItemRow({
             >
               {t("crf.detail.unitLabel", { value: u.unit.value })}
             </Typography>
-            {u.unit.notSubmitted && <NotSubmittedChip />}
+            {u.unit.notSubmitted && (
+              <NotSubmittedChip
+                onDelete={() =>
+                  onClearNotSubmitted({ kind: "unit", id: u.unit.id })
+                }
+              />
+            )}
           </Box>
         ))}
       </Box>
@@ -153,7 +157,13 @@ export function CrfItemRow({
               >
                 {o.option.value}
               </Typography>
-              {o.option.notSubmitted && <NotSubmittedChip />}
+              {o.option.notSubmitted && (
+                <NotSubmittedChip
+                  onDelete={() =>
+                    onClearNotSubmitted({ kind: "option", id: o.option.id })
+                  }
+                />
+              )}
               <Stack direction="row" spacing={1}>
                 {o.annotations.map((a) => (
                   <AnnotationChip

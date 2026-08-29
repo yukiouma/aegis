@@ -464,6 +464,96 @@ describe("CrfDetailPage", () => {
     expect(chips.every((c) => c.textContent === "[NOT SUBMITTED]")).toBe(true);
   });
 
+  it("clears the [NOT SUBMITTED] flag when the chip's delete icon is clicked, without cascade-deleting annotations", async () => {
+    // All four entities start not-submitted with annotations attached.
+    // Clicking the chip's delete icon must PATCH each owner with
+    // notSubmitted=false and must NOT delete any annotation (the
+    // cascade only fires on a `false → true` transition).
+    const detailNotSubmitted = {
+      ...fakeDetail,
+      form: { ...fakeDetail.form, notSubmitted: true },
+      items: fakeDetail.items.map((item) => ({
+        ...item,
+        item: { ...item.item, notSubmitted: true },
+        options: item.options.map((o) => ({
+          ...o,
+          option: { ...o.option, notSubmitted: true },
+        })),
+        units: item.units.map((u) => ({
+          ...u,
+          unit: { ...u.unit, notSubmitted: true },
+        })),
+      })),
+    };
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => ({ ...fakeForm, notSubmitted: true }),
+      get_crf_form_details: () => detailNotSubmitted,
+      update_crf_form: () => fakeForm,
+      update_crf_item: () => detailNotSubmitted.items[0]!.item,
+      update_crf_option: () => detailNotSubmitted.items[0]!.options[0]!.option,
+      update_crf_unit: () => detailNotSubmitted.items[0]!.units[0]!.unit,
+    });
+
+    renderPage(["/project/abc/crf/11"]);
+
+    // Let the chips mount.
+    const chips = await screen.findAllByTestId("not-submitted-chip");
+    expect(chips).toHaveLength(4);
+
+    // Click every chip's delete icon, one at a time. The cascade must
+    // not run, so we check after the final click that no
+    // `delete_crf_annotation` call ever fired.
+    for (const chip of chips) {
+      const chipRoot = chip.closest(".MuiChip-root")!;
+      const deleteIcon = chipRoot.querySelector(".MuiChip-deleteIcon");
+      expect(deleteIcon).not.toBeNull();
+      fireEvent.click(deleteIcon!);
+    }
+
+    // Each owner kind maps to a different wire command. We expect all
+    // four to fire exactly once with `notSubmitted: false`.
+    await waitFor(() => {
+      const calls = mockInvoke.mock.calls;
+      const commands = calls.map((c) => c[0]);
+      expect(commands).toEqual(
+        expect.arrayContaining([
+          "update_crf_form",
+          "update_crf_item",
+          "update_crf_option",
+          "update_crf_unit",
+        ]),
+      );
+    });
+
+    const calls = mockInvoke.mock.calls;
+    const findBody = (cmd: string) =>
+      calls.find((c) => c[0] === cmd)?.[1];
+    expect(findBody("update_crf_form")).toMatchObject({
+      id: 11,
+      body: { notSubmitted: false },
+    });
+    expect(findBody("update_crf_item")).toMatchObject({
+      id: 21,
+      body: { notSubmitted: false },
+    });
+    expect(findBody("update_crf_option")).toMatchObject({
+      id: 31,
+      body: { notSubmitted: false },
+    });
+    expect(findBody("update_crf_unit")).toMatchObject({
+      id: 41,
+      body: { notSubmitted: false },
+    });
+
+    // The cascade must NOT fire — the transition is `true → false`,
+    // so no annotations should be deleted.
+    expect(
+      calls.some((c) => c[0] === "delete_crf_annotation"),
+    ).toBe(false);
+  });
+
   it("cascades annotations when clicking `Not submit` in the DomainAnnotationDialog", async () => {
     // Open the DomainAnnotationDialog for the AE domain annotation
     // and click the dialog's `Not submit` button. The page must:
