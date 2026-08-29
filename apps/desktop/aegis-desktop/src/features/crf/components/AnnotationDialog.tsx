@@ -29,7 +29,6 @@ export interface AnnotationDialogBody {
   domainAnnotationId: number;
   content: string;
   assign: boolean;
-  notSubmitted: boolean;
 }
 
 interface Props {
@@ -37,11 +36,11 @@ interface Props {
   mode: "create" | "edit";
   owner: AnnotationOwner;
   /**
-   * The current `notSubmitted` flag of the annotation's owner
-   * (form / item / option / unit). The dialog seeds its
-   * `Not submitted` checkbox from this so the user can see
-   * the current state and toggle it; the page runs the
-   * cascade-delete + owner update when the new value differs.
+   * Current `notSubmitted` flag of the annotation's owner
+   * (form / item / option / unit). The dialog hides its
+   * `Not submit` action while the owner is already marked
+   * not-submitted — there's nothing left to do — and the
+   * page runs the cascade + owner update on click.
    */
   ownerNotSubmitted: boolean;
   row?: Annotation;
@@ -52,6 +51,15 @@ interface Props {
    * CreateAnnotationInput by merging the owner at the call site.
    */
   onSubmit: (body: AnnotationDialogBody) => void;
+  /**
+   * Trigger the owner-level cascade: delete every annotation
+   * attached to the owner (form / item / option / unit),
+   * then PATCH the owner's `notSubmitted` flag to true.
+   * Wired by the page to `useUpdateOwnerNotSubmitted`.
+   */
+  onMarkNotSubmitted: () => void;
+  markNotSubmittedPending: boolean;
+  markNotSubmittedError: ApiError | null;
   mutationError: ApiError | null;
   mutationPending: boolean;
 }
@@ -60,7 +68,6 @@ const EMPTY: AnnotationDialogBody = {
   domainAnnotationId: 0,
   content: "",
   assign: false,
-  notSubmitted: false,
 };
 
 export function AnnotationDialog({
@@ -72,6 +79,9 @@ export function AnnotationDialog({
   availableDomainAnnotations,
   onClose,
   onSubmit,
+  onMarkNotSubmitted,
+  markNotSubmittedPending,
+  markNotSubmittedError,
   mutationError,
   mutationPending,
 }: Props) {
@@ -85,22 +95,25 @@ export function AnnotationDialog({
         domainAnnotationId: row.domainAnnotationId,
         content: row.content,
         assign: row.assign,
-        notSubmitted: ownerNotSubmitted,
       });
     } else {
       setBody({
         domainAnnotationId: availableDomainAnnotations[0]?.id ?? 0,
         content: "",
         assign: false,
-        notSubmitted: ownerNotSubmitted,
       });
     }
-  }, [open, mode, row, availableDomainAnnotations, ownerNotSubmitted]);
+  }, [open, mode, row, availableDomainAnnotations]);
 
   const submitDisabled =
     mutationPending ||
     body.content.trim() === "" ||
     body.domainAnnotationId === 0;
+  // The Not submit action is one-way: only show it when the
+  // owner is currently submitted (notSubmitted === false).
+  const markVisible = !ownerNotSubmitted;
+  const markDisabled =
+    markNotSubmittedPending || mutationPending;
 
   function handleSubmit() {
     if (submitDisabled) return;
@@ -108,7 +121,6 @@ export function AnnotationDialog({
       domainAnnotationId: body.domainAnnotationId,
       content: body.content.trim(),
       assign: body.assign,
-      notSubmitted: body.notSubmitted,
     });
   }
 
@@ -177,26 +189,28 @@ export function AnnotationDialog({
             }
             label={t("crf.annotationDialog.field.assign")}
           />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={body.notSubmitted}
-                onChange={(e) =>
-                  setBody((b) => ({ ...b, notSubmitted: e.target.checked }))
-                }
-              />
-            }
-            label={t("crf.annotationDialog.field.notSubmitted")}
-          />
-          {mutationError && (
-            <Alert severity="error">{errorMessage(mutationError)}</Alert>
+          {(mutationError ?? markNotSubmittedError) && (
+            <Alert severity="error">
+              {errorMessage(mutationError ?? markNotSubmittedError!)}
+            </Alert>
           )}
         </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={mutationPending}>
+        <Button onClick={onClose} disabled={mutationPending || markNotSubmittedPending}>
           {t("common.cancel")}
         </Button>
+        {markVisible && (
+          <Button
+            variant="outlined"
+            color="warning"
+            onClick={onMarkNotSubmitted}
+            disabled={markDisabled}
+            data-testid="crf-annotation-dialog-not-submit"
+          >
+            {t("crf.annotationDialog.notSubmit")}
+          </Button>
+        )}
         <Button
           variant="contained"
           onClick={handleSubmit}

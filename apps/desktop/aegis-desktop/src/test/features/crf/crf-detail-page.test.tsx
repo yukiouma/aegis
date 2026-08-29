@@ -464,28 +464,17 @@ describe("CrfDetailPage", () => {
     expect(chips.every((c) => c.textContent === "[NOT SUBMITTED]")).toBe(true);
   });
 
-  it("cascades annotations when toggling `Not submitted` on the form via the DomainAnnotationDialog", async () => {
-    // Open the DomainAnnotationDialog for the AE domain annotation,
-    // check the new `Not submitted` checkbox, and save. The page
-    // must:
-    //   1. save the domain annotation (the dialog handles the name /
-    //      description save)
-    //   2. run the not-submitted cascade against the form: delete
-    //      every annotation attached to the form (here: form 100
-    //      + item 110), then PATCH the form's notSubmitted=true.
+  it("cascades annotations when clicking `Not submit` in the DomainAnnotationDialog", async () => {
+    // Open the DomainAnnotationDialog for the AE domain annotation
+    // and click the dialog's `Not submit` button. The page must:
+    //   1. delete every annotation attached to the form (here:
+    //      form 100 + item 110), then
+    //   2. PATCH the form with notSubmitted=true.
     mockCommands({
       is_logged_in: () => true,
       current_user: () => fakeUser,
       get_crf_form_by_id: () => fakeForm,
       get_crf_form_details: () => fakeDetail,
-      update_crf_domain_annotation: () => ({
-        id: 50,
-        formId: 11,
-        name: "AE",
-        description: "Adverse Events",
-        createdAt: "2026-01-01T00:00:00Z",
-        updatedAt: "2026-01-02T00:00:00Z",
-      }),
       update_crf_form: () => fakeForm,
       delete_crf_annotation: () => undefined,
     });
@@ -496,27 +485,20 @@ describe("CrfDetailPage", () => {
     const chip = await screen.findByTestId("domain-annotation-chip-50");
     fireEvent.click(chip);
 
-    // The dialog pre-fills with the row's data; the new `Not
-    // submitted` checkbox should be unchecked (current form flag
-    // is false in the fixture).
-    const checkboxes = await screen.findAllByRole("checkbox");
-    // The dialog only has one checkbox in edit mode: `Not submitted`.
-    // (`Assigned` lives on the annotation dialog, not the domain one.)
-    expect(checkboxes).toHaveLength(1);
-    expect(checkboxes[0]).not.toBeChecked();
-    fireEvent.click(checkboxes[0]);
+    // The dialog should expose a `Not submit` action button (the
+    // form is currently submitted, i.e. notSubmitted === false).
+    const notSubmit = await screen.findByTestId(
+      "crf-domain-dialog-not-submit",
+    );
+    expect(notSubmit).toBeInTheDocument();
+    fireEvent.click(notSubmit);
 
-    // Submit.
-    fireEvent.click(screen.getByRole("button", { name: /Save/i }));
-
-    // After submit, the page must have:
-    //   - updated the domain annotation (PATCH)
+    // After clicking, the page must have:
     //   - deleted the form's annotations (annotation 100 + item
     //     annotation 110 in this fixture)
     //   - PATCHed the form with notSubmitted=true
     await waitFor(() => {
       const calls = mockInvoke.mock.calls.map((c) => c[0]);
-      expect(calls).toContain("update_crf_domain_annotation");
       expect(calls).toContain("delete_crf_annotation");
       expect(calls).toContain("update_crf_form");
     });

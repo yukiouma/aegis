@@ -392,22 +392,23 @@ export function CrfDetailPage() {
               body: { name: body.name, description: body.description },
             }, { onSuccess: () => setDomainDialog(null) });
           }
-          // If the user toggled `Not submitted` on, run the cascade
-          // after the domain-annotation save so the form-level
-          // notSubmitted flag is the source of truth. The cascade
-          // deletes every annotation in the form when the flag
-          // transitions from false → true.
-          if (
-            body.notSubmitted !== (form?.notSubmitted ?? false) &&
-            body.notSubmitted
-          ) {
-            updateOwnerNotSubmitted.mutate({
+        }}
+        // The form-level `Not submit` action — runs the cascade
+        // (delete every annotation in the form, then PATCH the
+        // form's notSubmitted=true). Closes the dialog on success
+        // regardless of which dialog was open.
+        onMarkNotSubmitted={() =>
+          updateOwnerNotSubmitted.mutate(
+            {
               formId: id,
               owner: { kind: "form", id },
               notSubmitted: true,
-            });
-          }
-        }}
+            },
+            { onSuccess: () => setDomainDialog(null) },
+          )
+        }
+        markNotSubmittedPending={updateOwnerNotSubmitted.isPending}
+        markNotSubmittedError={updateOwnerNotSubmitted.error}
         mutationError={activeDomainMutation}
         mutationPending={domainMutationPending}
       />
@@ -457,22 +458,24 @@ export function CrfDetailPage() {
               { onSuccess: () => setAnnotationDialog(null) },
             );
           }
-          // If the user toggled `Not submitted` on, run the cascade
-          // for the annotation's owner. The cascade is what actually
-          // removes annotations (per owner kind: form → all,
-          // item → item+options+units, option/unit → own).
-          if (body.notSubmitted) {
-            const owner = annotationDialog?.owner ?? { kind: "form", id };
-            const current = readOwnerNotSubmitted(detail, owner);
-            if (current === false) {
-              updateOwnerNotSubmitted.mutate({
-                formId: id,
-                owner,
-                notSubmitted: true,
-              });
-            }
-          }
         }}
+        // The annotation-level `Not submit` action — runs the
+        // cascade against the annotation's owner (form → all,
+        // item → item+options+units, option/unit → own), then
+        // PATCHes the owner's notSubmitted=true. Closes the
+        // dialog on success regardless of create vs edit.
+        onMarkNotSubmitted={() =>
+          updateOwnerNotSubmitted.mutate(
+            {
+              formId: id,
+              owner: annotationDialog?.owner ?? { kind: "form", id },
+              notSubmitted: true,
+            },
+            { onSuccess: () => setAnnotationDialog(null) },
+          )
+        }
+        markNotSubmittedPending={updateOwnerNotSubmitted.isPending}
+        markNotSubmittedError={updateOwnerNotSubmitted.error}
         mutationError={activeAnnotationMutation}
         mutationPending={annotationMutationPending}
       />

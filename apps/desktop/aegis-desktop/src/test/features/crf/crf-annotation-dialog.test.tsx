@@ -35,6 +35,7 @@ function renderDialog(
   props: Partial<React.ComponentProps<typeof AnnotationDialog>> = {},
 ) {
   const onSubmit = vi.fn();
+  const onMarkNotSubmitted = vi.fn();
   const utils = render(
     <AegisI18nProvider>
       <AnnotationDialog
@@ -45,13 +46,16 @@ function renderDialog(
         availableDomainAnnotations={domainAnnotations}
         onClose={() => undefined}
         onSubmit={onSubmit}
+        onMarkNotSubmitted={onMarkNotSubmitted}
+        markNotSubmittedPending={false}
+        markNotSubmittedError={null}
         mutationError={null}
         mutationPending={false}
         {...props}
       />
     </AegisI18nProvider>,
   );
-  return { onSubmit, ...utils };
+  return { onSubmit, onMarkNotSubmitted, ...utils };
 }
 
 describe("AnnotationDialog", () => {
@@ -84,16 +88,29 @@ describe("AnnotationDialog", () => {
     expect(combobox).toHaveAttribute("aria-disabled", "true");
     // Content is pre-filled
     expect(screen.getByDisplayValue("old note")).toBeInTheDocument();
-    // Assign checkbox is checked (the first checkbox in the dialog;
-    // the second one is the new `Not submitted` flag)
-    const checkboxes = screen.getAllByRole("checkbox");
-    expect(checkboxes[0]).toBeChecked();
+    // Assign checkbox is checked
+    const assign = screen.getByRole("checkbox");
+    expect(assign).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: /Save/i }));
     expect(onSubmit).toHaveBeenCalledWith({
       domainAnnotationId: 50,
       content: "old note",
       assign: true,
-      notSubmitted: false,
     });
+  });
+
+  it("renders the Not submit button and triggers onMarkNotSubmitted", () => {
+    const { onMarkNotSubmitted } = renderDialog();
+    const notSubmit = screen.getByTestId("crf-annotation-dialog-not-submit");
+    expect(notSubmit).toBeInTheDocument();
+    fireEvent.click(notSubmit);
+    expect(onMarkNotSubmitted).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the Not submit button when the owner is already not-submitted", () => {
+    renderDialog({ ownerNotSubmitted: true });
+    expect(
+      screen.queryByTestId("crf-annotation-dialog-not-submit"),
+    ).not.toBeInTheDocument();
   });
 });

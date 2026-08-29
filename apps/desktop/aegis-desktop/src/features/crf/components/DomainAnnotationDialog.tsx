@@ -3,12 +3,10 @@ import {
   Alert,
   Box,
   Button,
-  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  FormControlLabel,
   TextField,
 } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
@@ -19,7 +17,6 @@ import type { ApiError, DomainAnnotation } from "../../../shared/api";
 export interface DomainAnnotationDialogBody {
   name: string;
   description: string;
-  notSubmitted: boolean;
 }
 
 interface Props {
@@ -28,13 +25,22 @@ interface Props {
   row?: DomainAnnotation;
   /**
    * Current `notSubmitted` flag of the form that owns this domain
-   * annotation. Seeds the dialog's `Not submitted` checkbox so the
-   * user can see the current state and toggle it; the page runs the
-   * cascade-delete + form update when the new value differs.
+   * annotation. The dialog hides its `Not submit` action while the
+   * form is already marked not-submitted — there's nothing left to
+   * do — and the page runs the cascade + form update on click.
    */
   formNotSubmitted: boolean;
   onClose: () => void;
   onSubmit: (body: DomainAnnotationDialogBody) => void;
+  /**
+   * Trigger the form-level cascade: delete every annotation in
+   * the form, then PATCH the form's `notSubmitted` flag to true.
+   * Wired by the page to `useUpdateOwnerNotSubmitted` for the
+   * `{ kind: "form", id }` owner.
+   */
+  onMarkNotSubmitted: () => void;
+  markNotSubmittedPending: boolean;
+  markNotSubmittedError: ApiError | null;
   mutationError: ApiError | null;
   mutationPending: boolean;
 }
@@ -42,7 +48,6 @@ interface Props {
 const EMPTY: DomainAnnotationDialogBody = {
   name: "",
   description: "",
-  notSubmitted: false,
 };
 
 export function DomainAnnotationDialog({
@@ -52,6 +57,9 @@ export function DomainAnnotationDialog({
   formNotSubmitted,
   onClose,
   onSubmit,
+  onMarkNotSubmitted,
+  markNotSubmittedPending,
+  markNotSubmittedError,
   mutationError,
   mutationPending,
 }: Props) {
@@ -64,25 +72,29 @@ export function DomainAnnotationDialog({
       setBody({
         name: row.name,
         description: row.description,
-        notSubmitted: formNotSubmitted,
       });
     } else {
       setBody({
         name: EMPTY.name,
         description: EMPTY.description,
-        notSubmitted: formNotSubmitted,
       });
     }
-  }, [open, mode, row, formNotSubmitted]);
+  }, [open, mode, row]);
 
   const submitDisabled = mutationPending || body.name.trim() === "";
+  // The Not submit action is one-way: only show it when the form
+  // is currently submitted (notSubmitted === false). Once the form
+  // is marked not-submitted the user can no longer toggle it from
+  // this dialog.
+  const markVisible = !formNotSubmitted;
+  const markDisabled =
+    markNotSubmittedPending || mutationPending;
 
   function handleSubmit() {
     if (submitDisabled) return;
     onSubmit({
       name: body.name.trim(),
       description: body.description.trim(),
-      notSubmitted: body.notSubmitted,
     });
   }
 
@@ -120,30 +132,29 @@ export function DomainAnnotationDialog({
               setBody((b) => ({ ...b, description: e.target.value }))
             }
           />
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={body.notSubmitted}
-                onChange={(e) =>
-                  setBody((b) => ({
-                    ...b,
-                    notSubmitted: e.target.checked,
-                  }))
-                }
-              />
-            }
-            label={t("crf.domainDialog.field.notSubmitted")}
-          />
-          {mutationError && (
-            <Alert severity="error">{errorMessage(mutationError)}</Alert>
+          {(mutationError ?? markNotSubmittedError) && (
+            <Alert severity="error">
+              {errorMessage(mutationError ?? markNotSubmittedError!)}
+            </Alert>
           )}
         </Box>
 
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={mutationPending}>
+        <Button onClick={onClose} disabled={mutationPending || markNotSubmittedPending}>
           {t("common.cancel")}
         </Button>
+        {markVisible && (
+          <Button
+            variant="outlined"
+            color="warning"
+            onClick={onMarkNotSubmitted}
+            disabled={markDisabled}
+            data-testid="crf-domain-dialog-not-submit"
+          >
+            {t("crf.domainDialog.notSubmit")}
+          </Button>
+        )}
         <Button
           variant="contained"
           onClick={handleSubmit}

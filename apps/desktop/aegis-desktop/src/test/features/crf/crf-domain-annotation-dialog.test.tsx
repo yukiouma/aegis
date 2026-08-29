@@ -11,6 +11,7 @@ function renderDialog(
   props: Partial<React.ComponentProps<typeof DomainAnnotationDialog>> = {},
 ) {
   const onSubmit = vi.fn();
+  const onMarkNotSubmitted = vi.fn();
   const utils = render(
     <AegisI18nProvider>
       <DomainAnnotationDialog
@@ -19,13 +20,16 @@ function renderDialog(
         formNotSubmitted={false}
         onClose={() => undefined}
         onSubmit={onSubmit}
+        onMarkNotSubmitted={onMarkNotSubmitted}
+        markNotSubmittedPending={false}
+        markNotSubmittedError={null}
         mutationError={null}
         mutationPending={false}
         {...props}
       />
     </AegisI18nProvider>,
   );
-  return { onSubmit, ...utils };
+  return { onSubmit, onMarkNotSubmitted, ...utils };
 }
 
 describe("DomainAnnotationDialog", () => {
@@ -41,7 +45,6 @@ describe("DomainAnnotationDialog", () => {
     expect(onSubmit).toHaveBeenCalledWith({
       name: "AE",
       description: "",
-      notSubmitted: false,
     });
   });
 
@@ -66,7 +69,21 @@ describe("DomainAnnotationDialog", () => {
     expect(onSubmit).toHaveBeenCalledWith({
       name: "Renamed",
       description: "Adverse Events",
-      notSubmitted: false,
     });
+  });
+
+  it("renders the Not submit button and triggers onMarkNotSubmitted", () => {
+    const { onMarkNotSubmitted } = renderDialog();
+    const notSubmit = screen.getByTestId("crf-domain-dialog-not-submit");
+    expect(notSubmit).toBeInTheDocument();
+    fireEvent.click(notSubmit);
+    expect(onMarkNotSubmitted).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the Not submit button when the form is already not-submitted", () => {
+    renderDialog({ formNotSubmitted: true });
+    expect(
+      screen.queryByTestId("crf-domain-dialog-not-submit"),
+    ).not.toBeInTheDocument();
   });
 });
