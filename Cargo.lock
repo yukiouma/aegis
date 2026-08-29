@@ -12,6 +12,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 name = "aegis-desktop"
 version = "0.1.0"
 dependencies = [
+ "als-resolver",
  "async-trait",
  "base64 0.22.1",
  "chrono",
@@ -91,6 +92,17 @@ name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
+
+[[package]]
+name = "als-resolver"
+version = "0.1.0"
+source = "git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.1#f132d62e50026c4b3e99f2fd48ac3ed115f52ac3"
+dependencies = [
+ "calamine",
+ "entities",
+ "quick-xml 0.40.1",
+ "thiserror 2.0.19",
+]
 
 [[package]]
 name = "android_system_properties"
@@ -1437,6 +1449,11 @@ name = "endi"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
+
+[[package]]
+name = "entities"
+version = "0.1.0"
+source = "git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.1#f132d62e50026c4b3e99f2fd48ac3ed115f52ac3"
 
 [[package]]
 name = "enumflags2"
@@ -3654,6 +3671,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdcc8dd4e2f670d309a5f0e83fe36dfdc05af317008fea29144da1a2ac858e5e"
 dependencies = [
  "encoding_rs",
+ "memchr",
+]
+
+[[package]]
+name = "quick-xml"
+version = "0.40.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2474bd2e5029e7ccb6abb2ba48cf2383a333851dedf495901544281590c7da7f"
+dependencies = [
  "memchr",
 ]
 
