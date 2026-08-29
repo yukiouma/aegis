@@ -183,8 +183,8 @@ describe("CrfDetailPage", () => {
     renderPage(["/project/abc/crf/11"]);
 
     const formName = await screen.findByTestId("crf-form-name");
-    // Hover over the form name to surface the action menu
-    fireEvent.mouseEnter(formName);
+    // Click the form name to open the action menu
+    fireEvent.click(formName);
     const newAnnotationMenu = await screen.findByRole("menuitem", {
       name: /New annotation/i,
     });
