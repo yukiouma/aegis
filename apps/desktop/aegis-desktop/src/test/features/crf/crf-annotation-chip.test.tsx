@@ -97,4 +97,33 @@ describe("AnnotationChip", () => {
       unmount();
     }
   });
+
+  it("uses a solid border when assign is false and a dotted border when assign is true", () => {
+    const { rerender, unmount } = render(
+      <AnnotationChip
+        annotation={{ ...baseAnnotation, assign: false }}
+        colorIndex={0}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+    const root = screen.getByText("form-level note").closest(".MuiChip-root");
+    expect(root).not.toBeNull();
+    // Default MUI outlined Chip renders a solid border.
+    expect(getComputedStyle(root as Element).borderStyle).toBe("solid");
+
+    rerender(
+      <AnnotationChip
+        annotation={{ ...baseAnnotation, assign: true }}
+        colorIndex={0}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+    expect(
+      getComputedStyle(screen.getByText("form-level note").closest(".MuiChip-root") as Element)
+        .borderStyle,
+    ).toBe("dotted");
+    unmount();
+  });
 });
