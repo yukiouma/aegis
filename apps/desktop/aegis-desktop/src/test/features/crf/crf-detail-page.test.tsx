@@ -152,10 +152,15 @@ describe("CrfDetailPage", () => {
     expect(await screen.findByText("Adverse Events")).toBeInTheDocument();
     expect(screen.getByText("AE")).toBeInTheDocument();
 
-    // Domain annotation chip (renders label `AE (Adverse Events)`)
-    expect(
-      await screen.findByTestId("domain-annotation-chip-50"),
-    ).toBeInTheDocument();
+    // Domain annotation chip (renders label `AE (Adverse Events)`).
+    // The header chip cycles through the same colour palette as the
+    // annotation chips below — `annotationColor(0) === "info"`, which
+    // MUI renders with the `MuiChip-colorInfo` class.
+    const domainChip = await screen.findByTestId(
+      "domain-annotation-chip-50",
+    );
+    expect(domainChip).toBeInTheDocument();
+    expect(domainChip).toHaveClass("MuiChip-colorInfo");
 
     // Form-level annotation chip + item-level annotation chip
     expect(await screen.findByText("form-level note")).toBeInTheDocument();

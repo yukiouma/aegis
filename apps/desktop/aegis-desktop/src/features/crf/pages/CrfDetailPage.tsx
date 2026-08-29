@@ -24,6 +24,7 @@ import {
   DeleteDomainAnnotationDialog,
   DomainAnnotationDialog,
 } from "../components";
+import { annotationColor } from "../components/AnnotationChip";
 import { useGetCrfForm } from "../data/list";
 import {
   useCrfFormDetail,
@@ -198,20 +199,25 @@ export function CrfDetailPage() {
             </MenuItem>
           </MenuList>
         </Popover>
-        {/* Domain annotation chips, right of name */}
+        {/* Domain annotation chips, right of name. Their colour cycles
+            with the position in `domainAnnotations` so the user can see
+            which annotation colour a chip produces — matches the cycle
+            applied to the per-domain annotation chips below. */}
         {detail && detail.domainAnnotations.length > 0 && (
           <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-            {detail.domainAnnotations.map((d) => (
+            {detail.domainAnnotations.map((d, i) => (
               <Chip
                 key={d.id}
                 label={t("crf.detail.domainChip.label", {
                   name: d.name,
                   description: d.description,
                 })}
+                color={annotationColor(i)}
                 onClick={() => setDomainDialog({ mode: "edit", row: d })}
                 onDelete={() => setConfirmDeleteDomain(d)}
                 size="small"
                 data-testid={`domain-annotation-chip-${d.id}`}
+                variant="outlined"
               />
             ))}
           </Stack>
