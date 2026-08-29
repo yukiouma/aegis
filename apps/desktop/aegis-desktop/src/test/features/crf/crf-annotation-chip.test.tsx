@@ -70,4 +70,31 @@ describe("AnnotationChip", () => {
     fireEvent.click(screen.getByTestId("annotation-chip-delete"));
     expect(onDelete).toHaveBeenCalledTimes(1);
   });
+
+  it("applies the colour for the supplied index", () => {
+    // The header domain-annotation chips share this same `annotationColor`
+    // palette, so this test guards both call sites. The colour class is
+    // attached to the chip's root element, not the label span that
+    // `getByText` returns — so walk up to the chip first.
+    const cases: Array<[number, string]> = [
+      [0, "MuiChip-colorInfo"],
+      [1, "MuiChip-colorWarning"],
+      [2, "MuiChip-colorSuccess"],
+      [3, "MuiChip-colorError"],
+    ];
+    for (const [colorIndex, className] of cases) {
+      const { unmount } = render(
+        <AnnotationChip
+          annotation={baseAnnotation}
+          colorIndex={colorIndex}
+          onEdit={vi.fn()}
+          onDelete={vi.fn()}
+        />,
+      );
+      const chip = screen.getByText("form-level note").closest(".MuiChip-root");
+      expect(chip).not.toBeNull();
+      expect(chip).toHaveClass(className);
+      unmount();
+    }
+  });
 });

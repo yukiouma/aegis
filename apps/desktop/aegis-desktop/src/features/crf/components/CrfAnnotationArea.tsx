@@ -1,5 +1,4 @@
-import { Box, Stack, Typography } from "@aegis/ui/mui";
-import { useI18n } from "@aegis/ui/i18n";
+import { Box, Stack } from "@aegis/ui/mui";
 
 import type { Annotation } from "../../../shared/api";
 import { AnnotationChip } from "./AnnotationChip";
@@ -21,14 +20,10 @@ export function CrfAnnotationArea({
   onEdit,
   onDelete,
 }: Props) {
-  const { t } = useI18n();
   if (annotations.length === 0) return null;
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      <Typography variant="subtitle2" sx={{ color: "text.secondary" }}>
-        {t("crf.detail.formAnnotationsHeading")}
-      </Typography>
-      <Stack direction="row" flexWrap="wrap" gap={1}>
+      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
         {annotations.map((a) => (
           <AnnotationChip
             key={a.id}

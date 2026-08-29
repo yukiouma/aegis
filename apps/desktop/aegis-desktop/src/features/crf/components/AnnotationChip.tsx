@@ -44,6 +44,7 @@ export function AnnotationChip({
         </span>
       }
       size="small"
+      variant="outlined"
     />
   );
 }

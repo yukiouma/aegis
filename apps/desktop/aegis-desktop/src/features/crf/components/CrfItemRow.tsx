@@ -1,4 +1,5 @@
 import { Box, Chip, Stack, Typography } from "@aegis/ui/mui";
+import { RadioButtonUnchecked as RadioButtonUncheckedIcon } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
 
 import type { Annotation, CrfItemDetail } from "../../../shared/api";
@@ -113,19 +114,16 @@ export function CrfItemRow({
         ))}
       </Box>
       {options.length > 0 && (
-        <Box sx={{ pl: 4, display: "flex", flexDirection: "column", gap: 1 }}>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            {t("crf.detail.optionsHeading")}
-          </Typography>
+        <Box sx={{ mt: 3, ml: 3, display: "flex", flexDirection: "column", gap: 1 }}>
           {options.map((o) => (
             <Box
               key={o.option.id}
-              sx={{ display: "flex", alignItems: "center", gap: 1 }}
+              sx={{ display: "flex", gap: 1 }}
             >
+              <RadioButtonUncheckedIcon fontSize="small" />
               <Typography
                 variant="body2"
                 sx={{
-                  flexGrow: 1,
                   cursor: "pointer",
                   "&:hover": { textDecoration: "underline" },
                 }}
@@ -134,9 +132,9 @@ export function CrfItemRow({
                 }
                 data-testid={`crf-option-${o.option.id}`}
               >
-                {t("crf.detail.optionLabel", { value: o.option.value })}
+                {o.option.value}
               </Typography>
-              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+              <Stack direction="row">
                 {o.annotations.map((a) => (
                   <AnnotationChip
                     key={a.id}
