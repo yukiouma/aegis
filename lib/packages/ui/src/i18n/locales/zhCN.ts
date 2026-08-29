@@ -350,6 +350,10 @@ export const zhCN = {
   "crf.detail.unitLabel": "单位：{value}",
   "crf.detail.menu.newDomain": "新建域注释",
   "crf.detail.menu.newAnnotation": "新建注释",
+  "crf.detail.menu.disabledWhenNotSubmitted":
+    "表单已标记为未提交，请清除该标记后再新建。",
+  "crf.detail.itemRow.disabledWhenNotSubmitted":
+    "表单已标记为未提交，请清除该标记后再添加注释。",
   "crf.detail.domainChip.label": "{name}（{description}）",
   "crf.detail.empty": "暂无项目",
   "crf.detail.loadFailed": "加载表单详情失败：{message}",

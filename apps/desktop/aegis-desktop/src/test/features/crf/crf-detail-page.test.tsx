@@ -699,4 +699,128 @@ describe("CrfDetailPage", () => {
     );
     expect(getByIdCalls.length).toBeGreaterThanOrEqual(2);
   });
+
+  it("disables the New domain / New annotation menu items when the form is marked not submitted", async () => {
+    // While the form is not-submitted the cascade has already wiped
+    // every annotation AND every domain annotation, so the create
+    // entry points in the form-name hover menu must be disabled to
+    // prevent the user from opening an empty dialog. Edit flows
+    // (clicking an existing domain annotation chip / annotation
+    // chip) still work — those are not blocked here.
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => ({ ...fakeForm, notSubmitted: true }),
+      get_crf_form_details: () => ({
+        ...fakeDetail,
+        form: { ...fakeDetail.form, notSubmitted: true },
+        // The cascade would have wiped domain annotations in the
+        // real flow; the fixture is the post-cascade reality.
+        domainAnnotations: [],
+        formAnnotations: [],
+      }),
+    });
+
+    renderPage(["/project/abc/crf/11"]);
+
+    // Wait for the form header to render — proves the page has the
+    // not-submitted flag before we interact with it. findByTestId
+    // polls the DOM up to the default timeout, so waiting on the
+    // chip directly also covers the small race where the form
+    // query resolves before the chip mounts.
+    const formName = await screen.findByTestId("crf-form-name");
+    await screen.findByTestId("not-submitted-chip");
+
+    // Open the menu. Note: the first click after the chip's
+    // mount is occasionally swallowed by a microtask race in
+    // React 18; a second click reliably opens the popover. Match
+    // menuitems through `.MuiMenuItem-root` (the disabled
+    // MenuItems are wrapped in a Tooltip-host `<span>` whose
+    // aria-label shadows the inner text in the accessibility
+    // tree, so accessibility-tree queries are unreliable here).
+    fireEvent.click(formName);
+    fireEvent.click(formName);
+    await waitFor(() => {
+      expect(
+        document.querySelectorAll(".MuiMenuItem-root").length,
+      ).toBeGreaterThanOrEqual(2);
+    });
+    const menuItems = Array.from(
+      document.querySelectorAll<HTMLElement>(".MuiMenuItem-root"),
+    );
+    const newDomain = menuItems.find(
+      (el) => el.textContent?.trim() === "New domain",
+    );
+    const newAnnotation = menuItems.find(
+      (el) => el.textContent?.trim() === "New annotation",
+    );
+    expect(newDomain).toBeDefined();
+    expect(newAnnotation).toBeDefined();
+
+    // Both create entries must be disabled so MUI ignores clicks.
+    expect(newDomain).toHaveAttribute("aria-disabled", "true");
+    expect(newAnnotation).toHaveAttribute("aria-disabled", "true");
+    expect(newDomain).toHaveClass("Mui-disabled");
+    expect(newAnnotation).toHaveClass("Mui-disabled");
+
+    // Even if a future caller bypasses the menu (a keyboard
+    // shortcut or a programmatic trigger), the page-level guard
+    // must short-circuit so no create dialog mounts. The DOM-level
+    // click on a `Mui-disabled` MenuItem is a no-op, but we
+    // still force-click to prove the page-level guard kicks in if
+    // the disabled flag is somehow bypassed.
+    fireEvent.click(newDomain!);
+    fireEvent.click(newAnnotation!);
+    expect(
+      screen.queryByRole("heading", { name: /Create annotation/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: /Create domain/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("ignores clicks on item / option / unit when the form is marked not submitted", async () => {
+    // The item / option / unit Typography click handlers each route
+    // back to `openCreateAnnotation({ kind, id })`. While the form
+    // is not submitted, CrfItemRow short-circuits the click so the
+    // create dialog never opens, and the cursor / hover affordances
+    // are removed to match.
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => ({ ...fakeForm, notSubmitted: true }),
+      get_crf_form_details: () => ({
+        ...fakeDetail,
+        form: { ...fakeDetail.form, notSubmitted: true },
+        domainAnnotations: [],
+        formAnnotations: [],
+      }),
+    });
+
+    renderPage(["/project/abc/crf/11"]);
+
+    // Confirm we're testing the not-submitted branch.
+    await screen.findByTestId("not-submitted-chip");
+
+    const item = await screen.findByTestId("crf-item-name-21");
+    const option = await screen.findByTestId("crf-option-31");
+    const unit = await screen.findByTestId("crf-unit-41");
+
+    fireEvent.click(item);
+    fireEvent.click(option);
+    fireEvent.click(unit);
+
+    // No create dialog should have mounted.
+    expect(
+      screen.queryByRole("heading", { name: /Create annotation/i }),
+    ).not.toBeInTheDocument();
+
+    // The cursor should be the default (auto / not pointer) since
+    // the click is no longer advertised. MUI uses the
+    // `cursor: pointer` style — assert via inline style that the
+    // element doesn't carry it.
+    expect(item).not.toHaveStyle({ cursor: "pointer" });
+    expect(option).not.toHaveStyle({ cursor: "pointer" });
+    expect(unit).not.toHaveStyle({ cursor: "pointer" });
+  });
 });

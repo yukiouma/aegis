@@ -9,6 +9,7 @@ import {
   MenuList,
   Popover,
   Stack,
+  Tooltip,
   Typography,
 } from "@aegis/ui/mui";
 import { ArrowBack as ArrowBackIcon } from "@aegis/ui/icons";
@@ -193,8 +194,16 @@ export function CrfDetailPage() {
     updateAnnotation.isPending ||
     deleteAnnotation.isPending;
 
-  const openCreateAnnotation = (owner: AnnotationOwner) =>
+  const openCreateAnnotation = (owner: AnnotationOwner) => {
+    // Defensive: when the form is marked not-submitted, the cascade
+    // has already wiped every annotation (and every domain
+    // annotation) on the form, so there is nothing to hang a new
+    // annotation on. The MenuItem in the header and the item/unit/
+    // option click handlers also gate themselves, but a future caller
+    // (or a hot-reload flicker) shouldn't be able to slip through.
+    if (form?.notSubmitted) return;
     setAnnotationDialog({ mode: "create", owner });
+  };
 
   const openEditAnnotation = (row: Annotation, owner: AnnotationOwner) =>
     setAnnotationDialog({ mode: "edit", row, owner });
@@ -254,22 +263,54 @@ export function CrfDetailPage() {
               warn in development and the Popover behaves as a real menu
               for assistive tech. */}
           <MenuList>
-            <MenuItem
-              onClick={() => {
-                setFormNameMenuAnchor(null);
-                setDomainDialog({ mode: "create" });
-              }}
+            <Tooltip
+              title={
+                form?.notSubmitted
+                  ? t("crf.detail.menu.disabledWhenNotSubmitted")
+                  : ""
+              }
+              disableHoverListener={!form?.notSubmitted}
+              disableFocusListener={!form?.notSubmitted}
+              disableTouchListener={!form?.notSubmitted}
             >
-              {t("crf.detail.menu.newDomain")}
-            </MenuItem>
-            <MenuItem
-              onClick={() => {
-                setFormNameMenuAnchor(null);
-                openCreateAnnotation({ kind: "form", id });
-              }}
+              {/* `span` wrapper is required because MUI's disabled
+                  MenuItem doesn't forward refs / props to a Tooltip
+                  host — wrapping lets the tooltip track hover even
+                  when the menu item itself is aria-disabled. */}
+              <span>
+                <MenuItem
+                  disabled={Boolean(form?.notSubmitted)}
+                  onClick={() => {
+                    setFormNameMenuAnchor(null);
+                    setDomainDialog({ mode: "create" });
+                  }}
+                >
+                  {t("crf.detail.menu.newDomain")}
+                </MenuItem>
+              </span>
+            </Tooltip>
+            <Tooltip
+              title={
+                form?.notSubmitted
+                  ? t("crf.detail.menu.disabledWhenNotSubmitted")
+                  : ""
+              }
+              disableHoverListener={!form?.notSubmitted}
+              disableFocusListener={!form?.notSubmitted}
+              disableTouchListener={!form?.notSubmitted}
             >
-              {t("crf.detail.menu.newAnnotation")}
-            </MenuItem>
+              <span>
+                <MenuItem
+                  disabled={Boolean(form?.notSubmitted)}
+                  onClick={() => {
+                    setFormNameMenuAnchor(null);
+                    openCreateAnnotation({ kind: "form", id });
+                  }}
+                >
+                  {t("crf.detail.menu.newAnnotation")}
+                </MenuItem>
+              </span>
+            </Tooltip>
           </MenuList>
         </Popover>
         {/* Domain annotation chips, right of name. Their colour cycles
@@ -377,6 +418,7 @@ export function CrfDetailPage() {
                     notSubmitted: false,
                   })
                 }
+                formNotSubmitted={Boolean(form?.notSubmitted)}
               />
             ))
           )}

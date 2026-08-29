@@ -24,6 +24,16 @@ interface Props {
    * annotations; going back to `false` just lifts the flag.
    */
   onClearNotSubmitted: (owner: AnnotationOwner) => void;
+  /**
+   * The owning form's `notSubmitted` flag. While the form is
+   * marked not-submitted the create-annotation entry points (the
+   * item name, the unit value, the option value) no longer open the
+   * create dialog — the form's annotations have already been wiped
+   * by the cascade, so there is nothing to annotate. The visual
+   * affordance (cursor, hover underline) is dropped in the same
+   * step so the row doesn't advertise a click that won't fire.
+   */
+  formNotSubmitted: boolean;
 }
 
 export function CrfItemRow({
@@ -33,9 +43,25 @@ export function CrfItemRow({
   onEditAnnotation,
   onDeleteAnnotation,
   onClearNotSubmitted,
+  formNotSubmitted,
 }: Props) {
   const { t } = useI18n();
   const { item, options, units, annotations } = itemDetail;
+  // Build the create-annotation handler once per row so the click
+  // short-circuits under a single readable guard instead of repeating
+  // `if (formNotSubmitted) return` at every call site.
+  const createFor = (owner: AnnotationOwner) => {
+    if (formNotSubmitted) return;
+    onCreateAnnotation(owner);
+  };
+  // Match MUI's disabled-MenuItem look: drop the pointer cursor and
+  // the hover underline so the row doesn't lie about being clickable.
+  const clickableSx = formNotSubmitted
+    ? undefined
+    : {
+        cursor: "pointer" as const,
+        "&:hover": { textDecoration: "underline" },
+      };
   return (
     <Box
       sx={{
@@ -61,11 +87,8 @@ export function CrfItemRow({
         <Chip label={item.code} variant="outlined" size="small" />
         <Typography
           variant="subtitle1"
-          sx={{
-            cursor: "pointer",
-            "&:hover": { textDecoration: "underline" },
-          }}
-          onClick={() => onCreateAnnotation({ kind: "item", id: item.id })}
+          sx={clickableSx}
+          onClick={() => createFor({ kind: "item", id: item.id })}
           data-testid={`crf-item-name-${item.id}`}
         >
           {item.name}
@@ -115,13 +138,8 @@ export function CrfItemRow({
             </Stack>
             <Typography
               variant="body2"
-              sx={{
-                cursor: "pointer",
-                "&:hover": { textDecoration: "underline" },
-              }}
-              onClick={() =>
-                onCreateAnnotation({ kind: "unit", id: u.unit.id })
-              }
+              sx={clickableSx}
+              onClick={() => createFor({ kind: "unit", id: u.unit.id })}
               data-testid={`crf-unit-${u.unit.id}`}
             >
               {t("crf.detail.unitLabel", { value: u.unit.value })}
@@ -146,13 +164,8 @@ export function CrfItemRow({
               <RadioButtonUncheckedIcon fontSize="small" />
               <Typography
                 variant="body2"
-                sx={{
-                  cursor: "pointer",
-                  "&:hover": { textDecoration: "underline" },
-                }}
-                onClick={() =>
-                  onCreateAnnotation({ kind: "option", id: o.option.id })
-                }
+                sx={clickableSx}
+                onClick={() => createFor({ kind: "option", id: o.option.id })}
                 data-testid={`crf-option-${o.option.id}`}
               >
                 {o.option.value}
