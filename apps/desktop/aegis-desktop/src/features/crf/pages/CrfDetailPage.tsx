@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -85,6 +85,26 @@ export function CrfDetailPage() {
     useState<Annotation | null>(null);
   const [formNameMenuAnchor, setFormNameMenuAnchor] =
     useState<HTMLElement | null>(null);
+  // Hovering from the anchor into the Popover crosses a layout gap
+  // (no DOM element bridges them). Without a grace period the
+  // anchor's `onMouseLeave` fires first, immediately closing the menu
+  // before the cursor reaches the items. Hold a pending-close timer
+  // and cancel it the moment the cursor lands on the Popover paper.
+  const closeFormNameMenuTimer = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
+  const scheduleCloseFormNameMenu = () => {
+    if (closeFormNameMenuTimer.current != null) return;
+    closeFormNameMenuTimer.current = setTimeout(() => {
+      setFormNameMenuAnchor(null);
+      closeFormNameMenuTimer.current = null;
+    }, 150);
+  };
+  const cancelCloseFormNameMenu = () => {
+    if (closeFormNameMenuTimer.current == null) return;
+    clearTimeout(closeFormNameMenuTimer.current);
+    closeFormNameMenuTimer.current = null;
+  };
 
   const colorByDomainAnnotationId = useMemo(() => {
     const map = new Map<number, number>();
@@ -152,11 +172,14 @@ export function CrfDetailPage() {
         <IconButton aria-label={t("crf.detail.back")} onClick={back}>
           <ArrowBackIcon />
         </IconButton>
-        {form?.code && <Chip label={form.code} variant="outlined" />}
+        {form?.code && <Chip size="small" label={form.code} variant="outlined" />}
         <Typography
           variant="h5"
-          onMouseEnter={(e) => setFormNameMenuAnchor(e.currentTarget)}
-          onMouseLeave={() => setFormNameMenuAnchor(null)}
+          onMouseEnter={(e) => {
+            cancelCloseFormNameMenu();
+            setFormNameMenuAnchor(e.currentTarget);
+          }}
+          onMouseLeave={scheduleCloseFormNameMenu}
           sx={{ cursor: "default" }}
           data-testid="crf-form-name"
         >
@@ -171,7 +194,8 @@ export function CrfDetailPage() {
           disableEnforceFocus
           slotProps={{
             paper: {
-              onMouseLeave: () => setFormNameMenuAnchor(null),
+              onMouseEnter: cancelCloseFormNameMenu,
+              onMouseLeave: scheduleCloseFormNameMenu,
               sx: { minWidth: 200 },
             },
           }}
