@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Alert,
+  Box,
   Button,
   Dialog,
   DialogActions,
@@ -77,27 +78,30 @@ export function DomainAnnotationDialog({
             : "crf.domainDialog.edit.title",
         )}
       </DialogTitle>
-      <DialogContent
-        sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 2 }}
-      >
-        <TextField
-          size="small"
-          label={t("crf.domainDialog.field.name")}
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <TextField
-          size="small"
-          label={t("crf.domainDialog.field.description")}
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          multiline
-          minRows={2}
-        />
-        {mutationError && (
-          <Alert severity="error">{errorMessage(mutationError)}</Alert>
-        )}
+      <DialogContent>
+        <Box
+          sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 2 }}
+        >
+          <TextField
+            size="small"
+            label={t("crf.domainDialog.field.name")}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          <TextField
+            size="small"
+            label={t("crf.domainDialog.field.description")}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            multiline
+            minRows={2}
+          />
+          {mutationError && (
+            <Alert severity="error">{errorMessage(mutationError)}</Alert>
+          )}
+        </Box>
+
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={mutationPending}>
