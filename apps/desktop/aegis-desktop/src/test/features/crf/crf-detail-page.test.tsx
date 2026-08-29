@@ -203,4 +203,160 @@ describe("CrfDetailPage", () => {
     // Submit is disabled until the user enters content
     expect(screen.getByRole("button", { name: /Create/i })).toBeDisabled();
   });
+
+  it("orders annotation chips by the form's domain-annotation order, not by insertion order", async () => {
+    // Form has three domain annotations in the order AE, VS, LB.
+    // The server delivers three item-level annotations in a different
+    // order (LB first, then VS, then AE) — the page must still render
+    // them AE → VS → LB.
+    const detailWithThree = {
+      ...fakeDetail,
+      domainAnnotations: [
+        {
+          id: 50,
+          formId: 11,
+          name: "AE",
+          description: "Adverse Events",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-02T00:00:00Z",
+        },
+        {
+          id: 51,
+          formId: 11,
+          name: "VS",
+          description: "Vital Signs",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-02T00:00:00Z",
+        },
+        {
+          id: 52,
+          formId: 11,
+          name: "LB",
+          description: "Lab",
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-02T00:00:00Z",
+        },
+      ],
+      formAnnotations: [
+        {
+          id: 200,
+          domainAnnotationId: 52,
+          content: "form-LB",
+          assign: false,
+          owner: { kind: "form", id: 11 },
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-02T00:00:00Z",
+        },
+        {
+          id: 201,
+          domainAnnotationId: 50,
+          content: "form-AE",
+          assign: false,
+          owner: { kind: "form", id: 11 },
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-02T00:00:00Z",
+        },
+        {
+          id: 202,
+          domainAnnotationId: 51,
+          content: "form-VS",
+          assign: false,
+          owner: { kind: "form", id: 11 },
+          createdAt: "2026-01-01T00:00:00Z",
+          updatedAt: "2026-01-02T00:00:00Z",
+        },
+      ],
+      items: [
+        {
+          ...fakeDetail.items[0]!,
+          annotations: [
+            {
+              id: 300,
+              domainAnnotationId: 52,
+              content: "item-LB",
+              assign: true,
+              owner: { kind: "item", id: 21 },
+              createdAt: "2026-01-01T00:00:00Z",
+              updatedAt: "2026-01-02T00:00:00Z",
+            },
+            {
+              id: 301,
+              domainAnnotationId: 50,
+              content: "item-AE",
+              assign: true,
+              owner: { kind: "item", id: 21 },
+              createdAt: "2026-01-01T00:00:00Z",
+              updatedAt: "2026-01-02T00:00:00Z",
+            },
+            {
+              id: 302,
+              domainAnnotationId: 51,
+              content: "item-VS",
+              assign: true,
+              owner: { kind: "item", id: 21 },
+              createdAt: "2026-01-01T00:00:00Z",
+              updatedAt: "2026-01-02T00:00:00Z",
+            },
+          ],
+        },
+      ],
+    };
+
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => fakeForm,
+      get_crf_form_details: () => detailWithThree,
+    });
+
+    renderPage(["/project/abc/crf/11"]);
+
+    // Wait for both form-level and item-level chips to be in the DOM
+    await screen.findByText("form-AE");
+    await screen.findByText("item-AE");
+
+    // Within their respective chips containers, the order must match
+    // the form's domain-annotation order AE → VS → LB, regardless of
+    // the order the server delivered them in. The labels live in a
+    // `MuiChip-label` span inside each chip root, so we walk up to the
+    // chip root before comparing positions.
+    const chipPositionsInDoc = (texts: string[]) => {
+      const els = texts.map((t) => {
+        const label = screen.getByText(t);
+        // Each chip renders as `<Chip label="…">` which puts the text
+        // in a `<span class="MuiChip-label">`. Walk up to the chip
+        // root before comparing positions so chips that wrap their
+        // label in extra spans are still ordered by their visual order.
+        const root = label.closest(".MuiChip-root");
+        if (!root) throw new Error(`no chip root for ${t}`);
+        return root;
+      });
+      // Compare each element against every other element. The number
+      // of peers that PRECEDE each chip (DOCUMENT_POSITION_PRECEDING
+      // = 2) is its 0-based index in the document order. Asserting on
+      // the "preceding" count instead of the "following" count means
+      // the first chip has 0, the second 1, the third 2 — matching the
+      // intuitive position.
+      return els.map((el) => {
+        let preceding = 0;
+        for (const other of els) {
+          if (other === el) continue;
+          if (
+            (el.compareDocumentPosition(other) &
+              Node.DOCUMENT_POSITION_PRECEDING) ===
+            Node.DOCUMENT_POSITION_PRECEDING
+          ) {
+            preceding++;
+          }
+        }
+        return preceding;
+      });
+    };
+
+    const formOrder = chipPositionsInDoc(["form-AE", "form-VS", "form-LB"]);
+    expect(formOrder).toEqual([0, 1, 2]);
+
+    const itemOrder = chipPositionsInDoc(["item-AE", "item-VS", "item-LB"]);
+    expect(itemOrder).toEqual([0, 1, 2]);
+  });
 });

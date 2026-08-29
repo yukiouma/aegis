@@ -54,6 +54,34 @@ type AnnotationDialogState =
   | { mode: "edit"; row: Annotation; owner: AnnotationOwner }
   | null;
 
+/**
+ * Order annotations the same way the form's `domainAnnotations` list
+ * is ordered — within a single owner (form / item / option / unit),
+ * chips for the first domain annotation appear first, then the
+ * second, and so on. Annotations whose domain annotation is not in
+ * the map (orphaned, e.g. the server returned a domain annotation
+ * the page hasn't seen yet) fall to the end.
+ */
+function sortByDomainAnnotationOrder<
+  T extends { domainAnnotationId: number; id: number },
+>(
+  annotations: T[],
+  indexByDomainAnnotationId: Map<number, number>,
+): T[] {
+  const fallback = Number.MAX_SAFE_INTEGER;
+  return [...annotations].sort((a, b) => {
+    const ai =
+      indexByDomainAnnotationId.get(a.domainAnnotationId) ?? fallback;
+    const bi =
+      indexByDomainAnnotationId.get(b.domainAnnotationId) ?? fallback;
+    if (ai !== bi) return ai - bi;
+    // Stable tie-breaker: keep insertion order within a single
+    // domain annotation. `Array.sort` is stable in modern engines,
+    // so this only matters if we later add a non-stable sort.
+    return a.id - b.id;
+  });
+}
+
 export function CrfDetailPage() {
   const { t } = useI18n();
   const { projectCode, formId } = useParams({ strict: false }) as {
@@ -250,7 +278,10 @@ export function CrfDetailPage() {
       {/* Form-level annotation chips */}
       {detail && (
         <CrfAnnotationArea
-          annotations={detail.formAnnotations}
+          annotations={sortByDomainAnnotationOrder(
+            detail.formAnnotations,
+            colorByDomainAnnotationId,
+          )}
           colorByDomainAnnotationId={colorByDomainAnnotationId}
           onEdit={(a) => openEditAnnotation(a, { kind: "form", id })}
           onDelete={(a) => setConfirmDeleteAnnotation(a)}
@@ -266,7 +297,27 @@ export function CrfDetailPage() {
             detail.items.map((itemDetail) => (
               <CrfItemRow
                 key={itemDetail.item.id}
-                itemDetail={itemDetail}
+                itemDetail={{
+                  ...itemDetail,
+                  annotations: sortByDomainAnnotationOrder(
+                    itemDetail.annotations,
+                    colorByDomainAnnotationId,
+                  ),
+                  options: itemDetail.options.map((opt) => ({
+                    ...opt,
+                    annotations: sortByDomainAnnotationOrder(
+                      opt.annotations,
+                      colorByDomainAnnotationId,
+                    ),
+                  })),
+                  units: itemDetail.units.map((u) => ({
+                    ...u,
+                    annotations: sortByDomainAnnotationOrder(
+                      u.annotations,
+                      colorByDomainAnnotationId,
+                    ),
+                  })),
+                }}
                 colorByDomainAnnotationId={colorByDomainAnnotationId}
                 onCreateAnnotation={openCreateAnnotation}
                 onEditAnnotation={(a) => {
