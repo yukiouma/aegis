@@ -3,7 +3,9 @@
 use tauri::State;
 
 use crate::http::client::HttpClient;
-use crate::http::crf::item::{self, CrfItemListResponse, CrfItemViewResponse};
+use crate::http::crf::item::{
+    self, CrfItemListResponse, CrfItemViewResponse, UpdateCrfItemRequest,
+};
 use crate::http::dto::ApiError;
 
 #[tauri::command]
@@ -20,4 +22,13 @@ pub async fn get_crf_item_by_id(
     id: i64,
 ) -> Result<CrfItemViewResponse, ApiError> {
     item::get_by_id(&client, id).await
+}
+
+#[tauri::command]
+pub async fn update_crf_item(
+    client: State<'_, HttpClient>,
+    id: i64,
+    body: UpdateCrfItemRequest,
+) -> Result<CrfItemViewResponse, ApiError> {
+    item::update(&client, id, body).await
 }

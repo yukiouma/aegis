@@ -41,6 +41,7 @@ function renderDialog(
         open
         mode="create"
         owner={owner}
+        ownerNotSubmitted={false}
         availableDomainAnnotations={domainAnnotations}
         onClose={() => undefined}
         onSubmit={onSubmit}
@@ -83,14 +84,16 @@ describe("AnnotationDialog", () => {
     expect(combobox).toHaveAttribute("aria-disabled", "true");
     // Content is pre-filled
     expect(screen.getByDisplayValue("old note")).toBeInTheDocument();
-    // Assign checkbox is checked
-    const assign = screen.getByRole("checkbox");
-    expect(assign).toBeChecked();
+    // Assign checkbox is checked (the first checkbox in the dialog;
+    // the second one is the new `Not submitted` flag)
+    const checkboxes = screen.getAllByRole("checkbox");
+    expect(checkboxes[0]).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: /Save/i }));
     expect(onSubmit).toHaveBeenCalledWith({
       domainAnnotationId: 50,
       content: "old note",
       assign: true,
+      notSubmitted: false,
     });
   });
 });

@@ -3,65 +3,87 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   TextField,
 } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
 
 import { errorMessage } from "../../../shared/api/error";
-import type {
-  ApiError,
-  CreateDomainAnnotationInput,
-  DomainAnnotation,
-  UpdateDomainAnnotationInput,
-} from "../../../shared/api";
+import type { ApiError, DomainAnnotation } from "../../../shared/api";
 
-type SubmitBody = CreateDomainAnnotationInput | UpdateDomainAnnotationInput;
+export interface DomainAnnotationDialogBody {
+  name: string;
+  description: string;
+  notSubmitted: boolean;
+}
 
 interface Props {
   open: boolean;
   mode: "create" | "edit";
   row?: DomainAnnotation;
+  /**
+   * Current `notSubmitted` flag of the form that owns this domain
+   * annotation. Seeds the dialog's `Not submitted` checkbox so the
+   * user can see the current state and toggle it; the page runs the
+   * cascade-delete + form update when the new value differs.
+   */
+  formNotSubmitted: boolean;
   onClose: () => void;
-  onSubmit: (body: SubmitBody) => void;
+  onSubmit: (body: DomainAnnotationDialogBody) => void;
   mutationError: ApiError | null;
   mutationPending: boolean;
 }
 
-const EMPTY: SubmitBody = { name: "", description: "" };
+const EMPTY: DomainAnnotationDialogBody = {
+  name: "",
+  description: "",
+  notSubmitted: false,
+};
 
 export function DomainAnnotationDialog({
   open,
   mode,
   row,
+  formNotSubmitted,
   onClose,
   onSubmit,
   mutationError,
   mutationPending,
 }: Props) {
   const { t } = useI18n();
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [body, setBody] = useState<DomainAnnotationDialogBody>(EMPTY);
 
   useEffect(() => {
     if (!open) return;
     if (mode === "edit" && row) {
-      setName(row.name);
-      setDescription(row.description);
+      setBody({
+        name: row.name,
+        description: row.description,
+        notSubmitted: formNotSubmitted,
+      });
     } else {
-      setName(EMPTY.name as string);
-      setDescription(EMPTY.description as string);
+      setBody({
+        name: EMPTY.name,
+        description: EMPTY.description,
+        notSubmitted: formNotSubmitted,
+      });
     }
-  }, [open, mode, row]);
+  }, [open, mode, row, formNotSubmitted]);
 
-  const submitDisabled = mutationPending || name.trim() === "";
+  const submitDisabled = mutationPending || body.name.trim() === "";
 
   function handleSubmit() {
     if (submitDisabled) return;
-    onSubmit({ name: name.trim(), description: description.trim() });
+    onSubmit({
+      name: body.name.trim(),
+      description: body.description.trim(),
+      notSubmitted: body.notSubmitted,
+    });
   }
 
   return (
@@ -85,15 +107,33 @@ export function DomainAnnotationDialog({
           <TextField
             size="small"
             label={t("crf.domainDialog.field.name")}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={body.name}
+            onChange={(e) =>
+              setBody((b) => ({ ...b, name: e.target.value }))
+            }
             required
           />
           <TextField
             size="small"
             label={t("crf.domainDialog.field.description")}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
+            value={body.description}
+            onChange={(e) =>
+              setBody((b) => ({ ...b, description: e.target.value }))
+            }
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={body.notSubmitted}
+                onChange={(e) =>
+                  setBody((b) => ({
+                    ...b,
+                    notSubmitted: e.target.checked,
+                  }))
+                }
+              />
+            }
+            label={t("crf.domainDialog.field.notSubmitted")}
           />
           {mutationError && (
             <Alert severity="error">{errorMessage(mutationError)}</Alert>

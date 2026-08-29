@@ -16,6 +16,7 @@ function renderDialog(
       <DomainAnnotationDialog
         open
         mode="create"
+        formNotSubmitted={false}
         onClose={() => undefined}
         onSubmit={onSubmit}
         mutationError={null}
@@ -37,7 +38,11 @@ describe("DomainAnnotationDialog", () => {
     });
     expect(submit).not.toBeDisabled();
     fireEvent.click(submit);
-    expect(onSubmit).toHaveBeenCalledWith({ name: "AE", description: "" });
+    expect(onSubmit).toHaveBeenCalledWith({
+      name: "AE",
+      description: "",
+      notSubmitted: false,
+    });
   });
 
   it("edit mode pre-fills from row", () => {
@@ -61,6 +66,7 @@ describe("DomainAnnotationDialog", () => {
     expect(onSubmit).toHaveBeenCalledWith({
       name: "Renamed",
       description: "Adverse Events",
+      notSubmitted: false,
     });
   });
 });

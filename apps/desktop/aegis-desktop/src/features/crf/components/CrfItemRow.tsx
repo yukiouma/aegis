@@ -1,9 +1,26 @@
 import { Box, Chip, Stack, Typography } from "@aegis/ui/mui";
 import { RadioButtonUnchecked as RadioButtonUncheckedIcon } from "@aegis/ui/icons";
-import { useI18n } from "@aegis/ui/i18n";
 
 import type { Annotation, CrfItemDetail } from "../../../shared/api";
+import { useI18n } from "@aegis/ui/i18n";
 import { AnnotationChip } from "./AnnotationChip";
+
+/**
+ * Tag rendered next to a form / item / option / unit name when
+ * its `notSubmitted` flag is true. The label is hard-coded English
+ * (no Chinese localisation) per the spec — the chip is meant to
+ * read as a system flag, not user-facing copy.
+ */
+function NotSubmittedChip() {
+  return (
+    <Chip
+      label="[NOT SUBMITTED]"
+      variant="outlined"
+      size="small"
+      data-testid="not-submitted-chip"
+    />
+  );
+}
 
 interface Props {
   itemDetail: CrfItemDetail;
@@ -61,6 +78,7 @@ export function CrfItemRow({
         >
           {item.name}
         </Typography>
+        {item.notSubmitted && <NotSubmittedChip />}
         <Stack
           direction="row"
           spacing={1}
@@ -110,6 +128,7 @@ export function CrfItemRow({
             >
               {t("crf.detail.unitLabel", { value: u.unit.value })}
             </Typography>
+            {u.unit.notSubmitted && <NotSubmittedChip />}
           </Box>
         ))}
       </Box>
@@ -134,6 +153,7 @@ export function CrfItemRow({
               >
                 {o.option.value}
               </Typography>
+              {o.option.notSubmitted && <NotSubmittedChip />}
               <Stack direction="row" spacing={1}>
                 {o.annotations.map((a) => (
                   <AnnotationChip

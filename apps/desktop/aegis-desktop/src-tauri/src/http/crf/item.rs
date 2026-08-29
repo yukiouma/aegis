@@ -26,6 +26,19 @@ pub struct CrfItemListResponse {
     pub items: Vec<CrfItemViewResponse>,
 }
 
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateCrfItemRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub order: Option<i32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub not_submitted: Option<bool>,
+}
+
 pub async fn list_by_form(
     c: &HttpClient,
     form_id: i64,
@@ -46,6 +59,19 @@ pub async fn get_by_id(
         reqwest::Method::GET,
         &format!("/api/crf/items/{id}"),
         None::<&()>,
+    )
+    .await
+}
+
+pub async fn update(
+    c: &HttpClient,
+    id: i64,
+    body: UpdateCrfItemRequest,
+) -> Result<CrfItemViewResponse, ApiError> {
+    c.request(
+        reqwest::Method::PATCH,
+        &format!("/api/crf/items/{id}"),
+        Some(&body),
     )
     .await
 }
@@ -110,5 +136,40 @@ mod tests {
             resp.created_at,
             Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()
         );
+    }
+
+    #[tokio::test]
+    async fn update_returns_view() {
+        let server = MockServer::start().await;
+        Mock::given(method("PATCH"))
+            .and(path("/api/crf/items/21"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(item_view_json(21, 11, "AETERMX")))
+            .mount(&server)
+            .await;
+        let resp = update(
+            &client(&server),
+            21,
+            UpdateCrfItemRequest {
+                code: None,
+                name: Some("AETERMX".into()),
+                order: None,
+                not_submitted: None,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.code, "AETERMX");
+    }
+
+    #[test]
+    fn update_request_skips_none_fields() {
+        let body = UpdateCrfItemRequest {
+            code: None,
+            name: Some("renamed".into()),
+            order: None,
+            not_submitted: None,
+        };
+        let j = serde_json::to_string(&body).unwrap();
+        assert_eq!(j, r#"{"name":"renamed"}"#);
     }
 }

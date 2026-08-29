@@ -29,12 +29,21 @@ export interface AnnotationDialogBody {
   domainAnnotationId: number;
   content: string;
   assign: boolean;
+  notSubmitted: boolean;
 }
 
 interface Props {
   open: boolean;
   mode: "create" | "edit";
   owner: AnnotationOwner;
+  /**
+   * The current `notSubmitted` flag of the annotation's owner
+   * (form / item / option / unit). The dialog seeds its
+   * `Not submitted` checkbox from this so the user can see
+   * the current state and toggle it; the page runs the
+   * cascade-delete + owner update when the new value differs.
+   */
+  ownerNotSubmitted: boolean;
   row?: Annotation;
   availableDomainAnnotations: DomainAnnotation[];
   onClose: () => void;
@@ -51,12 +60,14 @@ const EMPTY: AnnotationDialogBody = {
   domainAnnotationId: 0,
   content: "",
   assign: false,
+  notSubmitted: false,
 };
 
 export function AnnotationDialog({
   open,
   mode,
   owner: _owner,
+  ownerNotSubmitted,
   row,
   availableDomainAnnotations,
   onClose,
@@ -74,15 +85,17 @@ export function AnnotationDialog({
         domainAnnotationId: row.domainAnnotationId,
         content: row.content,
         assign: row.assign,
+        notSubmitted: ownerNotSubmitted,
       });
     } else {
       setBody({
         domainAnnotationId: availableDomainAnnotations[0]?.id ?? 0,
         content: "",
         assign: false,
+        notSubmitted: ownerNotSubmitted,
       });
     }
-  }, [open, mode, row, availableDomainAnnotations]);
+  }, [open, mode, row, availableDomainAnnotations, ownerNotSubmitted]);
 
   const submitDisabled =
     mutationPending ||
@@ -95,6 +108,7 @@ export function AnnotationDialog({
       domainAnnotationId: body.domainAnnotationId,
       content: body.content.trim(),
       assign: body.assign,
+      notSubmitted: body.notSubmitted,
     });
   }
 
@@ -163,6 +177,17 @@ export function AnnotationDialog({
               />
             }
             label={t("crf.annotationDialog.field.assign")}
+          />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={body.notSubmitted}
+                onChange={(e) =>
+                  setBody((b) => ({ ...b, notSubmitted: e.target.checked }))
+                }
+              />
+            }
+            label={t("crf.annotationDialog.field.notSubmitted")}
           />
           {mutationError && (
             <Alert severity="error">{errorMessage(mutationError)}</Alert>

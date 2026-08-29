@@ -427,4 +427,120 @@ describe("CrfDetailPage", () => {
     );
     expect(lastAnnotationIdx).toBeLessThan(firstDomainIdx);
   });
+
+  it("renders a [NOT SUBMITTED] chip on the form / item / option / unit when the flag is true", async () => {
+    // Same fixture as the basic render test, but every entity
+    // (form, item, option, unit) has notSubmitted flipped to true.
+    const detailNotSubmitted = {
+      ...fakeDetail,
+      form: { ...fakeDetail.form, notSubmitted: true },
+      items: fakeDetail.items.map((item) => ({
+        ...item,
+        item: { ...item.item, notSubmitted: true },
+        options: item.options.map((o) => ({
+          ...o,
+          option: { ...o.option, notSubmitted: true },
+        })),
+        units: item.units.map((u) => ({
+          ...u,
+          unit: { ...u.unit, notSubmitted: true },
+        })),
+      })),
+    };
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => ({ ...fakeForm, notSubmitted: true }),
+      get_crf_form_details: () => detailNotSubmitted,
+    });
+
+    renderPage(["/project/abc/crf/11"]);
+
+    // Wait for the page to render, then count [NOT SUBMITTED] chips.
+    await screen.findByTestId("crf-form-name");
+    const chips = await screen.findAllByTestId("not-submitted-chip");
+    // 1 form + 1 item + 1 option + 1 unit = 4 chips
+    expect(chips).toHaveLength(4);
+    expect(chips.every((c) => c.textContent === "[NOT SUBMITTED]")).toBe(true);
+  });
+
+  it("cascades annotations when toggling `Not submitted` on the form via the DomainAnnotationDialog", async () => {
+    // Open the DomainAnnotationDialog for the AE domain annotation,
+    // check the new `Not submitted` checkbox, and save. The page
+    // must:
+    //   1. save the domain annotation (the dialog handles the name /
+    //      description save)
+    //   2. run the not-submitted cascade against the form: delete
+    //      every annotation attached to the form (here: form 100
+    //      + item 110), then PATCH the form's notSubmitted=true.
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => fakeForm,
+      get_crf_form_details: () => fakeDetail,
+      update_crf_domain_annotation: () => ({
+        id: 50,
+        formId: 11,
+        name: "AE",
+        description: "Adverse Events",
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-02T00:00:00Z",
+      }),
+      update_crf_form: () => fakeForm,
+      delete_crf_annotation: () => undefined,
+    });
+
+    renderPage(["/project/abc/crf/11"]);
+
+    // Open the domain annotation dialog by clicking the chip.
+    const chip = await screen.findByTestId("domain-annotation-chip-50");
+    fireEvent.click(chip);
+
+    // The dialog pre-fills with the row's data; the new `Not
+    // submitted` checkbox should be unchecked (current form flag
+    // is false in the fixture).
+    const checkboxes = await screen.findAllByRole("checkbox");
+    // The dialog only has one checkbox in edit mode: `Not submitted`.
+    // (`Assigned` lives on the annotation dialog, not the domain one.)
+    expect(checkboxes).toHaveLength(1);
+    expect(checkboxes[0]).not.toBeChecked();
+    fireEvent.click(checkboxes[0]);
+
+    // Submit.
+    fireEvent.click(screen.getByRole("button", { name: /Save/i }));
+
+    // After submit, the page must have:
+    //   - updated the domain annotation (PATCH)
+    //   - deleted the form's annotations (annotation 100 + item
+    //     annotation 110 in this fixture)
+    //   - PATCHed the form with notSubmitted=true
+    await waitFor(() => {
+      const calls = mockInvoke.mock.calls.map((c) => c[0]);
+      expect(calls).toContain("update_crf_domain_annotation");
+      expect(calls).toContain("delete_crf_annotation");
+      expect(calls).toContain("update_crf_form");
+    });
+
+    const calls = mockInvoke.mock.calls;
+    const deleteAnnIds = calls
+      .filter((c) => c[0] === "delete_crf_annotation")
+      .map((c) => c[1]?.id);
+    expect(deleteAnnIds).toEqual(expect.arrayContaining([100, 110]));
+
+    const updateFormCalls = calls.filter((c) => c[0] === "update_crf_form");
+    expect(updateFormCalls).toHaveLength(1);
+    expect(updateFormCalls[0]?.[1]).toMatchObject({
+      id: 11,
+      body: { notSubmitted: true },
+    });
+
+    // Annotations must be deleted before the form's notSubmitted
+    // flag is updated — otherwise a halfway failure would leave
+    // dangling annotations on a "not submitted" form.
+    const lastAnnotationIdx = calls
+      .map((c) => c[0])
+      .lastIndexOf("delete_crf_annotation");
+    const firstFormIdx = calls.findIndex((c) => c[0] === "update_crf_form");
+    expect(lastAnnotationIdx).toBeLessThan(firstFormIdx);
+  });
 });

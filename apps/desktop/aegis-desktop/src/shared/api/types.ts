@@ -433,6 +433,23 @@ export interface UpdateCrfFormInput {
   notSubmitted?: boolean;
 }
 
+export interface UpdateCrfItemInput {
+  code?: string;
+  name?: string;
+  order?: number;
+  notSubmitted?: boolean;
+}
+
+export interface UpdateCrfOptionInput {
+  value?: string;
+  notSubmitted?: boolean;
+}
+
+export interface UpdateCrfUnitInput {
+  value?: string;
+  notSubmitted?: boolean;
+}
+
 // ---- CRF detail / items / options / units ----
 
 export type CrfItemKind =

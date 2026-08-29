@@ -22,6 +22,8 @@ import type {
   CrfFormDetail,
   CrfFormListResponse,
   CrfItem,
+  CrfOption,
+  CrfUnit,
   CrfVersion,
   CrfVersionListResponse,
   DomainAnnotation,
@@ -43,6 +45,9 @@ import type {
   UpdateCodeItemInput,
   UpdateCodeListInput,
   UpdateCrfFormInput,
+  UpdateCrfItemInput,
+  UpdateCrfOptionInput,
+  UpdateCrfUnitInput,
   UpdateDomainAnnotationInput,
   UpdateProjectBody,
   UpdateSdtmDomainInput,
@@ -299,6 +304,21 @@ export const api = {
     call<void>("delete_crf_form", { id }),
   getCrfFormDetails: (id: number): Promise<CrfFormDetail> =>
     call<CrfFormDetail>("get_crf_form_details", { id }),
+  updateCrfItem: (
+    id: number,
+    body: UpdateCrfItemInput,
+  ): Promise<CrfItem> =>
+    call<CrfItem>("update_crf_item", { id, body: { ...body } }),
+  updateCrfOption: (
+    id: number,
+    body: UpdateCrfOptionInput,
+  ): Promise<CrfOption> =>
+    call<CrfOption>("update_crf_option", { id, body: { ...body } }),
+  updateCrfUnit: (
+    id: number,
+    body: UpdateCrfUnitInput,
+  ): Promise<CrfUnit> =>
+    call<CrfUnit>("update_crf_unit", { id, body: { ...body } }),
   listCrfItemsByForm: async (formId: number): Promise<CrfItem[]> => {
     const resp = await call<{ items: CrfItem[] }>("list_crf_items_by_form", {
       formId,
@@ -398,6 +418,9 @@ export type {
   UpdateCodeItemInput,
   UpdateCodeListInput,
   UpdateCrfFormInput,
+  UpdateCrfItemInput,
+  UpdateCrfOptionInput,
+  UpdateCrfUnitInput,
   UpdateDomainAnnotationInput,
   UpdateProjectBody,
   UpdateSdtmDomainInput,

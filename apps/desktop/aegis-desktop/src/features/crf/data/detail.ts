@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   api,
+  type AnnotationOwner,
   type ApiError,
   type CreateAnnotationInput,
   type CreateDomainAnnotationInput,
@@ -128,6 +129,151 @@ export function useDeleteAnnotation() {
   const qc = useQueryClient();
   return useMutation<void, ApiError, { id: number; formId: number }>({
     mutationFn: ({ id }) => api.deleteCrfAnnotation(id),
+    onSuccess: (_void, vars) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.crf.formDetail(vars.formId) });
+    },
+  });
+}
+
+/**
+ * Look up the current `notSubmitted` flag for an owner in the cached
+ * detail. Returns `null` if the owner is not found (e.g. the cache is
+ * empty or stale) — callers use that to skip the cascade rather than
+ * risk deleting annotations that should stay.
+ */
+function readCurrentNotSubmitted(
+  detail: CrfFormDetail,
+  owner: AnnotationOwner,
+): boolean | null {
+  switch (owner.kind) {
+    case "form":
+      return detail.form.notSubmitted;
+    case "item": {
+      const found = detail.items.find((i) => i.item.id === owner.id);
+      return found ? found.item.notSubmitted : null;
+    }
+    case "option":
+      for (const item of detail.items) {
+        const opt = item.options.find((o) => o.option.id === owner.id);
+        if (opt) return opt.option.notSubmitted;
+      }
+      return null;
+    case "unit":
+      for (const item of detail.items) {
+        const u = item.units.find((uu) => uu.unit.id === owner.id);
+        if (u) return u.unit.notSubmitted;
+      }
+      return null;
+  }
+}
+
+/**
+ * Collect every annotation in the form detail attached to `owner`.
+ * Walks the relevant buckets:
+ *   - form → form-level + every item / option / unit annotation
+ *   - item → the item's annotations + each option / unit annotation
+ *   - option → the option's annotations only
+ *   - unit → the unit's annotations only
+ *
+ * Returning an empty array when the owner is not found keeps the
+ * cascade a no-op rather than throwing inside the mutation body.
+ */
+function collectAnnotationIdsForOwner(
+  detail: CrfFormDetail,
+  owner: AnnotationOwner,
+): number[] {
+  const ids: number[] = [];
+  if (owner.kind === "form") {
+    detail.formAnnotations.forEach((a) => ids.push(a.id));
+    for (const item of detail.items) {
+      item.annotations.forEach((a) => ids.push(a.id));
+      item.options.forEach((o) =>
+        o.annotations.forEach((a) => ids.push(a.id)),
+      );
+      item.units.forEach((u) =>
+        u.annotations.forEach((a) => ids.push(a.id)),
+      );
+    }
+    return ids;
+  }
+  if (owner.kind === "item") {
+    const item = detail.items.find((i) => i.item.id === owner.id);
+    if (!item) return ids;
+    item.annotations.forEach((a) => ids.push(a.id));
+    item.options.forEach((o) =>
+      o.annotations.forEach((a) => ids.push(a.id)),
+    );
+    item.units.forEach((u) =>
+      u.annotations.forEach((a) => ids.push(a.id)),
+    );
+    return ids;
+  }
+  if (owner.kind === "option") {
+    for (const item of detail.items) {
+      const opt = item.options.find((o) => o.option.id === owner.id);
+      if (opt) opt.annotations.forEach((a) => ids.push(a.id));
+    }
+    return ids;
+  }
+  // unit
+  for (const item of detail.items) {
+    const u = item.units.find((uu) => uu.unit.id === owner.id);
+    if (u) u.annotations.forEach((a) => ids.push(a.id));
+  }
+  return ids;
+}
+
+/**
+ * Update the `notSubmitted` flag on a form / item / option / unit
+ * owner. When the flag transitions from `false` to `true`, every
+ * annotation attached to that owner (and its descendants for form /
+ * item) is deleted first so a "not submitted" form is always empty
+ * of annotations. Sequential cascade + update so a halfway failure
+ * surfaces through the standard mutation error path.
+ */
+export function useUpdateOwnerNotSubmitted() {
+  const qc = useQueryClient();
+  return useMutation<
+    void,
+    ApiError,
+    {
+      formId: number;
+      owner: AnnotationOwner;
+      notSubmitted: boolean;
+    }
+  >({
+    mutationFn: async ({ formId, owner, notSubmitted }) => {
+      const detail = qc.getQueryData<CrfFormDetail>(
+        queryKeys.crf.formDetail(formId),
+      );
+      const current = detail
+        ? readCurrentNotSubmitted(detail, owner)
+        : null;
+      if (
+        current === false &&
+        notSubmitted === true &&
+        detail
+      ) {
+        const annIds = collectAnnotationIdsForOwner(detail, owner);
+        for (const annId of annIds) {
+          await api.deleteCrfAnnotation(annId);
+        }
+      }
+      switch (owner.kind) {
+        case "form":
+          await api.updateCrfForm(owner.id, { notSubmitted });
+          break;
+        case "item":
+          await api.updateCrfItem(owner.id, { notSubmitted });
+          break;
+        case "option":
+          await api.updateCrfOption(owner.id, { notSubmitted });
+          break;
+        case "unit":
+          await api.updateCrfUnit(owner.id, { notSubmitted });
+          break;
+      }
+    },
     onSuccess: (_void, vars) => {
       void qc.invalidateQueries({ queryKey: queryKeys.crf.formDetail(vars.formId) });
     },
