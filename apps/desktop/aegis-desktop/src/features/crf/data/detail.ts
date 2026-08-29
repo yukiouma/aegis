@@ -225,11 +225,16 @@ function collectAnnotationIdsForOwner(
 
 /**
  * Update the `notSubmitted` flag on a form / item / option / unit
- * owner. When the flag transitions from `false` to `true`, every
- * annotation attached to that owner (and its descendants for form /
- * item) is deleted first so a "not submitted" form is always empty
- * of annotations. Sequential cascade + update so a halfway failure
- * surfaces through the standard mutation error path.
+ * owner. When the flag transitions from `false` to `true`, the
+ * owner is wiped so a "not submitted" owner holds no annotations:
+ *   - form → all annotations AND all domain annotations in the form
+ *   - item → item's annotations + every option / unit annotation
+ *   - option / unit → own annotations only
+ * Annotations are deleted before domain annotations, and both before
+ * the PATCH, so a halfway failure surfaces through the standard
+ * mutation error path and the cache never lands in a "not submitted
+ * owner still references deleted annotations" state. The `true →
+ * false` transition just lifts the flag with no cascade.
  */
 export function useUpdateOwnerNotSubmitted() {
   const qc = useQueryClient();
@@ -258,6 +263,21 @@ export function useUpdateOwnerNotSubmitted() {
         for (const annId of annIds) {
           await api.deleteCrfAnnotation(annId);
         }
+        // Form-level cascade also wipes every domain annotation on
+        // the form. The spec for the form owner says "remove all the
+        // (domain_)annotations in this form" — domain annotations
+        // belong here too. Without this, marking a form not-submitted
+        // would leave its domain annotations in place, so the next
+        // "new domain annotation" would coexist with stale ones.
+        // Deleting domain annotations AFTER annotations (and BEFORE
+        // the form's notSubmitted PATCH) means a halfway failure
+        // leaves the form either fully populated or fully empty of
+        // both kinds — never half-empty with dangling references.
+        if (owner.kind === "form") {
+          for (const d of detail.domainAnnotations) {
+            await api.deleteCrfDomainAnnotation(d.id);
+          }
+        }
       }
       switch (owner.kind) {
         case "form":
@@ -276,6 +296,16 @@ export function useUpdateOwnerNotSubmitted() {
     },
     onSuccess: (_void, vars) => {
       void qc.invalidateQueries({ queryKey: queryKeys.crf.formDetail(vars.formId) });
+      // Also invalidate the single-form query that drives the header
+      // chip (`useGetCrfForm` reads `form.notSubmitted` from there).
+      // Without this, the form-level [NOT SUBMITTED] chip in the
+      // page header stays stale until the next manual refetch — and
+      // for the item / option / unit cases it doesn't matter (those
+      // chips read from the form detail), but invalidating the
+      // single-form query is cheap and keeps the rule uniform: every
+      // success of this hook refreshes every cache that could expose
+      // the changed flag.
+      void qc.invalidateQueries({ queryKey: queryKeys.crf.form(vars.formId) });
     },
   });
 }

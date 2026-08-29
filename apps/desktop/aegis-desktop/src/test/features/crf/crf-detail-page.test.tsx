@@ -554,12 +554,16 @@ describe("CrfDetailPage", () => {
     ).toBe(false);
   });
 
-  it("cascades annotations when clicking `Not submit` in the DomainAnnotationDialog", async () => {
+  it("cascades annotations and domain annotations when clicking `Not submit` in the DomainAnnotationDialog", async () => {
     // Open the DomainAnnotationDialog for the AE domain annotation
     // and click the dialog's `Not submit` button. The page must:
     //   1. delete every annotation attached to the form (here:
-    //      form 100 + item 110), then
-    //   2. PATCH the form with notSubmitted=true.
+    //      form 100 + item 110),
+    //   2. delete every domain annotation in the form (here: AE id 50),
+    //   3. PATCH the form with notSubmitted=true.
+    // Order matters: annotations → domain annotations → form PATCH,
+    // so a halfway failure surfaces rather than leaving the form in a
+    // half-cleared state.
     mockCommands({
       is_logged_in: () => true,
       current_user: () => fakeUser,
@@ -567,6 +571,7 @@ describe("CrfDetailPage", () => {
       get_crf_form_details: () => fakeDetail,
       update_crf_form: () => fakeForm,
       delete_crf_annotation: () => undefined,
+      delete_crf_domain_annotation: () => undefined,
     });
 
     renderPage(["/project/abc/crf/11"]);
@@ -586,10 +591,12 @@ describe("CrfDetailPage", () => {
     // After clicking, the page must have:
     //   - deleted the form's annotations (annotation 100 + item
     //     annotation 110 in this fixture)
+    //   - deleted the form's domain annotations (id 50)
     //   - PATCHed the form with notSubmitted=true
     await waitFor(() => {
       const calls = mockInvoke.mock.calls.map((c) => c[0]);
       expect(calls).toContain("delete_crf_annotation");
+      expect(calls).toContain("delete_crf_domain_annotation");
       expect(calls).toContain("update_crf_form");
     });
 
@@ -599,6 +606,11 @@ describe("CrfDetailPage", () => {
       .map((c) => c[1]?.id);
     expect(deleteAnnIds).toEqual(expect.arrayContaining([100, 110]));
 
+    const deleteDomainIds = calls
+      .filter((c) => c[0] === "delete_crf_domain_annotation")
+      .map((c) => c[1]?.id);
+    expect(deleteDomainIds).toEqual([50]);
+
     const updateFormCalls = calls.filter((c) => c[0] === "update_crf_form");
     expect(updateFormCalls).toHaveLength(1);
     expect(updateFormCalls[0]?.[1]).toMatchObject({
@@ -606,13 +618,85 @@ describe("CrfDetailPage", () => {
       body: { notSubmitted: true },
     });
 
-    // Annotations must be deleted before the form's notSubmitted
-    // flag is updated — otherwise a halfway failure would leave
-    // dangling annotations on a "not submitted" form.
-    const lastAnnotationIdx = calls
+    // Strict ordering: annotations → domain annotations → form PATCH.
+    // Annotations must be deleted before domain annotations because
+    // deleting a domain annotation can cascade to its annotations;
+    // deleting annotations first means each step is independent.
+    // Domain annotations must precede the form PATCH so a halfway
+    // failure leaves the form in either a fully-populated or a
+    // fully-empty state — never half-cleared with dangling refs.
+    const lastAnnIdx = calls
       .map((c) => c[0])
       .lastIndexOf("delete_crf_annotation");
+    const firstDomainIdx = calls.findIndex(
+      (c) => c[0] === "delete_crf_domain_annotation",
+    );
+    const lastDomainIdx = calls
+      .map((c) => c[0])
+      .lastIndexOf("delete_crf_domain_annotation");
     const firstFormIdx = calls.findIndex((c) => c[0] === "update_crf_form");
-    expect(lastAnnotationIdx).toBeLessThan(firstFormIdx);
+    expect(lastAnnIdx).toBeLessThan(firstDomainIdx);
+    expect(lastDomainIdx).toBeLessThan(firstFormIdx);
+  });
+
+  it("renders the form-level [NOT SUBMITTED] header chip after `Not submit` succeeds", async () => {
+    // The header chip reads `form.notSubmitted` from `useGetCrfForm`
+    // (the `crf.form` query, populated by `get_crf_form_by_id`). The
+    // cascade mutation must invalidate BOTH `crf.formDetail` and
+    // `crf.form` on success — otherwise the header stays stale even
+    // after the cascade and PATCH succeed, and the user never sees
+    // the chip appear. Here we model the post-mutation reality by
+    // flipping the flag the mock returns once `update_crf_form`
+    // has been called.
+    let notSubmitted = false;
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => ({ ...fakeForm, notSubmitted }),
+      get_crf_form_details: () => ({
+        ...fakeDetail,
+        form: { ...fakeDetail.form, notSubmitted },
+      }),
+      update_crf_form: (args) => {
+        notSubmitted = (args?.body as { notSubmitted: boolean })
+          ?.notSubmitted === true;
+        return { ...fakeForm, notSubmitted };
+      },
+      delete_crf_annotation: () => undefined,
+      delete_crf_domain_annotation: () => undefined,
+    });
+
+    renderPage(["/project/abc/crf/11"]);
+
+    // Sanity: header starts without the chip — form is submitted.
+    expect(screen.queryByTestId("not-submitted-chip")).not.toBeInTheDocument();
+
+    // Open the dialog and click `Not submit`.
+    const chip = await screen.findByTestId("domain-annotation-chip-50");
+    fireEvent.click(chip);
+    const notSubmit = await screen.findByTestId(
+      "crf-domain-dialog-not-submit",
+    );
+    fireEvent.click(notSubmit);
+
+    // The cascade runs, the form PATCH returns notSubmitted=true, and
+    // both queries re-fetch. The header chip — keyed by
+    // `data-testid="not-submitted-chip"` — must appear in the DOM.
+    // waitFor handles the React Query refetch round-trip.
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("not-submitted-chip"),
+      ).toBeInTheDocument();
+    });
+
+    // After the action, `get_crf_form_by_id` must have been called at
+    // least twice: once for the initial load, once after invalidation.
+    // If the mutation only invalidated `crf.formDetail`, the hook
+    // would never refetch the single-form query and the chip would
+    // stay stale.
+    const getByIdCalls = mockInvoke.mock.calls.filter(
+      (c) => c[0] === "get_crf_form_by_id",
+    );
+    expect(getByIdCalls.length).toBeGreaterThanOrEqual(2);
   });
 });
