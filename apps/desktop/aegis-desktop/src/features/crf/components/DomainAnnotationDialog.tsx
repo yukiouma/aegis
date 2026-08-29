@@ -111,7 +111,6 @@ export function DomainAnnotationDialog({
             onChange={(e) =>
               setBody((b) => ({ ...b, name: e.target.value }))
             }
-            required
           />
           <TextField
             size="small"

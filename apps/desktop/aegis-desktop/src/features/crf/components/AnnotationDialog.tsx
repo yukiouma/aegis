@@ -165,7 +165,6 @@ export function AnnotationDialog({
             onChange={(e) =>
               setBody((b) => ({ ...b, content: e.target.value }))
             }
-            required
           />
           <FormControlLabel
             control={
