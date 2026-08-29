@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import {
   Alert,
-  Box,
   Button,
-  Drawer,
-  Stack,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   TextField,
-  Typography,
 } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
 
@@ -64,57 +64,57 @@ export function DomainAnnotationDialog({
   }
 
   return (
-    <Drawer
-      anchor="right"
+    <Dialog
       open={open}
       onClose={onClose}
-      slotProps={{ paper: { sx: { width: 480 } } }}
+      maxWidth="sm"
+      fullWidth
     >
-      <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}>
-        <Typography variant="h6">
-          {t(
-            mode === "create"
-              ? "crf.domainDialog.create.title"
-              : "crf.domainDialog.edit.title",
-          )}
-        </Typography>
-        <Stack spacing={2}>
-          <TextField
-            size="small"
-            label={t("crf.domainDialog.field.name")}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-          <TextField
-            size="small"
-            label={t("crf.domainDialog.field.description")}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            multiline
-            minRows={2}
-          />
-        </Stack>
+      <DialogTitle>
+        {t(
+          mode === "create"
+            ? "crf.domainDialog.create.title"
+            : "crf.domainDialog.edit.title",
+        )}
+      </DialogTitle>
+      <DialogContent
+        sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 2 }}
+      >
+        <TextField
+          size="small"
+          label={t("crf.domainDialog.field.name")}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+        />
+        <TextField
+          size="small"
+          label={t("crf.domainDialog.field.description")}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          multiline
+          minRows={2}
+        />
         {mutationError && (
           <Alert severity="error">{errorMessage(mutationError)}</Alert>
         )}
-        <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>
-          <Button onClick={onClose} disabled={mutationPending}>
-            {t("common.cancel")}
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleSubmit}
-            disabled={submitDisabled}
-          >
-            {t(
-              mode === "create"
-                ? "crf.domainDialog.submit.create"
-                : "crf.domainDialog.submit.save",
-            )}
-          </Button>
-        </Box>
-      </Box>
-    </Drawer>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={mutationPending}>
+          {t("common.cancel")}
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handleSubmit}
+          disabled={submitDisabled}
+        >
+          {t(
+            mode === "create"
+              ? "crf.domainDialog.submit.create"
+              : "crf.domainDialog.submit.save",
+          )}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 }
