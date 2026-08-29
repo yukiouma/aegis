@@ -174,4 +174,70 @@ describe("api wrappers", () => {
       body: { name: "AETOX" },
     });
   });
+
+  it("getCrfFormDetails -> invoke('get_crf_form_details', { id })", async () => {
+    mockInvoke.mockResolvedValueOnce({});
+    await api.getCrfFormDetails(11);
+    expect(mockInvoke).toHaveBeenCalledWith("get_crf_form_details", { id: 11 });
+  });
+
+  it("createCrfDomainAnnotation -> invoke('create_crf_domain_annotation', { formId, body })", async () => {
+    mockInvoke.mockResolvedValueOnce({});
+    await api.createCrfDomainAnnotation(11, {
+      name: "AE",
+      description: "Adverse Events",
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("create_crf_domain_annotation", {
+      formId: 11,
+      body: { name: "AE", description: "Adverse Events" },
+    });
+  });
+
+  it("updateCrfDomainAnnotation -> invoke('update_crf_domain_annotation', { id, body })", async () => {
+    mockInvoke.mockResolvedValueOnce({});
+    await api.updateCrfDomainAnnotation(50, { name: "renamed" });
+    expect(mockInvoke).toHaveBeenCalledWith("update_crf_domain_annotation", {
+      id: 50,
+      body: { name: "renamed" },
+    });
+  });
+
+  it("deleteCrfDomainAnnotation -> invoke('delete_crf_domain_annotation', { id })", async () => {
+    mockInvoke.mockResolvedValueOnce(undefined);
+    await api.deleteCrfDomainAnnotation(50);
+    expect(mockInvoke).toHaveBeenCalledWith("delete_crf_domain_annotation", { id: 50 });
+  });
+
+  it("createCrfAnnotation -> invoke('create_crf_annotation', { body })", async () => {
+    mockInvoke.mockResolvedValueOnce({});
+    await api.createCrfAnnotation({
+      domainAnnotationId: 50,
+      content: "note",
+      assign: false,
+      owner: { kind: "item", id: 21 },
+    });
+    expect(mockInvoke).toHaveBeenCalledWith("create_crf_annotation", {
+      body: {
+        domainAnnotationId: 50,
+        content: "note",
+        assign: false,
+        owner: { kind: "item", id: 21 },
+      },
+    });
+  });
+
+  it("updateCrfAnnotation -> invoke('update_crf_annotation', { id, body })", async () => {
+    mockInvoke.mockResolvedValueOnce({});
+    await api.updateCrfAnnotation(100, { content: "renamed", assign: true });
+    expect(mockInvoke).toHaveBeenCalledWith("update_crf_annotation", {
+      id: 100,
+      body: { content: "renamed", assign: true },
+    });
+  });
+
+  it("deleteCrfAnnotation -> invoke('delete_crf_annotation', { id })", async () => {
+    mockInvoke.mockResolvedValueOnce(undefined);
+    await api.deleteCrfAnnotation(100);
+    expect(mockInvoke).toHaveBeenCalledWith("delete_crf_annotation", { id: 100 });
+  });
 });

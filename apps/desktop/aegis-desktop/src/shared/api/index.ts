@@ -2,23 +2,31 @@ import { invoke } from "@tauri-apps/api/core";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 import type {
+  Annotation,
   CodeItemListQuery,
   CodeItemListResponse,
   CodeItemView,
   CodeListListQuery,
   CodeListView,
+  CreateAnnotationInput,
   CreateCodeItemInput,
   CreateCodeListInput,
   CreateCrfFormInput,
+  CreateDomainAnnotationInput,
   CreateProjectInput,
   CreateSdtmDomainInput,
   CreateSdtmVariableInput,
   CreateTerminologyVersionInput,
   CreateUserInput,
   CrfForm,
+  CrfFormDetail,
   CrfFormListResponse,
+  CrfItem,
+  CrfOption,
+  CrfUnit,
   CrfVersion,
   CrfVersionListResponse,
+  DomainAnnotation,
   Identity,
   PagedCodeItemListResponse,
   PagedCodeListListResponse,
@@ -33,9 +41,14 @@ import type {
   SdtmVersionView,
   TerminologyKind,
   TerminologyVersionView,
+  UpdateAnnotationInput,
   UpdateCodeItemInput,
   UpdateCodeListInput,
   UpdateCrfFormInput,
+  UpdateCrfItemInput,
+  UpdateCrfOptionInput,
+  UpdateCrfUnitInput,
+  UpdateDomainAnnotationInput,
   UpdateProjectBody,
   UpdateSdtmDomainInput,
   UpdateSdtmVariableInput,
@@ -289,28 +302,91 @@ export const api = {
     call<CrfForm>("update_crf_form", { id, body: { ...body } }),
   deleteCrfForm: (id: number): Promise<void> =>
     call<void>("delete_crf_form", { id }),
+  getCrfFormDetails: (id: number): Promise<CrfFormDetail> =>
+    call<CrfFormDetail>("get_crf_form_details", { id }),
+  updateCrfItem: (
+    id: number,
+    body: UpdateCrfItemInput,
+  ): Promise<CrfItem> =>
+    call<CrfItem>("update_crf_item", { id, body: { ...body } }),
+  updateCrfOption: (
+    id: number,
+    body: UpdateCrfOptionInput,
+  ): Promise<CrfOption> =>
+    call<CrfOption>("update_crf_option", { id, body: { ...body } }),
+  updateCrfUnit: (
+    id: number,
+    body: UpdateCrfUnitInput,
+  ): Promise<CrfUnit> =>
+    call<CrfUnit>("update_crf_unit", { id, body: { ...body } }),
+  listCrfItemsByForm: async (formId: number): Promise<CrfItem[]> => {
+    const resp = await call<{ items: CrfItem[] }>("list_crf_items_by_form", {
+      formId,
+    });
+    return resp.items;
+  },
+  createCrfDomainAnnotation: (
+    formId: number,
+    body: CreateDomainAnnotationInput,
+  ): Promise<DomainAnnotation> =>
+    call<DomainAnnotation>("create_crf_domain_annotation", {
+      formId,
+      body: { ...body },
+    }),
+  updateCrfDomainAnnotation: (
+    id: number,
+    body: UpdateDomainAnnotationInput,
+  ): Promise<DomainAnnotation> =>
+    call<DomainAnnotation>("update_crf_domain_annotation", {
+      id,
+      body: { ...body },
+    }),
+  deleteCrfDomainAnnotation: (id: number): Promise<void> =>
+    call<void>("delete_crf_domain_annotation", { id }),
+  createCrfAnnotation: (body: CreateAnnotationInput): Promise<Annotation> =>
+    call<Annotation>("create_crf_annotation", { body: { ...body } }),
+  updateCrfAnnotation: (
+    id: number,
+    body: UpdateAnnotationInput,
+  ): Promise<Annotation> =>
+    call<Annotation>("update_crf_annotation", { id, body: { ...body } }),
+  deleteCrfAnnotation: (id: number): Promise<void> =>
+    call<void>("delete_crf_annotation", { id }),
 } as const;
 
 export type { ApiError } from "./types";
 export type {
+  Annotation,
+  AnnotationOwner,
   CodeItemListQuery,
   CodeItemListResponse,
   CodeItemView,
   CodeListListQuery,
   CodeListListResponse,
   CodeListView,
+  CreateAnnotationInput,
   CreateCodeItemInput,
   CreateCodeListInput,
   CreateCrfFormInput,
+  CreateDomainAnnotationInput,
   CreateProjectInput,
   CreateSdtmDomainInput,
   CreateSdtmVariableInput,
   CreateTerminologyVersionInput,
   CreateUserInput,
   CrfForm,
+  CrfFormDetail,
   CrfFormListResponse,
+  CrfItem,
+  CrfItemDetail,
+  CrfItemKind,
+  CrfOption,
+  CrfOptionDetail,
+  CrfUnit,
+  CrfUnitDetail,
   CrfVersion,
   CrfVersionListResponse,
+  DomainAnnotation,
   DomainCategory,
   Identity,
   PagedCodeItemListResponse,
@@ -338,9 +414,14 @@ export type {
   TerminologyKind,
   TerminologyVersionListResponse,
   TerminologyVersionView,
+  UpdateAnnotationInput,
   UpdateCodeItemInput,
   UpdateCodeListInput,
   UpdateCrfFormInput,
+  UpdateCrfItemInput,
+  UpdateCrfOptionInput,
+  UpdateCrfUnitInput,
+  UpdateDomainAnnotationInput,
   UpdateProjectBody,
   UpdateSdtmDomainInput,
   UpdateSdtmVariableInput,

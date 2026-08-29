@@ -109,6 +109,121 @@ pub async fn get_by_id(
     .await
 }
 
+// ---- detail composition ----
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum AnnotationOwner {
+    Form { id: i64 },
+    Item { id: i64 },
+    #[serde(rename = "option")]
+    Option { id: i64 },
+    Unit { id: i64 },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfItemViewResponse {
+    pub id: i64,
+    pub form_id: i64,
+    pub code: String,
+    pub name: String,
+    pub kind: String,
+    pub order: i32,
+    pub not_submitted: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfOptionViewResponse {
+    pub id: i64,
+    pub item_id: i64,
+    pub value: String,
+    pub not_submitted: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfUnitViewResponse {
+    pub id: i64,
+    pub item_id: i64,
+    pub value: String,
+    pub not_submitted: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationViewResponse {
+    pub id: i64,
+    pub domain_annotation_id: i64,
+    pub content: String,
+    pub assign: bool,
+    pub owner: AnnotationOwner,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainAnnotationViewResponse {
+    pub id: i64,
+    pub form_id: i64,
+    pub name: String,
+    pub description: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfOptionDetailResponse {
+    pub option: CrfOptionViewResponse,
+    pub annotations: Vec<AnnotationViewResponse>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfUnitDetailResponse {
+    pub unit: CrfUnitViewResponse,
+    pub annotations: Vec<AnnotationViewResponse>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfItemDetailResponse {
+    pub item: CrfItemViewResponse,
+    pub options: Vec<CrfOptionDetailResponse>,
+    pub units: Vec<CrfUnitDetailResponse>,
+    pub annotations: Vec<AnnotationViewResponse>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfFormDetailResponse {
+    pub form: CrfFormViewResponse,
+    pub form_annotations: Vec<AnnotationViewResponse>,
+    pub items: Vec<CrfItemDetailResponse>,
+    pub domain_annotations: Vec<DomainAnnotationViewResponse>,
+}
+
+pub async fn details(
+    c: &HttpClient,
+    id: i64,
+) -> Result<CrfFormDetailResponse, ApiError> {
+    c.request(
+        reqwest::Method::GET,
+        &format!("/api/crf/forms/{id}/details"),
+        None::<&()>,
+    )
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242,5 +357,50 @@ mod tests {
         };
         let j = serde_json::to_string(&body).unwrap();
         assert_eq!(j, r#"{"name":"renamed"}"#);
+    }
+
+    #[tokio::test]
+    async fn details_returns_composed_view() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/crf/forms/11/details"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "form": form_view_json(11, 7, "AE", "Adverse Events"),
+                "formAnnotations": [{
+                    "id": 100,
+                    "domainAnnotationId": 50,
+                    "content": "form-level note",
+                    "assign": false,
+                    "owner": { "kind": "form", "id": 11 },
+                    "createdAt": "2026-01-01T00:00:00Z",
+                    "updatedAt": "2026-01-02T00:00:00Z"
+                }],
+                "items": [{
+                    "item": {
+                        "id": 21, "formId": 11, "code": "AETERM", "name": "Term",
+                        "kind": "text", "order": 0, "notSubmitted": false,
+                        "createdAt": "2026-01-01T00:00:00Z",
+                        "updatedAt": "2026-01-02T00:00:00Z"
+                    },
+                    "options": [],
+                    "units": [],
+                    "annotations": []
+                }],
+                "domainAnnotations": [{
+                    "id": 50, "formId": 11,
+                    "name": "Adverse Events", "description": "AE",
+                    "createdAt": "2026-01-01T00:00:00Z",
+                    "updatedAt": "2026-01-02T00:00:00Z"
+                }]
+            })))
+            .mount(&server)
+            .await;
+        let resp = details(&client(&server), 11).await.unwrap();
+        assert_eq!(resp.form.id, 11);
+        assert_eq!(resp.form_annotations.len(), 1);
+        assert_eq!(resp.items.len(), 1);
+        assert_eq!(resp.items[0].item.code, "AETERM");
+        assert_eq!(resp.domain_annotations.len(), 1);
+        assert_eq!(resp.domain_annotations[0].name, "Adverse Events");
     }
 }
