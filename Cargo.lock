@@ -25,7 +25,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "tauri-plugin-store",
- "terminology 0.1.0 (git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.1)",
+ "terminology 0.1.0 (git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.2)",
  "thiserror 2.0.19",
  "tokio",
  "windows-utils",
@@ -97,7 +97,7 @@ checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
 [[package]]
 name = "als-resolver"
 version = "0.1.0"
-source = "git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.1#f132d62e50026c4b3e99f2fd48ac3ed115f52ac3"
+source = "git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.2#fe21c2d21d0c508677567ba0b829bca4c7306aa0"
 dependencies = [
  "calamine",
  "entities",
@@ -1454,7 +1454,7 @@ checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
 [[package]]
 name = "entities"
 version = "0.1.0"
-source = "git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.1#f132d62e50026c4b3e99f2fd48ac3ed115f52ac3"
+source = "git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.2#fe21c2d21d0c508677567ba0b829bca4c7306aa0"
 
 [[package]]
 name = "enumflags2"
@@ -5381,7 +5381,7 @@ dependencies = [
 [[package]]
 name = "terminology"
 version = "0.1.0"
-source = "git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.1#f132d62e50026c4b3e99f2fd48ac3ed115f52ac3"
+source = "git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.2#fe21c2d21d0c508677567ba0b829bca4c7306aa0"
 dependencies = [
  "calamine",
  "serde",
