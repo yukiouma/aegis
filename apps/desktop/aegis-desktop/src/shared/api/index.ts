@@ -18,6 +18,7 @@ import type {
   CreateSdtmVariableInput,
   CreateTerminologyVersionInput,
   CreateUserInput,
+  CrfEdcType,
   CrfForm,
   CrfFormDetail,
   CrfFormListResponse,
@@ -295,6 +296,13 @@ export const api = {
     body: CreateCrfFormInput,
   ): Promise<CrfForm> =>
     call<CrfForm>("create_crf_form", { versionId, body: { ...body } }),
+  importAls: (
+    name: string,
+    projectCode: string,
+    filepath: string,
+    edcType: CrfEdcType,
+  ): Promise<CrfVersion> =>
+    call<CrfVersion>("import_als", { name, projectCode, filepath, edcType }),
   updateCrfForm: (
     id: number,
     body: UpdateCrfFormInput,
@@ -374,6 +382,7 @@ export type {
   CreateSdtmVariableInput,
   CreateTerminologyVersionInput,
   CreateUserInput,
+  CrfEdcType,
   CrfForm,
   CrfFormDetail,
   CrfFormListResponse,
@@ -389,6 +398,7 @@ export type {
   DomainAnnotation,
   DomainCategory,
   Identity,
+  ImportAlsInput,
   PagedCodeItemListResponse,
   PagedCodeListListResponse,
   ProjectMembers,
