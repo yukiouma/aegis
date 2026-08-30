@@ -65,6 +65,40 @@ impl From<AlsImportError> for ApiError {
     }
 }
 
+/// Wire mirror of `lib/crates/apis/src/crf.rs::CrfItemKind`. Kept local
+/// to this module to avoid pulling in `http::crf::form` for what is
+/// only a string-tagged translator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CrfItemKind {
+    Text,
+    Selection,
+    Checkbox,
+    Datetime,
+    Label,
+}
+
+impl CrfItemKind {
+    pub(crate) fn as_wire(self) -> &'static str {
+        match self {
+            CrfItemKind::Text => "text",
+            CrfItemKind::Selection => "selection",
+            CrfItemKind::Checkbox => "checkbox",
+            CrfItemKind::Datetime => "datetime",
+            CrfItemKind::Label => "label",
+        }
+    }
+}
+
+fn control_type_to_kind(c: entities::project::ControlType) -> CrfItemKind {
+    use entities::project::ControlType as C;
+    match c {
+        C::TEXT => CrfItemKind::Text,
+        C::DATETIME => CrfItemKind::Datetime,
+        C::SELECTION => CrfItemKind::Selection,
+        C::CHECKBOX => CrfItemKind::Checkbox,
+    }
+}
+
 pub async fn list_by_project(
     c: &HttpClient,
     project_code: &str,
@@ -137,5 +171,23 @@ mod tests {
             }
             other => panic!("expected Parse variant, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn control_type_to_kind_covers_all_variants() {
+        use entities::project::ControlType;
+        assert_eq!(control_type_to_kind(ControlType::TEXT), CrfItemKind::Text);
+        assert_eq!(control_type_to_kind(ControlType::DATETIME), CrfItemKind::Datetime);
+        assert_eq!(control_type_to_kind(ControlType::SELECTION), CrfItemKind::Selection);
+        assert_eq!(control_type_to_kind(ControlType::CHECKBOX), CrfItemKind::Checkbox);
+    }
+
+    #[test]
+    fn crf_item_kind_as_wire_matches_shared_types_ts() {
+        assert_eq!(CrfItemKind::Text.as_wire(), "text");
+        assert_eq!(CrfItemKind::Selection.as_wire(), "selection");
+        assert_eq!(CrfItemKind::Checkbox.as_wire(), "checkbox");
+        assert_eq!(CrfItemKind::Datetime.as_wire(), "datetime");
+        assert_eq!(CrfItemKind::Label.as_wire(), "label");
     }
 }
