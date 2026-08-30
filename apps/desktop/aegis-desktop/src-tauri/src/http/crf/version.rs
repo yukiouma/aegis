@@ -77,7 +77,11 @@ impl From<AlsImportError> for ApiError {
 
 /// Wire mirror of `lib/crates/apis/src/crf.rs::CrfItemKind`. Kept local
 /// to this module to avoid pulling in `http::crf::form` for what is
-/// only a string-tagged translator.
+/// only a string-tagged translator. `Label` exists in the wire shape
+/// but is never constructed here because als-resolver does not emit
+/// label controls — the variant is still listed so the wire→local
+/// mapping in `From<WireCrfItemKind>` covers every server variant.
+#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CrfItemKind {
     Text,
