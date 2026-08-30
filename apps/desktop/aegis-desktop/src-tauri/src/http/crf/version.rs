@@ -6,9 +6,9 @@ use thiserror::Error;
 
 use crate::http::client::HttpClient;
 use crate::http::crf::form::{
-    self as form_http, BulkCreateCrfFormItemInput, BulkCreateCrfFormRequest,
-    CreateCrfFormRequest, CreateCrfItemRequest, CreateCrfOptionRequest,
-    CreateCrfUnitRequest, CrfItemKind as WireCrfItemKind,
+    self as form_http, BulkCreateCrfFormItemInput, BulkCreateCrfFormRequest, CreateCrfFormRequest,
+    CreateCrfItemRequest, CreateCrfOptionRequest, CreateCrfUnitRequest,
+    CrfItemKind as WireCrfItemKind,
 };
 use crate::http::dto::ApiError;
 
@@ -37,7 +37,10 @@ pub struct CrfVersionListResponse {
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum AlsImportError {
     #[error("form #{form_index}: {target} must not be empty")]
-    Empty { target: &'static str, form_index: usize },
+    Empty {
+        target: &'static str,
+        form_index: usize,
+    },
 
     #[error("form #{form_index} item '{item_code}': {field} must not be empty")]
     EmptyItem {
@@ -66,7 +69,9 @@ impl AlsImportError {
 
 impl From<AlsImportError> for ApiError {
     fn from(err: AlsImportError) -> Self {
-        ApiError::Parse { message: err.to_string() }
+        ApiError::Parse {
+            message: err.to_string(),
+        }
     }
 }
 
@@ -212,7 +217,11 @@ fn pre_validate(project: &als_resolver::Project) -> Result<(), Vec<AlsImportErro
         }
     }
 
-    if errs.is_empty() { Ok(()) } else { Err(errs) }
+    if errs.is_empty() {
+        Ok(())
+    } else {
+        Err(errs)
+    }
 }
 
 pub async fn list_by_project(
@@ -275,17 +284,19 @@ pub async fn import_als(
 
     // 1. parse off-thread
     let filepath_owned = filepath.to_string();
-    let parsed: Result<als_resolver::Project, ApiError> = tokio::task::spawn_blocking(
-        move || -> Result<als_resolver::Project, AlsImportError> {
-            let file = std::fs::File::open(&filepath_owned)
-                .map_err(AlsImportError::from_io)?;
+    let parsed: Result<als_resolver::Project, ApiError> =
+        tokio::task::spawn_blocking(move || -> Result<als_resolver::Project, AlsImportError> {
+            let file = std::fs::File::open(&filepath_owned).map_err(AlsImportError::from_io)?;
             parse_als_dispatch(edc_type, BufReader::new(file))
                 .map_err(|e| AlsImportError::Io(e.to_string()))
-        },
-    )
-    .await
-    .map_err(|e| ApiError::Parse { message: format!("join error: {e}") })?
-    .map_err(|e: AlsImportError| ApiError::Parse { message: e.to_string() });
+        })
+        .await
+        .map_err(|e| ApiError::Parse {
+            message: format!("join error: {e}"),
+        })?
+        .map_err(|e: AlsImportError| ApiError::Parse {
+            message: e.to_string(),
+        });
 
     let parsed = parsed?;
 
@@ -438,7 +449,9 @@ mod tests {
         let resp = create(
             &client(&server),
             "P1",
-            CreateCrfVersionRequest { name: "v1".to_string() },
+            CreateCrfVersionRequest {
+                name: "v1".to_string(),
+            },
         )
         .await
         .unwrap();
@@ -464,10 +477,9 @@ mod tests {
         )
         .await;
         match res.unwrap_err() {
-            ApiError::Parse { message } => assert!(
-                !message.is_empty(),
-                "Parse message should not be empty"
-            ),
+            ApiError::Parse { message } => {
+                assert!(!message.is_empty(), "Parse message should not be empty")
+            }
             other => panic!("expected Parse, got {other:?}"),
         }
     }
@@ -496,9 +508,18 @@ mod tests {
     fn control_type_to_kind_covers_all_variants() {
         use entities::project::ControlType;
         assert_eq!(control_type_to_kind(ControlType::TEXT), CrfItemKind::Text);
-        assert_eq!(control_type_to_kind(ControlType::DATETIME), CrfItemKind::Datetime);
-        assert_eq!(control_type_to_kind(ControlType::SELECTION), CrfItemKind::Selection);
-        assert_eq!(control_type_to_kind(ControlType::CHECKBOX), CrfItemKind::Checkbox);
+        assert_eq!(
+            control_type_to_kind(ControlType::DATETIME),
+            CrfItemKind::Datetime
+        );
+        assert_eq!(
+            control_type_to_kind(ControlType::SELECTION),
+            CrfItemKind::Selection
+        );
+        assert_eq!(
+            control_type_to_kind(ControlType::CHECKBOX),
+            CrfItemKind::Checkbox
+        );
     }
 
     #[test]
@@ -542,7 +563,10 @@ mod tests {
         let errs = pre_validate(&p).unwrap_err();
         assert!(matches!(
             errs[0],
-            AlsImportError::KindShapeViolation { field: "options", .. }
+            AlsImportError::KindShapeViolation {
+                field: "options",
+                ..
+            }
         ));
     }
 
@@ -552,7 +576,10 @@ mod tests {
         let errs = pre_validate(&p).unwrap_err();
         assert!(matches!(
             errs[0],
-            AlsImportError::Empty { target: "form code", form_index: 0 }
+            AlsImportError::Empty {
+                target: "form code",
+                form_index: 0
+            }
         ));
     }
 

@@ -174,10 +174,7 @@ pub async fn delete(c: &HttpClient, id: i64) -> Result<(), ApiError> {
     Ok(())
 }
 
-pub async fn get_by_id(
-    c: &HttpClient,
-    id: i64,
-) -> Result<CrfFormViewResponse, ApiError> {
+pub async fn get_by_id(c: &HttpClient, id: i64) -> Result<CrfFormViewResponse, ApiError> {
     c.request(
         reqwest::Method::GET,
         &format!("/api/crf/forms/{id}"),
@@ -191,11 +188,19 @@ pub async fn get_by_id(
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum AnnotationOwner {
-    Form { id: i64 },
-    Item { id: i64 },
+    Form {
+        id: i64,
+    },
+    Item {
+        id: i64,
+    },
     #[serde(rename = "option")]
-    Option { id: i64 },
-    Unit { id: i64 },
+    Option {
+        id: i64,
+    },
+    Unit {
+        id: i64,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -289,10 +294,7 @@ pub struct CrfFormDetailResponse {
     pub domain_annotations: Vec<DomainAnnotationViewResponse>,
 }
 
-pub async fn details(
-    c: &HttpClient,
-    id: i64,
-) -> Result<CrfFormDetailResponse, ApiError> {
+pub async fn details(c: &HttpClient, id: i64) -> Result<CrfFormDetailResponse, ApiError> {
     c.request(
         reqwest::Method::GET,
         &format!("/api/crf/forms/{id}/details"),
@@ -354,7 +356,12 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/api/crf/versions/7/forms"))
-            .respond_with(ResponseTemplate::new(201).set_body_json(form_view_json(11, 7, "AE", "Adverse Events")))
+            .respond_with(ResponseTemplate::new(201).set_body_json(form_view_json(
+                11,
+                7,
+                "AE",
+                "Adverse Events",
+            )))
             .mount(&server)
             .await;
         let f = create(
@@ -382,7 +389,9 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("PATCH"))
             .and(path("/api/crf/forms/11"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(form_view_json(11, 7, "AE", "Renamed")))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(form_view_json(11, 7, "AE", "Renamed")),
+            )
             .mount(&server)
             .await;
         let f = update(
@@ -416,7 +425,12 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
             .and(path("/api/crf/forms/11"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(form_view_json(11, 7, "AE", "Adverse Events")))
+            .respond_with(ResponseTemplate::new(200).set_body_json(form_view_json(
+                11,
+                7,
+                "AE",
+                "Adverse Events",
+            )))
             .mount(&server)
             .await;
         let f = get_by_id(&client(&server), 11).await.unwrap();
