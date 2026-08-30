@@ -99,6 +99,86 @@ fn control_type_to_kind(c: entities::project::ControlType) -> CrfItemKind {
     }
 }
 
+fn pre_validate(project: &als_resolver::Project) -> Result<(), Vec<AlsImportError>> {
+    let mut errs = Vec::new();
+
+    for (form_index, f) in project.forms.iter().enumerate() {
+        if f.name.trim().is_empty() {
+            errs.push(AlsImportError::Empty {
+                target: "form code",
+                form_index,
+            });
+        }
+        if f.description.trim().is_empty() {
+            errs.push(AlsImportError::Empty {
+                target: "form name",
+                form_index,
+            });
+        }
+
+        for item in &f.items {
+            if item.name.trim().is_empty() {
+                errs.push(AlsImportError::EmptyItem {
+                    form_index,
+                    item_code: item.name.clone(),
+                    field: "code",
+                });
+            }
+            if item.label.trim().is_empty() {
+                errs.push(AlsImportError::EmptyItem {
+                    form_index,
+                    item_code: item.name.clone(),
+                    field: "name",
+                });
+            }
+            let opts = item.item_option.as_deref().unwrap_or(&[]);
+            for opt in opts {
+                if opt.option_display.trim().is_empty() {
+                    errs.push(AlsImportError::EmptyItem {
+                        form_index,
+                        item_code: item.name.clone(),
+                        field: "option value",
+                    });
+                }
+            }
+            if let Some(u) = &item.item_unit {
+                if u.value.trim().is_empty() {
+                    errs.push(AlsImportError::EmptyItem {
+                        form_index,
+                        item_code: item.name.clone(),
+                        field: "unit value",
+                    });
+                }
+            }
+
+            let kind = control_type_to_kind(item.control_type);
+            match kind {
+                CrfItemKind::Selection | CrfItemKind::Checkbox if opts.is_empty() => {
+                    errs.push(AlsImportError::KindShapeViolation {
+                        form_index,
+                        item_code: item.name.clone(),
+                        kind: kind.as_wire().to_string(),
+                        field: "options",
+                    });
+                }
+                CrfItemKind::Text | CrfItemKind::Datetime | CrfItemKind::Label
+                    if !opts.is_empty() =>
+                {
+                    errs.push(AlsImportError::KindShapeViolation {
+                        form_index,
+                        item_code: item.name.clone(),
+                        kind: kind.as_wire().to_string(),
+                        field: "options",
+                    });
+                }
+                _ => {}
+            }
+        }
+    }
+
+    if errs.is_empty() { Ok(()) } else { Err(errs) }
+}
+
 pub async fn list_by_project(
     c: &HttpClient,
     project_code: &str,
@@ -189,5 +269,164 @@ mod tests {
         assert_eq!(CrfItemKind::Checkbox.as_wire(), "checkbox");
         assert_eq!(CrfItemKind::Datetime.as_wire(), "datetime");
         assert_eq!(CrfItemKind::Label.as_wire(), "label");
+    }
+
+    #[test]
+    fn pre_validate_rejects_selection_with_empty_options() {
+        let p = selection_with_zero_options();
+        let errs = pre_validate(&p).unwrap_err();
+        assert_eq!(
+            errs,
+            vec![AlsImportError::KindShapeViolation {
+                form_index: 0,
+                item_code: "BAD".into(),
+                kind: "selection".into(),
+                field: "options",
+            }],
+        );
+    }
+
+    #[test]
+    fn pre_validate_rejects_text_with_options() {
+        let p = text_with_one_option();
+        let errs = pre_validate(&p).unwrap_err();
+        assert!(matches!(
+            errs[0],
+            AlsImportError::KindShapeViolation { field: "options", .. }
+        ));
+    }
+
+    #[test]
+    fn pre_validate_rejects_empty_form_code() {
+        let p = form_with_whitespace_code();
+        let errs = pre_validate(&p).unwrap_err();
+        assert!(matches!(
+            errs[0],
+            AlsImportError::Empty { target: "form code", form_index: 0 }
+        ));
+    }
+
+    #[test]
+    fn pre_validate_accepts_zero_items() {
+        let p = form_with_no_items();
+        assert!(pre_validate(&p).is_ok());
+    }
+
+    #[test]
+    fn pre_validate_isolates_per_form_errors() {
+        let p = three_forms_middle_broken();
+        let errs = pre_validate(&p).unwrap_err();
+        assert_eq!(errs.len(), 1);
+        assert!(matches!(
+            errs[0],
+            AlsImportError::Empty { form_index: 1, .. }
+        ));
+    }
+
+    // --- helpers ---
+
+    fn selection_with_zero_options() -> als_resolver::Project {
+        use entities::project::{CRFForm, CRFItem, ControlType};
+        als_resolver::Project {
+            forms: vec![CRFForm {
+                name: "F1".into(),
+                description: "Form 1".into(),
+                order: 0,
+                items: vec![CRFItem {
+                    name: "BAD".into(),
+                    label: "Bad".into(),
+                    item_option: None,
+                    annotations: vec![],
+                    format: String::new(),
+                    control_type: ControlType::SELECTION,
+                    item_unit: None,
+                    not_variable: None,
+                }],
+                domains: vec![],
+                annotations: vec![],
+            }],
+            visit: vec![],
+        }
+    }
+
+    fn text_with_one_option() -> als_resolver::Project {
+        use entities::project::{CRFForm, CRFItem, ControlType, ItemOption};
+        als_resolver::Project {
+            forms: vec![CRFForm {
+                name: "F1".into(),
+                description: "F1".into(),
+                order: 0,
+                items: vec![CRFItem {
+                    name: "TXT".into(),
+                    label: "T".into(),
+                    item_option: Some(vec![ItemOption {
+                        option_display: "x".into(),
+                        annotations: vec![],
+                    }]),
+                    annotations: vec![],
+                    format: String::new(),
+                    control_type: ControlType::TEXT,
+                    item_unit: None,
+                    not_variable: None,
+                }],
+                domains: vec![],
+                annotations: vec![],
+            }],
+            visit: vec![],
+        }
+    }
+
+    fn form_with_whitespace_code() -> als_resolver::Project {
+        use entities::project::CRFForm;
+        als_resolver::Project {
+            forms: vec![CRFForm {
+                name: "   ".into(),
+                description: "ok".into(),
+                order: 0,
+                items: vec![],
+                domains: vec![],
+                annotations: vec![],
+            }],
+            visit: vec![],
+        }
+    }
+
+    fn form_with_no_items() -> als_resolver::Project {
+        use entities::project::CRFForm;
+        als_resolver::Project {
+            forms: vec![CRFForm {
+                name: "F1".into(),
+                description: "F1".into(),
+                order: 0,
+                items: vec![],
+                domains: vec![],
+                annotations: vec![],
+            }],
+            visit: vec![],
+        }
+    }
+
+    fn three_forms_middle_broken() -> als_resolver::Project {
+        use entities::project::CRFForm;
+        let good = || CRFForm {
+            name: "ok".into(),
+            description: "ok".into(),
+            order: 0,
+            items: vec![],
+            domains: vec![],
+            annotations: vec![],
+        };
+        let broken = CRFForm {
+            name: "   ".into(),
+            description: "bad".into(),
+            order: 1,
+            items: vec![],
+            domains: vec![],
+            annotations: vec![],
+        };
+        als_resolver::Project {
+            forms: vec![good(), broken, good()],
+            visit: vec![],
+        }
     }
 }
