@@ -559,3 +559,14 @@ export interface UpdateAnnotationInput {
   content?: string;
   assign?: boolean;
 }
+
+/** Wire-side EDC source type for an ALS import. */
+export type CrfEdcType = "rave" | "ecollectV6" | "ecollectLegacy";
+
+/** Body for `api.importAls(name, projectCode, filepath, edcType)`. */
+export interface ImportAlsInput {
+  name: string;
+  projectCode: string;
+  filepath: string;
+  edcType: CrfEdcType;
+}
