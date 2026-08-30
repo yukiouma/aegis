@@ -34,9 +34,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { mockCommands } from "../../helpers/tauri-mock";
 
-import { CreateCrfVersionPage } from
-  "../../../features/crf/pages/CreateCrfVersionPage";
-
 const happyVersion = {
   id: 42,
   projectCode: "P1",
