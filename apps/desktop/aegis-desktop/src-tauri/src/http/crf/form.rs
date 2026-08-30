@@ -35,6 +35,70 @@ pub struct CreateCrfFormRequest {
     pub not_submitted: bool,
 }
 
+/// Wire mirror of `apis::crf::CrfItemKind`. Used by the bulk-create
+/// request and by `http::crf::version::import_als` to tag items
+/// when transcribing the parsed ALS `Project` into wire shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CrfItemKind {
+    Text,
+    Selection,
+    Checkbox,
+    Datetime,
+    Label,
+}
+
+/// Body for `POST /api/crf/versions/{version_id}/forms/bulk`. Owning
+/// `version_id` is supplied via the path segment; the body carries
+/// the form's scalar fields plus every item (each with its own
+/// options + units subtree). The bulk port stamps the surrogate
+/// `form_id` / `item_id` at insert time, so neither appears here.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkCreateCrfFormRequest {
+    pub form: CreateCrfFormRequest,
+    pub items: Vec<BulkCreateCrfFormItemInput>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkCreateCrfFormItemInput {
+    pub item: CreateCrfItemRequest,
+    pub options: Vec<CreateCrfOptionRequest>,
+    pub units: Vec<CreateCrfUnitRequest>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCrfItemRequest {
+    pub code: String,
+    pub name: String,
+    pub kind: CrfItemKind,
+    pub order: i32,
+    pub not_submitted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCrfOptionRequest {
+    pub value: String,
+    pub not_submitted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCrfUnitRequest {
+    pub value: String,
+    pub not_submitted: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkCreateCrfFormResponse {
+    pub form: CrfFormViewResponse,
+    pub items: Vec<CrfItemViewResponse>,
+}
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCrfFormRequest {
@@ -68,6 +132,19 @@ pub async fn create(
     c.request(
         reqwest::Method::POST,
         &format!("/api/crf/versions/{version_id}/forms"),
+        Some(&body),
+    )
+    .await
+}
+
+pub async fn bulk_create(
+    c: &HttpClient,
+    version_id: i64,
+    body: BulkCreateCrfFormRequest,
+) -> Result<BulkCreateCrfFormResponse, ApiError> {
+    c.request(
+        reqwest::Method::POST,
+        &format!("/api/crf/versions/{version_id}/forms/bulk"),
         Some(&body),
     )
     .await
