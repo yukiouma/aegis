@@ -198,7 +198,7 @@ fn pre_validate(project: &als_resolver::Project) -> Result<(), Vec<AlsImportErro
 
             let kind = control_type_to_kind(item.control_type);
             match kind {
-                CrfItemKind::Selection | CrfItemKind::Checkbox if opts.is_empty() => {
+                CrfItemKind::Selection if opts.is_empty() => {
                     errs.push(AlsImportError::KindShapeViolation {
                         form_index,
                         item_code: item.name.clone(),
