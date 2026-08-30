@@ -2,6 +2,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 use crate::http::client::HttpClient;
 use crate::http::dto::ApiError;
@@ -20,6 +21,48 @@ pub struct CrfVersionViewResponse {
 #[serde(rename_all = "camelCase")]
 pub struct CrfVersionListResponse {
     pub versions: Vec<CrfVersionViewResponse>,
+}
+
+/// Local error taxonomy for the `import_als` orchestrator.
+///
+/// Pre-validation is a fast-fail mirror of the server-side rules in
+/// `lib/crates/crf/src/domain/crf_bulk_form.rs`; we surface violations
+/// as `ApiError::Parse` so the page renders them through the same Snackbar
+/// path as parse failures.
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum AlsImportError {
+    #[error("form #{form_index}: {target} must not be empty")]
+    Empty { target: &'static str, form_index: usize },
+
+    #[error("form #{form_index} item '{item_code}': {field} must not be empty")]
+    EmptyItem {
+        form_index: usize,
+        item_code: String,
+        field: &'static str,
+    },
+
+    #[error("form #{form_index} item '{item_code}': kind={kind} requires non-empty {field}")]
+    KindShapeViolation {
+        form_index: usize,
+        item_code: String,
+        kind: String,
+        field: &'static str,
+    },
+
+    #[error("I/O error: {0}")]
+    Io(String),
+}
+
+impl AlsImportError {
+    pub(crate) fn from_io(e: std::io::Error) -> Self {
+        AlsImportError::Io(e.to_string())
+    }
+}
+
+impl From<AlsImportError> for ApiError {
+    fn from(err: AlsImportError) -> Self {
+        ApiError::Parse { message: err.to_string() }
+    }
 }
 
 pub async fn list_by_project(
@@ -74,5 +117,25 @@ mod tests {
             resp.versions[0].created_at,
             Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()
         );
+    }
+
+    #[test]
+    fn als_import_error_wraps_to_api_error_parse() {
+        let err = AlsImportError::KindShapeViolation {
+            form_index: 0,
+            item_code: "X".to_string(),
+            kind: "selection".to_string(),
+            field: "options",
+        };
+        let api: ApiError = err.into();
+        match api {
+            ApiError::Parse { message } => {
+                assert!(
+                    message.contains("selection") && message.contains("X"),
+                    "got: {message}"
+                );
+            }
+            other => panic!("expected Parse variant, got {other:?}"),
+        }
     }
 }
