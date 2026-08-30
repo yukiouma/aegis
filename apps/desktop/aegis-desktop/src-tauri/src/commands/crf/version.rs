@@ -3,9 +3,7 @@
 use tauri::State;
 
 use crate::http::client::HttpClient;
-use crate::http::crf::version::{
-    self, CrfVersionListResponse, CrfVersionViewResponse, EdcType,
-};
+use crate::http::crf::version::{self, CrfVersionListResponse, CrfVersionViewResponse, EdcType};
 use crate::http::dto::ApiError;
 
 #[tauri::command]
