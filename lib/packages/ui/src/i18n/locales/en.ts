@@ -369,4 +369,27 @@ export const en = {
   "crf.detail.domainChip.label": "{name} ({description})",
   "crf.detail.empty": "No items yet",
   "crf.detail.loadFailed": "Failed to load form detail: {message}",
+
+  "crf.import.title": "Create CRF Version",
+  "crf.import.nameLabel": "Version name",
+  "crf.import.namePlaceholder": "e.g. v1",
+  "crf.import.errors.nameRequired": "Version name is required.",
+  "crf.import.errors.nameDuplicate":
+    'A version named "{name}" already exists in this project.',
+  "crf.import.errors.edcTypeRequired": "Select an EDC source type.",
+  "crf.import.errors.fileRequired":
+    "Select an ALS file (.xls, .xlsx, or .xml).",
+  "crf.import.errors.fileTypeHint":
+    "ALS files only — .xls, .xlsx, or .xml.",
+  "crf.import.edcTypeLabel": "EDC source",
+  "crf.import.edcTypeRave": "RAVE",
+  "crf.import.edcTypeEcollectV6": "eCollect V6",
+  "crf.import.edcTypeEcollectLegacy": "eCollect Legacy",
+  "crf.import.dropZone":
+    "Drop an ALS file here, or click to choose",
+  "crf.import.selectedFile": "Selected",
+  "crf.import.submit": "Create",
+  "crf.import.importing": "Importing ALS file…",
+  "crf.import.success": 'Imported "{name}".',
+  "crf.import.failure": "Import failed: {message}",
 } as const;
