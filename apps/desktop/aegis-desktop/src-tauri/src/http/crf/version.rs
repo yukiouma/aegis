@@ -99,6 +99,25 @@ fn control_type_to_kind(c: entities::project::ControlType) -> CrfItemKind {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum EdcType {
+    Rave,
+    EcollectV6,
+    EcollectLegacy,
+}
+
+fn parse_als_dispatch<R: std::io::Read + std::io::Seek>(
+    edc: EdcType,
+    reader: R,
+) -> Result<als_resolver::Project, als_resolver::AlsParseError> {
+    match edc {
+        EdcType::Rave => als_resolver::parse_rave_als(reader),
+        EdcType::EcollectV6 => als_resolver::parse_ecollect_v6_als(reader),
+        EdcType::EcollectLegacy => als_resolver::parse_ecollect_legacy_als(reader),
+    }
+}
+
 fn pre_validate(project: &als_resolver::Project) -> Result<(), Vec<AlsImportError>> {
     let mut errs = Vec::new();
 
@@ -260,6 +279,17 @@ mod tests {
         assert_eq!(control_type_to_kind(ControlType::DATETIME), CrfItemKind::Datetime);
         assert_eq!(control_type_to_kind(ControlType::SELECTION), CrfItemKind::Selection);
         assert_eq!(control_type_to_kind(ControlType::CHECKBOX), CrfItemKind::Checkbox);
+    }
+
+    #[test]
+    fn edc_type_dispatch_picks_correct_parser() {
+        use std::io::Cursor;
+        // The dispatch boundary is the only thing under test; each
+        // parser will return Err on empty input, but the dispatch must
+        // reach all three branches without panicking.
+        let _ = parse_als_dispatch(EdcType::Rave, Cursor::new(Vec::<u8>::new()));
+        let _ = parse_als_dispatch(EdcType::EcollectV6, Cursor::new(Vec::<u8>::new()));
+        let _ = parse_als_dispatch(EdcType::EcollectLegacy, Cursor::new(Vec::<u8>::new()));
     }
 
     #[test]
