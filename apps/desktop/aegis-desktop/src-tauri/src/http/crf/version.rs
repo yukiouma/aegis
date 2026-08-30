@@ -5,6 +5,11 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::http::client::HttpClient;
+use crate::http::crf::form::{
+    self as form_http, BulkCreateCrfFormItemInput, BulkCreateCrfFormRequest,
+    CreateCrfFormRequest, CreateCrfItemRequest, CreateCrfOptionRequest,
+    CreateCrfUnitRequest, CrfItemKind as WireCrfItemKind,
+};
 use crate::http::dto::ApiError;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -96,6 +101,18 @@ fn control_type_to_kind(c: entities::project::ControlType) -> CrfItemKind {
         C::DATETIME => CrfItemKind::Datetime,
         C::SELECTION => CrfItemKind::Selection,
         C::CHECKBOX => CrfItemKind::Checkbox,
+    }
+}
+
+impl From<CrfItemKind> for WireCrfItemKind {
+    fn from(k: CrfItemKind) -> Self {
+        match k {
+            CrfItemKind::Text => WireCrfItemKind::Text,
+            CrfItemKind::Selection => WireCrfItemKind::Selection,
+            CrfItemKind::Checkbox => WireCrfItemKind::Checkbox,
+            CrfItemKind::Datetime => WireCrfItemKind::Datetime,
+            CrfItemKind::Label => WireCrfItemKind::Label,
+        }
     }
 }
 
@@ -210,6 +227,154 @@ pub async fn list_by_project(
     .await
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCrfVersionRequest {
+    pub name: String,
+}
+
+pub async fn create(
+    c: &HttpClient,
+    project_code: &str,
+    body: CreateCrfVersionRequest,
+) -> Result<CrfVersionViewResponse, ApiError> {
+    c.request(
+        reqwest::Method::POST,
+        &format!("/api/crf/projects/{project_code}/versions"),
+        Some(&body),
+    )
+    .await
+}
+
+/// Top-level orchestrator for `commands::crf::version::import_als`.
+///
+/// Steps:
+/// 1. Open the user-supplied file and parse it via `parse_als_dispatch`
+///    off the runtime thread.
+/// 2. Pre-validate the parsed `Project` against the same kind-shape
+///    and non-empty rules the server's `bulk_create_form` enforces.
+///    Failures here abort *before* any HTTP call — no DB writes happen.
+/// 3. POST `/api/crf/projects/{project_code}/versions` to get back a
+///    fresh version id.
+/// 4. For each form in the project, POST
+///    `/api/crf/versions/{id}/forms/bulk` with the items subtree.
+///
+/// Partial-failure semantics: the orchestrator does NOT roll back
+/// forms whose bulk-create succeeded when a later one fails; it
+/// surfaces the first error and the user re-runs the import. The
+/// pre-validate pass exists precisely to catch shape problems before
+/// any DB writes so this almost never fires.
+pub async fn import_als(
+    c: &HttpClient,
+    project_code: &str,
+    name: &str,
+    filepath: &str,
+    edc_type: EdcType,
+) -> Result<CrfVersionViewResponse, ApiError> {
+    use std::io::BufReader;
+
+    // 1. parse off-thread
+    let filepath_owned = filepath.to_string();
+    let parsed: Result<als_resolver::Project, ApiError> = tokio::task::spawn_blocking(
+        move || -> Result<als_resolver::Project, AlsImportError> {
+            let file = std::fs::File::open(&filepath_owned)
+                .map_err(AlsImportError::from_io)?;
+            parse_als_dispatch(edc_type, BufReader::new(file))
+                .map_err(|e| AlsImportError::Io(e.to_string()))
+        },
+    )
+    .await
+    .map_err(|e| ApiError::Parse { message: format!("join error: {e}") })?
+    .map_err(|e: AlsImportError| ApiError::Parse { message: e.to_string() });
+
+    let parsed = parsed?;
+
+    // 2. pre-validate
+    if let Err(errs) = pre_validate(&parsed) {
+        let messages: Vec<String> = errs.iter().map(|e| e.to_string()).collect();
+        return Err(ApiError::Parse {
+            message: format!(
+                "{} validation error(s): {}",
+                messages.len(),
+                messages.join("; ")
+            ),
+        });
+    }
+
+    // 3. create version
+    let version_view = create(
+        c,
+        project_code,
+        CreateCrfVersionRequest {
+            name: name.to_string(),
+        },
+    )
+    .await?;
+    if version_view.id <= 0 {
+        return Err(ApiError::Parse {
+            message: format!(
+                "invalid version_id {} from create_version response",
+                version_view.id
+            ),
+        });
+    }
+
+    // 4. insert each form via bulk_create
+    for f in &parsed.forms {
+        let items: Vec<BulkCreateCrfFormItemInput> = f
+            .items
+            .iter()
+            .enumerate()
+            .map(|(i, item)| {
+                let opts: &[entities::project::ItemOption] =
+                    item.item_option.as_deref().unwrap_or(&[]);
+                let units: Vec<CreateCrfUnitRequest> = item
+                    .item_unit
+                    .as_ref()
+                    .map(|u| CreateCrfUnitRequest {
+                        value: u.value.clone(),
+                        not_submitted: false,
+                    })
+                    .into_iter()
+                    .collect();
+                BulkCreateCrfFormItemInput {
+                    item: CreateCrfItemRequest {
+                        code: item.name.clone(),
+                        name: item.label.clone(),
+                        kind: control_type_to_kind(item.control_type).into(),
+                        order: i as i32,
+                        not_submitted: false,
+                    },
+                    options: opts
+                        .iter()
+                        .map(|o| CreateCrfOptionRequest {
+                            value: o.option_display.clone(),
+                            not_submitted: false,
+                        })
+                        .collect(),
+                    units,
+                }
+            })
+            .collect();
+        let _: form_http::BulkCreateCrfFormResponse = form_http::bulk_create(
+            c,
+            version_view.id,
+            BulkCreateCrfFormRequest {
+                form: CreateCrfFormRequest {
+                    code: f.name.clone(),
+                    name: f.description.clone(),
+                    order: f.order,
+                    not_submitted: false,
+                },
+                items,
+            },
+        )
+        .await?;
+    }
+
+    Ok(version_view)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -225,6 +390,12 @@ mod tests {
         let _ = store.set_access_token("AT");
         let _ = store.set_refresh_token("RT");
         HttpClient::new(server.uri(), store)
+    }
+
+    fn tmpfile_als_path() -> std::path::PathBuf {
+        let path = std::env::temp_dir().join("aegis-desktop-import-als-test.als");
+        std::fs::write(&path, b"<root/>").unwrap();
+        path
     }
 
     #[tokio::test]
@@ -250,6 +421,55 @@ mod tests {
             resp.versions[0].created_at,
             Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()
         );
+    }
+
+    #[tokio::test]
+    async fn create_returns_version_view() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/crf/projects/P1/versions"))
+            .respond_with(ResponseTemplate::new(201).set_body_json(serde_json::json!({
+                "id": 7, "projectCode": "P1", "name": "v1",
+                "createdAt": "2026-01-01T00:00:00Z",
+                "updatedAt": "2026-01-01T00:00:00Z"
+            })))
+            .mount(&server)
+            .await;
+        let resp = create(
+            &client(&server),
+            "P1",
+            CreateCrfVersionRequest { name: "v1".to_string() },
+        )
+        .await
+        .unwrap();
+        assert_eq!(resp.id, 7);
+        assert_eq!(resp.name, "v1");
+        assert_eq!(resp.project_code, "P1");
+    }
+
+    #[tokio::test]
+    async fn import_als_returns_parse_error_on_empty_file() {
+        // Empty ALS file aborts at the parser; no mock is mounted for
+        // /api/crf/projects/.../versions — if the orchestrator reaches
+        // that call, mock will 404 and the test fails. This pins that
+        // parse failure aborts BEFORE any HTTP call (no auto-rollback
+        // needed since nothing was written).
+        let server = MockServer::start().await;
+        let res = import_als(
+            &client(&server),
+            "P1",
+            "v1",
+            tmpfile_als_path().to_str().unwrap(),
+            EdcType::Rave,
+        )
+        .await;
+        match res.unwrap_err() {
+            ApiError::Parse { message } => assert!(
+                !message.is_empty(),
+                "Parse message should not be empty"
+            ),
+            other => panic!("expected Parse, got {other:?}"),
+        }
     }
 
     #[test]
