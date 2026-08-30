@@ -52,16 +52,20 @@ export function CreateCrfVersionPage() {
     delayMs: 300,
     maxWaitMs: 1000,
   });
-  const trimmed = debouncedName.trim();
   const versionsQuery = useListCrfVersions(projectCode || null);
+  // Duplicate detection uses the debounced name so we don't refetch
+  // versions on every keystroke; submit-gating uses the live name so
+  // the button enables as soon as the user types something.
+  const trimmedLive = name.trim();
+  const trimmedDebounced = debouncedName.trim();
   const duplicate =
-    trimmed.length > 0 &&
-    (versionsQuery.data ?? []).some((v) => v.name === trimmed);
+    trimmedDebounced.length > 0 &&
+    (versionsQuery.data ?? []).some((v) => v.name === trimmedDebounced);
 
   const importMutation = useImportAls();
 
   const canSubmit =
-    trimmed.length > 0 &&
+    trimmedLive.length > 0 &&
     !duplicate &&
     edcType !== "" &&
     filepath !== null &&
@@ -99,7 +103,7 @@ export function CreateCrfVersionPage() {
   function submit() {
     if (!canSubmit || filepath === null) return;
     importMutation.mutate({
-      name: trimmed,
+      name: trimmedLive,
       projectCode,
       filepath,
       edcType: edcType as CrfEdcType,
@@ -142,7 +146,7 @@ export function CreateCrfVersionPage() {
             error={duplicate}
             helperText={
               duplicate
-                ? t("crf.import.errors.nameDuplicate", { name: trimmed })
+                ? t("crf.import.errors.nameDuplicate", { name: trimmedDebounced })
                 : ""
             }
           />
