@@ -3,6 +3,7 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 
 import type {
   Annotation,
+  AnnotationListResponse,
   CodeItemListQuery,
   CodeItemListResponse,
   CodeItemView,
@@ -24,10 +25,13 @@ import type {
   CrfFormListResponse,
   CrfItem,
   CrfOption,
+  CrfOptionListResponse,
   CrfUnit,
+  CrfUnitListResponse,
   CrfVersion,
   CrfVersionListResponse,
   DomainAnnotation,
+  DomainAnnotationListResponse,
   Identity,
   PagedCodeItemListResponse,
   PagedCodeListListResponse,
@@ -312,6 +316,68 @@ export const api = {
     call<void>("delete_crf_form", { id }),
   getCrfFormDetails: (id: number): Promise<CrfFormDetail> =>
     call<CrfFormDetail>("get_crf_form_details", { id }),
+  searchCrfFormsByVersion: async (
+    versionId: number,
+    fragment: string,
+  ): Promise<CrfForm[]> => {
+    const resp = await call<CrfFormListResponse>(
+      "search_crf_forms_by_version",
+      { versionId, fragment },
+    );
+    return resp.forms;
+  },
+  searchCrfItemsByVersion: async (
+    versionId: number,
+    fragment: string,
+  ): Promise<CrfItem[]> => {
+    const resp = await call<{ items: CrfItem[] }>(
+      "search_crf_items_by_version",
+      { versionId, fragment },
+    );
+    return resp.items;
+  },
+  searchCrfOptionsByVersion: async (
+    versionId: number,
+    fragment: string,
+  ): Promise<CrfOption[]> => {
+    const resp = await call<CrfOptionListResponse>(
+      "search_crf_options_by_version",
+      { versionId, fragment },
+    );
+    return resp.options;
+  },
+  searchCrfUnitsByVersion: async (
+    versionId: number,
+    fragment: string,
+  ): Promise<CrfUnit[]> => {
+    const resp = await call<CrfUnitListResponse>(
+      "search_crf_units_by_version",
+      { versionId, fragment },
+    );
+    return resp.units;
+  },
+  searchCrfDomainAnnotationsByVersion: async (
+    versionId: number,
+    fragment: string,
+  ): Promise<DomainAnnotation[]> => {
+    const resp = await call<DomainAnnotationListResponse>(
+      "search_crf_domain_annotations_by_version",
+      { versionId, fragment },
+    );
+    return resp.domainAnnotations;
+  },
+  searchCrfAnnotationsByVersion: async (
+    versionId: number,
+    fragment: string,
+  ): Promise<Annotation[]> => {
+    const resp = await call<AnnotationListResponse>(
+      "search_crf_annotations_by_version",
+      { versionId, fragment },
+    );
+    return resp.annotations;
+  },
+  getCrfItemById: (id: number): Promise<CrfItem> =>
+    call<CrfItem>("get_crf_item_by_id", { id }),
   updateCrfItem: (
     id: number,
     body: UpdateCrfItemInput,

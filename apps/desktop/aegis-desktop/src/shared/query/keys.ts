@@ -53,5 +53,19 @@ export const queryKeys = {
       ["crf", "form", id] as const,
     formDetail: (id: number) =>
       ["crf", "formDetail", id] as const,
+    item: (id: number) =>
+      ["crf", "item", id] as const,
+    searchFormsByVersion: (v: number, f: string) =>
+      ["crf", "searchFormsByVersion", v, f] as const,
+    searchItemsByVersion: (v: number, f: string) =>
+      ["crf", "searchItemsByVersion", v, f] as const,
+    searchUnitsByVersion: (v: number, f: string) =>
+      ["crf", "searchUnitsByVersion", v, f] as const,
+    searchOptionsByVersion: (v: number, f: string) =>
+      ["crf", "searchOptionsByVersion", v, f] as const,
+    searchDomainAnnotationsByVersion: (v: number, f: string) =>
+      ["crf", "searchDomainAnnotationsByVersion", v, f] as const,
+    searchAnnotationsByVersion: (v: number, f: string) =>
+      ["crf", "searchAnnotationsByVersion", v, f] as const,
   },
 } as const;
