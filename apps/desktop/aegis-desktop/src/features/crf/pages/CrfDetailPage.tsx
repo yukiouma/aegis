@@ -147,12 +147,19 @@ export function CrfDetailPage() {
     if (!focus || !detailQuery.data) return;
     const [kind, idStr] = focus.split("-");
     if (!kind || !idStr) return;
-    const el =
-      document.querySelector(`[data-testid="crf-${kind}-${idStr}"]`) ??
-      document.querySelector(
-        `[data-testid="domain-annotation-chip-${idStr}"]`,
-      );
-    el?.scrollIntoView({ block: "start", behavior: "smooth" });
+    // Defer the scroll one frame so the freshly rendered items Box
+    // has had a chance to lay out. Without this the rows can be at
+    // 0×0 when `scrollIntoView` measures them and the page stays
+    // stuck at the top.
+    const raf = requestAnimationFrame(() => {
+      const el =
+        document.querySelector(`[data-testid="crf-${kind}-${idStr}"]`) ??
+        document.querySelector(
+          `[data-testid="domain-annotation-chip-${idStr}"]`,
+        );
+      el?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(raf);
   }, [focus, detailQuery.data]);
 
   const createDomain = useCreateDomainAnnotation();
@@ -258,7 +265,18 @@ export function CrfDetailPage() {
         <IconButton aria-label={t("crf.detail.back")} onClick={back}>
           <ArrowBackIcon />
         </IconButton>
-        {form?.code && <Chip sx={{ minWidth: 70 }} size="small" label={form.code} variant="outlined" />}
+        {form?.code && (
+          <Chip
+            sx={{ minWidth: 70 }}
+            size="small"
+            label={form.code}
+            variant="outlined"
+            // Stable anchor for `?focus=form-<id>` from the global
+            // search page. Sits next to the form-name Typography so
+            // scrolling here lands the user on the form header.
+            data-testid={`crf-form-${id}`}
+          />
+        )}
         <Typography
           variant="h5"
           onClick={(e) =>
