@@ -101,7 +101,7 @@ export function CrfItemRow({
         borderColor: "divider",
         borderRadius: 1,
       }}
-      data-testid={`crf-item-row-${item.id}`}
+      data-testid={`crf-item-${item.id}`}
     >
       <Box
         sx={{

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -14,7 +14,7 @@ import {
 } from "@aegis/ui/mui";
 import { ArrowBack as ArrowBackIcon } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
-import { useNavigate, useParams } from "@tanstack/react-router";
+import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 
 import {
   AnnotationDialog,
@@ -131,6 +131,37 @@ export function CrfDetailPage() {
   const query = useGetCrfForm(id);
   const detailQuery = useCrfFormDetail(id);
 
+  // `focus` carries `kind-id` from the global-search row click
+  // (e.g. "item-21"). When the detail query resolves we scroll the
+  // matching `data-testid` into view. Falls back to the existing
+  // `domain-annotation-chip-<id>` testid because domain-annotation
+  // chips use that prefix; `scrollIntoView` walks up to the nearest
+  // scrollable ancestor so the `Box` wrapping `detail.items`
+  // (around line 400) is the container.
+  const routeSearch = useSearch({ strict: false }) as {
+    versionId?: number;
+    focus?: string;
+  };
+  const focus = routeSearch.focus;
+  useEffect(() => {
+    if (!focus || !detailQuery.data) return;
+    const [kind, idStr] = focus.split("-");
+    if (!kind || !idStr) return;
+    // Defer the scroll one frame so the freshly rendered items Box
+    // has had a chance to lay out. Without this the rows can be at
+    // 0×0 when `scrollIntoView` measures them and the page stays
+    // stuck at the top.
+    const raf = requestAnimationFrame(() => {
+      const el =
+        document.querySelector(`[data-testid="crf-${kind}-${idStr}"]`) ??
+        document.querySelector(
+          `[data-testid="domain-annotation-chip-${idStr}"]`,
+        );
+      el?.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [focus, detailQuery.data]);
+
   const createDomain = useCreateDomainAnnotation();
   const updateDomain = useUpdateDomainAnnotation();
   const deleteDomain = useDeleteDomainAnnotation();
@@ -234,7 +265,18 @@ export function CrfDetailPage() {
         <IconButton aria-label={t("crf.detail.back")} onClick={back}>
           <ArrowBackIcon />
         </IconButton>
-        {form?.code && <Chip sx={{ minWidth: 70 }} size="small" label={form.code} variant="outlined" />}
+        {form?.code && (
+          <Chip
+            sx={{ minWidth: 70 }}
+            size="small"
+            label={form.code}
+            variant="outlined"
+            // Stable anchor for `?focus=form-<id>` from the global
+            // search page. Sits next to the form-name Typography so
+            // scrolling here lands the user on the form header.
+            data-testid={`crf-form-${id}`}
+          />
+        )}
         <Typography
           variant="h5"
           onClick={(e) =>
@@ -358,7 +400,7 @@ export function CrfDetailPage() {
           </Stack>
         )}
         <Box sx={{ flexGrow: 1 }} />
-        <CrfToolsMenu projectCode={projectCode} />
+        <CrfToolsMenu projectCode={projectCode} versionId={routeSearch.versionId ?? null} />
       </Box>
 
       {query.isFetching && !form && (

@@ -39,12 +39,57 @@ pub async fn update(
     .await
 }
 
+pub async fn get_by_id(c: &HttpClient, id: i64) -> Result<CrfOptionViewResponse, ApiError> {
+    c.request(
+        reqwest::Method::GET,
+        &format!("/api/crf/options/{id}"),
+        None::<&()>,
+    )
+    .await
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CrfOptionListResponse {
+    pub options: Vec<CrfOptionViewResponse>,
+}
+
+// ---- search ----
+
+fn percent_encode_fragment(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    for b in input.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(b as char)
+            }
+            b' ' => out.push('+'),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+pub async fn search_by_version(
+    c: &HttpClient,
+    version_id: i64,
+    fragment: String,
+) -> Result<CrfOptionListResponse, ApiError> {
+    let encoded = percent_encode_fragment(&fragment);
+    c.request(
+        reqwest::Method::GET,
+        &format!("/api/crf/versions/{version_id}/options/search?fragment={encoded}"),
+        None::<&()>,
+    )
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::TimeZone;
     use std::sync::Arc;
-    use wiremock::matchers::{method, path};
+    use wiremock::matchers::{method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     use crate::http::client::{HttpClient, MemoryStore, TokenStore};
@@ -100,5 +145,37 @@ mod tests {
         };
         let j = serde_json::to_string(&body).unwrap();
         assert_eq!(j, r#"{"notSubmitted":true}"#);
+    }
+
+    #[tokio::test]
+    async fn get_by_id_returns_view() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/crf/options/31"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(option_view_json(31, 21, "NO")))
+            .mount(&server)
+            .await;
+        let resp = get_by_id(&client(&server), 31).await.unwrap();
+        assert_eq!(resp.id, 31);
+        assert_eq!(resp.value, "NO");
+        assert_eq!(resp.item_id, 21);
+    }
+
+    #[tokio::test]
+    async fn search_by_version_with_fragment_includes_query_param() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/crf/versions/7/options/search"))
+            .and(query_param("fragment", "Yes"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "options": [option_view_json(31, 21, "Yes")]
+            })))
+            .mount(&server)
+            .await;
+        let resp = search_by_version(&client(&server), 7, "Yes".into())
+            .await
+            .unwrap();
+        assert_eq!(resp.options.len(), 1);
+        assert_eq!(resp.options[0].value, "Yes");
     }
 }

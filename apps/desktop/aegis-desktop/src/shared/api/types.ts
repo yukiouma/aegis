@@ -420,6 +420,22 @@ export interface CrfFormListResponse {
   forms: CrfForm[];
 }
 
+export interface CrfOptionListResponse {
+  options: CrfOption[];
+}
+
+export interface CrfUnitListResponse {
+  units: CrfUnit[];
+}
+
+export interface AnnotationListResponse {
+  annotations: Annotation[];
+}
+
+export interface DomainAnnotationListResponse {
+  domainAnnotations: DomainAnnotation[];
+}
+
 export interface CreateCrfFormInput {
   code: string;
   name: string;

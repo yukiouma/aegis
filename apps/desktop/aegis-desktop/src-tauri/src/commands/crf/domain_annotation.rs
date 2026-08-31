@@ -42,3 +42,12 @@ pub async fn delete_crf_domain_annotation(
 ) -> Result<(), ApiError> {
     domain_annotation::delete(&client, id).await
 }
+
+#[tauri::command]
+pub async fn search_crf_domain_annotations_by_version(
+    client: State<'_, HttpClient>,
+    version_id: i64,
+    fragment: String,
+) -> Result<domain_annotation::DomainAnnotationListResponse, ApiError> {
+    domain_annotation::search_by_version(&client, version_id, fragment).await
+}

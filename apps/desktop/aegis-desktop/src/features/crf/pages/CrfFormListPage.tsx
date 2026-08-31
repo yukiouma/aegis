@@ -204,7 +204,7 @@ export function CrfFormListPage() {
       />
       <CrfStatusChip />
       <Box sx={{ flexGrow: 1 }} />
-      <CrfToolsMenu projectCode={projectCode} />
+      <CrfToolsMenu projectCode={projectCode} versionId={selectedVersionId} />
     </Box>
 
       {versionsQuery.isError && (

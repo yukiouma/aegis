@@ -32,3 +32,12 @@ pub async fn update_crf_item(
 ) -> Result<CrfItemViewResponse, ApiError> {
     item::update(&client, id, body).await
 }
+
+#[tauri::command]
+pub async fn search_crf_items_by_version(
+    client: State<'_, HttpClient>,
+    version_id: i64,
+    fragment: String,
+) -> Result<CrfItemListResponse, ApiError> {
+    item::search_by_version(&client, version_id, fragment).await
+}

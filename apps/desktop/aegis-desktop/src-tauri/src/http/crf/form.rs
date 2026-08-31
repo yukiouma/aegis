@@ -303,12 +303,42 @@ pub async fn details(c: &HttpClient, id: i64) -> Result<CrfFormDetailResponse, A
     .await
 }
 
+// ---- search ----
+
+fn percent_encode_fragment(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    for b in input.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(b as char)
+            }
+            b' ' => out.push('+'),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+pub async fn search_by_version(
+    c: &HttpClient,
+    version_id: i64,
+    fragment: String,
+) -> Result<CrfFormListResponse, ApiError> {
+    let encoded = percent_encode_fragment(&fragment);
+    c.request(
+        reqwest::Method::GET,
+        &format!("/api/crf/versions/{version_id}/forms/search?fragment={encoded}"),
+        None::<&()>,
+    )
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::TimeZone;
     use std::sync::Arc;
-    use wiremock::matchers::{method, path};
+    use wiremock::matchers::{method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     use crate::http::client::{HttpClient, MemoryStore, TokenStore};
@@ -493,5 +523,23 @@ mod tests {
         assert_eq!(resp.items[0].item.code, "AETERM");
         assert_eq!(resp.domain_annotations.len(), 1);
         assert_eq!(resp.domain_annotations[0].name, "Adverse Events");
+    }
+
+    #[tokio::test]
+    async fn search_by_version_with_fragment_includes_query_param() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/crf/versions/7/forms/search"))
+            .and(query_param("fragment", "AE"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "forms": [form_view_json(11, 7, "AE", "Adverse Events")]
+            })))
+            .mount(&server)
+            .await;
+        let resp = search_by_version(&client(&server), 7, "AE".into())
+            .await
+            .unwrap();
+        assert_eq!(resp.forms.len(), 1);
+        assert_eq!(resp.forms[0].id, 11);
     }
 }

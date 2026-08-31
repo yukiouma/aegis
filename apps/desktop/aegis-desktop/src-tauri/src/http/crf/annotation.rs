@@ -37,12 +37,8 @@ pub async fn create(
     c: &HttpClient,
     body: CreateAnnotationRequest,
 ) -> Result<AnnotationViewResponse, ApiError> {
-    c.request(
-        reqwest::Method::POST,
-        "/api/crf/annotations",
-        Some(&body),
-    )
-    .await
+    c.request(reqwest::Method::POST, "/api/crf/annotations", Some(&body))
+        .await
 }
 
 pub async fn update(
@@ -69,11 +65,47 @@ pub async fn delete(c: &HttpClient, id: i64) -> Result<(), ApiError> {
     Ok(())
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnnotationListResponse {
+    pub annotations: Vec<AnnotationViewResponse>,
+}
+
+// ---- search ----
+
+fn percent_encode_fragment(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    for b in input.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(b as char)
+            }
+            b' ' => out.push('+'),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+pub async fn search_by_version(
+    c: &HttpClient,
+    version_id: i64,
+    fragment: String,
+) -> Result<AnnotationListResponse, ApiError> {
+    let encoded = percent_encode_fragment(&fragment);
+    c.request(
+        reqwest::Method::GET,
+        &format!("/api/crf/versions/{version_id}/annotations/search?fragment={encoded}"),
+        None::<&()>,
+    )
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::Arc;
-    use wiremock::matchers::{method, path};
+    use wiremock::matchers::{method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     use crate::http::client::{HttpClient, MemoryStore, TokenStore};
@@ -108,7 +140,10 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/api/crf/annotations"))
-            .respond_with(ResponseTemplate::new(201).set_body_json(annotation_json(100, AnnotationOwner::Form { id: 11 })))
+            .respond_with(
+                ResponseTemplate::new(201)
+                    .set_body_json(annotation_json(100, AnnotationOwner::Form { id: 11 })),
+            )
             .mount(&server)
             .await;
         let view = create(
@@ -134,7 +169,10 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("PATCH"))
             .and(path("/api/crf/annotations/100"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(annotation_json(100, AnnotationOwner::Item { id: 21 })))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(annotation_json(100, AnnotationOwner::Item { id: 21 })),
+            )
             .mount(&server)
             .await;
         let view = update(
@@ -172,5 +210,23 @@ mod tests {
             .mount(&server)
             .await;
         delete(&client(&server), 100).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn search_by_version_with_fragment_includes_query_param() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/crf/versions/7/annotations/search"))
+            .and(query_param("fragment", "mild"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "annotations": [annotation_json(100, AnnotationOwner::Form { id: 11 })]
+            })))
+            .mount(&server)
+            .await;
+        let resp = search_by_version(&client(&server), 7, "mild".into())
+            .await
+            .unwrap();
+        assert_eq!(resp.annotations.len(), 1);
+        assert_eq!(resp.annotations[0].content, "note");
     }
 }
