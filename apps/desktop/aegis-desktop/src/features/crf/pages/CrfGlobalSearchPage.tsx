@@ -175,36 +175,26 @@ function AnnotationRowOwnerCell({ owner }: { owner: Annotation["owner"] }) {
     owner.kind === "option" ? owner.id : null,
   );
   const unit = useGetCrfUnit(owner.kind === "unit" ? owner.id : null);
-  switch (owner.kind) {
-    case "form":
-      return (
-        <>
-          {t("crf.globalSearch.ownerKind.form")}:{" "}
-          {form.data?.name ?? `#${owner.id}`}
-        </>
-      );
-    case "item":
-      return (
-        <>
-          {t("crf.globalSearch.ownerKind.item")}:{" "}
-          {item.data?.name ?? `#${owner.id}`}
-        </>
-      );
-    case "option":
-      return (
-        <>
-          {t("crf.globalSearch.ownerKind.option")}:{" "}
-          {option.data?.value ?? `#${owner.id}`}
-        </>
-      );
-    case "unit":
-      return (
-        <>
-          {t("crf.globalSearch.ownerKind.unit")}:{" "}
-          {unit.data?.value ?? `#${owner.id}`}
-        </>
-      );
-  }
+  const kindLabel = t(`crf.globalSearch.ownerKind.${owner.kind}`);
+  const name =
+    owner.kind === "form"
+      ? (form.data?.name ?? `#${owner.id}`)
+      : owner.kind === "item"
+        ? (item.data?.name ?? `#${owner.id}`)
+        : owner.kind === "option"
+          ? (option.data?.value ?? `#${owner.id}`)
+          : (unit.data?.value ?? `#${owner.id}`);
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      <Chip
+        size="small"
+        variant="outlined"
+        label={kindLabel}
+        sx={{ minWidth: 70 }}
+      />
+      <Typography variant="body2">{name}</Typography>
+    </Box>
+  );
 }
 
 interface ColumnDef<T> {
