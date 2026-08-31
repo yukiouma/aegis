@@ -21,11 +21,18 @@ import { useNavigate } from "@tanstack/react-router";
  * entries land here as the feature grows. Used in the form-list
  * toolbar and the detail page header — the global-search page
  * itself renders no second copy of this control.
+ *
+ * `versionId` is optional; when present the menu forwards it as
+ * `?versionId=` so the search page opens on the same version the
+ * user was browsing. Omitting it is safe (the search page shows
+ * its empty-input hint).
  */
 export function CrfToolsMenu({
   projectCode,
+  versionId,
 }: {
   projectCode: string;
+  versionId?: number | null;
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -59,6 +66,7 @@ export function CrfToolsMenu({
             navigate({
               to: "/project/$projectCode/crf/search",
               params: { projectCode },
+              search: versionId != null ? { versionId } : undefined,
             });
           }}
         >
