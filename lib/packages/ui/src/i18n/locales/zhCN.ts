@@ -296,6 +296,7 @@ export const zhCN = {
   "crf.globalSearch.tab.annotations": "批注",
   "crf.globalSearch.col.code": "编码",
   "crf.globalSearch.col.name": "名称",
+  "crf.globalSearch.col.form": "表单",
   "crf.globalSearch.col.kind": "类型",
   "crf.globalSearch.col.value": "值",
   "crf.globalSearch.col.description": "描述",

@@ -4,6 +4,7 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   IconButton,
   InputAdornment,
@@ -167,7 +168,7 @@ function ResultTable<T extends { id: number }>({
       )}
       <TableContainer
         component={Paper}
-        sx={{ maxHeight: "calc(100vh - 220px)" }}
+        sx={{ maxHeight: "calc(100vh - 180px)" }}
       >
         <Table size="small" stickyHeader>
           <TableHead>
@@ -345,14 +346,19 @@ export function CrfGlobalSearchPage() {
           errorText={t("crf.globalSearch.loadFailed.forms")}
           columns={[
             {
-              key: "code",
-              label: t("crf.globalSearch.col.code"),
-              render: (row) => row.code,
-            },
-            {
-              key: "name",
-              label: t("crf.globalSearch.col.name"),
-              render: (row) => row.name,
+              key: "form",
+              label: t("crf.globalSearch.col.form"),
+              render: (row) => (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={row.code}
+                    sx={{ minWidth: 70 }}
+                  />
+                  <Typography variant="body2">{row.name}</Typography>
+                </Box>
+              ),
             },
           ]}
           onRowClick={(row) =>

@@ -305,6 +305,7 @@ export const en = {
   "crf.globalSearch.tab.annotations": "Annotations",
   "crf.globalSearch.col.code": "Code",
   "crf.globalSearch.col.name": "Name",
+  "crf.globalSearch.col.form": "Form",
   "crf.globalSearch.col.kind": "Kind",
   "crf.globalSearch.col.value": "Value",
   "crf.globalSearch.col.description": "Description",
