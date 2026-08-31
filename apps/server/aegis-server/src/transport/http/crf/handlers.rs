@@ -540,14 +540,13 @@ pub async fn list_items_by_form(
     Ok(Json(dto::CrfItemListResponse { items }))
 }
 
-/// `GET /api/crf/forms/{id}/items/search?fragment=...` —
-/// version-scoped substring search on item code / name. The version
-/// is derived from the form at the usecase layer.
+/// `GET /api/crf/versions/{id}/items/search?fragment=...` —
+/// version-scoped substring search on item code / name.
 #[utoipa::path(
-    get, path = "/forms/{id}/items/search", tag = "crf",
+    get, path = "/versions/{id}/items/search", tag = "crf",
     operation_id = "crf_search_items_by_version",
     params(
-        ("id" = i64, Path, description = "Owning CRF form id; the version is derived from this row"),
+        ("id" = i64, Path, description = "Owning CRF version id"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
@@ -561,18 +560,13 @@ pub async fn list_items_by_form(
 pub async fn search_items_by_version(
     State(state): State<AppState>,
     _claims: AuthClaims,
-    Path(CrfPathId { id: form_id }): Path<CrfPathId>,
+    Path(CrfPathId { id: version_id }): Path<CrfPathId>,
     Query(CrfFragmentQuery { fragment }): Query<CrfFragmentQuery>,
 ) -> Result<Json<dto::CrfItemListResponse>, ApiError> {
-    // Resolve the form -> version_id at the apis layer.
-    let form = state
-        .crf
-        .get_form_by_id(apis::crf::GetCrfFormByIdRequest { id: form_id })
-        .await?;
     let views = state
         .crf
         .search_items_by_version(apis::crf::SearchCrfItemsByVersionRequest {
-            version_id: form.version_id,
+            version_id,
             fragment,
         })
         .await?;
@@ -736,14 +730,13 @@ pub async fn list_options_by_item(
     Ok(Json(dto::CrfOptionListResponse { options }))
 }
 
-/// `GET /api/crf/items/{id}/options/search?fragment=...` —
-/// version-scoped substring search on option value. The version is
-/// derived from item -> form -> version at the usecase layer.
+/// `GET /api/crf/versions/{id}/options/search?fragment=...` —
+/// version-scoped substring search on option value.
 #[utoipa::path(
-    get, path = "/items/{id}/options/search", tag = "crf",
+    get, path = "/versions/{id}/options/search", tag = "crf",
     operation_id = "crf_search_options_by_version",
     params(
-        ("id" = i64, Path, description = "Owning CRF item id; the version is derived from this row"),
+        ("id" = i64, Path, description = "Owning CRF version id"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
@@ -757,21 +750,13 @@ pub async fn list_options_by_item(
 pub async fn search_options_by_version(
     State(state): State<AppState>,
     _claims: AuthClaims,
-    Path(CrfPathId { id: item_id }): Path<CrfPathId>,
+    Path(CrfPathId { id: version_id }): Path<CrfPathId>,
     Query(CrfFragmentQuery { fragment }): Query<CrfFragmentQuery>,
 ) -> Result<Json<dto::CrfOptionListResponse>, ApiError> {
-    let item = state
-        .crf
-        .get_item_by_id(apis::crf::GetCrfItemByIdRequest { id: item_id })
-        .await?;
-    let form = state
-        .crf
-        .get_form_by_id(apis::crf::GetCrfFormByIdRequest { id: item.form_id })
-        .await?;
     let views = state
         .crf
         .search_options_by_version(apis::crf::SearchCrfOptionsByVersionRequest {
-            version_id: form.version_id,
+            version_id,
             fragment,
         })
         .await?;
@@ -932,14 +917,13 @@ pub async fn list_units_by_item(
     Ok(Json(dto::CrfUnitListResponse { units }))
 }
 
-/// `GET /api/crf/items/{id}/units/search?fragment=...` —
-/// version-scoped substring search on unit value. The version is
-/// derived from item -> form -> version at the usecase layer.
+/// `GET /api/crf/versions/{id}/units/search?fragment=...` —
+/// version-scoped substring search on unit value.
 #[utoipa::path(
-    get, path = "/items/{id}/units/search", tag = "crf",
+    get, path = "/versions/{id}/units/search", tag = "crf",
     operation_id = "crf_search_units_by_version",
     params(
-        ("id" = i64, Path, description = "Owning CRF item id; the version is derived from this row"),
+        ("id" = i64, Path, description = "Owning CRF version id"),
         ("fragment" = String, Query, description = "Required non-empty text fragment"),
     ),
     responses(
@@ -953,21 +937,13 @@ pub async fn list_units_by_item(
 pub async fn search_units_by_version(
     State(state): State<AppState>,
     _claims: AuthClaims,
-    Path(CrfPathId { id: item_id }): Path<CrfPathId>,
+    Path(CrfPathId { id: version_id }): Path<CrfPathId>,
     Query(CrfFragmentQuery { fragment }): Query<CrfFragmentQuery>,
 ) -> Result<Json<dto::CrfUnitListResponse>, ApiError> {
-    let item = state
-        .crf
-        .get_item_by_id(apis::crf::GetCrfItemByIdRequest { id: item_id })
-        .await?;
-    let form = state
-        .crf
-        .get_form_by_id(apis::crf::GetCrfFormByIdRequest { id: item.form_id })
-        .await?;
     let views = state
         .crf
         .search_units_by_version(apis::crf::SearchCrfUnitsByVersionRequest {
-            version_id: form.version_id,
+            version_id,
             fragment,
         })
         .await?;
