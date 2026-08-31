@@ -46,6 +46,9 @@ export function AnnotationChip({
       // supplies border-color from the active colour and a 1px width;
       // overriding only `borderStyle` keeps the colour theming intact.
       sx={annotation.assign ? { borderStyle: "dashed" } : undefined}
+      // Stable DOM anchor the CrfGlobalSearchPage uses for
+      // scrollIntoView when navigating in with ?focus=annotation-<id>.
+      data-testid={`crf-annotation-${annotation.id}`}
     />
   );
 }
