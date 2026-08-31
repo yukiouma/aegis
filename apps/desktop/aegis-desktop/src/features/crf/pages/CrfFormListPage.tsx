@@ -233,6 +233,12 @@ export function CrfFormListPage() {
           navigate({
             to: "/project/$projectCode/crf/$formId",
             params: { projectCode, formId: String(row.id) },
+            // Carry the selected version onto the detail URL so the
+            // back navigation in `CrfDetailPage` can hand it back to
+            // the list via `search: (prev) => prev`. Without this the
+            // detail page's search is empty and the list falls back
+            // to `versions[0]` on remount.
+            search: { versionId: selectedVersionId ?? undefined },
           })
         }
         onReorder={handleReorder}
