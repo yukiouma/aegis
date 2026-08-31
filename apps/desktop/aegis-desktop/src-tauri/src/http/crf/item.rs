@@ -76,12 +76,42 @@ pub async fn update(
     .await
 }
 
+// ---- search ----
+
+fn percent_encode_fragment(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    for b in input.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(b as char)
+            }
+            b' ' => out.push('+'),
+            _ => out.push_str(&format!("%{b:02X}")),
+        }
+    }
+    out
+}
+
+pub async fn search_by_version(
+    c: &HttpClient,
+    version_id: i64,
+    fragment: String,
+) -> Result<CrfItemListResponse, ApiError> {
+    let encoded = percent_encode_fragment(&fragment);
+    c.request(
+        reqwest::Method::GET,
+        &format!("/api/crf/versions/{version_id}/items/search?fragment={encoded}"),
+        None::<&()>,
+    )
+    .await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::TimeZone;
     use std::sync::Arc;
-    use wiremock::matchers::{method, path};
+    use wiremock::matchers::{method, path, query_param};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     use crate::http::client::{HttpClient, MemoryStore, TokenStore};
@@ -171,5 +201,23 @@ mod tests {
         };
         let j = serde_json::to_string(&body).unwrap();
         assert_eq!(j, r#"{"name":"renamed"}"#);
+    }
+
+    #[tokio::test]
+    async fn search_by_version_with_fragment_includes_query_param() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/crf/versions/7/items/search"))
+            .and(query_param("fragment", "AET"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "items": [item_view_json(21, 11, "AETERM")]
+            })))
+            .mount(&server)
+            .await;
+        let resp = search_by_version(&client(&server), 7, "AET".into())
+            .await
+            .unwrap();
+        assert_eq!(resp.items.len(), 1);
+        assert_eq!(resp.items[0].code, "AETERM");
     }
 }
