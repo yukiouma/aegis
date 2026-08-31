@@ -160,14 +160,15 @@ function ItemRowFormCell({ formId }: { formId: number }) {
 }
 
 /**
- * Renders the annotation's owner as the human-readable name of the
- * underlying resource: form name, item name, option value, or unit
- * value. Resolves each kind via the cached get-by-id hooks; React
- * Query dedupes lookups across rows so a search returning many
- * annotations on the same owner share one HTTP round-trip. Falls
- * back to `kind:id` while the lookup is in flight.
+ * Renders the annotation's owner as `Kind: <resource name>` —
+ * `Form: Demographics`, `Item: Vital Sign Date`, `Option: YES`,
+ * `Unit: mg`. Resolves each kind via the cached get-by-id hooks;
+ * React Query dedupes lookups across rows so a search returning
+ * many annotations on the same owner share one HTTP round-trip.
+ * Falls back to `Kind: #<id>` while the lookup is in flight.
  */
 function AnnotationRowOwnerCell({ owner }: { owner: Annotation["owner"] }) {
+  const { t } = useI18n();
   const form = useGetCrfForm(owner.kind === "form" ? owner.id : null);
   const item = useGetCrfItem(owner.kind === "item" ? owner.id : null);
   const option = useGetCrfOption(
@@ -176,13 +177,33 @@ function AnnotationRowOwnerCell({ owner }: { owner: Annotation["owner"] }) {
   const unit = useGetCrfUnit(owner.kind === "unit" ? owner.id : null);
   switch (owner.kind) {
     case "form":
-      return <>{form.data?.name ?? `form:${owner.id}`}</>;
+      return (
+        <>
+          {t("crf.globalSearch.ownerKind.form")}:{" "}
+          {form.data?.name ?? `#${owner.id}`}
+        </>
+      );
     case "item":
-      return <>{item.data?.name ?? `item:${owner.id}`}</>;
+      return (
+        <>
+          {t("crf.globalSearch.ownerKind.item")}:{" "}
+          {item.data?.name ?? `#${owner.id}`}
+        </>
+      );
     case "option":
-      return <>{option.data?.value ?? `option:${owner.id}`}</>;
+      return (
+        <>
+          {t("crf.globalSearch.ownerKind.option")}:{" "}
+          {option.data?.value ?? `#${owner.id}`}
+        </>
+      );
     case "unit":
-      return <>{unit.data?.value ?? `unit:${owner.id}`}</>;
+      return (
+        <>
+          {t("crf.globalSearch.ownerKind.unit")}:{" "}
+          {unit.data?.value ?? `#${owner.id}`}
+        </>
+      );
   }
 }
 
