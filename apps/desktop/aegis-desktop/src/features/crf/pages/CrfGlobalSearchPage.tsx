@@ -549,6 +549,11 @@ export function CrfGlobalSearchPage() {
           errorText={t("crf.globalSearch.loadFailed.domainAnnotations")}
           columns={[
             {
+              key: "form",
+              label: t("crf.globalSearch.col.form"),
+              render: (row) => <ItemRowFormCell formId={row.formId} />,
+            },
+            {
               key: "name",
               label: t("crf.globalSearch.col.name"),
               render: (row) => row.name,
