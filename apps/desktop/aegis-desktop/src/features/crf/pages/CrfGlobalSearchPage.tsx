@@ -114,6 +114,28 @@ function UnitRowItemCodeCell({ itemId }: { itemId: number }) {
   return <>{item.data?.code ?? `#${itemId}`}</>;
 }
 
+/**
+ * Renders the owning form for an Items-tab row as
+ * `Chip(form.code) + form.name`. Resolves `formId → form` via the
+ * cached get-by-id hook; React Query dedupes across rows. Falls
+ * back to `#<id>` while loading or on error so the table stays
+ * usable before the lookup returns.
+ */
+function ItemRowFormCell({ formId }: { formId: number }) {
+  const form = useGetCrfForm(formId);
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      <Chip
+        size="small"
+        variant="outlined"
+        label={form.data?.code ?? `#${formId}`}
+        sx={{ minWidth: 70 }}
+      />
+      <Typography variant="body2">{form.data?.name ?? ""}</Typography>
+    </Box>
+  );
+}
+
 interface ColumnDef<T> {
   key: string;
   label: string;
@@ -375,19 +397,24 @@ export function CrfGlobalSearchPage() {
           errorText={t("crf.globalSearch.loadFailed.items")}
           columns={[
             {
-              key: "code",
-              label: t("crf.globalSearch.col.code"),
-              render: (row) => row.code,
+              key: "form",
+              label: t("crf.globalSearch.col.form"),
+              render: (row) => <ItemRowFormCell formId={row.formId} />,
             },
             {
-              key: "name",
-              label: t("crf.globalSearch.col.name"),
-              render: (row) => row.name,
-            },
-            {
-              key: "kind",
-              label: t("crf.globalSearch.col.kind"),
-              render: (row) => row.kind,
+              key: "item",
+              label: t("crf.globalSearch.col.item"),
+              render: (row) => (
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={row.code}
+                    sx={{ minWidth: 70 }}
+                  />
+                  <Typography variant="body2">{row.name}</Typography>
+                </Box>
+              ),
             },
           ]}
           onRowClick={(row) =>
