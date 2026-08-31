@@ -400,7 +400,7 @@ export function CrfDetailPage() {
           </Stack>
         )}
         <Box sx={{ flexGrow: 1 }} />
-        <CrfToolsMenu projectCode={projectCode} />
+        <CrfToolsMenu projectCode={projectCode} versionId={routeSearch.versionId ?? null} />
       </Box>
 
       {query.isFetching && !form && (
