@@ -306,23 +306,24 @@ export function CrfGlobalSearchPage() {
           }}
           size="small"
           aria-label="crf global search tab"
+          sx={{ display: "flex", width: "100%" }}
         >
-          <ToggleButton value="forms">
+          <ToggleButton sx={{ flex: 1 }} value="forms">
             {t("crf.globalSearch.tab.forms")}
           </ToggleButton>
-          <ToggleButton value="items">
+          <ToggleButton sx={{ flex: 1 }} value="items">
             {t("crf.globalSearch.tab.items")}
           </ToggleButton>
-          <ToggleButton value="units">
+          <ToggleButton sx={{ flex: 1 }} value="units">
             {t("crf.globalSearch.tab.units")}
           </ToggleButton>
-          <ToggleButton value="options">
+          <ToggleButton sx={{ flex: 1 }} value="options">
             {t("crf.globalSearch.tab.options")}
           </ToggleButton>
-          <ToggleButton value="domains">
+          <ToggleButton sx={{ flex: 1 }} value="domains">
             {t("crf.globalSearch.tab.domainAnnotations")}
           </ToggleButton>
-          <ToggleButton value="annotations">
+          <ToggleButton sx={{ flex: 1 }} value="annotations">
             {t("crf.globalSearch.tab.annotations")}
           </ToggleButton>
         </ToggleButtonGroup>
