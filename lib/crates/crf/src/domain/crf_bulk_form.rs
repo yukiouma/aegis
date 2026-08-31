@@ -94,7 +94,7 @@ pub fn validate_bulk_create(input: &CrfBulkCreateForm) -> Result<(), DomainError
         // Kind-shape: Selection / Checkbox require ≥1 option;
         // Text / Datetime / Label require 0 options.
         let kind = bi.item.kind;
-        let needs_options = matches!(kind, CrfItemKind::Selection | CrfItemKind::Checkbox);
+        let needs_options = matches!(kind, CrfItemKind::Selection);
         if needs_options == bi.options.is_empty() {
             return Err(DomainError::KindShapeViolation {
                 kind,
