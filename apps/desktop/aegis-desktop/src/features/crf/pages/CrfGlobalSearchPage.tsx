@@ -42,6 +42,8 @@ import type {
 import { useGetCrfForm } from "../data/list";
 import {
   useGetCrfItem,
+  useGetCrfOption,
+  useGetCrfUnit,
   useSearchCrfAnnotations,
   useSearchCrfDomainAnnotations,
   useSearchCrfForms,
@@ -155,6 +157,33 @@ function ItemRowFormCell({ formId }: { formId: number }) {
       <Typography variant="body2">{form.data?.name ?? ""}</Typography>
     </Box>
   );
+}
+
+/**
+ * Renders the annotation's owner as the human-readable name of the
+ * underlying resource: form name, item name, option value, or unit
+ * value. Resolves each kind via the cached get-by-id hooks; React
+ * Query dedupes lookups across rows so a search returning many
+ * annotations on the same owner share one HTTP round-trip. Falls
+ * back to `kind:id` while the lookup is in flight.
+ */
+function AnnotationRowOwnerCell({ owner }: { owner: Annotation["owner"] }) {
+  const form = useGetCrfForm(owner.kind === "form" ? owner.id : null);
+  const item = useGetCrfItem(owner.kind === "item" ? owner.id : null);
+  const option = useGetCrfOption(
+    owner.kind === "option" ? owner.id : null,
+  );
+  const unit = useGetCrfUnit(owner.kind === "unit" ? owner.id : null);
+  switch (owner.kind) {
+    case "form":
+      return <>{form.data?.name ?? `form:${owner.id}`}</>;
+    case "item":
+      return <>{item.data?.name ?? `item:${owner.id}`}</>;
+    case "option":
+      return <>{option.data?.value ?? `option:${owner.id}`}</>;
+    case "unit":
+      return <>{unit.data?.value ?? `unit:${owner.id}`}</>;
+  }
 }
 
 interface ColumnDef<T> {
@@ -586,14 +615,9 @@ export function CrfGlobalSearchPage() {
               render: (row) => row.content,
             },
             {
-              key: "assign",
-              label: t("crf.globalSearch.col.assign"),
-              render: (row) => (row.assign ? "✓" : ""),
-            },
-            {
               key: "owner",
               label: t("crf.globalSearch.col.owner"),
-              render: (row) => `${row.owner.kind}:${row.owner.id}`,
+              render: (row) => <AnnotationRowOwnerCell owner={row.owner} />,
             },
           ]}
           onRowClick={(row) => {
@@ -605,25 +629,41 @@ export function CrfGlobalSearchPage() {
               });
               return;
             }
-            if (owner.kind === "item") {
-              void (async () => {
-                try {
-                  const fetched = await import("../../../shared/api").then(
-                    (m) => m.api.getCrfItemById(owner.id),
-                  );
+            // `item`, `option`, and `unit` owners all need their
+            // parent form id, which is one or two HTTP lookups away.
+            // Resolve via the same `api.*` wrappers the cell hooks
+            // call, so React Query's cache is reused across the table.
+            void (async () => {
+              try {
+                const api = await import("../../../shared/api").then(
+                  (m) => m.api,
+                );
+                let formId: number;
+                if (owner.kind === "item") {
+                  const fetched = await api.getCrfItemById(owner.id);
                   if (!fetched) return;
-                  openFormDetail({
-                    formId: fetched.formId,
-                    focus: `annotation-${row.id}`,
-                  });
-                } catch {
-                  // swallow
+                  formId = fetched.formId;
+                } else {
+                  // option / unit: fetch the leaf first to learn its
+                  // `itemId`, then fetch the item to learn its
+                  // `formId`.
+                  const leaf =
+                    owner.kind === "option"
+                      ? await api.getCrfOptionById(owner.id)
+                      : await api.getCrfUnitById(owner.id);
+                  if (!leaf) return;
+                  const item = await api.getCrfItemById(leaf.itemId);
+                  if (!item) return;
+                  formId = item.formId;
                 }
-              })();
-              return;
-            }
-            // option / unit owners: no top-level getOption / getUnit
-            // endpoint today. Click is a no-op until that lands.
+                openFormDetail({
+                  formId,
+                  focus: `annotation-${row.id}`,
+                });
+              } catch {
+                // swallow
+              }
+            })();
           }}
         />
       )}
