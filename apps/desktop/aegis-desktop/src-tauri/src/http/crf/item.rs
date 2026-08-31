@@ -39,10 +39,7 @@ pub struct UpdateCrfItemRequest {
     pub not_submitted: Option<bool>,
 }
 
-pub async fn list_by_form(
-    c: &HttpClient,
-    form_id: i64,
-) -> Result<CrfItemListResponse, ApiError> {
+pub async fn list_by_form(c: &HttpClient, form_id: i64) -> Result<CrfItemListResponse, ApiError> {
     c.request(
         reqwest::Method::GET,
         &format!("/api/crf/forms/{form_id}/items"),
@@ -51,10 +48,7 @@ pub async fn list_by_form(
     .await
 }
 
-pub async fn get_by_id(
-    c: &HttpClient,
-    id: i64,
-) -> Result<CrfItemViewResponse, ApiError> {
+pub async fn get_by_id(c: &HttpClient, id: i64) -> Result<CrfItemViewResponse, ApiError> {
     c.request(
         reqwest::Method::GET,
         &format!("/api/crf/items/{id}"),
@@ -157,7 +151,9 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
             .and(path("/api/crf/items/21"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(item_view_json(21, 11, "AETERM")))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(item_view_json(21, 11, "AETERM")),
+            )
             .mount(&server)
             .await;
         let resp = get_by_id(&client(&server), 21).await.unwrap();
@@ -173,7 +169,9 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("PATCH"))
             .and(path("/api/crf/items/21"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(item_view_json(21, 11, "AETERMX")))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(item_view_json(21, 11, "AETERMX")),
+            )
             .mount(&server)
             .await;
         let resp = update(

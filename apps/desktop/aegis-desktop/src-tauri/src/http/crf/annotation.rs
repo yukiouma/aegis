@@ -37,12 +37,8 @@ pub async fn create(
     c: &HttpClient,
     body: CreateAnnotationRequest,
 ) -> Result<AnnotationViewResponse, ApiError> {
-    c.request(
-        reqwest::Method::POST,
-        "/api/crf/annotations",
-        Some(&body),
-    )
-    .await
+    c.request(reqwest::Method::POST, "/api/crf/annotations", Some(&body))
+        .await
 }
 
 pub async fn update(
@@ -144,7 +140,10 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/api/crf/annotations"))
-            .respond_with(ResponseTemplate::new(201).set_body_json(annotation_json(100, AnnotationOwner::Form { id: 11 })))
+            .respond_with(
+                ResponseTemplate::new(201)
+                    .set_body_json(annotation_json(100, AnnotationOwner::Form { id: 11 })),
+            )
             .mount(&server)
             .await;
         let view = create(
@@ -170,7 +169,10 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("PATCH"))
             .and(path("/api/crf/annotations/100"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(annotation_json(100, AnnotationOwner::Item { id: 21 })))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(annotation_json(100, AnnotationOwner::Item { id: 21 })),
+            )
             .mount(&server)
             .await;
         let view = update(

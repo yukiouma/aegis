@@ -27,10 +27,7 @@ pub async fn update_crf_annotation(
 }
 
 #[tauri::command]
-pub async fn delete_crf_annotation(
-    client: State<'_, HttpClient>,
-    id: i64,
-) -> Result<(), ApiError> {
+pub async fn delete_crf_annotation(client: State<'_, HttpClient>, id: i64) -> Result<(), ApiError> {
     annotation::delete(&client, id).await
 }
 
