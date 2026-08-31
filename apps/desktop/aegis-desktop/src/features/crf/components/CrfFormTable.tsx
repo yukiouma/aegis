@@ -232,8 +232,8 @@ export function CrfFormTable({
         onReorder(next);
       }}
     >
-      <TableContainer component={Paper}>
-        <Table size="small">
+      <TableContainer component={Paper} sx={{ maxHeight: "calc(100vh - 120px)" }} >
+        <Table size="small" stickyHeader >
           <TableHead>
             <TableRow>
               <TableCell sx={{ width: 40 }} />

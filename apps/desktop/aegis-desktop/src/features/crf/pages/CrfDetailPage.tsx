@@ -234,7 +234,7 @@ export function CrfDetailPage() {
         <IconButton aria-label={t("crf.detail.back")} onClick={back}>
           <ArrowBackIcon />
         </IconButton>
-        {form?.code && <Chip size="small" label={form.code} variant="outlined" />}
+        {form?.code && <Chip sx={{ minWidth: 70 }} size="small" label={form.code} variant="outlined" />}
         <Typography
           variant="h5"
           onClick={(e) =>
@@ -397,7 +397,7 @@ export function CrfDetailPage() {
 
       {/* Item list */}
       {detail && (
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 1, maxHeight: "calc(100vh - 160px)", overflowY: "auto" }}>
           {detail.items.length === 0 ? (
             <Alert severity="info">{t("crf.detail.empty")}</Alert>
           ) : (
