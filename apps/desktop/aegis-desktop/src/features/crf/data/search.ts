@@ -148,3 +148,33 @@ export function useGetCrfItem(
     enabled: id != null && id > 0,
   });
 }
+
+/**
+ * Fetch a single CRF option by id. Used by the Annotations tab
+ * to resolve an annotation owner of kind `option` to its `value`
+ * for display in the Owner column.
+ */
+export function useGetCrfOption(
+  id: number | null,
+): UseQueryResult<CrfOption, ApiError> {
+  return useQuery<CrfOption, ApiError>({
+    queryKey: queryKeys.crf.option(id ?? 0),
+    queryFn: () => api.getCrfOptionById(id!),
+    enabled: id != null && id > 0,
+  });
+}
+
+/**
+ * Fetch a single CRF unit by id. Used by the Annotations tab to
+ * resolve an annotation owner of kind `unit` to its `value` for
+ * display in the Owner column.
+ */
+export function useGetCrfUnit(
+  id: number | null,
+): UseQueryResult<CrfUnit, ApiError> {
+  return useQuery<CrfUnit, ApiError>({
+    queryKey: queryKeys.crf.unit(id ?? 0),
+    queryFn: () => api.getCrfUnitById(id!),
+    enabled: id != null && id > 0,
+  });
+}

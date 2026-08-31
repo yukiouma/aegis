@@ -39,6 +39,15 @@ pub async fn update(
     .await
 }
 
+pub async fn get_by_id(c: &HttpClient, id: i64) -> Result<CrfUnitViewResponse, ApiError> {
+    c.request(
+        reqwest::Method::GET,
+        &format!("/api/crf/units/{id}"),
+        None::<&()>,
+    )
+    .await
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CrfUnitListResponse {
@@ -136,6 +145,20 @@ mod tests {
         };
         let j = serde_json::to_string(&body).unwrap();
         assert_eq!(j, r#"{"notSubmitted":true}"#);
+    }
+
+    #[tokio::test]
+    async fn get_by_id_returns_view() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/crf/units/41"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(unit_view_json(41, 21, "kg")))
+            .mount(&server)
+            .await;
+        let resp = get_by_id(&client(&server), 41).await.unwrap();
+        assert_eq!(resp.id, 41);
+        assert_eq!(resp.value, "kg");
+        assert_eq!(resp.item_id, 21);
     }
 
     #[tokio::test]

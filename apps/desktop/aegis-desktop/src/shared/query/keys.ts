@@ -55,6 +55,10 @@ export const queryKeys = {
       ["crf", "formDetail", id] as const,
     item: (id: number) =>
       ["crf", "item", id] as const,
+    option: (id: number) =>
+      ["crf", "option", id] as const,
+    unit: (id: number) =>
+      ["crf", "unit", id] as const,
     searchFormsByVersion: (v: number, f: string) =>
       ["crf", "searchFormsByVersion", v, f] as const,
     searchItemsByVersion: (v: number, f: string) =>

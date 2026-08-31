@@ -378,6 +378,10 @@ export const api = {
   },
   getCrfItemById: (id: number): Promise<CrfItem> =>
     call<CrfItem>("get_crf_item_by_id", { id }),
+  getCrfOptionById: (id: number): Promise<CrfOption> =>
+    call<CrfOption>("get_crf_option_by_id", { id }),
+  getCrfUnitById: (id: number): Promise<CrfUnit> =>
+    call<CrfUnit>("get_crf_unit_by_id", { id }),
   updateCrfItem: (
     id: number,
     body: UpdateCrfItemInput,

@@ -39,6 +39,15 @@ pub async fn update(
     .await
 }
 
+pub async fn get_by_id(c: &HttpClient, id: i64) -> Result<CrfOptionViewResponse, ApiError> {
+    c.request(
+        reqwest::Method::GET,
+        &format!("/api/crf/options/{id}"),
+        None::<&()>,
+    )
+    .await
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CrfOptionListResponse {
@@ -136,6 +145,20 @@ mod tests {
         };
         let j = serde_json::to_string(&body).unwrap();
         assert_eq!(j, r#"{"notSubmitted":true}"#);
+    }
+
+    #[tokio::test]
+    async fn get_by_id_returns_view() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path("/api/crf/options/31"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(option_view_json(31, 21, "NO")))
+            .mount(&server)
+            .await;
+        let resp = get_by_id(&client(&server), 31).await.unwrap();
+        assert_eq!(resp.id, 31);
+        assert_eq!(resp.value, "NO");
+        assert_eq!(resp.item_id, 21);
     }
 
     #[tokio::test]
