@@ -296,6 +296,8 @@ export function CrfGlobalSearchPage() {
             },
           }}
         />
+      </Box>
+      <Box>
         <ToggleButtonGroup
           exclusive
           value={tab}
