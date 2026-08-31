@@ -55,3 +55,12 @@ pub async fn get_crf_form_details(
 ) -> Result<CrfFormDetailResponse, ApiError> {
     form::details(&client, id).await
 }
+
+#[tauri::command]
+pub async fn search_crf_forms_by_version(
+    client: State<'_, HttpClient>,
+    version_id: i64,
+    fragment: String,
+) -> Result<CrfFormListResponse, ApiError> {
+    form::search_by_version(&client, version_id, fragment).await
+}

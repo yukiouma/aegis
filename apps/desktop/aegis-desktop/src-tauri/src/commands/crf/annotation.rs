@@ -4,7 +4,7 @@ use tauri::State;
 
 use crate::http::client::HttpClient;
 use crate::http::crf::annotation::{
-    self, CreateAnnotationRequest, UpdateAnnotationRequest,
+    self, AnnotationListResponse, CreateAnnotationRequest, UpdateAnnotationRequest,
 };
 use crate::http::crf::form::AnnotationViewResponse;
 use crate::http::dto::ApiError;
@@ -32,4 +32,13 @@ pub async fn delete_crf_annotation(
     id: i64,
 ) -> Result<(), ApiError> {
     annotation::delete(&client, id).await
+}
+
+#[tauri::command]
+pub async fn search_crf_annotations_by_version(
+    client: State<'_, HttpClient>,
+    version_id: i64,
+    fragment: String,
+) -> Result<AnnotationListResponse, ApiError> {
+    annotation::search_by_version(&client, version_id, fragment).await
 }
