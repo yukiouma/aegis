@@ -91,27 +91,48 @@ function useOpenFormDetail(
 }
 
 /**
- * Renders an item's owning form's code by resolving
- * `itemId → item.formId → form.code`. React Query dedupes across
- * rows so 50 units under the same item share one HTTP round-trip
- * per lookup. Falls back to `#<id>` while loading or on error so
- * the table doesn't break.
+ * Renders the owning form for a Units / Options row as
+ * `Chip(form.code) + form.name`. Resolves
+ * `itemId → item → formId → form` via the cached get-by-id
+ * hooks; React Query dedupes so N rows under the same item
+ * share a single HTTP round-trip per lookup. Falls back to
+ * `#<formId>` while loading or on error.
  */
-function UnitRowFormCodeCell({ itemId }: { itemId: number }) {
+function UnitRowFormCell({ itemId }: { itemId: number }) {
   const item = useGetCrfItem(itemId);
-  const form = useGetCrfForm(item.data?.formId ?? null);
+  const formId = item.data?.formId ?? null;
+  const form = useGetCrfForm(formId);
   return (
-    <>{form.data?.code ?? `#${item.data?.formId ?? itemId}`}</>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      <Chip
+        size="small"
+        variant="outlined"
+        label={form.data?.code ?? `#${formId ?? itemId}`}
+        sx={{ minWidth: 70 }}
+      />
+      <Typography variant="body2">{form.data?.name ?? ""}</Typography>
+    </Box>
   );
 }
 
 /**
- * Renders the item code for a unit / option / annotation row by
- * looking up the cached item. Falls back to `#<id>` on miss.
+ * Renders an item for a Units / Options row as
+ * `Chip(item.code) + item.name`. Falls back to `#<itemId>`
+ * while loading or on error.
  */
-function UnitRowItemCodeCell({ itemId }: { itemId: number }) {
+function UnitRowItemCell({ itemId }: { itemId: number }) {
   const item = useGetCrfItem(itemId);
-  return <>{item.data?.code ?? `#${itemId}`}</>;
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+      <Chip
+        size="small"
+        variant="outlined"
+        label={item.data?.code ?? `#${itemId}`}
+        sx={{ minWidth: 70 }}
+      />
+      <Typography variant="body2">{item.data?.name ?? ""}</Typography>
+    </Box>
+  );
 }
 
 /**
@@ -434,14 +455,14 @@ export function CrfGlobalSearchPage() {
           errorText={t("crf.globalSearch.loadFailed.units")}
           columns={[
             {
-              key: "formCode",
-              label: t("crf.globalSearch.col.formCode"),
-              render: (row) => <UnitRowFormCodeCell itemId={row.itemId} />,
+              key: "form",
+              label: t("crf.globalSearch.col.form"),
+              render: (row) => <UnitRowFormCell itemId={row.itemId} />,
             },
             {
-              key: "itemCode",
-              label: t("crf.globalSearch.col.itemCode"),
-              render: (row) => <UnitRowItemCodeCell itemId={row.itemId} />,
+              key: "item",
+              label: t("crf.globalSearch.col.item"),
+              render: (row) => <UnitRowItemCell itemId={row.itemId} />,
             },
             {
               key: "value",
@@ -486,14 +507,14 @@ export function CrfGlobalSearchPage() {
           errorText={t("crf.globalSearch.loadFailed.options")}
           columns={[
             {
-              key: "formCode",
-              label: t("crf.globalSearch.col.formCode"),
-              render: (row) => <UnitRowFormCodeCell itemId={row.itemId} />,
+              key: "form",
+              label: t("crf.globalSearch.col.form"),
+              render: (row) => <UnitRowFormCell itemId={row.itemId} />,
             },
             {
-              key: "itemCode",
-              label: t("crf.globalSearch.col.itemCode"),
-              render: (row) => <UnitRowItemCodeCell itemId={row.itemId} />,
+              key: "item",
+              label: t("crf.globalSearch.col.item"),
+              render: (row) => <UnitRowItemCell itemId={row.itemId} />,
             },
             {
               key: "value",
