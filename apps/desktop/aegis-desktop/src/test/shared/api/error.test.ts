@@ -75,4 +75,15 @@ describe("errorMessage", () => {
   it("formats a store error", () => {
     expect(errorMessage({ kind: "store", message: "locked" })).toBe("locked");
   });
+
+  it("formats a parse error using its message", () => {
+    expect(
+      errorMessage({
+        kind: "parse",
+        message: "3 validation error(s): form code empty; item BAD has kind 'text' but options are not allowed",
+      }),
+    ).toBe(
+      "3 validation error(s): form code empty; item BAD has kind 'text' but options are not allowed",
+    );
+  });
 });

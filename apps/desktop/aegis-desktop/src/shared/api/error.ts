@@ -46,5 +46,7 @@ export function errorMessage(e: unknown): string {
       return err.detail;
     case "store":
       return err.message;
+    case "parse":
+      return err.message;
   }
 }

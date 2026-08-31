@@ -22,7 +22,8 @@ export type ApiError =
   | { kind: "http"; status: number; code: string; message: string }
   | { kind: "refreshFailed" }
   | { kind: "notImplemented"; detail: string }
-  | { kind: "store"; message: string };
+  | { kind: "store"; message: string }
+  | { kind: "parse"; message: string };
 
 // Mirrors `system::identity::Identity` in src-tauri. That struct carries
 // `#[serde(rename_all = "camelCase")]`, so unlike the other response
