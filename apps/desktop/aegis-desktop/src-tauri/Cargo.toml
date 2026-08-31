@@ -29,7 +29,13 @@ thiserror = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
 base64 = { workspace = true }
-terminology = { git = "https://github.com/yukiouma/ypsilo.git", tag = "v0.1.0-alpha.1", package = "terminology" }
+terminology = { git = "https://github.com/yukiouma/ypsilo.git", tag = "v0.1.0-alpha.4", package = "terminology" }
+als-resolver = { git = "https://github.com/yukiouma/ypsilo.git", tag = "v0.1.0-alpha.4", package = "als-resolver" }
+# `entities` is als-resolver's transitive dep; pulled in directly so the
+# `import_als` orchestrator can name `ControlType`, `CRFForm`, `CRFItem`
+# etc. when walking the parsed `Project`. Pinned to the same ypsilo tag
+# to guarantee type compatibility with als-resolver.
+entities = { git = "https://github.com/yukiouma/ypsilo.git", tag = "v0.1.0-alpha.4", package = "entities" }
 tauri-plugin-dialog = "2"
 
 [target.'cfg(target_os = "windows")'.dependencies]

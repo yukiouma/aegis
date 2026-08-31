@@ -22,7 +22,8 @@ export type ApiError =
   | { kind: "http"; status: number; code: string; message: string }
   | { kind: "refreshFailed" }
   | { kind: "notImplemented"; detail: string }
-  | { kind: "store"; message: string };
+  | { kind: "store"; message: string }
+  | { kind: "parse"; message: string };
 
 // Mirrors `system::identity::Identity` in src-tauri. That struct carries
 // `#[serde(rename_all = "camelCase")]`, so unlike the other response
@@ -558,4 +559,15 @@ export interface CreateAnnotationInput {
 export interface UpdateAnnotationInput {
   content?: string;
   assign?: boolean;
+}
+
+/** Wire-side EDC source type for an ALS import. */
+export type CrfEdcType = "rave" | "ecollectV6" | "ecollectLegacy";
+
+/** Body for `api.importAls(name, projectCode, filepath, edcType)`. */
+export interface ImportAlsInput {
+  name: string;
+  projectCode: string;
+  filepath: string;
+  edcType: CrfEdcType;
 }

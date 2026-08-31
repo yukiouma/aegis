@@ -3,7 +3,11 @@ import {
   Alert,
   Box,
   CircularProgress,
+  IconButton,
+  Tooltip,
 } from "@aegis/ui/mui";
+import { NoteAdd as NoteAddIcon } from "@aegis/ui/icons";
+import { useI18n } from "@aegis/ui/i18n";
 import {
   useNavigate,
   useParams,
@@ -75,6 +79,7 @@ export function CrfFormListPage() {
     projectCode: string;
   };
   const navigate = useNavigate();
+  const { t } = useI18n();
   const routeSearch = useSearch({ strict: false }) as { versionId?: number };
   const selectedVersionId =
     typeof routeSearch.versionId === "number" && routeSearch.versionId > 0
@@ -171,6 +176,20 @@ export function CrfFormListPage() {
         gap: 2,
       }}
     >
+      <Tooltip title={t("crf.toolbar.createVersion")}>
+        <IconButton
+          size="small"
+          aria-label={t("crf.toolbar.createVersion")}
+          onClick={() =>
+            navigate({
+              to: "/project/$projectCode/crf/versions/new",
+              params: { projectCode },
+            })
+          }
+        >
+          <NoteAddIcon />
+        </IconButton>
+      </Tooltip>
       <CrfVersionDropdown
         versions={versions}
         value={selectedVersionId}

@@ -77,6 +77,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::domain_model::variable::delete_sdtm_variable,
             // crf
             commands::crf::version::list_crf_versions,
+            commands::crf::version::import_als,
             commands::crf::form::list_crf_forms_by_version,
             commands::crf::form::create_crf_form,
             commands::crf::form::update_crf_form,

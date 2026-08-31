@@ -35,6 +35,70 @@ pub struct CreateCrfFormRequest {
     pub not_submitted: bool,
 }
 
+/// Wire mirror of `apis::crf::CrfItemKind`. Used by the bulk-create
+/// request and by `http::crf::version::import_als` to tag items
+/// when transcribing the parsed ALS `Project` into wire shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CrfItemKind {
+    Text,
+    Selection,
+    Checkbox,
+    Datetime,
+    Label,
+}
+
+/// Body for `POST /api/crf/versions/{version_id}/forms/bulk`. Owning
+/// `version_id` is supplied via the path segment; the body carries
+/// the form's scalar fields plus every item (each with its own
+/// options + units subtree). The bulk port stamps the surrogate
+/// `form_id` / `item_id` at insert time, so neither appears here.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkCreateCrfFormRequest {
+    pub form: CreateCrfFormRequest,
+    pub items: Vec<BulkCreateCrfFormItemInput>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkCreateCrfFormItemInput {
+    pub item: CreateCrfItemRequest,
+    pub options: Vec<CreateCrfOptionRequest>,
+    pub units: Vec<CreateCrfUnitRequest>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCrfItemRequest {
+    pub code: String,
+    pub name: String,
+    pub kind: CrfItemKind,
+    pub order: i32,
+    pub not_submitted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCrfOptionRequest {
+    pub value: String,
+    pub not_submitted: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateCrfUnitRequest {
+    pub value: String,
+    pub not_submitted: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkCreateCrfFormResponse {
+    pub form: CrfFormViewResponse,
+    pub items: Vec<CrfItemViewResponse>,
+}
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateCrfFormRequest {
@@ -73,6 +137,19 @@ pub async fn create(
     .await
 }
 
+pub async fn bulk_create(
+    c: &HttpClient,
+    version_id: i64,
+    body: BulkCreateCrfFormRequest,
+) -> Result<BulkCreateCrfFormResponse, ApiError> {
+    c.request(
+        reqwest::Method::POST,
+        &format!("/api/crf/versions/{version_id}/forms/bulk"),
+        Some(&body),
+    )
+    .await
+}
+
 pub async fn update(
     c: &HttpClient,
     id: i64,
@@ -97,10 +174,7 @@ pub async fn delete(c: &HttpClient, id: i64) -> Result<(), ApiError> {
     Ok(())
 }
 
-pub async fn get_by_id(
-    c: &HttpClient,
-    id: i64,
-) -> Result<CrfFormViewResponse, ApiError> {
+pub async fn get_by_id(c: &HttpClient, id: i64) -> Result<CrfFormViewResponse, ApiError> {
     c.request(
         reqwest::Method::GET,
         &format!("/api/crf/forms/{id}"),
@@ -114,11 +188,19 @@ pub async fn get_by_id(
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum AnnotationOwner {
-    Form { id: i64 },
-    Item { id: i64 },
+    Form {
+        id: i64,
+    },
+    Item {
+        id: i64,
+    },
     #[serde(rename = "option")]
-    Option { id: i64 },
-    Unit { id: i64 },
+    Option {
+        id: i64,
+    },
+    Unit {
+        id: i64,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -212,10 +294,7 @@ pub struct CrfFormDetailResponse {
     pub domain_annotations: Vec<DomainAnnotationViewResponse>,
 }
 
-pub async fn details(
-    c: &HttpClient,
-    id: i64,
-) -> Result<CrfFormDetailResponse, ApiError> {
+pub async fn details(c: &HttpClient, id: i64) -> Result<CrfFormDetailResponse, ApiError> {
     c.request(
         reqwest::Method::GET,
         &format!("/api/crf/forms/{id}/details"),
@@ -277,7 +356,12 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/api/crf/versions/7/forms"))
-            .respond_with(ResponseTemplate::new(201).set_body_json(form_view_json(11, 7, "AE", "Adverse Events")))
+            .respond_with(ResponseTemplate::new(201).set_body_json(form_view_json(
+                11,
+                7,
+                "AE",
+                "Adverse Events",
+            )))
             .mount(&server)
             .await;
         let f = create(
@@ -305,7 +389,9 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("PATCH"))
             .and(path("/api/crf/forms/11"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(form_view_json(11, 7, "AE", "Renamed")))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(form_view_json(11, 7, "AE", "Renamed")),
+            )
             .mount(&server)
             .await;
         let f = update(
@@ -339,7 +425,12 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("GET"))
             .and(path("/api/crf/forms/11"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(form_view_json(11, 7, "AE", "Adverse Events")))
+            .respond_with(ResponseTemplate::new(200).set_body_json(form_view_json(
+                11,
+                7,
+                "AE",
+                "Adverse Events",
+            )))
             .mount(&server)
             .await;
         let f = get_by_id(&client(&server), 11).await.unwrap();

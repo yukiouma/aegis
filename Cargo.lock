@@ -12,9 +12,11 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 name = "aegis-desktop"
 version = "0.1.0"
 dependencies = [
+ "als-resolver",
  "async-trait",
  "base64 0.22.1",
  "chrono",
+ "entities",
  "reqwest",
  "serde",
  "serde_json",
@@ -23,7 +25,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "tauri-plugin-store",
- "terminology 0.1.0 (git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.1)",
+ "terminology 0.1.0 (git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.4)",
  "thiserror 2.0.19",
  "tokio",
  "windows-utils",
@@ -91,6 +93,17 @@ name = "allocator-api2"
 version = "0.2.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "683d7910e743518b0e34f1186f92494becacb047c7b6bf616c96772180fef923"
+
+[[package]]
+name = "als-resolver"
+version = "0.1.0"
+source = "git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.4#ac2910caafcea2401c6fd98238a7500f5c758912"
+dependencies = [
+ "calamine",
+ "entities",
+ "quick-xml 0.40.1",
+ "thiserror 2.0.19",
+]
 
 [[package]]
 name = "android_system_properties"
@@ -1437,6 +1450,11 @@ name = "endi"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
+
+[[package]]
+name = "entities"
+version = "0.1.0"
+source = "git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.4#ac2910caafcea2401c6fd98238a7500f5c758912"
 
 [[package]]
 name = "enumflags2"
@@ -3659,6 +3677,15 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
+version = "0.40.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2474bd2e5029e7ccb6abb2ba48cf2383a333851dedf495901544281590c7da7f"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
+name = "quick-xml"
 version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1"
@@ -5354,7 +5381,7 @@ dependencies = [
 [[package]]
 name = "terminology"
 version = "0.1.0"
-source = "git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.1#f132d62e50026c4b3e99f2fd48ac3ed115f52ac3"
+source = "git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.4#ac2910caafcea2401c6fd98238a7500f5c758912"
 dependencies = [
  "calamine",
  "serde",
