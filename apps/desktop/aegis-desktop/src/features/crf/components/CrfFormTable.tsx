@@ -207,7 +207,19 @@ export function CrfFormTable({
   const [internalOrder, setInternalOrder] = useState<number[] | null>(null);
 
   const orderedIds = useMemo(() => {
-    if (internalOrder) return internalOrder;
+    // `internalOrder` is the user's local override after a drag-and-drop.
+    // It only applies to the rows it describes — if the rows prop changes
+    // (version switch, row delete, row create) the override must fall
+    // back to the server order. Without this guard, ids from the previous
+    // version linger in `orderedIds`, `rowById.get(id)` returns undefined,
+    // and the new version renders empty.
+    if (internalOrder != null) {
+      const rowIds = new Set(rows.map((r) => r.id));
+      const isPermutation =
+        internalOrder.length === rows.length &&
+        internalOrder.every((id) => rowIds.has(id));
+      if (isPermutation) return internalOrder;
+    }
     return rows.map((r) => r.id);
   }, [rows, internalOrder]);
 
@@ -232,8 +244,8 @@ export function CrfFormTable({
         onReorder(next);
       }}
     >
-      <TableContainer component={Paper}>
-        <Table size="small">
+      <TableContainer component={Paper} sx={{ maxHeight: "calc(100vh - 120px)" }} >
+        <Table size="small" stickyHeader >
           <TableHead>
             <TableRow>
               <TableCell sx={{ width: 40 }} />

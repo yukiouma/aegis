@@ -20,10 +20,10 @@ export function CrfAnnotationArea({
   onEdit,
   onDelete,
 }: Props) {
-  if (annotations.length === 0) return null;
+
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1, height: "20px" }}>
+      {annotations.length === 0 ? null : <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
         {annotations.map((a) => (
           <AnnotationChip
             key={a.id}
@@ -33,7 +33,8 @@ export function CrfAnnotationArea({
             onDelete={() => onDelete(a)}
           />
         ))}
-      </Stack>
+      </Stack>}
+
     </Box>
   );
 }

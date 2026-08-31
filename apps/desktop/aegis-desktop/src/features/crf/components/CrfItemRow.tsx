@@ -87,9 +87,9 @@ export function CrfItemRow({
   const clickableSx = rowBlocked
     ? undefined
     : {
-        cursor: "pointer" as const,
-        "&:hover": { textDecoration: "underline" },
-      };
+      cursor: "pointer" as const,
+      "&:hover": { textDecoration: "underline" },
+    };
   return (
     <Box
       sx={{
@@ -112,7 +112,7 @@ export function CrfItemRow({
           flexWrap: "wrap",
         }}
       >
-        <Chip label={item.code} variant="outlined" size="small" />
+        <Chip sx={{ width: 85 }} label={item.code} variant="outlined" size="small" />
         <Typography
           variant="subtitle1"
           sx={clickableSx}
