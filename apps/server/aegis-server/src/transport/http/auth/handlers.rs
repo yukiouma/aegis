@@ -169,7 +169,7 @@ mod tests {
     use tower::ServiceExt;
 
     use crate::state::test_support::{
-        NullCrfService, NullDomainModelService, NullTerminologyService,
+        NullCrfService, NullDomainModelService, NullMissionService, NullTerminologyService,
     };
 
     use apis::auth::{
@@ -369,6 +369,7 @@ mod tests {
                 as Arc<dyn apis::terminology::TerminologyService>,
             domain_model: Arc::new(NullDomainModelService)
                 as Arc<dyn apis::domain_model::DomainModelService>,
+            mission: Arc::new(NullMissionService) as Arc<dyn apis::mission::MissionService>,
             crf: Arc::new(NullCrfService) as Arc<dyn apis::crf::CrfService>,
         }
     }

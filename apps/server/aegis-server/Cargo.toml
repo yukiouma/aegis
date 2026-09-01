@@ -71,6 +71,12 @@ terminology = { path = "../../../lib/crates/terminology" }
 # the DomainModelUsecase, and the apis::DomainModelService adapter
 # that the HTTP layer consumes through AppState.
 domain-model = { path = "../../../lib/crates/domain-model" }
+# mission provides the mission Postgres repositories (mission +
+#assignee), the MissionUsecase, and the apis::MissionService adapter
+# that the HTTP layer consumes through AppState. Authorization
+# reuses the apis::project::ProjectService port to check leader
+# membership on the owning project.
+mission = { path = "../../../lib/crates/mission" }
 # crf provides the Case Report Form Postgres repositories, the
 # CrfUsecase, and the apis::crf::CrfService adapter that the HTTP
 # layer consumes through AppState.

@@ -1868,6 +1868,165 @@ pub struct CrfFragmentQuery {
     pub fragment: String,
 }
 
+// ===========================================================================
+// Mission wire DTOs
+// ===========================================================================
+//
+// Wire projections of `apis::mission::*`. Handlers translate at the
+// boundary so the apis crate stays free of serde / utoipa derives.
+// Mission handlers authorize by checking leader membership of the
+// owning project — there is no separate role gate.
+
+/// Wire enum mirroring [`apis::mission::MissionKind`]. JSON spelling
+/// is `snake_case` (`crf`, `sdtm`, `adam`, `tfl`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MissionKind {
+    Crf,
+    Sdtm,
+    Adam,
+    Tfl,
+}
+
+impl From<apis::mission::MissionKind> for MissionKind {
+    fn from(k: apis::mission::MissionKind) -> Self {
+        match k {
+            apis::mission::MissionKind::Crf => Self::Crf,
+            apis::mission::MissionKind::Sdtm => Self::Sdtm,
+            apis::mission::MissionKind::Adam => Self::Adam,
+            apis::mission::MissionKind::Tfl => Self::Tfl,
+        }
+    }
+}
+
+impl From<MissionKind> for apis::mission::MissionKind {
+    fn from(k: MissionKind) -> Self {
+        match k {
+            MissionKind::Crf => apis::mission::MissionKind::Crf,
+            MissionKind::Sdtm => apis::mission::MissionKind::Sdtm,
+            MissionKind::Adam => apis::mission::MissionKind::Adam,
+            MissionKind::Tfl => apis::mission::MissionKind::Tfl,
+        }
+    }
+}
+
+/// Wire enum mirroring [`apis::mission::MissionRole`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MissionRole {
+    Dev,
+    Qc,
+}
+
+impl From<apis::mission::MissionRole> for MissionRole {
+    fn from(r: apis::mission::MissionRole) -> Self {
+        match r {
+            apis::mission::MissionRole::Dev => Self::Dev,
+            apis::mission::MissionRole::Qc => Self::Qc,
+        }
+    }
+}
+
+impl From<MissionRole> for apis::mission::MissionRole {
+    fn from(r: MissionRole) -> Self {
+        match r {
+            MissionRole::Dev => apis::mission::MissionRole::Dev,
+            MissionRole::Qc => apis::mission::MissionRole::Qc,
+        }
+    }
+}
+
+/// One assignee entry inside a [`CreateMissionRequest`] or a
+/// standalone `add_assignee` call.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AssigneeDataRequest {
+    pub user_code: String,
+    pub role: MissionRole,
+}
+
+/// Body for `POST /api/mission`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateMissionRequest {
+    pub project_code: String,
+    pub mission_kind: MissionKind,
+    pub mission_code: String,
+    #[serde(default)]
+    pub assignees: Vec<AssigneeDataRequest>,
+}
+
+/// Wire projection of [`apis::mission::AssigneeView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AssigneeViewResponse {
+    pub id: i64,
+    pub user_code: String,
+    pub role: MissionRole,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::mission::AssigneeView> for AssigneeViewResponse {
+    fn from(v: apis::mission::AssigneeView) -> Self {
+        Self {
+            id: v.id,
+            user_code: v.user_code,
+            role: v.role.into(),
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+/// Wire projection of [`apis::mission::MissionView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MissionViewResponse {
+    pub id: i64,
+    pub project_code: String,
+    pub mission_kind: MissionKind,
+    pub mission_code: String,
+    pub assignees: Vec<AssigneeViewResponse>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::mission::MissionView> for MissionViewResponse {
+    fn from(v: apis::mission::MissionView) -> Self {
+        Self {
+            id: v.id,
+            project_code: v.project_code,
+            mission_kind: v.mission_kind.into(),
+            mission_code: v.mission_code,
+            assignees: v.assignees.into_iter().map(Into::into).collect(),
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+/// Wrapper for the two mission list endpoints.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MissionListResponse {
+    pub missions: Vec<MissionViewResponse>,
+}
+
+/// Query for `GET /api/mission/by-project/{project_code}`. The
+/// optional `kind` query parameter narrows the result set to a
+/// single `MissionKind`. `kind` is captured as `String` at the wire
+/// so a malformed value can be surfaced as a `400` via
+/// `MissionApiError::Validation` instead of a deserializer 422 —
+/// see the handler.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MissionByProjectQuery {
+    pub project_code: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -13,6 +13,7 @@ pub struct AppState {
     pub project: Arc<dyn apis::project::ProjectService>,
     pub terminology: Arc<dyn apis::terminology::TerminologyService>,
     pub domain_model: Arc<dyn apis::domain_model::DomainModelService>,
+    pub mission: Arc<dyn apis::mission::MissionService>,
     pub crf: Arc<dyn apis::crf::CrfService>,
 }
 
@@ -258,6 +259,66 @@ pub(crate) mod test_support {
             &self,
             _id: i64,
         ) -> Result<(), apis::domain_model::DomainModelApiError> {
+            unimplemented!()
+        }
+    }
+
+    /// Null mission service for tests that don't exercise the
+    /// mission surface. Every method panics with `unimplemented!()`
+    /// — the corresponding handler is never reached because the
+    /// test either uses a different route or short-circuits on auth
+    /// / role checks before the usecase is invoked.
+    #[derive(Clone)]
+    pub(crate) struct NullMissionService;
+
+    #[async_trait]
+    impl apis::mission::MissionService for NullMissionService {
+        async fn create_mission(
+            &self,
+            _actor: &apis::mission::Actor,
+            _req: apis::mission::CreateMissionRequest,
+        ) -> Result<apis::mission::MissionView, apis::mission::MissionApiError> {
+            unimplemented!()
+        }
+        async fn get_mission_by_id(
+            &self,
+            _id: i64,
+        ) -> Result<apis::mission::MissionView, apis::mission::MissionApiError> {
+            unimplemented!()
+        }
+        async fn list_missions_by_project(
+            &self,
+            _req: apis::mission::ListMissionsByProjectRequest,
+        ) -> Result<Vec<apis::mission::MissionView>, apis::mission::MissionApiError> {
+            unimplemented!()
+        }
+        async fn list_missions_by_user(
+            &self,
+            _req: apis::mission::ListMissionsByUserRequest,
+        ) -> Result<Vec<apis::mission::MissionView>, apis::mission::MissionApiError> {
+            unimplemented!()
+        }
+        async fn delete_mission(
+            &self,
+            _actor: &apis::mission::Actor,
+            _id: i64,
+        ) -> Result<(), apis::mission::MissionApiError> {
+            unimplemented!()
+        }
+        async fn add_assignee(
+            &self,
+            _actor: &apis::mission::Actor,
+            _mission_id: i64,
+            _data: apis::mission::AssigneeData,
+        ) -> Result<apis::mission::AssigneeView, apis::mission::MissionApiError> {
+            unimplemented!()
+        }
+        async fn remove_assignee(
+            &self,
+            _actor: &apis::mission::Actor,
+            _mission_id: i64,
+            _assignee_id: i64,
+        ) -> Result<(), apis::mission::MissionApiError> {
             unimplemented!()
         }
     }

@@ -41,7 +41,7 @@ use crate::transport::http::error::ErrorBody;
     info(
         title = "aegis-server API",
         version = "0.1.0",
-        description = "HTTP transport for the aegis auth + user services."
+        description = "HTTP transport for the aegis auth + user + project + terminology + domain-model + crf + mission services."
     ),
     modifiers(&SecurityAddon),
     components(schemas(
@@ -145,6 +145,14 @@ use crate::transport::http::error::ErrorBody;
         dto::UpdateDomainAnnotationRequest,
         dto::CreateAnnotationRequest,
         dto::UpdateAnnotationRequest,
+        dto::MissionKind,
+        dto::MissionRole,
+        dto::AssigneeDataRequest,
+        dto::CreateMissionRequest,
+        dto::AssigneeViewResponse,
+        dto::MissionViewResponse,
+        dto::MissionListResponse,
+        dto::MissionByProjectQuery,
         ErrorBody,
     )),
     tags(
@@ -156,6 +164,7 @@ use crate::transport::http::error::ErrorBody;
         (name = "terminology", description = "Terminology version / codelist / codeitem endpoints"),
         (name = "domain-model", description = "SDTM domain model version / domain / variable endpoints"),
         (name = "crf", description = "Case Report Form version / form / item / option / unit / annotation endpoints"),
+        (name = "mission", description = "Mission lifecycle endpoints (leader-only writes)"),
     ),
 )]
 pub struct ApiDoc;
@@ -319,6 +328,14 @@ mod tests {
             "UpdateDomainAnnotationRequest",
             "CreateAnnotationRequest",
             "UpdateAnnotationRequest",
+            "MissionKind",
+            "MissionRole",
+            "AssigneeDataRequest",
+            "CreateMissionRequest",
+            "AssigneeViewResponse",
+            "MissionViewResponse",
+            "MissionListResponse",
+            "MissionByProjectQuery",
         ] {
             let entry: &RefOr<_> = schemas
                 .get(name)

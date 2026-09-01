@@ -7,6 +7,8 @@
 //! [`MissionApiError`]) live alongside the trait so a single
 //! `use apis::mission::*;` brings the whole contract into scope.
 
+use std::str::FromStr;
+
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use thiserror::Error;
@@ -23,6 +25,22 @@ pub enum MissionKind {
     Sdtm,
     Adam,
     Tfl,
+}
+
+impl FromStr for MissionKind {
+    type Err = MissionApiError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "crf" => Ok(MissionKind::Crf),
+            "sdtm" => Ok(MissionKind::Sdtm),
+            "adam" => Ok(MissionKind::Adam),
+            "tfl" => Ok(MissionKind::Tfl),
+            other => Err(MissionApiError::Validation(format!(
+                "unknown mission kind: {}",
+                other
+            ))),
+        }
+    }
 }
 
 /// Role the assignee plays on the mission.
@@ -171,11 +189,7 @@ pub trait MissionService: Send + Sync {
         req: ListMissionsByUserRequest,
     ) -> Result<Vec<MissionView>, MissionApiError>;
 
-    async fn delete_mission(
-        &self,
-        actor: &Actor,
-        id: i64,
-    ) -> Result<(), MissionApiError>;
+    async fn delete_mission(&self, actor: &Actor, id: i64) -> Result<(), MissionApiError>;
 
     async fn add_assignee(
         &self,
