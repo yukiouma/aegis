@@ -193,6 +193,7 @@ fn build_app(pool: PgPool) -> Router {
             as Arc<dyn apis::terminology::TerminologyService>,
         domain_model: Arc::new(NullDomainModelService)
             as Arc<dyn apis::domain_model::DomainModelService>,
+        mission: Arc::new(NullMissionService) as Arc<dyn apis::mission::MissionService>,
         crf: Arc::new(NullCrfService) as Arc<dyn apis::crf::CrfService>,
     };
 
@@ -1132,6 +1133,64 @@ impl apis::crf::CrfService for NullCrfService {
         &self,
         _req: apis::crf::SearchAnnotationsByVersionRequest,
     ) -> Result<Vec<apis::crf::AnnotationView>, apis::crf::CrfApiError> {
+        unimplemented!()
+    }
+}
+
+/// Stub [`apis::mission::MissionService`] for the live-DB auth test.
+/// Every method `unimplemented!()`s — this test never exercises
+/// mission routes.
+#[derive(Clone)]
+struct NullMissionService;
+
+#[async_trait]
+impl apis::mission::MissionService for NullMissionService {
+    async fn create_mission(
+        &self,
+        _actor: &apis::mission::Actor,
+        _req: apis::mission::CreateMissionRequest,
+    ) -> Result<apis::mission::MissionView, apis::mission::MissionApiError> {
+        unimplemented!()
+    }
+    async fn get_mission_by_id(
+        &self,
+        _id: i64,
+    ) -> Result<apis::mission::MissionView, apis::mission::MissionApiError> {
+        unimplemented!()
+    }
+    async fn list_missions_by_project(
+        &self,
+        _req: apis::mission::ListMissionsByProjectRequest,
+    ) -> Result<Vec<apis::mission::MissionView>, apis::mission::MissionApiError> {
+        unimplemented!()
+    }
+    async fn list_missions_by_user(
+        &self,
+        _req: apis::mission::ListMissionsByUserRequest,
+    ) -> Result<Vec<apis::mission::MissionView>, apis::mission::MissionApiError> {
+        unimplemented!()
+    }
+    async fn delete_mission(
+        &self,
+        _actor: &apis::mission::Actor,
+        _id: i64,
+    ) -> Result<(), apis::mission::MissionApiError> {
+        unimplemented!()
+    }
+    async fn add_assignee(
+        &self,
+        _actor: &apis::mission::Actor,
+        _mission_id: i64,
+        _data: apis::mission::AssigneeData,
+    ) -> Result<apis::mission::AssigneeView, apis::mission::MissionApiError> {
+        unimplemented!()
+    }
+    async fn remove_assignee(
+        &self,
+        _actor: &apis::mission::Actor,
+        _mission_id: i64,
+        _assignee_id: i64,
+    ) -> Result<(), apis::mission::MissionApiError> {
         unimplemented!()
     }
 }

@@ -11,6 +11,7 @@
 //! - `/api/terminology/*`                terminology CRUD
 //! - `/api/domain-model/*`               SDTM domain model CRUD
 //! - `/api/crf/*`                        Case Report Form CRUD
+//! - `/api/mission/*`                    Mission CRUD (leader-only writes)
 //! - `/healthz`                         liveness probe
 //! - `/swagger-ui/`                      swagger-ui HTML
 //! - `/swagger-ui/{*rest}`               swagger-ui assets
@@ -28,6 +29,7 @@ use crate::transport::http::auth;
 use crate::transport::http::crf::router as crf_router;
 use crate::transport::http::domain_model::router as domain_model_router;
 use crate::transport::http::healthz;
+use crate::transport::http::mission::router as mission_router;
 use crate::transport::http::openapi::ApiDoc;
 use crate::transport::http::project::router as project_router;
 use crate::transport::http::terminology::router as terminology_router;
@@ -46,13 +48,15 @@ pub fn router(state: AppState) -> axum::Router {
     let terminology_routes = terminology_router::router();
     let domain_model_routes = domain_model_router::router();
     let crf_routes = crf_router::router();
+    let mission_routes = mission_router::router();
     let api_routers = OpenApiRouter::new()
         .nest("/auth", auth::router())
         .nest("/user", user::router())
         .nest("/project", project_routes)
         .nest("/terminology", terminology_routes)
         .nest("/domain-model", domain_model_routes)
-        .nest("/crf", crf_routes);
+        .nest("/crf", crf_routes)
+        .nest("/mission", mission_routes);
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/api", api_routers)
@@ -330,6 +334,8 @@ mod tests {
                 as Arc<dyn apis::terminology::TerminologyService>,
             domain_model: Arc::new(crate::state::test_support::NullDomainModelService)
                 as Arc<dyn apis::domain_model::DomainModelService>,
+            mission: Arc::new(crate::state::test_support::NullMissionService)
+                as Arc<dyn apis::mission::MissionService>,
             crf: Arc::new(crate::state::test_support::NullCrfService)
                 as Arc<dyn apis::crf::CrfService>,
         }
@@ -347,6 +353,8 @@ mod tests {
                 as Arc<dyn apis::terminology::TerminologyService>,
             domain_model: Arc::new(crate::state::test_support::NullDomainModelService)
                 as Arc<dyn apis::domain_model::DomainModelService>,
+            mission: Arc::new(crate::state::test_support::NullMissionService)
+                as Arc<dyn apis::mission::MissionService>,
             crf: Arc::new(crate::state::test_support::NullCrfService)
                 as Arc<dyn apis::crf::CrfService>,
         }
@@ -363,6 +371,8 @@ mod tests {
                 as Arc<dyn apis::terminology::TerminologyService>,
             domain_model: Arc::new(crate::state::test_support::NullDomainModelService)
                 as Arc<dyn apis::domain_model::DomainModelService>,
+            mission: Arc::new(crate::state::test_support::NullMissionService)
+                as Arc<dyn apis::mission::MissionService>,
             crf: Arc::new(crate::state::test_support::NullCrfService)
                 as Arc<dyn apis::crf::CrfService>,
         }
@@ -1179,6 +1189,8 @@ mod tests {
                 as Arc<dyn apis::terminology::TerminologyService>,
             domain_model: Arc::new(crate::state::test_support::NullDomainModelService)
                 as Arc<dyn apis::domain_model::DomainModelService>,
+            mission: Arc::new(crate::state::test_support::NullMissionService)
+                as Arc<dyn apis::mission::MissionService>,
             crf: Arc::new(crate::state::test_support::NullCrfService)
                 as Arc<dyn apis::crf::CrfService>,
         }
@@ -1676,6 +1688,8 @@ mod tests {
                 as Arc<dyn apis::terminology::TerminologyService>,
             domain_model: Arc::new(crate::state::test_support::NullDomainModelService)
                 as Arc<dyn apis::domain_model::DomainModelService>,
+            mission: Arc::new(crate::state::test_support::NullMissionService)
+                as Arc<dyn apis::mission::MissionService>,
             crf: Arc::new(StubCrfService) as Arc<dyn apis::crf::CrfService>,
         }
     }

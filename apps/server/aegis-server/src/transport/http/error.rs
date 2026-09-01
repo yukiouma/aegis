@@ -54,6 +54,9 @@ pub enum ApiError {
     #[error("{0}")]
     Crf(#[from] apis::crf::CrfApiError),
 
+    #[error("{0}")]
+    Mission(#[from] apis::mission::MissionApiError),
+
     #[error("admin or root role required")]
     Forbidden,
 }
@@ -68,6 +71,7 @@ impl ApiError {
             Self::Terminology(e) => terminology_status(e),
             Self::DomainModel(e) => domain_model_status(e),
             Self::Crf(e) => crf_status(e),
+            Self::Mission(e) => mission_status(e),
             Self::Forbidden => StatusCode::FORBIDDEN,
         }
     }
@@ -81,6 +85,7 @@ impl ApiError {
             Self::Terminology(e) => terminology_code(e),
             Self::DomainModel(e) => domain_model_code(e),
             Self::Crf(e) => crf_code(e),
+            Self::Mission(e) => mission_code(e),
             Self::Forbidden => "forbidden",
         }
     }
@@ -269,6 +274,37 @@ fn crf_code(e: &apis::crf::CrfApiError) -> &'static str {
         CrfApiError::EmptySearchFragment => "empty_search_fragment",
         CrfApiError::KindShapeViolation { .. } => "kind_shape_violation",
         CrfApiError::Repository(_) => "repository_error",
+    }
+}
+
+fn mission_status(e: &apis::mission::MissionApiError) -> StatusCode {
+    use apis::mission::MissionApiError;
+    match e {
+        MissionApiError::Validation(_) => StatusCode::BAD_REQUEST,
+        MissionApiError::NotFound | MissionApiError::AssigneeNotFound => StatusCode::NOT_FOUND,
+        MissionApiError::ProjectNotFound(_) | MissionApiError::UserNotFound(_) => {
+            StatusCode::NOT_FOUND
+        }
+        MissionApiError::Forbidden { .. } => StatusCode::FORBIDDEN,
+        MissionApiError::DuplicateMission { .. } | MissionApiError::DuplicateAssignee { .. } => {
+            StatusCode::CONFLICT
+        }
+        MissionApiError::Repository(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn mission_code(e: &apis::mission::MissionApiError) -> &'static str {
+    use apis::mission::MissionApiError;
+    match e {
+        MissionApiError::Validation(_) => "validation_failed",
+        MissionApiError::NotFound => "not_found",
+        MissionApiError::AssigneeNotFound => "assignee_not_found",
+        MissionApiError::ProjectNotFound(_) => "project_not_found",
+        MissionApiError::UserNotFound(_) => "user_not_found",
+        MissionApiError::Forbidden { .. } => "forbidden",
+        MissionApiError::DuplicateMission { .. } => "duplicate_mission",
+        MissionApiError::DuplicateAssignee { .. } => "duplicate_assignee",
+        MissionApiError::Repository(_) => "repository_error",
     }
 }
 

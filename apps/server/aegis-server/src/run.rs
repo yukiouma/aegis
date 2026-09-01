@@ -13,6 +13,7 @@ use std::time::Duration;
 use apis::auth::AuthService;
 use apis::crf::CrfService;
 use apis::domain_model::DomainModelService;
+use apis::mission::MissionService;
 use apis::terminology::TerminologyService;
 use apis::user::UserService;
 use auth::{
@@ -27,6 +28,10 @@ use crf::{
 use domain_model::{
     DomainModelServiceImpl, DomainModelUsecase, DomainModelUsecaseConfig, SdtmDomainRepoPg,
     SdtmVariableRepoPg, SdtmVersionRepoPg,
+};
+use mission::{
+    AssigneeRepo, MissionRepo, MissionServiceImpl, MissionUsecase, MissionUsecaseConfig,
+    ProjectLookupImpl as MissionProjectLookupImpl, UserLookupImpl as MissionUserLookupImpl,
 };
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
@@ -57,6 +62,7 @@ pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send 
     let project = build_project_service(pool.clone(), user.clone());
     let terminology = build_terminology_service(pool.clone());
     let domain_model = build_domain_model_service(pool.clone());
+    let mission = build_mission_service(pool.clone(), project.clone(), user.clone());
     let crf = build_crf_service(pool, project.clone());
 
     let state = AppState {
@@ -65,6 +71,7 @@ pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send 
         project,
         terminology,
         domain_model,
+        mission,
         crf,
     };
     let app = transport::http::router(state);
@@ -269,6 +276,31 @@ fn build_crf_service(
         projects,
         Arc::new(bulk_form_repo),
     ))
+}
+
+/// Wire the mission crate's adapters into the apis
+/// `MissionService` trait object. Two Postgres repos share the
+/// same pool as the rest of the server; the project + user
+/// lookups are bridged off the shared `ProjectService` /
+/// `UserService` so leader-membership checks reuse the canonical
+/// tables and leader authorization stays a single source of
+/// truth.
+fn build_mission_service(
+    pool: PgPool,
+    project: Arc<dyn apis::project::ProjectService>,
+    user: Arc<dyn UserService>,
+) -> Arc<dyn MissionService> {
+    let mission_repo = MissionRepo::new(pool.clone());
+    let assignee_repo = AssigneeRepo::new(pool);
+    let projects = MissionProjectLookupImpl::new(project);
+    let users = MissionUserLookupImpl::new(user);
+    let usecase = MissionUsecase::new(MissionUsecaseConfig {
+        mission_repo,
+        assignee_repo,
+        project_lookup: projects,
+        user_lookup: users,
+    });
+    Arc::new(MissionServiceImpl::from_usecase(usecase))
 }
 
 #[cfg(test)]
