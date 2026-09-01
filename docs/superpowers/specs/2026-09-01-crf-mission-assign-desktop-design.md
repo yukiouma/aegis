@@ -98,10 +98,17 @@ authoritative gate.
 
 | Command | Input | Output |
 |---|---|---|
-| `list_missions_by_project` | `{ projectCode: string, kind?: string }` | `MissionListResponse` |
-| `add_assignee` | `{ missionId: i64, userCode: string, role: string }` | `AssigneeViewResponse` |
-| `remove_assignee` | `{ missionId: i64, assigneeId: i64 }` | `()` (204 No Content) |
-| `create_mission` | `{ projectCode, missionKind, missionCode, assignees[] }` | `MissionViewResponse` |
+| `list_missions_by_project` | `{ projectCode: string, kind?: Option<String> }` | `MissionListResponse` |
+| `add_assignee` | `{ mission_id: i64, user_code: String, role: String }` | `AssigneeViewResponse` |
+| `remove_assignee` | `{ mission_id: i64, assignee_id: i64 }` | `()` (204 No Content) |
+| `create_mission` | `{ project_code: String, mission_kind: String, mission_code: String, assignees: Vec<AssigneeDataArg> }` | `MissionViewResponse` |
+
+The `kind` / `mission_kind` / `role` fields are passed through as
+`String` at the command boundary (Tauri serde deserializes JSON
+directly). The `http/mission.rs` adapter parses them into the typed
+`apis::mission::{MissionKind, MissionRole}` enums and surfaces
+`ApiError::Mission(Validation)` on bad input — matching the
+server-side handler's pattern.
 
 All commands accept an injected `State<HttpClient>` and translate the
 wire DTO through the `http/mission.rs` adapter. The Rust DTOs in
@@ -201,10 +208,12 @@ features/mission/
   index.ts               # re-exports
 ```
 
-All three mutation hooks invalidate
-`queryKeys.mission.byProject(projectCode, "crf")` on success. The
-invalidating project code is captured via the closure of the hook
-factory (the call site passes `projectCode`).
+All three mutation hooks (`useAddAssignee`, `useRemoveAssignee`,
+`useCreateMission`) are factory-style: each takes `projectCode` as
+an argument and uses it in the `onSuccess` closure to invalidate
+`queryKeys.mission.byProject(projectCode, "crf")`. The call site
+captures `projectCode` once at the top of the page / drawer body
+and threads it through.
 
 `useListMissionsByProject(projectCode, "crf")` returns
 `useQuery<MissionView[], ApiError>` keyed on
@@ -304,10 +313,14 @@ Right-anchored drawer, `width: 480`, mirroring `ProjectDrawer` style:
 |---|---|
 | `useListMissionsByProject(projectCode, "crf")` | Look up this form's mission |
 | `useListUsers()` | Resolve `userCode` → display name |
-| `useProject(projectCode)` (existing pattern at `features/project-list/data/projects.ts:34-47`) | Get project members for the user dropdown |
-| `useCreateMission()` | Implicit mission creation on first add |
-| `useAddAssignee()` | Add assignee mutation |
-| `useRemoveAssignee()` | Remove assignee mutation |
+| `useListProjects()` filtered by `code === projectCode` | Get project members for the user dropdown (same data source as `useIsProjectLeader`) |
+| `useCreateMission(projectCode)` | Implicit mission creation on first add; invalidates `mission.byProject(projectCode, "crf")` on success |
+| `useAddAssignee(projectCode)` | Add assignee mutation; invalidates `mission.byProject(projectCode, "crf")` on success |
+| `useRemoveAssignee(projectCode)` | Remove assignee mutation; invalidates `mission.byProject(projectCode, "crf")` on success |
+
+All three mutation hooks are factory-style: the call site passes
+`projectCode` so the `onSuccess` invalidation closure knows which
+query key to bust. (See §6 for the invalidation pattern.)
 
 ### Implicit mission-creation flow
 
@@ -481,7 +494,7 @@ Each `features/mission/data/*.ts` has a sibling `*.test.ts`:
 - `apps/desktop/aegis-desktop/src/features/mission/data/create-mission.test.ts`
 - `apps/desktop/aegis-desktop/src/features/mission/data/leader.test.ts`
 
-**Modified (10 files):**
+**Modified (12 files):**
 
 - `apps/desktop/aegis-desktop/src-tauri/src/commands/mod.rs` (register `mission` module)
 - `apps/desktop/aegis-desktop/src-tauri/src/http/dto.rs` (add mission DTOs)
@@ -517,12 +530,11 @@ Each `features/mission/data/*.ts` has a sibling `*.test.ts`:
 13. `CrfFormListPage.tsx` wiring
 14. `CrfFormTable.tsx` assignee cell + leader gate
 15. `crf-form-table.test.tsx` updates + new cases
-16. i18n column/action rename in en.ts + zhCN.ts
+16. i18n: column/action rename + `crf.missionAssign.*` strings in en.ts + zhCN.ts (single edit per file)
 17. `CrfMissionAssignDrawer.tsx` + test
 18. Delete `CrfAssignTakersDrawer.tsx`
-19. Add `crf.missionAssign.*` strings to en.ts + zhCN.ts
 
-Each phase ends with `cargo clippy -p aegis-desktop --all-targets --all-features -- -D warnings`, `cargo fmt --all -- --check`, `pnpm --filter aegis-desktop typecheck`, `pnpm --filter aegis-desktop test`.
+Each step ends with `cargo clippy -p aegis-desktop --all-targets --all-features -- -D warnings`, `cargo fmt --all -- --check`, `pnpm --filter aegis-desktop typecheck`, `pnpm --filter aegis-desktop test`.
 
 ## 14. Out of scope reminder
 
