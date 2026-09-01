@@ -22,9 +22,12 @@ pub struct ListMissionsByProjectArgs {
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AddAssigneeArgs {
+    // The frontend wraps the payload under `body`, matching the
+    // `body: SomeStruct` convention used by create_crf_form /
+    // update_crf_form / etc. Tauri maps the JSON `body` field to this
+    // parameter directly.
     pub mission_id: i64,
-    pub user_code: String,
-    pub role: String,
+    pub body: AssigneeDataArg,
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -51,13 +54,15 @@ pub struct CreateMissionArgs {
 }
 
 fn parse_kind(s: &str) -> Result<crate::http::mission::MissionKind, ApiError> {
-    serde_json::from_value(serde_json::Value::String(s.to_string()))
-        .map_err(|e| ApiError::Parse { message: e.to_string() })
+    serde_json::from_value(serde_json::Value::String(s.to_string())).map_err(|e| ApiError::Parse {
+        message: e.to_string(),
+    })
 }
 
 fn parse_role(s: &str) -> Result<crate::http::mission::MissionRole, ApiError> {
-    serde_json::from_value(serde_json::Value::String(s.to_string()))
-        .map_err(|e| ApiError::Parse { message: e.to_string() })
+    serde_json::from_value(serde_json::Value::String(s.to_string())).map_err(|e| ApiError::Parse {
+        message: e.to_string(),
+    })
 }
 
 #[tauri::command]
@@ -77,15 +82,7 @@ pub async fn add_assignee(
     client: State<'_, HttpClient>,
     args: AddAssigneeArgs,
 ) -> Result<AssigneeViewResponse, ApiError> {
-    mission::add_assignee(
-        &client,
-        args.mission_id,
-        AssigneeDataArg {
-            user_code: args.user_code,
-            role: parse_role(&args.role)?,
-        },
-    )
-    .await
+    mission::add_assignee(&client, args.mission_id, args.body).await
 }
 
 #[tauri::command]
@@ -121,4 +118,83 @@ pub async fn create_mission(
         },
     )
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    //! Wire-shape tests for the Tauri argument structs. These pin the
+    //! JSON shape the frontend wrapper produces so a future
+    //! restructuring can't silently desync Rust and TS (this exact
+    //! drift caused `add_assignee` to break against a real Tauri
+    //! runtime before this guard was added).
+
+    use super::*;
+    use crate::http::mission::MissionRole;
+    use serde_json::json;
+
+    #[test]
+    fn add_assignee_args_deserialize_wire_shape_with_body_wrapper() {
+        // Matches `api.addAssignee(...)` in shared/api/index.ts which
+        // emits `{ missionId, body: { userCode, role } }`.
+        let raw = json!({
+            "missionId": 10,
+            "body": { "userCode": "carol", "role": "qc" }
+        });
+        let args: AddAssigneeArgs = serde_json::from_value(raw).unwrap();
+        assert_eq!(args.mission_id, 10);
+        assert_eq!(args.body.user_code, "carol");
+        assert_eq!(args.body.role, MissionRole::Qc);
+    }
+
+    #[test]
+    fn remove_assignee_args_deserialize_flat_shape() {
+        let raw = json!({ "missionId": 10, "assigneeId": 100 });
+        let args: RemoveAssigneeArgs = serde_json::from_value(raw).unwrap();
+        assert_eq!(args.mission_id, 10);
+        assert_eq!(args.assignee_id, 100);
+    }
+
+    #[test]
+    fn list_missions_by_project_args_deserialize_flat_shape() {
+        let raw = json!({ "projectCode": "alpha", "kind": "crf" });
+        let args: ListMissionsByProjectArgs = serde_json::from_value(raw).unwrap();
+        assert_eq!(args.project_code, "alpha");
+        assert_eq!(args.kind.as_deref(), Some("crf"));
+    }
+
+    #[test]
+    fn create_mission_args_deserialize_flat_shape_with_nested_assignees() {
+        let raw = json!({
+            "projectCode": "alpha",
+            "missionKind": "crf",
+            "missionCode": "VS",
+            "assignees": [{ "userCode": "carol", "role": "qc" }]
+        });
+        let args: CreateMissionArgs = serde_json::from_value(raw).unwrap();
+        assert_eq!(args.project_code, "alpha");
+        assert_eq!(args.mission_kind, "crf");
+        assert_eq!(args.mission_code, "VS");
+        assert_eq!(args.assignees.len(), 1);
+        assert_eq!(args.assignees[0].user_code, "carol");
+        assert_eq!(args.assignees[0].role, "qc");
+    }
+
+    #[test]
+    fn add_assignee_args_rejects_flat_user_code_role_shape() {
+        // Regression guard: the *old* `AddAssigneeArgs` flattened the
+        // body into top-level `user_code` / `role` fields, which would
+        // succeed against the old struct but does NOT match what the
+        // frontend actually sends. With the new `body:` wrapper, this
+        // shape must fail to deserialize.
+        let raw = json!({
+            "missionId": 10,
+            "userCode": "carol",
+            "role": "qc"
+        });
+        let result: Result<AddAssigneeArgs, _> = serde_json::from_value(raw);
+        assert!(
+            result.is_err(),
+            "flat userCode/role shape must not parse against the body-wrapped AddAssigneeArgs"
+        );
+    }
 }
