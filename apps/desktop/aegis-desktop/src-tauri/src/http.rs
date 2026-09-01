@@ -10,6 +10,7 @@ pub mod crf;
 pub mod domain_model;
 pub mod dto;
 pub mod healthz;
+pub mod mission;
 pub mod project;
 pub mod terminology;
 pub mod user;
