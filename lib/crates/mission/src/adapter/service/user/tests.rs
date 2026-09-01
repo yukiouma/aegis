@@ -13,10 +13,7 @@ struct FakeUser;
 
 #[async_trait]
 impl UserService for FakeUser {
-    async fn create(
-        &self,
-        _: apis::user::CreateUserRequest,
-    ) -> Result<UserView, UserApiError> {
+    async fn create(&self, _: apis::user::CreateUserRequest) -> Result<UserView, UserApiError> {
         unimplemented!()
     }
     async fn get_by_id(&self, _: i32) -> Result<UserView, UserApiError> {
@@ -36,10 +33,7 @@ impl UserService for FakeUser {
     async fn list(&self) -> Result<Vec<UserView>, UserApiError> {
         unimplemented!()
     }
-    async fn update(
-        &self,
-        _: apis::user::UpdateUserRequest,
-    ) -> Result<UserView, UserApiError> {
+    async fn update(&self, _: apis::user::UpdateUserRequest) -> Result<UserView, UserApiError> {
         unimplemented!()
     }
 }
@@ -48,10 +42,7 @@ struct MissingUser;
 
 #[async_trait]
 impl UserService for MissingUser {
-    async fn create(
-        &self,
-        _: apis::user::CreateUserRequest,
-    ) -> Result<UserView, UserApiError> {
+    async fn create(&self, _: apis::user::CreateUserRequest) -> Result<UserView, UserApiError> {
         unimplemented!()
     }
     async fn get_by_id(&self, _: i32) -> Result<UserView, UserApiError> {
@@ -63,10 +54,7 @@ impl UserService for MissingUser {
     async fn list(&self) -> Result<Vec<UserView>, UserApiError> {
         unimplemented!()
     }
-    async fn update(
-        &self,
-        _: apis::user::UpdateUserRequest,
-    ) -> Result<UserView, UserApiError> {
+    async fn update(&self, _: apis::user::UpdateUserRequest) -> Result<UserView, UserApiError> {
         unimplemented!()
     }
 }

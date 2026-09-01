@@ -92,10 +92,7 @@ async fn create_mission_rejects_unknown_user_in_assignees() {
 #[tokio::test]
 async fn list_missions_by_project_filters_by_kind() {
     let uc = usecase();
-    for (kind, code) in [
-        (MissionKind::Crf, "c1"),
-        (MissionKind::Sdtm, "s1"),
-    ] {
+    for (kind, code) in [(MissionKind::Crf, "c1"), (MissionKind::Sdtm, "s1")] {
         uc.create_mission(
             &Actor {
                 user_code: "alice".into(),

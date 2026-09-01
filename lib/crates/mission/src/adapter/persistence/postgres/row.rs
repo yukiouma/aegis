@@ -4,9 +4,7 @@ use std::str::FromStr;
 use chrono::{DateTime, Utc};
 use sqlx::FromRow;
 
-use crate::domain::{
-    Assignee, DomainError, Mission, MissionKind, MissionRole,
-};
+use crate::domain::{Assignee, DomainError, Mission, MissionKind, MissionRole};
 
 /// Raw row from `missions`. `mission_kind` is read as TEXT and
 /// parsed via `MissionKind::from_str` so the DB CHECK is the

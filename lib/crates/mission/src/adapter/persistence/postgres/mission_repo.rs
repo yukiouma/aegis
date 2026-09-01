@@ -78,7 +78,7 @@ impl MissionRepository for MissionRepo {
         .ok_or(DomainError::NotFound)?;
 
         let assignees = load_assignees(&self.pool, id).await?;
-        Mission::try_from((row, assignees)).map_err(Into::into)
+        Mission::try_from((row, assignees))
     }
 
     async fn list_by_project(
@@ -106,17 +106,16 @@ impl MissionRepository for MissionRepo {
     async fn list_by_user(&self, user_code: &str) -> Result<Vec<Mission>, DomainError> {
         // First fetch the mission ids that have an assignee with
         // `user_code`, then fetch the missions + their assignees.
-        let ids: Vec<i64> = sqlx::QueryBuilder::new(
-            "SELECT DISTINCT mission_id FROM assignees WHERE user_code = ",
-        )
-        .push_bind(user_code)
-        .build_query_as::<(i64,)>()
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_db_error)?
-        .into_iter()
-        .map(|(id,)| id)
-        .collect();
+        let ids: Vec<i64> =
+            sqlx::QueryBuilder::new("SELECT DISTINCT mission_id FROM assignees WHERE user_code = ")
+                .push_bind(user_code)
+                .build_query_as::<(i64,)>()
+                .fetch_all(&self.pool)
+                .await
+                .map_err(map_db_error)?
+                .into_iter()
+                .map(|(id,)| id)
+                .collect();
 
         if ids.is_empty() {
             return Ok(vec![]);
@@ -158,30 +157,29 @@ async fn insert_assignee(
     mission_id: i64,
     assignee: &AssigneeNew,
 ) -> Result<(), DomainError> {
-    let _: AssigneeRow = sqlx::QueryBuilder::new(
-        "INSERT INTO assignees (mission_id, user_code, role) VALUES (",
-    )
-    .push_bind(mission_id)
-    .push(", ")
-    .push_bind(&assignee.user_code)
-    .push(", ")
-    .push_bind(assignee.role.as_str())
-    .push(") RETURNING id, mission_id, user_code, role, created_at, updated_at")
-    .build_query_as::<AssigneeRow>()
-    .fetch_one(&mut **tx)
-    .await
-    .map_err(|e| match e {
-        sqlx::Error::Database(ref db)
-            if db.code().as_deref() == Some(SQLSTATE_UNIQUE_VIOLATION) =>
-        {
-            DomainError::DuplicateAssignee {
-                mission_id,
-                user_code: assignee.user_code.clone(),
-                role: assignee.role,
-            }
-        }
-        other => map_db_error(other),
-    })?;
+    let _: AssigneeRow =
+        sqlx::QueryBuilder::new("INSERT INTO assignees (mission_id, user_code, role) VALUES (")
+            .push_bind(mission_id)
+            .push(", ")
+            .push_bind(&assignee.user_code)
+            .push(", ")
+            .push_bind(assignee.role.as_str())
+            .push(") RETURNING id, mission_id, user_code, role, created_at, updated_at")
+            .build_query_as::<AssigneeRow>()
+            .fetch_one(&mut **tx)
+            .await
+            .map_err(|e| match e {
+                sqlx::Error::Database(ref db)
+                    if db.code().as_deref() == Some(SQLSTATE_UNIQUE_VIOLATION) =>
+                {
+                    DomainError::DuplicateAssignee {
+                        mission_id,
+                        user_code: assignee.user_code.clone(),
+                        role: assignee.role,
+                    }
+                }
+                other => map_db_error(other),
+            })?;
     Ok(())
 }
 
@@ -231,7 +229,7 @@ async fn load_missions_with_assignees(
     rows.into_iter()
         .map(|row| {
             let assignees = by_mission.remove(&row.id).unwrap_or_default();
-            Mission::try_from((row, assignees)).map_err(Into::into)
+            Mission::try_from((row, assignees))
         })
         .collect()
 }

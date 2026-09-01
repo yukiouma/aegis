@@ -1,8 +1,8 @@
 use apis::mission::Actor;
 
 use crate::domain::{
-    assignees_within_mission_are_unique, AssigneeNew, AssigneeRepository, MissionKind,
-    MissionRepository, ProjectLookup, UserLookup,
+    AssigneeNew, AssigneeRepository, MissionKind, MissionRepository, ProjectLookup, UserLookup,
+    assignees_within_mission_are_unique,
 };
 
 use super::commands::{AssigneeData, CreateMission};
@@ -39,11 +39,7 @@ where
         }
     }
 
-    async fn ensure_leader(
-        &self,
-        actor: &Actor,
-        project_code: &str,
-    ) -> Result<(), UsecaseError> {
+    async fn ensure_leader(&self, actor: &Actor, project_code: &str) -> Result<(), UsecaseError> {
         let is_leader = self
             .project_lookup
             .is_leader(project_code, &actor.user_code)
@@ -149,11 +145,7 @@ where
             .collect())
     }
 
-    pub async fn delete_mission(
-        &self,
-        actor: &Actor,
-        id: i64,
-    ) -> Result<(), UsecaseError> {
+    pub async fn delete_mission(&self, actor: &Actor, id: i64) -> Result<(), UsecaseError> {
         let m = self.mission_repo.find_by_id(id).await?;
         self.ensure_leader(actor, &m.project_code).await?;
         self.mission_repo.delete(id).await?;

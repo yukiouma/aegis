@@ -28,3 +28,13 @@
 pub mod adapter;
 pub mod domain;
 pub mod usecase;
+
+pub use adapter::facade::in_memory::MissionServiceImpl;
+pub use adapter::persistence::postgres::{AssigneeRepo, MissionRepo};
+pub use adapter::service::project::ProjectLookupImpl;
+pub use adapter::service::user::UserLookupImpl;
+pub use domain::{
+    Assignee, AssigneeRepository, DomainError, Mission, MissionKind, MissionRepository,
+    MissionRole, ProjectLookup, UserLookup,
+};
+pub use usecase::{MissionUsecase, MissionUsecaseConfig, UsecaseError};

@@ -31,26 +31,16 @@ impl ProjectLookup for ProjectLookupImpl {
         }
     }
 
-    async fn is_leader(
-        &self,
-        project_code: &str,
-        user_code: &str,
-    ) -> Result<bool, DomainError> {
+    async fn is_leader(&self, project_code: &str, user_code: &str) -> Result<bool, DomainError> {
         let view = self
             .projects
             .get_project_by_code(project_code)
             .await
             .map_err(|e| match e {
-                ProjectApiError::NotFound => {
-                    DomainError::ProjectNotFound(project_code.to_string())
-                }
+                ProjectApiError::NotFound => DomainError::ProjectNotFound(project_code.to_string()),
                 other => DomainError::Repository(other.to_string()),
             })?;
-        Ok(view
-            .members
-            .leaders
-            .iter()
-            .any(|u| u.code == user_code))
+        Ok(view.members.leaders.iter().any(|u| u.code == user_code))
     }
 }
 

@@ -4,8 +4,8 @@
 
 #![allow(dead_code)]
 
-use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicI32, Ordering};
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -71,9 +71,7 @@ impl MissionRepository for FakeMissionRepo {
             .lock()
             .unwrap()
             .iter()
-            .filter(|m| {
-                m.project_code == project_code && kind.is_none_or(|k| k == m.mission_kind)
-            })
+            .filter(|m| m.project_code == project_code && kind.is_none_or(|k| k == m.mission_kind))
             .cloned()
             .collect())
     }
@@ -107,11 +105,7 @@ pub struct FakeAssigneeRepo {
 
 #[async_trait]
 impl AssigneeRepository for FakeAssigneeRepo {
-    async fn add(
-        &self,
-        mission_id: i64,
-        input: AssigneeNew,
-    ) -> Result<Assignee, DomainError> {
+    async fn add(&self, mission_id: i64, input: AssigneeNew) -> Result<Assignee, DomainError> {
         let now = Utc::now();
         let a = Assignee::new(
             self.next_id.fetch_add(1, Ordering::SeqCst) as i64,
@@ -121,9 +115,9 @@ impl AssigneeRepository for FakeAssigneeRepo {
             now,
         )?;
         let mut g = self.assignees.lock().unwrap();
-        if g.iter().any(|(mid, x)| {
-            *mid == mission_id && x.user_code == a.user_code && x.role == a.role
-        }) {
+        if g.iter()
+            .any(|(mid, x)| *mid == mission_id && x.user_code == a.user_code && x.role == a.role)
+        {
             return Err(DomainError::DuplicateAssignee {
                 mission_id,
                 user_code: a.user_code.clone(),
@@ -158,11 +152,7 @@ impl ProjectLookup for FakeProject {
             Err(DomainError::ProjectNotFound(code.into()))
         }
     }
-    async fn is_leader(
-        &self,
-        project_code: &str,
-        user_code: &str,
-    ) -> Result<bool, DomainError> {
+    async fn is_leader(&self, project_code: &str, user_code: &str) -> Result<bool, DomainError> {
         Ok(project_code == "p1" && self.leader_for.contains(&user_code))
     }
 }

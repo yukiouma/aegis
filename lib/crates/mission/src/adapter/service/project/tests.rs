@@ -26,10 +26,7 @@ impl ProjectService for FakeProject {
     async fn get_project_by_id(&self, _id: i32) -> Result<ProjectView, ProjectApiError> {
         unimplemented!()
     }
-    async fn get_project_by_code(
-        &self,
-        code: &str,
-    ) -> Result<ProjectView, ProjectApiError> {
+    async fn get_project_by_code(&self, code: &str) -> Result<ProjectView, ProjectApiError> {
         Ok(view(code, &self.leader_codes))
     }
     async fn list_projects(&self) -> Result<Vec<ProjectView>, ProjectApiError> {
@@ -98,10 +95,7 @@ async fn get_by_code_maps_not_found() {
         async fn get_project_by_id(&self, _: i32) -> Result<ProjectView, ProjectApiError> {
             unimplemented!()
         }
-        async fn get_project_by_code(
-            &self,
-            _: &str,
-        ) -> Result<ProjectView, ProjectApiError> {
+        async fn get_project_by_code(&self, _: &str) -> Result<ProjectView, ProjectApiError> {
             Err(ProjectApiError::NotFound)
         }
         async fn list_projects(&self) -> Result<Vec<ProjectView>, ProjectApiError> {

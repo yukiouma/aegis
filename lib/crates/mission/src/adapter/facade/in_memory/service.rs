@@ -2,8 +2,8 @@ use async_trait::async_trait;
 
 use apis::mission::{
     Actor, AssigneeData, AssigneeView as ApiAssigneeView, CreateMissionRequest,
-    ListMissionsByProjectRequest, ListMissionsByUserRequest, MissionApiError, MissionKind as ApiKind,
-    MissionRole as ApiRole, MissionService, MissionView as ApiMissionView,
+    ListMissionsByProjectRequest, ListMissionsByUserRequest, MissionApiError,
+    MissionKind as ApiKind, MissionRole as ApiRole, MissionService, MissionView as ApiMissionView,
 };
 
 use crate::domain::{DomainError, MissionRepository, ProjectLookup, UserLookup};
@@ -115,12 +115,11 @@ where
             .map_err(map_error)
     }
 
-    async fn delete_mission(
-        &self,
-        actor: &Actor,
-        id: i64,
-    ) -> Result<(), MissionApiError> {
-        self.usecase.delete_mission(actor, id).await.map_err(map_error)
+    async fn delete_mission(&self, actor: &Actor, id: i64) -> Result<(), MissionApiError> {
+        self.usecase
+            .delete_mission(actor, id)
+            .await
+            .map_err(map_error)
     }
 
     async fn add_assignee(
@@ -235,9 +234,7 @@ fn map_error(e: UsecaseError) -> MissionApiError {
             DomainError::EmptyMissionCode
             | DomainError::EmptyUserCode
             | DomainError::UnknownMissionKind(_)
-            | DomainError::UnknownMissionRole(_) => {
-                MissionApiError::Validation(d.to_string())
-            }
+            | DomainError::UnknownMissionRole(_) => MissionApiError::Validation(d.to_string()),
             DomainError::NotFound => MissionApiError::NotFound,
             DomainError::AssigneeNotFound => MissionApiError::AssigneeNotFound,
             DomainError::ProjectNotFound(c) => MissionApiError::ProjectNotFound(c),
