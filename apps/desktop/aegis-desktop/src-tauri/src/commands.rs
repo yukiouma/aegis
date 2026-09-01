@@ -4,6 +4,7 @@ pub mod crf;
 pub mod domain_model;
 pub mod healthz;
 pub mod identity;
+pub mod mission;
 pub mod project;
 pub mod terminology;
 pub mod user;

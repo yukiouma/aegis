@@ -75,6 +75,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::domain_model::variable::get_sdtm_variable_by_id,
             commands::domain_model::variable::update_sdtm_variable,
             commands::domain_model::variable::delete_sdtm_variable,
+            // mission
+            commands::mission::list_missions_by_project,
+            commands::mission::add_assignee,
+            commands::mission::remove_assignee,
+            commands::mission::create_mission,
             // crf
             commands::crf::version::list_crf_versions,
             commands::crf::version::import_als,
