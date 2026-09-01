@@ -15,11 +15,11 @@ import {
 } from "@tanstack/react-router";
 
 import {
-  CrfAssignTakersDrawer,
   CrfFormDrawer,
   CrfFormFilterDrawer,
   type CrfStatusFilter,
   CrfFormTable,
+  CrfMissionAssignDrawer,
   CrfToolsMenu,
   CrfStatusChip,
   CrfVersionDropdown,
@@ -32,6 +32,7 @@ import {
   useListCrfVersions,
   useUpdateCrfForm,
 } from "../data/list";
+import { useListMissionsByProject } from "../../mission";
 import type { CrfForm } from "../../../shared/api";
 import { errorMessage } from "../../../shared/api/error";
 
@@ -107,6 +108,15 @@ export function CrfFormListPage() {
 
   const formsQuery = useListCrfForms(selectedVersionId);
   const allRows = formsQuery.data ?? [];
+
+  // Missions are keyed by `(projectCode, missionCode === form.code)`.
+  // The table cell needs the assignees for the current form, so we
+  // pull all CRF missions for the project once and pass the array
+  // down — the cell does an O(n) lookup. We could fetch one mission
+  // per row, but the project-scoped read is a single round trip and
+  // matches the page's already-loaded cache shape.
+  const missionsQuery = useListMissionsByProject(projectCode, "crf");
+  const missions = missionsQuery.data ?? [];
 
   // Page-owned filter state (drawer is fully controlled).
   const [searchInput, setSearchInput] = useState("");
@@ -221,6 +231,8 @@ export function CrfFormListPage() {
 
       <CrfFormTable
         rows={filteredRows}
+        missions={missions}
+        projectCode={projectCode}
         loading={formsQuery.isFetching}
         error={formsQuery.error}
         canAddFilter={selectedVersionId != null}
@@ -281,8 +293,11 @@ export function CrfFormListPage() {
         mutationPending={deleteMutation.isPending}
       />
 
-      <CrfAssignTakersDrawer
+      <CrfMissionAssignDrawer
         open={assignTakersFor != null}
+        row={assignTakersFor}
+        projectCode={projectCode}
+        missions={missions}
         onClose={() => setAssignTakersFor(null)}
       />
 

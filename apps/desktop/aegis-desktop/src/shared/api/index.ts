@@ -437,14 +437,18 @@ export const api = {
     call<void>("delete_crf_annotation", { id }),
 
   // mission
-  listMissionsByProject: (
+  listMissionsByProject: async (
     projectCode: string,
     kind?: MissionKind,
-  ): Promise<MissionViewResponse[]> =>
-    call<MissionViewResponse[]>("list_missions_by_project", {
-      projectCode,
-      kind,
-    }),
+  ): Promise<MissionViewResponse[]> => {
+    // The server returns a `MissionListResponse { missions: [...] }`
+    // envelope — unwrap it here so callers get the array directly.
+    const resp = await call<{ missions: MissionViewResponse[] }>(
+      "list_missions_by_project",
+      { projectCode, kind },
+    );
+    return resp.missions;
+  },
   addAssignee: (
     missionId: number,
     body: AssigneeDataArg,

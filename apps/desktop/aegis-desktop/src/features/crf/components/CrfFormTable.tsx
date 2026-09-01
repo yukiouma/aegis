@@ -28,7 +28,8 @@ import {
   useDroppable,
 } from "@aegis/ui/dnd";
 import { useI18n } from "@aegis/ui/i18n";
-import type { CrfForm } from "../../../shared/api";
+import type { CrfForm, MissionViewResponse } from "../../../shared/api";
+import { useIsProjectLeader } from "../../mission";
 
 /**
  * Move `sourceId` to `targetId`'s slot in the ordered id sequence, shifting
@@ -87,6 +88,8 @@ export function applyReorder(
 
 interface Props {
   rows: CrfForm[];
+  missions: MissionViewResponse[];
+  projectCode: string;
   loading: boolean;
   error: unknown;
   canAddFilter: boolean;
@@ -101,16 +104,46 @@ interface Props {
 
 interface DraggableRowProps {
   row: CrfForm;
+  mission: MissionViewResponse | undefined;
   showHandle: boolean;
+  canAssign: boolean;
   onAssignTakers: (row: CrfForm) => void;
   onEdit: (row: CrfForm) => void;
   onDelete: (row: CrfForm) => void;
   onOpenDetail: (row: CrfForm) => void;
 }
 
+function AssigneeChip({
+  role,
+  userCode,
+}: {
+  role: "dev" | "qc";
+  userCode: string;
+}) {
+  const { t } = useI18n();
+  // QC role uses a dashed outlined chip per design; DEV uses a solid
+  // filled chip. The label is the role key so it stays neutral
+  // across i18n updates — the table doesn't need to know the user's
+  // display name here.
+  const isQc = role === "qc";
+  return (
+    <Chip
+      size="small"
+      label={`${userCode} · ${t(
+        isQc ? "crf.missionAssign.roleQc" : "crf.missionAssign.roleDev",
+      )}`}
+      variant={isQc ? "outlined" : "filled"}
+      color="primary"
+      sx={isQc ? { borderStyle: "dashed" } : undefined}
+    />
+  );
+}
+
 function DraggableRow({
   row,
+  mission,
   showHandle,
+  canAssign,
   onAssignTakers,
   onEdit,
   onDelete,
@@ -138,7 +171,19 @@ function DraggableRow({
       </TableCell>
       <TableCell>{row.code}</TableCell>
       <TableCell>{row.name}</TableCell>
-      <TableCell />
+      <TableCell sx={{ minWidth: 220 }}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+          {mission?.assignees.length ? (
+            mission.assignees.map((a) => (
+              <AssigneeChip key={a.id} role={a.role} userCode={a.userCode} />
+            ))
+          ) : (
+            <Box sx={{ color: "text.secondary", fontSize: 12 }}>
+              {t("crf.missionAssign.empty")}
+            </Box>
+          )}
+        </Box>
+      </TableCell>
       <TableCell>
         <Chip
           icon={<PendingActionsIcon />}
@@ -149,15 +194,17 @@ function DraggableRow({
         />
       </TableCell>
       <TableCell align="right">
-        <Tooltip title={t("crf.table.action.assignTakers")}>
-          <IconButton
-            size="small"
-            aria-label={t("crf.table.action.assignTakers")}
-            onClick={() => onAssignTakers(row)}
-          >
-            <AssignmentIndIcon />
-          </IconButton>
-        </Tooltip>
+        {canAssign && (
+          <Tooltip title={t("crf.table.action.assignTakers")}>
+            <IconButton
+              size="small"
+              aria-label={t("crf.table.action.assignTakers")}
+              onClick={() => onAssignTakers(row)}
+            >
+              <AssignmentIndIcon />
+            </IconButton>
+          </Tooltip>
+        )}
         <Tooltip title={t("crf.table.action.edit")}>
           <IconButton
             size="small"
@@ -192,6 +239,8 @@ function DraggableRow({
 
 export function CrfFormTable({
   rows,
+  missions,
+  projectCode,
   loading,
   error,
   canAddFilter,
@@ -205,6 +254,7 @@ export function CrfFormTable({
 }: Props) {
   const { t } = useI18n();
   const [internalOrder, setInternalOrder] = useState<number[] | null>(null);
+  const isLeader = useIsProjectLeader(projectCode);
 
   const orderedIds = useMemo(() => {
     // `internalOrder` is the user's local override after a drag-and-drop.
@@ -231,9 +281,21 @@ export function CrfFormTable({
     return m;
   }, [rows]);
 
+  // Map form.code -> mission so the cell does an O(1) lookup per row.
+  const missionByFormCode = useMemo(() => {
+    const m = new Map<string, MissionViewResponse>();
+    for (const mission of missions) m.set(mission.missionCode, mission);
+    return m;
+  }, [missions]);
+
   // Show the drag indicator only when there's something to drag into.
   // With a single row there's no drop target, so the cell renders empty.
   const showHandle = orderedIds.length >= 2;
+
+  // Leader gate: hide the icon entirely while loading (`null`) and for
+  // non-leaders (`false`). Server-side enforcement is the authority;
+  // this just controls the UI affordance.
+  const canAssign = isLeader === true;
 
   return (
     <DragDropProvider
@@ -251,7 +313,7 @@ export function CrfFormTable({
               <TableCell sx={{ width: 40 }} />
               <TableCell>{t("crf.table.column.code")}</TableCell>
               <TableCell>{t("crf.table.column.name")}</TableCell>
-              <TableCell>{t("crf.table.column.taker")}</TableCell>
+              <TableCell>{t("crf.table.column.assignee")}</TableCell>
               <TableCell>{t("crf.table.column.status")}</TableCell>
               <TableCell align="right">
                 <Tooltip title={t("crf.table.action.addForm")}>
@@ -293,7 +355,9 @@ export function CrfFormTable({
                 <DraggableRow
                   key={row.id}
                   row={row}
+                  mission={missionByFormCode.get(row.code)}
                   showHandle={showHandle}
+                  canAssign={canAssign}
                   onAssignTakers={onAssignTakers}
                   onEdit={onEdit}
                   onDelete={onDelete}

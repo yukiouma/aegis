@@ -63,6 +63,18 @@ describe("CrfFormListPage", () => {
           },
         ],
       }),
+      list_missions_by_project: () => ({ missions: [] }),
+      get_project_by_code: () => ({
+        id: 1,
+        code: "abc",
+        description: "",
+        members: { leaders: [], workers: [] },
+        unblindMembers: { leaders: [], workers: [] },
+        tags: [],
+        active: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      }),
     });
 
     renderPage(["/project/abc/crf?versionId=7"]);

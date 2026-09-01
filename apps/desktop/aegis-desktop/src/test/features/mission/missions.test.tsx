@@ -106,14 +106,14 @@ function CreateHarness({ projectCode }: { projectCode: string }) {
 
 describe("useListMissionsByProject", () => {
   it("does not fetch when projectCode is null", async () => {
-    mockCommands({ list_missions_by_project: () => [mission] });
+    mockCommands({ list_missions_by_project: () => ({ missions: [mission] }) });
     renderWithQueryClient(<ListProbe projectCode={null} />);
     await new Promise((r) => setTimeout(r, 0));
     expect(invoke).not.toHaveBeenCalled();
   });
 
   it("invokes api.listMissionsByProject with { projectCode, kind } and exposes the array", async () => {
-    mockCommands({ list_missions_by_project: () => [mission] });
+    mockCommands({ list_missions_by_project: () => ({ missions: [mission] }) });
     renderWithQueryClient(<ListProbe projectCode="alpha" />);
     await waitFor(() => {
       expect(invoke).toHaveBeenCalledWith("list_missions_by_project", {
