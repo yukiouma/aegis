@@ -7,6 +7,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 import { useIsProjectLeader } from "../../../features/mission";
 import type { ProjectView, UserView } from "../../../shared/api";
+import { queryKeys } from "../../../shared/query";
 import { mockCommands } from "../../../test/helpers/tauri-mock";
 import { renderWithQueryClient } from "../../../test/helpers/render-with-query-client";
 
@@ -155,5 +156,70 @@ describe("useIsProjectLeader", () => {
   it("returns false when no leader membership exists", async () => {
     const v = await renderAndGet("alpha", projectNoLeader, alice);
     expect(v).toBe(false);
+  });
+
+  // Regression guard for the assign-mission-drawer table shake.
+  // `useIsProjectLeader` shares `queryKeys.project.byCode(code)` with
+  // the drawer's `useProject(code, { enabled: open })`. Opening the
+  // drawer enables the second observer, which (with `staleTime: 0`)
+  // triggers a refetch. Before the fix, the hook returned `null`
+  // whenever `projectQuery.isFetching` was true — so the refetch
+  // flipped `isLeader` from `true` to `null`, briefly hiding the
+  // per-row assign-mission icon and shaking the table. The hook now
+  // returns the cached `true` during refetches.
+  it("preserves the cached leader result during a refetch (does not flash to null)", async () => {
+    // Make the refetch deliberately slow so React has time to
+    // render the intermediate `isFetching: true` state. Without
+    // this delay the test's network round-trip completes in the
+    // same microtask as the invalidate and React never observes
+    // the buggy intermediate value.
+    let resolveRefetch!: (v: ProjectView) => void;
+    const pendingRefetch = new Promise<ProjectView>((r) => {
+      resolveRefetch = r;
+    });
+    let projectCalls = 0;
+    mockCommands({
+      current_user: () => alice,
+      get_project_by_code: () => {
+        projectCalls += 1;
+        if (projectCalls === 1) return projectAliceLeader;
+        return pendingRefetch;
+      },
+    });
+
+    // Capture every value the hook produces across renders.
+    const history: (boolean | null)[] = [];
+    const { client } = renderWithQueryClient(
+      <Capture projectCode="alpha" sink={(v) => history.push(v)} />,
+    );
+
+    // Wait until the initial fetch resolves to true.
+    await waitFor(() => expect(history[history.length - 1]).toBe(true));
+
+    // Trigger a refetch via invalidation — the same sequence the
+    // assign-mission drawer produces when its `useProject` enables.
+    void client.invalidateQueries({
+      queryKey: queryKeys.project.byCode("alpha"),
+    });
+
+    // Wait until the second fetch is in flight (mock invoked twice,
+    // second call hanging on `pendingRefetch`). At this moment
+    // `projectQuery.isFetching` is true; if the bug were present
+    // the hook would render `null` here.
+    const mockInvoke = invoke as unknown as ReturnType<typeof vi.fn>;
+    await waitFor(() => expect(mockInvoke.mock.calls.length).toBeGreaterThanOrEqual(2));
+
+    // Sample the most recent value while the refetch is still pending.
+    // With the fix: `true` (cached). Without the fix: `null`.
+    expect(history[history.length - 1]).toBe(true);
+
+    // Resolve the refetch so React Query can settle.
+    resolveRefetch(projectAliceLeader);
+
+    // Confirm the entire post-`true` history stayed `true`.
+    const firstTrueIdx = history.indexOf(true);
+    expect(firstTrueIdx).toBeGreaterThanOrEqual(0);
+    const afterFirstTrue = history.slice(firstTrueIdx);
+    expect(afterFirstTrue.every((v) => v === true)).toBe(true);
   });
 });

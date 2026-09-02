@@ -11,9 +11,16 @@ import { useCurrentUser } from "../../auth";
  * ::ensure_leader` is the authoritative gate — this hook only governs
  * UI affordance.
  *
- * Returns `null` while any of the dependent queries is still loading,
- * so callers can distinguish "not a leader" (`false`) from "unknown
- * yet" (`null`) and avoid flashing the icon during a refresh.
+ * Returns `null` only on the very first mount (no project data yet)
+ * so the caller can distinguish "not a leader" (`false`) from
+ * "unknown yet" (`null`) and avoid flashing the icon during the
+ * initial fetch.
+ *
+ * Once the project data is in the cache, the cached leader result is
+ * returned even while `projectQuery.isFetching` is true (e.g. when
+ * another observer — like the assign-mission drawer's `useProject`
+ * — enables and triggers a refetch). Flipping to `null` on every
+ * refetch would briefly hide the icon and visibly shake the table.
  *
  * Uses its own auto-enabled `get_project_by_code` query rather than
  * `useProject` from `project-list`, because that hook is
@@ -43,7 +50,10 @@ export function useIsProjectLeader(
 
   return useMemo(() => {
     if (projectCode == null || projectCode === "") return null;
-    if (currentUser.isLoading || projectQuery.isFetching) return null;
+    if (currentUser.isLoading) return null;
+    // `!project` catches the initial-load case (data still
+    // `undefined`). Refetches preserve the cached leader result
+    // — see the docstring above.
     if (!currentUser.data || !project) return null;
     const myCode = currentUser.data.code;
     const leaders = project.members?.leaders ?? [];
@@ -56,7 +66,6 @@ export function useIsProjectLeader(
     projectCode,
     currentUser.isLoading,
     currentUser.data,
-    projectQuery.isFetching,
     project,
   ]);
 }
