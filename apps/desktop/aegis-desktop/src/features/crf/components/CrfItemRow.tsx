@@ -2,6 +2,7 @@ import { Box, Chip, Stack, Typography } from "@aegis/ui/mui";
 import { RadioButtonUnchecked as RadioButtonUncheckedIcon } from "@aegis/ui/icons";
 
 import type { Annotation, AnnotationOwner, CrfItemDetail } from "../../../shared/api";
+import { sanitizeHtml } from "../../../shared/sanitize";
 import { useI18n } from "@aegis/ui/i18n";
 import { AnnotationChip } from "./AnnotationChip";
 import { NotSubmittedChip } from "./NotSubmittedChip";
@@ -122,7 +123,7 @@ export function CrfItemRow({
             field that can be annotated. */}
         {!isLabel && (
           <Chip
-            sx={{ width: 85 }}
+            sx={{ width: 92 }}
             label={item.code}
             variant="outlined"
             size="small"
@@ -133,9 +134,13 @@ export function CrfItemRow({
           sx={clickableSx}
           onClick={() => createFor({ kind: "item", id: item.id })}
           data-testid={`crf-item-name-${item.id}`}
-        >
-          {item.name}
-        </Typography>
+          // `item.name` arrives verbatim from als-resolver and may
+          // contain inline markup (`<br />`, `<b>…</b>`) that the
+          // user expects to render. Sanitize before injecting —
+          // the backend stores it raw, so we cannot assume the
+          // input is safe.
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(item.name) }}
+        />
         {item.notSubmitted && (
           <NotSubmittedChip
             onDelete={() =>
