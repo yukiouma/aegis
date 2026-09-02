@@ -32,7 +32,10 @@ import {
   useListCrfVersions,
   useUpdateCrfForm,
 } from "../data/list";
-import { useListMissionsByProject } from "../../mission";
+import {
+  useIsProjectLeader,
+  useListMissionsByProject,
+} from "../../mission";
 import type { CrfForm } from "../../../shared/api";
 import { errorMessage } from "../../../shared/api/error";
 
@@ -89,6 +92,13 @@ export function CrfFormListPage() {
 
   const versionsQuery = useListCrfVersions(projectCode);
   const versions = versionsQuery.data ?? [];
+
+  // Hide the create-version affordance for non-leaders. The table
+  // itself gates per-row actions on its own copy of `canAssign` —
+  // duplicating the call here keeps the page's toolbar decision
+  // independent of the table's render lifecycle.
+  const isLeader = useIsProjectLeader(projectCode);
+  const canManageVersions = isLeader === true;
 
   // Reconcile ?versionId URL ↔ first version fallback.
   useEffect(() => {
@@ -186,20 +196,22 @@ export function CrfFormListPage() {
         gap: 2,
       }}
     >
-      <Tooltip title={t("crf.toolbar.createVersion")}>
-        <IconButton
-          size="small"
-          aria-label={t("crf.toolbar.createVersion")}
-          onClick={() =>
-            navigate({
-              to: "/project/$projectCode/crf/versions/new",
-              params: { projectCode },
-            })
-          }
-        >
-          <NoteAddIcon />
-        </IconButton>
-      </Tooltip>
+      {canManageVersions && (
+        <Tooltip title={t("crf.toolbar.createVersion")}>
+          <IconButton
+            size="small"
+            aria-label={t("crf.toolbar.createVersion")}
+            onClick={() =>
+              navigate({
+                to: "/project/$projectCode/crf/versions/new",
+                params: { projectCode },
+              })
+            }
+          >
+            <NoteAddIcon />
+          </IconButton>
+        </Tooltip>
+      )}
       <CrfVersionDropdown
         versions={versions}
         value={selectedVersionId}
