@@ -205,25 +205,29 @@ function DraggableRow({
             </IconButton>
           </Tooltip>
         )}
-        <Tooltip title={t("crf.table.action.edit")}>
-          <IconButton
-            size="small"
-            aria-label={t("crf.table.action.edit")}
-            onClick={() => onEdit(row)}
-          >
-            <EditIcon />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title={t("crf.table.action.delete")}>
-          <IconButton
-            size="small"
-            color="error"
-            aria-label={t("crf.table.action.delete")}
-            onClick={() => onDelete(row)}
-          >
-            <DeleteIcon />
-          </IconButton>
-        </Tooltip>
+        {canAssign && (
+          <Tooltip title={t("crf.table.action.edit")}>
+            <IconButton
+              size="small"
+              aria-label={t("crf.table.action.edit")}
+              onClick={() => onEdit(row)}
+            >
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+        {canAssign && (
+          <Tooltip title={t("crf.table.action.delete")}>
+            <IconButton
+              size="small"
+              color="error"
+              aria-label={t("crf.table.action.delete")}
+              onClick={() => onDelete(row)}
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Tooltip>
+        )}
         <Tooltip title={t("crf.table.action.openDetail")}>
           <IconButton
             size="small"
