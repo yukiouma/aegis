@@ -12,7 +12,7 @@ import {
   TextField,
   Typography,
 } from "@aegis/ui/mui";
-import { Close as CloseIcon } from "@aegis/ui/icons";
+import { Close as CloseIcon, Delete as DeleteIcon } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
 
 import type {
@@ -203,30 +203,33 @@ export function CrfMissionAssignDrawer({
               {matched.assignees.map((a) => (
                 <Box
                   key={a.id}
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 1,
-                  }}
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
                 >
+                  <Typography sx={{ flexGrow: 1 }}>
+                    {resolveName(a.userCode)}
+                  </Typography>
                   <Chip
                     size="small"
-                    label={`${resolveName(a.userCode)} · ${
+                    label={
                       a.role === "qc"
                         ? t("crf.missionAssign.roleQc")
                         : t("crf.missionAssign.roleDev")
-                    }`}
-                    variant={a.role === "qc" ? "outlined" : "filled"}
+                    }
+                    variant="outlined"
                     color="primary"
-                    sx={a.role === "qc" ? { borderStyle: "dashed" } : undefined}
+                    sx={
+                      a.role === "qc"
+                        ? { borderStyle: "dashed" }
+                        : undefined
+                    }
                   />
                   <IconButton
                     size="small"
+                    color="error"
                     aria-label={t("crf.missionAssign.remove")}
                     onClick={() => handleRemove(a.id)}
                   >
-                    <CloseIcon fontSize="small" />
+                    <DeleteIcon fontSize="small" />
                   </IconButton>
                 </Box>
               ))}
@@ -242,7 +245,7 @@ export function CrfMissionAssignDrawer({
           <Autocomplete
             sx={{ flex: 1 }}
             options={availableMembers}
-            getOptionLabel={(opt) => `${opt.code} — ${opt.name}`}
+            getOptionLabel={(opt) => opt.name}
             value={
               availableMembers.find((m) => m.code === userCode) ?? null
             }
