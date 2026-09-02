@@ -67,14 +67,19 @@ export function CrfItemRow({
 }: Props) {
   const { t } = useI18n();
   const { item, options, units, annotations } = itemDetail;
+  // Label items are static text — they don't carry a captured
+  // variable, so the code chip and every create-annotation entry
+  // point are no-ops for them. Treat `kind === "label"` as a
+  // row-wide block alongside the existing guards.
+  const isLabel = item.kind === "label";
   // Collapse the three "no new annotations" guards into one. When
   // any of these is true every create-annotation entry point on
   // this row must short-circuit — the form cascade has wiped
   // every annotation, the item cascade has wiped this row's
-  // annotations, or there is no domain annotation to assign a
-  // new annotation to.
+  // annotations, there is no domain annotation to assign a
+  // new annotation to, or the item is a static label.
   const rowBlocked =
-    formNotSubmitted || itemNotSubmitted || noDomainAnnotations;
+    formNotSubmitted || itemNotSubmitted || noDomainAnnotations || isLabel;
   // Build the create-annotation handler once per row so the click
   // short-circuits under a single readable guard instead of
   // repeating the conditions at every call site.
@@ -112,7 +117,17 @@ export function CrfItemRow({
           flexWrap: "wrap",
         }}
       >
-        <Chip sx={{ width: 85 }} label={item.code} variant="outlined" size="small" />
+        {/* Label items have no captured variable — hide the code
+            chip so the row reads as static text rather than as a
+            field that can be annotated. */}
+        {!isLabel && (
+          <Chip
+            sx={{ width: 85 }}
+            label={item.code}
+            variant="outlined"
+            size="small"
+          />
+        )}
         <Typography
           variant="subtitle1"
           sx={clickableSx}
