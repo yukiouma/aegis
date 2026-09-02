@@ -36,6 +36,7 @@ import {
   useIsProjectLeader,
   useListMissionsByProject,
 } from "../../mission";
+import { useCurrentUser } from "../../auth";
 import type { CrfForm } from "../../../shared/api";
 import { errorMessage } from "../../../shared/api/error";
 
@@ -100,6 +101,8 @@ export function CrfFormListPage() {
   const isLeader = useIsProjectLeader(projectCode);
   const canManageVersions = isLeader === true;
 
+  const currentUserQuery = useCurrentUser();
+
   // Reconcile ?versionId URL ↔ first version fallback.
   useEffect(() => {
     if (versions.length === 0) return;
@@ -131,7 +134,7 @@ export function CrfFormListPage() {
   // Page-owned filter state (drawer is fully controlled).
   const [searchInput, setSearchInput] = useState("");
   const [statusSelected, setStatusSelected] = useState<CrfStatusFilter[]>([]);
-  const [involvedChecked] = useState(false);
+  const [involvedChecked, setInvolvedChecked] = useState(false);
 
   // Inline debounce: 300 ms delay, no max-wait.
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -140,17 +143,33 @@ export function CrfFormListPage() {
     return () => clearTimeout(handle);
   }, [searchInput]);
 
+  // Pre-compute the set of form codes whose mission has the current
+  // user as an assignee — used by the "Involved" filter.
+  const myInvolvedFormCodes = useMemo(() => {
+    if (!involvedChecked) return null;
+    const myCode = currentUserQuery.data?.code;
+    if (!myCode) return new Set<string>();
+    const codes = new Set<string>();
+    for (const mission of missions) {
+      if (mission.assignees.some((a) => a.userCode === myCode)) {
+        codes.add(mission.missionCode);
+      }
+    }
+    return codes;
+  }, [involvedChecked, currentUserQuery.data, missions]);
+
   const filteredRows = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
     return allRows.filter((r) => {
-      // statusSelected + involvedChecked are held but no-op this PR
+      // statusSelected is held for future use; currently no-op.
       void statusSelected;
-      void involvedChecked;
-      return (
+      const matchesSearch =
         q === "" ||
         r.code.toLowerCase().includes(q) ||
-        r.name.toLowerCase().includes(q)
-      );
+        r.name.toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+      if (myInvolvedFormCodes && !myInvolvedFormCodes.has(r.code)) return false;
+      return true;
     });
   }, [allRows, debouncedSearch, statusSelected, involvedChecked]);
 
@@ -319,8 +338,11 @@ export function CrfFormListPage() {
         onSearchInputChange={setSearchInput}
         statusSelected={statusSelected}
         onStatusSelectedChange={setStatusSelected}
+        involvedChecked={involvedChecked}
+        onInvolvedCheckedChange={setInvolvedChecked}
         onClear={() => {
           setSearchInput("");
+          setInvolvedChecked(false);
           setStatusSelected([]);
         }}
         onApply={() => setFilterOpen(false)}
