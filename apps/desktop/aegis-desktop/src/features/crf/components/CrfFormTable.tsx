@@ -122,19 +122,16 @@ function AssigneeChip({
   role: "dev" | "qc";
   name: string;
 }) {
-  const { t } = useI18n();
-  // QC role uses a dashed outlined chip per design; DEV uses a solid
-  // filled chip. `name` is the assignee's display name resolved via
-  // `useUserNameMap` in the parent — falls back to the userCode when
-  // the user list isn't loaded yet, so the chip stays legible.
+  // The chip carries the assignee's display name; the role is
+  // communicated by the chip's border style. Both chips are
+  // outlined. QC uses a dashed border; DEV keeps the default
+  // (solid).
   const isQc = role === "qc";
   return (
     <Chip
       size="small"
-      label={`${name} · ${t(
-        isQc ? "crf.missionAssign.roleQc" : "crf.missionAssign.roleDev",
-      )}`}
-      variant={isQc ? "outlined" : "filled"}
+      label={name}
+      variant="outlined"
       color="primary"
       sx={isQc ? { borderStyle: "dashed" } : undefined}
     />
