@@ -374,7 +374,7 @@ export const en = {
   "crf.missionAssign.field.user": "User",
   "crf.missionAssign.field.role": "Role",
   "crf.missionAssign.roleDev": "Dev",
-  "crf.missionAssign.roleQc": "QC",
+  "crf.missionAssign.roleQc": "Qc",
   "crf.missionAssign.submit": "Add",
   "crf.missionAssign.remove": "Remove",
   "crf.missionAssign.error.required": "User and role are required",
