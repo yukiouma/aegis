@@ -73,7 +73,15 @@ export const queryKeys = {
       ["crf", "searchAnnotationsByVersion", v, f] as const,
   },
   mission: {
+    // Omit `kind` from the key when it is not provided, so the
+    // returned tuple is a *prefix* of the kind-bearing cache key
+    // rather than a 4-element tuple with `undefined` at the end.
+    // (React Query's `invalidateQueries` does element-wise `===`
+    // prefix matching; `undefined !== "crf"` would miss the real
+    // cache entry and the cache would never invalidate.)
     byProject: (projectCode: string, kind?: string) =>
-      ["mission", "byProject", projectCode, kind] as const,
+      kind !== undefined
+        ? (["mission", "byProject", projectCode, kind] as const)
+        : (["mission", "byProject", projectCode] as const),
   },
 } as const;
