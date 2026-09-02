@@ -4,22 +4,23 @@ import { describe, expect, it } from "vitest";
 import { queryKeys } from "../../../shared/query";
 
 describe("queryKeys.mission.byProject", () => {
-  it("matches the kind-bearing cache key via prefix when kind is omitted", () => {
+  // Regression guard: the cache key used by `useListMissionsByProject`
+  // and the invalidation key used by the mission mutation hooks
+  // (`useAddAssignee`, `useRemoveAssignee`, `useCreateMission`) must
+  // be the same 4-element tuple. Earlier the factory took `kind?`
+  // optional and produced a 4-element tuple with `undefined` at index
+  // 3 — React Query's element-wise `===` prefix match then missed the
+  // real cache entry (`undefined !== "crf"`) and the new/removed
+  // assignee never appeared in the drawer or the table. The factory
+  // now requires `kind`; this test pins the cache-key shape so the
+  // kind cannot be silently dropped again.
+  it("matches the cache key when both query and invalidation carry the same kind", () => {
     const qc = new QueryClient();
-    // Seed the cache with the kind-bearing key (what
-    // `useListMissionsByProject` writes).
     const cacheKey = queryKeys.mission.byProject("AK001-002", "crf");
     qc.setQueryData(cacheKey, []);
 
-    // Invalidate with the kind-less key (what the mutations call).
-    qc.invalidateQueries({
-      queryKey: queryKeys.mission.byProject("AK001-002"),
-    });
+    qc.invalidateQueries({ queryKey: cacheKey });
 
-    // If the factory's tuple length and `undefined` last element
-    // round-trip through React Query's prefix-match correctly, the
-    // cache entry is now invalidated. If not (the bug we're
-    // chasing), it stays untouched.
     expect(qc.getQueryState(cacheKey)?.isInvalidated).toBe(true);
   });
 });

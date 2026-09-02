@@ -30,11 +30,16 @@ export function useListMissionsByProject(
 
 /**
  * Add an assignee to an existing mission. The factory takes the
- * `projectCode` so the success handler can invalidate that project's
- * mission list — the drawer always lives in the context of a project,
- * so the caller already has it.
+ * `projectCode` and `kind` so the success handler can invalidate the
+ * exact kind-bearing cache key (`queryKeys.mission.byProject`
+ * includes `kind` in the tuple — using a kind-less key would miss
+ * the real cache entry). Defaults `kind` to `"crf"` to match the
+ * drawer's current scope.
  */
-export function useAddAssignee(projectCode: string) {
+export function useAddAssignee(
+  projectCode: string,
+  kind: MissionKind = "crf",
+) {
   const qc = useQueryClient();
   return useMutation<
     AssigneeViewResponse,
@@ -44,7 +49,7 @@ export function useAddAssignee(projectCode: string) {
     mutationFn: ({ missionId, body }) => api.addAssignee(missionId, body),
     onSuccess: () => {
       void qc.invalidateQueries({
-        queryKey: queryKeys.mission.byProject(projectCode),
+        queryKey: queryKeys.mission.byProject(projectCode, kind),
       });
     },
   });
@@ -52,10 +57,13 @@ export function useAddAssignee(projectCode: string) {
 
 /**
  * Remove an assignee from a mission. Invalidates the project's
- * mission list — the assignees array on the mission changes, and the
- * next read picks that up.
+ * kind-bearing mission list — the assignees array on the mission
+ * changes, and the next read picks that up.
  */
-export function useRemoveAssignee(projectCode: string) {
+export function useRemoveAssignee(
+  projectCode: string,
+  kind: MissionKind = "crf",
+) {
   const qc = useQueryClient();
   return useMutation<
     void,
@@ -66,7 +74,7 @@ export function useRemoveAssignee(projectCode: string) {
       api.removeAssignee(missionId, assigneeId),
     onSuccess: () => {
       void qc.invalidateQueries({
-        queryKey: queryKeys.mission.byProject(projectCode),
+        queryKey: queryKeys.mission.byProject(projectCode, kind),
       });
     },
   });
@@ -76,16 +84,19 @@ export function useRemoveAssignee(projectCode: string) {
  * Create a new mission with the first assignee baked in. The drawer
  * uses this when no mission exists yet for a CRF form: the picked
  * user becomes the first assignee on the brand-new mission. On
- * success the project's mission list is invalidated so the table
- * cell re-renders with the new chips.
+ * success the project's kind-bearing mission list is invalidated so
+ * the table cell re-renders with the new chips.
  */
-export function useCreateMission(projectCode: string) {
+export function useCreateMission(
+  projectCode: string,
+  kind: MissionKind = "crf",
+) {
   const qc = useQueryClient();
   return useMutation<MissionViewResponse, ApiError, CreateMissionInput>({
     mutationFn: (input) => api.createMission(input),
     onSuccess: () => {
       void qc.invalidateQueries({
-        queryKey: queryKeys.mission.byProject(projectCode),
+        queryKey: queryKeys.mission.byProject(projectCode, kind),
       });
     },
   });

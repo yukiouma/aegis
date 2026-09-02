@@ -148,7 +148,7 @@ describe("useAddAssignee", () => {
     await waitFor(() => {
       expect(spy).toHaveBeenCalledWith(
         expect.objectContaining({
-          queryKey: queryKeys.mission.byProject("alpha"),
+          queryKey: queryKeys.mission.byProject("alpha", "crf"),
         }),
       );
     });
@@ -178,7 +178,7 @@ describe("useRemoveAssignee", () => {
     await waitFor(() => {
       expect(spy).toHaveBeenCalledWith(
         expect.objectContaining({
-          queryKey: queryKeys.mission.byProject("alpha"),
+          queryKey: queryKeys.mission.byProject("alpha", "crf"),
         }),
       );
     });
@@ -210,7 +210,7 @@ describe("useCreateMission", () => {
     await waitFor(() => {
       expect(spy).toHaveBeenCalledWith(
         expect.objectContaining({
-          queryKey: queryKeys.mission.byProject("alpha"),
+          queryKey: queryKeys.mission.byProject("alpha", "crf"),
         }),
       );
     });
@@ -226,7 +226,7 @@ describe("mission hooks share the QueryClient cache", () => {
     await waitFor(() => {
       expect(spy).toHaveBeenCalledWith(
         expect.objectContaining({
-          queryKey: queryKeys.mission.byProject("alpha"),
+          queryKey: queryKeys.mission.byProject("alpha", "crf"),
         }),
       );
     });
