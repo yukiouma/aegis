@@ -161,10 +161,11 @@ describe("CrfFormListPage", () => {
 
     renderPage(["/project/abc/crf?versionId=7"]);
 
-    // The chip label is `name · role`; wait for the post-fetch
-    // state since `useListUsers` resolves asynchronously.
+    // The chip label is just the assignee's name (role is encoded
+    // by border style); wait for the post-fetch state since
+    // `useListUsers` resolves asynchronously.
     await waitFor(() =>
-      expect(screen.getByText(/^Carol Lin · /)).toBeInTheDocument(),
+      expect(screen.getByText("Carol Lin")).toBeInTheDocument(),
     );
   });
 
@@ -236,7 +237,7 @@ describe("CrfFormListPage", () => {
     // no rows. Use `findByText` (not `getByText`) since the chip
     // only appears once both `list_missions_by_project` and
     // `list_crf_forms_by_version` resolve.
-    expect(await screen.findByText(/^carol · /)).toBeInTheDocument();
+    expect(await screen.findByText("carol")).toBeInTheDocument();
   });
 });
 
