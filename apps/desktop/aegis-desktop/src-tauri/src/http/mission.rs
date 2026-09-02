@@ -107,8 +107,16 @@ pub async fn remove_assignee(
     mission_id: i64,
     assignee_id: i64,
 ) -> Result<(), ApiError> {
-    let _: serde_json::Value = c
-        .request(
+    // Use `request_bytes` + `let _ = ...` so an empty 204 body does
+    // not get JSON-decoded. Every other DELETE endpoint in this
+    // crate follows the same pattern (see `crf::annotation::delete`,
+    // `crf::form::delete`, `domain_model::version::delete`, …).
+    // Routing through `request::<Value>` would call
+    // `serde_json::from_slice::<Value>(b"")` on the empty body and
+    // return `decode_failed: EOF while parsing a value at line 1
+    // column 0`, even though the server-side delete succeeded.
+    let _ = c
+        .request_bytes(
             reqwest::Method::DELETE,
             &format!("/api/mission/{mission_id}/assignee/{assignee_id}"),
             None::<&()>,
@@ -129,8 +137,45 @@ pub async fn create_mission(
 mod tests {
     //! Unit tests for serde shape only. The HTTP adapter round-trips
     //! are covered by the command tests in `commands/mission.rs`.
+    //!
+    //! The `remove_assignee_204_no_body` test below is the one
+    //! exception: it round-trips the HTTP adapter against a wiremock
+    //! server returning 204 No Content, because that exact failure
+    //! mode (`decode_failed: EOF while parsing a value`) only
+    //! manifests in the HTTP layer, not in serde.
 
     use super::*;
+    use crate::http::client::{HttpClient, MemoryStore, TokenStore};
+    use std::sync::Arc;
+    use wiremock::matchers::{header, method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[tokio::test]
+    async fn remove_assignee_204_no_body() {
+        // The server returns 204 No Content (empty body). The adapter
+        // must NOT try to JSON-decode the empty bytes — every other
+        // DELETE endpoint in the codebase uses `request_bytes` +
+        // `let _ = ...; Ok(())` for exactly this reason. `remove_assignee`
+        // was an outlier that used `request::<Value>`, which fails
+        // with `decode_failed: EOF while parsing a value at line 1
+        // column 0` on an empty body even though the DELETE
+        // succeeded server-side.
+        let server = MockServer::start().await;
+        let store = Arc::new(MemoryStore::default());
+        store.set_access_token("AT").await.unwrap();
+        let m = Mock::given(method("DELETE"))
+            .and(path("/api/mission/7/assignee/100"))
+            .and(header("authorization", "Bearer AT"))
+            .respond_with(ResponseTemplate::new(204));
+        server.register(m).await;
+        let c = HttpClient::new(server.uri(), store);
+
+        let result = remove_assignee(&c, 7, 100).await;
+        assert!(
+            result.is_ok(),
+            "remove_assignee must succeed on 204; got {result:?}"
+        );
+    }
 
     #[test]
     fn mission_kind_serializes_snake_case() {
