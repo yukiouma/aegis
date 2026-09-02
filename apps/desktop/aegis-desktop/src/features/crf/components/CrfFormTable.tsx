@@ -30,6 +30,7 @@ import {
 import { useI18n } from "@aegis/ui/i18n";
 import type { CrfForm, MissionViewResponse } from "../../../shared/api";
 import { useIsProjectLeader } from "../../mission";
+import { useUserNameMap } from "../../user/data/list";
 
 /**
  * Move `sourceId` to `targetId`'s slot in the ordered id sequence, shifting
@@ -107,6 +108,7 @@ interface DraggableRowProps {
   mission: MissionViewResponse | undefined;
   showHandle: boolean;
   canAssign: boolean;
+  resolveName: (userCode: string) => string;
   onAssignTakers: (row: CrfForm) => void;
   onEdit: (row: CrfForm) => void;
   onDelete: (row: CrfForm) => void;
@@ -115,21 +117,21 @@ interface DraggableRowProps {
 
 function AssigneeChip({
   role,
-  userCode,
+  name,
 }: {
   role: "dev" | "qc";
-  userCode: string;
+  name: string;
 }) {
   const { t } = useI18n();
   // QC role uses a dashed outlined chip per design; DEV uses a solid
-  // filled chip. The label is the role key so it stays neutral
-  // across i18n updates — the table doesn't need to know the user's
-  // display name here.
+  // filled chip. `name` is the assignee's display name resolved via
+  // `useUserNameMap` in the parent — falls back to the userCode when
+  // the user list isn't loaded yet, so the chip stays legible.
   const isQc = role === "qc";
   return (
     <Chip
       size="small"
-      label={`${userCode} · ${t(
+      label={`${name} · ${t(
         isQc ? "crf.missionAssign.roleQc" : "crf.missionAssign.roleDev",
       )}`}
       variant={isQc ? "outlined" : "filled"}
@@ -144,6 +146,7 @@ function DraggableRow({
   mission,
   showHandle,
   canAssign,
+  resolveName,
   onAssignTakers,
   onEdit,
   onDelete,
@@ -175,7 +178,7 @@ function DraggableRow({
         <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
           {mission?.assignees.length ? (
             mission.assignees.map((a) => (
-              <AssigneeChip key={a.id} role={a.role} userCode={a.userCode} />
+              <AssigneeChip key={a.id} role={a.role} name={resolveName(a.userCode)} />
             ))
           ) : (
             <Box sx={{ color: "text.secondary", fontSize: 12 }}>
@@ -255,6 +258,7 @@ export function CrfFormTable({
   const { t } = useI18n();
   const [internalOrder, setInternalOrder] = useState<number[] | null>(null);
   const isLeader = useIsProjectLeader(projectCode);
+  const resolveName = useUserNameMap();
 
   const orderedIds = useMemo(() => {
     // `internalOrder` is the user's local override after a drag-and-drop.
@@ -358,6 +362,7 @@ export function CrfFormTable({
                   mission={missionByFormCode.get(row.code)}
                   showHandle={showHandle}
                   canAssign={canAssign}
+                  resolveName={resolveName}
                   onAssignTakers={onAssignTakers}
                   onEdit={onEdit}
                   onDelete={onDelete}
