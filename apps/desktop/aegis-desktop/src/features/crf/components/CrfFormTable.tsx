@@ -322,15 +322,17 @@ export function CrfFormTable({
               <TableCell>{t("crf.table.column.assignee")}</TableCell>
               <TableCell>{t("crf.table.column.status")}</TableCell>
               <TableCell align="right">
-                <Tooltip title={t("crf.table.action.addForm")}>
-                  <IconButton
-                    size="small"
-                    aria-label={t("crf.table.action.addForm")}
-                    onClick={onAdd}
-                  >
-                    <AddIcon />
-                  </IconButton>
-                </Tooltip>
+                {canAssign && (
+                  <Tooltip title={t("crf.table.action.addForm")}>
+                    <IconButton
+                      size="small"
+                      aria-label={t("crf.table.action.addForm")}
+                      onClick={onAdd}
+                    >
+                      <AddIcon />
+                    </IconButton>
+                  </Tooltip>
+                )}
                 <Tooltip title={t("crf.table.action.filter")}>
                   <IconButton
                     size="small"
