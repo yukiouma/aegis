@@ -217,6 +217,7 @@ function DraggableRow({
         <Tooltip title={t("crf.table.action.delete")}>
           <IconButton
             size="small"
+            color="error"
             aria-label={t("crf.table.action.delete")}
             onClick={() => onDelete(row)}
           >
