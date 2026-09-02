@@ -57,6 +57,18 @@ function SingleProbe({ code }: { code: string | null }) {
   );
 }
 
+function AutoProbe({ code }: { code: string }) {
+  const q = useProject(code, { enabled: true });
+  return (
+    <>
+      <span data-testid="project-code">{q.data?.code ?? "none"}</span>
+      <span data-testid="project-leaders">
+        {q.data?.members.leaders.map((l) => l.code).join(",") ?? "none"}
+      </span>
+    </>
+  );
+}
+
 function CreateHarness() {
   const m = useCreateProject();
   return (
@@ -165,6 +177,28 @@ describe("useProject", () => {
     await userEvent.click(screen.getByRole("button", { name: "refetch" }));
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
     await userEvent.click(screen.getByRole("button", { name: "refetch" }));
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2));
+  });
+
+  // When the assign-mission drawer mounts it passes `enabled: open`,
+  // making the query "active" so cache invalidations from sibling
+  // surfaces (e.g. `useUpdateProject` on the project-list page)
+  // trigger a refetch and the user dropdown stays in sync.
+  it("auto-fetches on mount when enabled: true", async () => {
+    mockCommands({ get_project_by_code: () => projectFixture });
+    renderWithQueryClient(<AutoProbe code="alpha" />);
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("get_project_by_code", {
+        code: "alpha",
+      });
+    });
+  });
+
+  it("refetches when project.byCode(code) is invalidated while enabled: true", async () => {
+    mockCommands({ get_project_by_code: () => projectFixture });
+    const { client } = renderWithQueryClient(<AutoProbe code="alpha" />);
+    await waitFor(() => expect(invoke).toHaveBeenCalledTimes(1));
+    await client.invalidateQueries({ queryKey: queryKeys.project.byCode("alpha") });
     await waitFor(() => expect(invoke).toHaveBeenCalledTimes(2));
   });
 });

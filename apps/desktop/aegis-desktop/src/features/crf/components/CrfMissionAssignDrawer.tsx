@@ -66,7 +66,14 @@ export function CrfMissionAssignDrawer({
 }: Props) {
   const { t } = useI18n();
 
-  const projectQuery = useProject(projectCode);
+  // Drive a one-shot lookup of the project so members are loaded.
+  // Pass `enabled: open` so the query is active while the drawer is
+  // open: when another surface (e.g. the project-list page) calls
+  // `useUpdateProject` and invalidates `project.byCode(code)`, this
+  // query auto-refetches and the user dropdown stays in sync. Drop
+  // the previous manual `refetch()` effect — with `staleTime: 0`
+  // and the query enabled, React Query fetches on mount itself.
+  const projectQuery = useProject(projectCode, { enabled: open });
   const addAssignee = useAddAssignee(projectCode);
   const removeAssignee = useRemoveAssignee(projectCode);
   const createMission = useCreateMission(projectCode);
@@ -112,20 +119,6 @@ export function CrfMissionAssignDrawer({
     setRole("dev");
     setSubmitting(false);
   }, [open, row?.id]);
-
-  // Drive a one-shot lookup of the project so members are loaded.
-  // `useProject` is manual-trigger (`enabled: false`), so we call
-  // refetch() here on open.
-  useEffect(() => {
-    if (
-      open &&
-      projectCode &&
-      !projectQuery.data &&
-      !projectQuery.isFetching
-    ) {
-      void projectQuery.refetch();
-    }
-  }, [open, projectCode, projectQuery]);
 
   const mutationError: ApiError | null =
     addAssignee.error ??
