@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
@@ -85,6 +85,158 @@ describe("CrfFormListPage", () => {
 
     expect(await screen.findByText("Adverse Events")).toBeInTheDocument();
     expect(screen.getByText("AE")).toBeInTheDocument();
+  });
+
+  it("renders the assignee's display name (resolved via useListUsers) on the chip", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => ({
+        id: 1,
+        code: "u",
+        name: "U",
+        role: "admin",
+        active: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      }),
+      list_crf_versions: () => ({
+        versions: [{ id: 7, projectCode: "abc", name: "v1" }],
+      }),
+      list_crf_forms_by_version: () => ({
+        forms: [
+          {
+            id: 11,
+            versionId: 7,
+            code: "AE",
+            name: "Adverse Events",
+            order: 0,
+            notSubmitted: false,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+          },
+        ],
+      }),
+      list_missions_by_project: () => [
+        {
+          id: 1,
+          projectCode: "abc",
+          missionKind: "crf",
+          missionCode: "AE",
+          assignees: [
+            {
+              id: 99,
+              userCode: "carol",
+              role: "qc",
+              createdAt: "",
+              updatedAt: "",
+            },
+          ],
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+      list_users: () => [
+        {
+          id: 2,
+          code: "carol",
+          name: "Carol Lin",
+          role: "worker",
+          active: true,
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+      get_project_by_code: () => ({
+        id: 1,
+        code: "abc",
+        description: "",
+        members: { leaders: [], workers: [] },
+        unblindMembers: { leaders: [], workers: [] },
+        tags: [],
+        active: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      }),
+    });
+
+    renderPage(["/project/abc/crf?versionId=7"]);
+
+    // The chip label is `name · role`; wait for the post-fetch
+    // state since `useListUsers` resolves asynchronously.
+    await waitFor(() =>
+      expect(screen.getByText(/^Carol Lin · /)).toBeInTheDocument(),
+    );
+  });
+
+  it("falls back to userCode on the chip when list_users returns an empty list", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => ({
+        id: 1,
+        code: "u",
+        name: "U",
+        role: "admin",
+        active: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      }),
+      list_crf_versions: () => ({
+        versions: [{ id: 7, projectCode: "abc", name: "v1" }],
+      }),
+      list_crf_forms_by_version: () => ({
+        forms: [
+          {
+            id: 11,
+            versionId: 7,
+            code: "AE",
+            name: "Adverse Events",
+            order: 0,
+            notSubmitted: false,
+            createdAt: "2026-01-01T00:00:00Z",
+            updatedAt: "2026-01-01T00:00:00Z",
+          },
+        ],
+      }),
+      list_missions_by_project: () => [
+        {
+          id: 1,
+          projectCode: "abc",
+          missionKind: "crf",
+          missionCode: "AE",
+          assignees: [
+            {
+              id: 99,
+              userCode: "carol",
+              role: "qc",
+              createdAt: "",
+              updatedAt: "",
+            },
+          ],
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+      list_users: () => [],
+      get_project_by_code: () => ({
+        id: 1,
+        code: "abc",
+        description: "",
+        members: { leaders: [], workers: [] },
+        unblindMembers: { leaders: [], workers: [] },
+        tags: [],
+        active: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      }),
+    });
+
+    renderPage(["/project/abc/crf?versionId=7"]);
+
+    // The chip falls back to the userCode when `list_users` returns
+    // no rows. Use `findByText` (not `getByText`) since the chip
+    // only appears once both `list_missions_by_project` and
+    // `list_crf_forms_by_version` resolve.
+    expect(await screen.findByText(/^carol · /)).toBeInTheDocument();
   });
 });
 
