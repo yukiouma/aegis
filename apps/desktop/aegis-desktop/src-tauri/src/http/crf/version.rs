@@ -103,8 +103,18 @@ impl CrfItemKind {
     }
 }
 
-fn control_type_to_kind(c: entities::project::ControlType) -> CrfItemKind {
+fn control_type_to_kind(
+    c: entities::project::ControlType,
+    not_variable: Option<bool>,
+) -> CrfItemKind {
     use entities::project::ControlType as C;
+    // als-resolver marks an item with `not_variable=true` when it is a
+    // static label rather than a captured variable. Surface that as
+    // `CrfItemKind::Label` here so the wire shape matches what the
+    // server (and the detail page) already understand.
+    if not_variable == Some(true) {
+        return CrfItemKind::Label;
+    }
     match c {
         C::TEXT => CrfItemKind::Text,
         C::DATETIME => CrfItemKind::Datetime,
@@ -196,7 +206,7 @@ fn pre_validate(project: &als_resolver::Project) -> Result<(), Vec<AlsImportErro
                 }
             }
 
-            let kind = control_type_to_kind(item.control_type);
+            let kind = control_type_to_kind(item.control_type, item.not_variable);
             match kind {
                 CrfItemKind::Selection if opts.is_empty() => {
                     errs.push(AlsImportError::KindShapeViolation {
@@ -356,7 +366,7 @@ pub async fn import_als(
                     item: CreateCrfItemRequest {
                         code: item.name.clone(),
                         name: item.label.clone(),
-                        kind: control_type_to_kind(item.control_type).into(),
+                        kind: control_type_to_kind(item.control_type, item.not_variable).into(),
                         order: i as i32,
                         not_submitted: false,
                     },
@@ -511,18 +521,38 @@ mod tests {
     #[test]
     fn control_type_to_kind_covers_all_variants() {
         use entities::project::ControlType;
-        assert_eq!(control_type_to_kind(ControlType::TEXT), CrfItemKind::Text);
         assert_eq!(
-            control_type_to_kind(ControlType::DATETIME),
+            control_type_to_kind(ControlType::TEXT, None),
+            CrfItemKind::Text
+        );
+        assert_eq!(
+            control_type_to_kind(ControlType::DATETIME, None),
             CrfItemKind::Datetime
         );
         assert_eq!(
-            control_type_to_kind(ControlType::SELECTION),
+            control_type_to_kind(ControlType::SELECTION, None),
             CrfItemKind::Selection
         );
         assert_eq!(
-            control_type_to_kind(ControlType::CHECKBOX),
+            control_type_to_kind(ControlType::CHECKBOX, None),
             CrfItemKind::Checkbox
+        );
+        // `not_variable = Some(true)` overrides the control type and
+        // surfaces a label — covers the als-resolver case where a
+        // captured field has been re-emitted as a static label.
+        assert_eq!(
+            control_type_to_kind(ControlType::TEXT, Some(true)),
+            CrfItemKind::Label
+        );
+        assert_eq!(
+            control_type_to_kind(ControlType::CHECKBOX, Some(true)),
+            CrfItemKind::Label
+        );
+        // `not_variable = Some(false)` mirrors `None` and must NOT
+        // promote the item to a label.
+        assert_eq!(
+            control_type_to_kind(ControlType::TEXT, Some(false)),
+            CrfItemKind::Text
         );
     }
 
