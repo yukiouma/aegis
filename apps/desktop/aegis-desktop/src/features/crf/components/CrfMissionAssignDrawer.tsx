@@ -29,6 +29,7 @@ import {
   useRemoveAssignee,
 } from "../../mission";
 import { useProject } from "../../project-list";
+import { useUserNameMap } from "../../user/data/list";
 
 interface Props {
   open: boolean;
@@ -69,6 +70,7 @@ export function CrfMissionAssignDrawer({
   const addAssignee = useAddAssignee(projectCode);
   const removeAssignee = useRemoveAssignee(projectCode);
   const createMission = useCreateMission(projectCode);
+  const resolveName = useUserNameMap();
 
   const [userCode, setUserCode] = useState<string | null>(null);
   const [role, setRole] = useState<MissionRole>("dev");
@@ -210,7 +212,7 @@ export function CrfMissionAssignDrawer({
                 >
                   <Chip
                     size="small"
-                    label={`${a.userCode} · ${
+                    label={`${resolveName(a.userCode)} · ${
                       a.role === "qc"
                         ? t("crf.missionAssign.roleQc")
                         : t("crf.missionAssign.roleDev")
