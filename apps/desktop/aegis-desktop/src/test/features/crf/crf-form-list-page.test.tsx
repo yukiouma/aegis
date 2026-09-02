@@ -63,7 +63,7 @@ describe("CrfFormListPage", () => {
           },
         ],
       }),
-      list_missions_by_project: () => ({ missions: [] }),
+      list_missions_by_project: () => [],
       get_project_by_code: () => ({
         id: 1,
         code: "abc",
