@@ -15,11 +15,11 @@ import {
 } from "@tanstack/react-router";
 
 import {
-  CrfAssignTakersDrawer,
   CrfFormDrawer,
   CrfFormFilterDrawer,
   type CrfStatusFilter,
   CrfFormTable,
+  CrfMissionAssignDrawer,
   CrfToolsMenu,
   CrfStatusChip,
   CrfVersionDropdown,
@@ -32,6 +32,11 @@ import {
   useListCrfVersions,
   useUpdateCrfForm,
 } from "../data/list";
+import {
+  useIsProjectLeader,
+  useListMissionsByProject,
+} from "../../mission";
+import { useCurrentUser } from "../../auth";
 import type { CrfForm } from "../../../shared/api";
 import { errorMessage } from "../../../shared/api/error";
 
@@ -89,6 +94,15 @@ export function CrfFormListPage() {
   const versionsQuery = useListCrfVersions(projectCode);
   const versions = versionsQuery.data ?? [];
 
+  // Hide the create-version affordance for non-leaders. The table
+  // itself gates per-row actions on its own copy of `canAssign` —
+  // duplicating the call here keeps the page's toolbar decision
+  // independent of the table's render lifecycle.
+  const isLeader = useIsProjectLeader(projectCode);
+  const canManageVersions = isLeader === true;
+
+  const currentUserQuery = useCurrentUser();
+
   // Reconcile ?versionId URL ↔ first version fallback.
   useEffect(() => {
     if (versions.length === 0) return;
@@ -108,10 +122,19 @@ export function CrfFormListPage() {
   const formsQuery = useListCrfForms(selectedVersionId);
   const allRows = formsQuery.data ?? [];
 
+  // Missions are keyed by `(projectCode, missionCode === form.code)`.
+  // The table cell needs the assignees for the current form, so we
+  // pull all CRF missions for the project once and pass the array
+  // down — the cell does an O(n) lookup. We could fetch one mission
+  // per row, but the project-scoped read is a single round trip and
+  // matches the page's already-loaded cache shape.
+  const missionsQuery = useListMissionsByProject(projectCode, "crf");
+  const missions = missionsQuery.data ?? [];
+
   // Page-owned filter state (drawer is fully controlled).
   const [searchInput, setSearchInput] = useState("");
   const [statusSelected, setStatusSelected] = useState<CrfStatusFilter[]>([]);
-  const [involvedChecked] = useState(false);
+  const [involvedChecked, setInvolvedChecked] = useState(false);
 
   // Inline debounce: 300 ms delay, no max-wait.
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -120,17 +143,33 @@ export function CrfFormListPage() {
     return () => clearTimeout(handle);
   }, [searchInput]);
 
+  // Pre-compute the set of form codes whose mission has the current
+  // user as an assignee — used by the "Involved" filter.
+  const myInvolvedFormCodes = useMemo(() => {
+    if (!involvedChecked) return null;
+    const myCode = currentUserQuery.data?.code;
+    if (!myCode) return new Set<string>();
+    const codes = new Set<string>();
+    for (const mission of missions) {
+      if (mission.assignees.some((a) => a.userCode === myCode)) {
+        codes.add(mission.missionCode);
+      }
+    }
+    return codes;
+  }, [involvedChecked, currentUserQuery.data, missions]);
+
   const filteredRows = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
     return allRows.filter((r) => {
-      // statusSelected + involvedChecked are held but no-op this PR
+      // statusSelected is held for future use; currently no-op.
       void statusSelected;
-      void involvedChecked;
-      return (
+      const matchesSearch =
         q === "" ||
         r.code.toLowerCase().includes(q) ||
-        r.name.toLowerCase().includes(q)
-      );
+        r.name.toLowerCase().includes(q);
+      if (!matchesSearch) return false;
+      if (myInvolvedFormCodes && !myInvolvedFormCodes.has(r.code)) return false;
+      return true;
     });
   }, [allRows, debouncedSearch, statusSelected, involvedChecked]);
 
@@ -176,20 +215,22 @@ export function CrfFormListPage() {
         gap: 2,
       }}
     >
-      <Tooltip title={t("crf.toolbar.createVersion")}>
-        <IconButton
-          size="small"
-          aria-label={t("crf.toolbar.createVersion")}
-          onClick={() =>
-            navigate({
-              to: "/project/$projectCode/crf/versions/new",
-              params: { projectCode },
-            })
-          }
-        >
-          <NoteAddIcon />
-        </IconButton>
-      </Tooltip>
+      {canManageVersions && (
+        <Tooltip title={t("crf.toolbar.createVersion")}>
+          <IconButton
+            size="small"
+            aria-label={t("crf.toolbar.createVersion")}
+            onClick={() =>
+              navigate({
+                to: "/project/$projectCode/crf/versions/new",
+                params: { projectCode },
+              })
+            }
+          >
+            <NoteAddIcon />
+          </IconButton>
+        </Tooltip>
+      )}
       <CrfVersionDropdown
         versions={versions}
         value={selectedVersionId}
@@ -221,6 +262,8 @@ export function CrfFormListPage() {
 
       <CrfFormTable
         rows={filteredRows}
+        missions={missions}
+        projectCode={projectCode}
         loading={formsQuery.isFetching}
         error={formsQuery.error}
         canAddFilter={selectedVersionId != null}
@@ -281,8 +324,11 @@ export function CrfFormListPage() {
         mutationPending={deleteMutation.isPending}
       />
 
-      <CrfAssignTakersDrawer
+      <CrfMissionAssignDrawer
         open={assignTakersFor != null}
+        row={assignTakersFor}
+        projectCode={projectCode}
+        missions={missions}
         onClose={() => setAssignTakersFor(null)}
       />
 
@@ -292,8 +338,11 @@ export function CrfFormListPage() {
         onSearchInputChange={setSearchInput}
         statusSelected={statusSelected}
         onStatusSelectedChange={setStatusSelected}
+        involvedChecked={involvedChecked}
+        onInvolvedCheckedChange={setInvolvedChecked}
         onClear={() => {
           setSearchInput("");
+          setInvolvedChecked(false);
           setStatusSelected([]);
         }}
         onApply={() => setFilterOpen(false)}

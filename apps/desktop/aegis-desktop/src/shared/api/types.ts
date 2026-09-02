@@ -587,3 +587,38 @@ export interface ImportAlsInput {
   filepath: string;
   edcType: CrfEdcType;
 }
+
+// Mission
+
+export type MissionKind = "crf" | "sdtm" | "adam" | "tfl";
+export type MissionRole = "dev" | "qc";
+
+export interface AssigneeDataArg {
+  userCode: string;
+  role: MissionRole;
+}
+
+export interface AssigneeViewResponse {
+  id: number;
+  userCode: string;
+  role: MissionRole;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface MissionViewResponse {
+  id: number;
+  projectCode: string;
+  missionKind: MissionKind;
+  missionCode: string;
+  assignees: AssigneeViewResponse[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateMissionInput {
+  projectCode: string;
+  missionKind: MissionKind;
+  missionCode: string;
+  assignees: AssigneeDataArg[];
+}

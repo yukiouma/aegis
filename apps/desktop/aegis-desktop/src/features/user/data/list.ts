@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
@@ -19,6 +20,28 @@ export function useListUsers(options?: { enabled?: boolean }) {
     queryFn: () => api.listUsers(),
     enabled: options?.enabled ?? true,
   });
+}
+
+/**
+ * Resolve a `userCode` to its display `name` using the cached
+ * `useListUsers` query. Falls back to the userCode itself when the
+ * list has not loaded yet, or the user is not in the list (e.g. the
+ * user was deactivated after the mission was created).
+ *
+ * The lookup is intentional: assignees carry `userCode` on the wire
+ * (`AssigneeViewResponse` has no `name`), and the UI needs a
+ * human-readable label without changing the API.
+ */
+export function useUserNameMap() {
+  const usersQuery = useListUsers();
+  const map = useMemo(
+    () => new Map(usersQuery.data?.map((u) => [u.code, u.name] as const)),
+    [usersQuery.data],
+  );
+  return useCallback(
+    (userCode: string) => map.get(userCode) ?? userCode,
+    [map],
+  );
 }
 
 /**

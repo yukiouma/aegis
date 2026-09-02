@@ -31,7 +31,18 @@ export function useListProjects() {
  * fresh read without auto-firing on every mount. `staleTime: 0`
  * keeps the read always-fresh before edit.
  */
-export function useProject(code: string | null) {
+/**
+ * Fetch a single project by code. Manual-trigger by default
+ * (`enabled: false`) — callers drive fetching via `refetch()`. Pass
+ * `{ enabled: true }` to opt into auto-fetch, e.g. when a long-lived
+ * surface (like the assign-mission drawer) wants the project to
+ * refresh whenever another surface invalidates the cache.
+ */
+export function useProject(
+  code: string | null,
+  options?: { enabled?: boolean },
+) {
+  const enabled = (options?.enabled ?? false) && code !== null;
   return useQuery<ProjectView, ApiError>({
     queryKey:
       code === null
@@ -41,7 +52,7 @@ export function useProject(code: string | null) {
       if (code === null) throw new Error("useProject disabled");
       return api.getProjectByCode(code);
     },
-    enabled: false,
+    enabled,
     staleTime: 0,
   });
 }

@@ -22,14 +22,16 @@ interface Props {
   onSearchInputChange: (value: string) => void;
   statusSelected: CrfStatusFilter[];
   onStatusSelectedChange: (value: CrfStatusFilter[]) => void;
+  involvedChecked: boolean;
+  onInvolvedCheckedChange: (value: boolean) => void;
   onClear: () => void;
   onApply: () => void;
 }
 
 /**
- * Right-anchored filter drawer. Status multi-select + Involved
- * checkbox are UI scaffolding only — the page tracks them but
- * the in-memory filter only consumes the search text this PR.
+ * Right-anchored filter drawer. Search text, status multi-select,
+ * and the "Involved" checkbox are all wired to page-owned state
+ * and applied via the page's `filteredRows` selector.
  */
 export function CrfFormFilterDrawer({
   open,
@@ -37,6 +39,8 @@ export function CrfFormFilterDrawer({
   onSearchInputChange,
   statusSelected,
   onStatusSelectedChange,
+  involvedChecked,
+  onInvolvedCheckedChange,
   onClear,
   onApply,
 }: Props) {
@@ -96,7 +100,12 @@ export function CrfFormFilterDrawer({
           </Select>
         </FormControl>
         <FormControlLabel
-          control={<Checkbox disabled checked={false} />}
+          control={
+            <Checkbox
+              checked={involvedChecked}
+              onChange={(e) => onInvolvedCheckedChange(e.target.checked)}
+            />
+          }
           label={t("crf.filter.involved")}
         />
         <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end" }}>

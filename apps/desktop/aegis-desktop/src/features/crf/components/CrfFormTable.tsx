@@ -28,7 +28,9 @@ import {
   useDroppable,
 } from "@aegis/ui/dnd";
 import { useI18n } from "@aegis/ui/i18n";
-import type { CrfForm } from "../../../shared/api";
+import type { CrfForm, MissionViewResponse } from "../../../shared/api";
+import { useIsProjectLeader } from "../../mission";
+import { useUserNameMap } from "../../user/data/list";
 
 /**
  * Move `sourceId` to `targetId`'s slot in the ordered id sequence, shifting
@@ -87,6 +89,8 @@ export function applyReorder(
 
 interface Props {
   rows: CrfForm[];
+  missions: MissionViewResponse[];
+  projectCode: string;
   loading: boolean;
   error: unknown;
   canAddFilter: boolean;
@@ -101,16 +105,45 @@ interface Props {
 
 interface DraggableRowProps {
   row: CrfForm;
+  mission: MissionViewResponse | undefined;
   showHandle: boolean;
+  canAssign: boolean;
+  resolveName: (userCode: string) => string;
   onAssignTakers: (row: CrfForm) => void;
   onEdit: (row: CrfForm) => void;
   onDelete: (row: CrfForm) => void;
   onOpenDetail: (row: CrfForm) => void;
 }
 
+function AssigneeChip({
+  role,
+  name,
+}: {
+  role: "dev" | "qc";
+  name: string;
+}) {
+  // The chip carries the assignee's display name; the role is
+  // communicated by the chip's border style. Both chips are
+  // outlined. QC uses a dashed border; DEV keeps the default
+  // (solid).
+  const isQc = role === "qc";
+  return (
+    <Chip
+      size="small"
+      label={name}
+      variant="outlined"
+      color="primary"
+      sx={isQc ? { borderStyle: "dashed" } : undefined}
+    />
+  );
+}
+
 function DraggableRow({
   row,
+  mission,
   showHandle,
+  canAssign,
+  resolveName,
   onAssignTakers,
   onEdit,
   onDelete,
@@ -138,7 +171,19 @@ function DraggableRow({
       </TableCell>
       <TableCell>{row.code}</TableCell>
       <TableCell>{row.name}</TableCell>
-      <TableCell />
+      <TableCell sx={{ minWidth: 220 }}>
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+          {mission?.assignees.length ? (
+            mission.assignees.map((a) => (
+              <AssigneeChip key={a.id} role={a.role} name={resolveName(a.userCode)} />
+            ))
+          ) : (
+            <Box sx={{ color: "text.secondary", fontSize: 12 }}>
+              {t("crf.missionAssign.empty")}
+            </Box>
+          )}
+        </Box>
+      </TableCell>
       <TableCell>
         <Chip
           icon={<PendingActionsIcon />}
@@ -149,33 +194,40 @@ function DraggableRow({
         />
       </TableCell>
       <TableCell align="right">
-        <Tooltip title={t("crf.table.action.assignTakers")}>
-          <IconButton
-            size="small"
-            aria-label={t("crf.table.action.assignTakers")}
-            onClick={() => onAssignTakers(row)}
-          >
-            <AssignmentIndIcon />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title={t("crf.table.action.edit")}>
-          <IconButton
-            size="small"
-            aria-label={t("crf.table.action.edit")}
-            onClick={() => onEdit(row)}
-          >
-            <EditIcon />
-          </IconButton>
-        </Tooltip>
-        <Tooltip title={t("crf.table.action.delete")}>
-          <IconButton
-            size="small"
-            aria-label={t("crf.table.action.delete")}
-            onClick={() => onDelete(row)}
-          >
-            <DeleteIcon />
-          </IconButton>
-        </Tooltip>
+        {canAssign && (
+          <Tooltip title={t("crf.table.action.assignTakers")}>
+            <IconButton
+              size="small"
+              aria-label={t("crf.table.action.assignTakers")}
+              onClick={() => onAssignTakers(row)}
+            >
+              <AssignmentIndIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+        {canAssign && (
+          <Tooltip title={t("crf.table.action.edit")}>
+            <IconButton
+              size="small"
+              aria-label={t("crf.table.action.edit")}
+              onClick={() => onEdit(row)}
+            >
+              <EditIcon />
+            </IconButton>
+          </Tooltip>
+        )}
+        {canAssign && (
+          <Tooltip title={t("crf.table.action.delete")}>
+            <IconButton
+              size="small"
+              color="error"
+              aria-label={t("crf.table.action.delete")}
+              onClick={() => onDelete(row)}
+            >
+              <DeleteIcon />
+            </IconButton>
+          </Tooltip>
+        )}
         <Tooltip title={t("crf.table.action.openDetail")}>
           <IconButton
             size="small"
@@ -192,6 +244,8 @@ function DraggableRow({
 
 export function CrfFormTable({
   rows,
+  missions,
+  projectCode,
   loading,
   error,
   canAddFilter,
@@ -205,6 +259,8 @@ export function CrfFormTable({
 }: Props) {
   const { t } = useI18n();
   const [internalOrder, setInternalOrder] = useState<number[] | null>(null);
+  const isLeader = useIsProjectLeader(projectCode);
+  const resolveName = useUserNameMap();
 
   const orderedIds = useMemo(() => {
     // `internalOrder` is the user's local override after a drag-and-drop.
@@ -231,9 +287,21 @@ export function CrfFormTable({
     return m;
   }, [rows]);
 
+  // Map form.code -> mission so the cell does an O(1) lookup per row.
+  const missionByFormCode = useMemo(() => {
+    const m = new Map<string, MissionViewResponse>();
+    for (const mission of missions) m.set(mission.missionCode, mission);
+    return m;
+  }, [missions]);
+
   // Show the drag indicator only when there's something to drag into.
   // With a single row there's no drop target, so the cell renders empty.
   const showHandle = orderedIds.length >= 2;
+
+  // Leader gate: hide the icon entirely while loading (`null`) and for
+  // non-leaders (`false`). Server-side enforcement is the authority;
+  // this just controls the UI affordance.
+  const canAssign = isLeader === true;
 
   return (
     <DragDropProvider
@@ -251,18 +319,20 @@ export function CrfFormTable({
               <TableCell sx={{ width: 40 }} />
               <TableCell>{t("crf.table.column.code")}</TableCell>
               <TableCell>{t("crf.table.column.name")}</TableCell>
-              <TableCell>{t("crf.table.column.taker")}</TableCell>
+              <TableCell>{t("crf.table.column.assignee")}</TableCell>
               <TableCell>{t("crf.table.column.status")}</TableCell>
               <TableCell align="right">
-                <Tooltip title={t("crf.table.action.addForm")}>
-                  <IconButton
-                    size="small"
-                    aria-label={t("crf.table.action.addForm")}
-                    onClick={onAdd}
-                  >
-                    <AddIcon />
-                  </IconButton>
-                </Tooltip>
+                {canAssign && (
+                  <Tooltip title={t("crf.table.action.addForm")}>
+                    <IconButton
+                      size="small"
+                      aria-label={t("crf.table.action.addForm")}
+                      onClick={onAdd}
+                    >
+                      <AddIcon />
+                    </IconButton>
+                  </Tooltip>
+                )}
                 <Tooltip title={t("crf.table.action.filter")}>
                   <IconButton
                     size="small"
@@ -293,7 +363,10 @@ export function CrfFormTable({
                 <DraggableRow
                   key={row.id}
                   row={row}
+                  mission={missionByFormCode.get(row.code)}
                   showHandle={showHandle}
+                  canAssign={canAssign}
+                  resolveName={resolveName}
                   onAssignTakers={onAssignTakers}
                   onEdit={onEdit}
                   onDelete={onDelete}

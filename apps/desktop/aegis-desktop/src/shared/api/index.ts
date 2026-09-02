@@ -4,6 +4,8 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type {
   Annotation,
   AnnotationListResponse,
+  AssigneeDataArg,
+  AssigneeViewResponse,
   CodeItemListQuery,
   CodeItemListResponse,
   CodeItemView,
@@ -14,6 +16,7 @@ import type {
   CreateCodeListInput,
   CreateCrfFormInput,
   CreateDomainAnnotationInput,
+  CreateMissionInput,
   CreateProjectInput,
   CreateSdtmDomainInput,
   CreateSdtmVariableInput,
@@ -33,6 +36,8 @@ import type {
   DomainAnnotation,
   DomainAnnotationListResponse,
   Identity,
+  MissionKind,
+  MissionViewResponse,
   PagedCodeItemListResponse,
   PagedCodeListListResponse,
   ProjectView,
@@ -430,11 +435,39 @@ export const api = {
     call<Annotation>("update_crf_annotation", { id, body: { ...body } }),
   deleteCrfAnnotation: (id: number): Promise<void> =>
     call<void>("delete_crf_annotation", { id }),
+
+  // mission
+  listMissionsByProject: (
+    projectCode: string,
+    kind?: MissionKind,
+  ): Promise<MissionViewResponse[]> =>
+    // The *server* returns a `MissionListResponse { missions: [...] }`
+    // envelope, but `http::mission::list_by_project` already unwraps it,
+    // so the Tauri command hands back a bare `Vec<MissionViewResponse>`.
+    // Do not unwrap again here — `.missions` on an array is `undefined`.
+    call<MissionViewResponse[]>("list_missions_by_project", {
+      projectCode,
+      kind,
+    }),
+  addAssignee: (
+    missionId: number,
+    body: AssigneeDataArg,
+  ): Promise<AssigneeViewResponse> =>
+    call<AssigneeViewResponse>("add_assignee", {
+      missionId,
+      body: { ...body },
+    }),
+  removeAssignee: (missionId: number, assigneeId: number): Promise<void> =>
+    call<void>("remove_assignee", { missionId, assigneeId }),
+  createMission: (input: CreateMissionInput): Promise<MissionViewResponse> =>
+    call<MissionViewResponse>("create_mission", { ...input }),
 } as const;
 
 export type { ApiError } from "./types";
 export type {
   Annotation,
+  AssigneeDataArg,
+  AssigneeViewResponse,
   AnnotationOwner,
   CodeItemListQuery,
   CodeItemListResponse,
@@ -447,6 +480,7 @@ export type {
   CreateCodeListInput,
   CreateCrfFormInput,
   CreateDomainAnnotationInput,
+  CreateMissionInput,
   CreateProjectInput,
   CreateSdtmDomainInput,
   CreateSdtmVariableInput,
@@ -469,6 +503,9 @@ export type {
   DomainCategory,
   Identity,
   ImportAlsInput,
+  MissionKind,
+  MissionRole,
+  MissionViewResponse,
   PagedCodeItemListResponse,
   PagedCodeListListResponse,
   ProjectMembers,
