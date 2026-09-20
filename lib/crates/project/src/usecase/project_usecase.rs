@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::domain::{
-    DomainError, Project, ProjectMember, ProjectNew, ProjectRepository, ProjectTag, ProjectUpdate,
-    UserService, UserSummary,
+    DomainError, Project, ProjectConfiguration, ProjectMember, ProjectNew, ProjectRepository,
+    ProjectTag, ProjectUpdate, UserService, UserSummary,
 };
 
 use super::commands::{CreateProject, UpdateProject};
@@ -39,7 +39,7 @@ impl<R: ProjectRepository, U: UserService> ProjectUsecase<R, U> {
                 description: cmd.description,
                 members: cmd.members,
                 unblind_members: cmd.unblind_members,
-                tags: cmd.tags,
+                configuration: cmd.configuration,
             })
             .await?;
 
@@ -81,7 +81,7 @@ impl<R: ProjectRepository, U: UserService> ProjectUsecase<R, U> {
                 active: cmd.active,
                 members: cmd.members,
                 unblind_members: cmd.unblind_members,
-                tags: cmd.tags,
+                configuration: cmd.configuration,
             })
             .await?;
         self.hydrate_project_view(updated).await
@@ -151,23 +151,8 @@ fn validate_create_project(cmd: &CreateProject) -> Result<(), UsecaseError> {
     if let Some(ref m) = cmd.unblind_members {
         ProjectMember::new(m.leaders.clone(), m.workers.clone())?;
     }
-    if let Some(ref tags) = cmd.tags {
-        for tag in tags {
-            // Tag validation surfaces as `Validation`, not
-            // `Repository`. The domain `From<DomainError>` impl maps
-            // straight to `Repository`, so map the two tag variants
-            // explicitly.
-            match ProjectTag::new(tag.key.clone(), tag.value.clone()) {
-                Ok(_) => {}
-                Err(DomainError::EmptyTagKey) => {
-                    return Err(UsecaseError::Validation(DomainError::EmptyTagKey));
-                }
-                Err(DomainError::EmptyTagValue) => {
-                    return Err(UsecaseError::Validation(DomainError::EmptyTagValue));
-                }
-                Err(other) => return Err(UsecaseError::Repository(other)),
-            }
-        }
+    if let Some(ref c) = cmd.configuration {
+        validate_configuration_tags(c)?;
     }
     Ok(())
 }
@@ -184,18 +169,26 @@ fn validate_update_project(cmd: &UpdateProject) -> Result<(), UsecaseError> {
     if let Some(ref m) = cmd.unblind_members {
         ProjectMember::new(m.leaders.clone(), m.workers.clone())?;
     }
-    if let Some(ref tags) = cmd.tags {
-        for tag in tags {
-            match ProjectTag::new(tag.key.clone(), tag.value.clone()) {
-                Ok(_) => {}
-                Err(DomainError::EmptyTagKey) => {
-                    return Err(UsecaseError::Validation(DomainError::EmptyTagKey));
-                }
-                Err(DomainError::EmptyTagValue) => {
-                    return Err(UsecaseError::Validation(DomainError::EmptyTagValue));
-                }
-                Err(other) => return Err(UsecaseError::Repository(other)),
+    if let Some(ref c) = cmd.configuration {
+        validate_configuration_tags(c)?;
+    }
+    Ok(())
+}
+
+/// Tag validation surfaces as `Validation`, not `Repository`. The
+/// domain `From<DomainError>` impl maps straight to `Repository`,
+/// so map the two tag variants explicitly.
+fn validate_configuration_tags(c: &ProjectConfiguration) -> Result<(), UsecaseError> {
+    for tag in &c.tags {
+        match ProjectTag::new(tag.key.clone(), tag.value.clone()) {
+            Ok(_) => {}
+            Err(DomainError::EmptyTagKey) => {
+                return Err(UsecaseError::Validation(DomainError::EmptyTagKey));
             }
+            Err(DomainError::EmptyTagValue) => {
+                return Err(UsecaseError::Validation(DomainError::EmptyTagValue));
+            }
+            Err(other) => return Err(UsecaseError::Repository(other)),
         }
     }
     Ok(())
