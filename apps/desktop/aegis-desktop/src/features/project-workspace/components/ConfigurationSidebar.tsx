@@ -37,7 +37,7 @@ const ORDER: SectionEntry[] = [
 export function ConfigurationSidebar({
   value,
   onChange,
-  width = 200,
+  width = 150,
 }: ConfigurationSidebarProps) {
   const { t } = useI18n();
 
@@ -47,11 +47,7 @@ export function ConfigurationSidebar({
       aria-label="configuration-section"
       sx={{
         width,
-        flexShrink: 0,
-        borderLeft: 1,
-        borderColor: "divider",
-        bgcolor: "background.paper",
-        py: 2,
+        py: 13,
         px: 1,
       }}
     >
@@ -66,10 +62,10 @@ export function ConfigurationSidebar({
             key={section}
             value={section}
             icon={<Icon />}
-            iconPosition="top"
+            iconPosition="end"
             label={t(`project.configuration.section.${section}` as const)}
             data-testid={`config-section-${section}`}
-            sx={{ alignItems: "flex-start", minHeight: "auto", py: 1.5 }}
+            sx={{ justifyContent: "flex-end", minHeight: "auto", py: 1.5 }}
           />
         ))}
       </Tabs>
