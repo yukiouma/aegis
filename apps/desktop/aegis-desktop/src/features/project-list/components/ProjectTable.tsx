@@ -137,7 +137,7 @@ export function ProjectTable({
                       spacing={0.5}
                       sx={{ flexWrap: "wrap", gap: 0.5 }}
                     >
-                      {row.tags.map((tag, i) => (
+                      {row.configurations.tags.map((tag, i) => (
                         <Chip
                           key={`tag-${i}-${tag.key}-${tag.value}`}
                           size="small"
@@ -145,7 +145,7 @@ export function ProjectTable({
                           title={tag.key}
                         />
                       ))}
-                      {row.tags.length === 0 && <span>—</span>}
+                      {row.configurations.tags.length === 0 && <span>—</span>}
                     </Stack>
                   </TableCell>
                   <TableCell>

@@ -107,13 +107,23 @@ export interface Tag {
   key: string;
   value: string;
 }
+/** Wire code is one of two well-known strings; mirrors
+ *  `src-tauri/src/http/project.rs::ProjectLanguage`. */
+export type ProjectLanguage = "en" | "zh-CN";
+
+/** Project configuration payload: optional locale plus the tag list.
+ *  Server treats `Some(config)` on update as whole-replace. */
+export interface ProjectConfiguration {
+  language: ProjectLanguage | null;
+  tags: Tag[];
+}
 export interface ProjectView {
   id: number;
   code: string;
   description: string;
   members: ProjectMembersView;
   unblindMembers: ProjectMembersView;
-  tags: Tag[];
+  configurations: ProjectConfiguration;
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -123,7 +133,7 @@ export interface CreateProjectInput {
   description: string;
   members?: ProjectMembers;
   unblindMembers?: ProjectMembers;
-  tags?: Tag[];
+  configurations?: ProjectConfiguration;
 }
 export interface UpdateProjectBody {
   code?: string;
@@ -131,7 +141,7 @@ export interface UpdateProjectBody {
   active?: boolean;
   members?: ProjectMembers;
   unblindMembers?: ProjectMembers;
-  tags?: Tag[];
+  configurations?: ProjectConfiguration;
 }
 
 // Terminology

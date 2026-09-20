@@ -6,7 +6,7 @@ import {
   Stack,
   TextField,
 } from "@aegis/ui/mui";
-import { Add, Close } from "@aegis/ui/icons";
+import { Add, Delete } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
 
 import type { Tag } from "../../../shared/api";
@@ -104,9 +104,10 @@ export function TagEditor({ value, onChange, onTouched }: TagEditorProps) {
             />
             <IconButton
               aria-label={t("common.remove")}
+              color="error"
               onClick={() => removeRow(i)}
             >
-              <Close />
+              <Delete />
             </IconButton>
           </Box>
         ))}

@@ -1,3 +1,9 @@
 // Public API of the project-workspace feature.
-// Currently no data hooks — pages and layouts only.
-export {};
+export { useProjectConfiguration } from "./data/project-configuration";
+export { ConfigurationFilepathSection } from "./components/ConfigurationFilepathSection";
+export { ConfigurationGeneralSection } from "./components/ConfigurationGeneralSection";
+export { ConfigurationMembersSection } from "./components/ConfigurationMembersSection";
+export {
+  ConfigurationSidebar,
+  type ConfigurationSection,
+} from "./components/ConfigurationSidebar";

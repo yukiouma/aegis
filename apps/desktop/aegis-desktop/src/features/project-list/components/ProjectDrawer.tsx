@@ -5,7 +5,11 @@ import {
   Box,
   Button,
   Drawer,
+  FormControl,
   FormControlLabel,
+  InputLabel,
+  MenuItem,
+  Select,
   Stack,
   Switch,
   TextField,
@@ -22,6 +26,8 @@ import {
 import {
   type ApiError,
   type CreateProjectInput,
+  type ProjectConfiguration,
+  type ProjectLanguage,
   type Tag,
   type UpdateProjectBody,
   type UserSummary,
@@ -62,7 +68,9 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
   const [memberWorkers, setMemberWorkers] = useState<UserSummary[]>([]);
   const [unblindLeaders, setUnblindLeaders] = useState<UserSummary[]>([]);
   const [unblindWorkers, setUnblindWorkers] = useState<UserSummary[]>([]);
+  const [language, setLanguage] = useState<ProjectLanguage | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [languageTouched, setLanguageTouched] = useState(false);
   const [tagsTouched, setTagsTouched] = useState(false);
   const [active, setActive] = useState(true);
 
@@ -80,7 +88,9 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
     setMemberWorkers([]);
     setUnblindLeaders([]);
     setUnblindWorkers([]);
+    setLanguage(null);
     setTags([]);
+    setLanguageTouched(false);
     setTagsTouched(false);
     setActive(true);
   }, [mode]);
@@ -104,7 +114,9 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
       setMemberWorkers(r.data.members.workers);
       setUnblindLeaders(r.data.unblindMembers.leaders);
       setUnblindWorkers(r.data.unblindMembers.workers);
-      setTags(r.data.tags);
+      setLanguage(r.data.configurations.language);
+      setTags(r.data.configurations.tags);
+      setLanguageTouched(false);
       setTagsTouched(false);
       setActive(r.data.active);
     })();
@@ -125,6 +137,7 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
       leaders: unblindLeaders.map((u) => u.code),
       workers: unblindWorkers.map((u) => u.code),
     };
+    const configurations: ProjectConfiguration = { language, tags };
     try {
       if (mode === "create") {
         const input: CreateProjectInput = {
@@ -132,7 +145,7 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
           description: description.trim(),
           members,
           unblindMembers,
-          tags,
+          configurations,
         };
         await create.mutateAsync(input);
       } else if (mode === "edit" && code) {
@@ -141,7 +154,7 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
           active,
           members,
           unblindMembers,
-          ...(tagsTouched ? { tags } : {}),
+          ...(languageTouched || tagsTouched ? { configurations } : {}),
         };
         await update.mutateAsync({ code, body });
       }
@@ -184,6 +197,28 @@ export function ProjectDrawer({ mode, code, onClose }: ProjectDrawerProps) {
           size="small"
           required
         />
+
+        <FormControl size="small" sx={{ maxWidth: 320 }}>
+          <InputLabel id="project-language-label">
+            {t("project.field.language")}
+          </InputLabel>
+          <Select<ProjectLanguage | "" >
+            labelId="project-language-label"
+            label={t("project.field.language")}
+            value={language ?? ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              setLanguage(v === "" ? null : (v as ProjectLanguage));
+              if (!languageTouched) setLanguageTouched(true);
+            }}
+          >
+            <MenuItem value="">{t("project.field.language.none")}</MenuItem>
+            <MenuItem value="en">{t("language.english")}</MenuItem>
+            <MenuItem value="zh-CN">
+              {t("language.simplifiedChinese")}
+            </MenuItem>
+          </Select>
+        </FormControl>
 
         <TagEditor
           value={tags}
