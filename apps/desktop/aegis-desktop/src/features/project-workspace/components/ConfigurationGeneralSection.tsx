@@ -83,7 +83,7 @@ export function ConfigurationGeneralSection({
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 3 }}>
-      <FormControl size="small" sx={{ maxWidth: 320 }} disabled={readonly}>
+      <FormControl size="small" disabled={readonly}>
         <InputLabel id="config-language-label">
           {t("project.configuration.general.language")}
         </InputLabel>
