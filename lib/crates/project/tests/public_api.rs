@@ -5,16 +5,15 @@
 //! `cargo test -p project` time.
 
 use apis::project::{
-    CreateProjectRequest, ProjectApiError, ProjectMemberData,
-    ProjectMemberView as ApiProjectMemberView, ProjectService, TagData, TagView,
-    UpdateProjectRequest,
-    UserSummaryView as ApiUserSummaryView,
+    CreateProjectRequest, ProjectApiError, ProjectConfigurationData, ProjectConfigurationView,
+    ProjectMemberData, ProjectMemberView as ApiProjectMemberView, ProjectService, TagData,
+    TagView, UpdateProjectRequest, UserSummaryView as ApiUserSummaryView,
 };
 use project::{
-    CreateProject, DomainError, ProjectMember, ProjectNew, ProjectRepo, ProjectRepository,
-    ProjectServiceImpl, ProjectTag, ProjectUpdate, ProjectUsecaseConfig, ProjectView, RoleType,
-    TeamType, UpdateProject, UsecaseError, UserService, UserServiceImpl, UserSummary,
-    UserSummaryView,
+    CreateProject, DomainError, ProjectConfiguration, ProjectLanguage, ProjectMember, ProjectNew,
+    ProjectRepo, ProjectRepository, ProjectServiceImpl, ProjectTag, ProjectUpdate,
+    ProjectUsecaseConfig, ProjectView, RoleType, TeamType, UpdateProject, UsecaseError, UserService,
+    UserServiceImpl, UserSummary, UserSummaryView,
 };
 use sqlx::PgPool;
 
@@ -25,6 +24,8 @@ fn public_types_are_nameable_from_crate_root() {
     fn assert_user_summary(_: UserSummary) {}
     fn assert_user_view(_: UserSummaryView) {}
     fn assert_tag(_: ProjectTag) {}
+    fn assert_project_configuration(_: ProjectConfiguration) {}
+    fn assert_project_language(_: ProjectLanguage) {}
 
     assert_role(RoleType::Leader);
     assert_team(TeamType::Members);
@@ -41,6 +42,8 @@ fn public_types_are_nameable_from_crate_root() {
     assert_user_view(view);
     let t = ProjectTag::for_repository("k".into(), "v".into());
     assert_tag(t);
+    assert_project_configuration(ProjectConfiguration::default());
+    assert_project_language(ProjectLanguage::English);
 }
 
 #[test]
@@ -50,7 +53,7 @@ fn usecase_commands_have_expected_field_shape() {
         description: "".into(),
         members: None,
         unblind_members: None,
-        tags: None,
+        configuration: None,
     };
 
     let _update_project = UpdateProject {
@@ -60,7 +63,7 @@ fn usecase_commands_have_expected_field_shape() {
         active: None,
         members: None,
         unblind_members: None,
-        tags: None,
+        configuration: None,
     };
 }
 
@@ -71,7 +74,7 @@ fn api_requests_have_expected_field_shape() {
         description: "".into(),
         members: None,
         unblind_members: None,
-        tags: None,
+        configurations: None,
     };
 
     let _update_project = UpdateProjectRequest {
@@ -81,7 +84,7 @@ fn api_requests_have_expected_field_shape() {
         active: None,
         members: None,
         unblind_members: None,
-        tags: None,
+        configurations: None,
     };
 }
 
@@ -109,6 +112,7 @@ fn domain_error_variants_are_nameable() {
     assert_dom(DomainError::EmptyTagValue);
     assert_dom(DomainError::DuplicateCode("p1".into()));
     assert_dom(DomainError::UserNotFound("u1".into()));
+    assert_dom(DomainError::UnknownLanguage("ja".into()));
 }
 
 #[test]
@@ -145,6 +149,8 @@ fn ports_can_be_dispatched_dynamically() {
 fn apis_view_dtos_are_nameable() {
     fn assert_member_view(_: ApiProjectMemberView) {}
     fn assert_tag_view(_: TagView) {}
+    fn assert_configuration_view(_: ProjectConfigurationView) {}
+    fn assert_configuration_data(_: ProjectConfigurationData) {}
     let _ = ApiProjectMemberView::default();
     assert_member_view(ApiProjectMemberView {
         leaders: vec![ApiUserSummaryView {
@@ -161,6 +167,11 @@ fn apis_view_dtos_are_nameable() {
         key: "k".into(),
         value: "v".into(),
     });
+    assert_configuration_view(ProjectConfigurationView {
+        language: Some(apis::project::ProjectLanguage::English),
+        tags: vec![],
+    });
+    assert_configuration_data(ProjectConfigurationData::default());
 }
 
 #[test]

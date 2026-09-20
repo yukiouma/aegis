@@ -8,7 +8,7 @@ use std::convert::TryFrom;
 use chrono::{DateTime, Utc};
 use sqlx::FromRow;
 
-use crate::domain::{DomainError, Project, ProjectMember, ProjectTag};
+use crate::domain::{DomainError, Project, ProjectConfiguration, ProjectMember};
 
 #[derive(Clone, FromRow)]
 pub struct ProjectRow {
@@ -16,7 +16,7 @@ pub struct ProjectRow {
     pub code: String,
     pub description: String,
     pub active: bool,
-    pub tags: sqlx::types::Json<Vec<ProjectTag>>,
+    pub configuration: sqlx::types::Json<ProjectConfiguration>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -31,7 +31,7 @@ impl TryFrom<ProjectRow> for Project {
             row.description,
             ProjectMember::default(),
             ProjectMember::default(),
-            row.tags.0,
+            row.configuration.0,
             row.active,
             row.created_at,
             row.updated_at,

@@ -9,13 +9,14 @@ use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 
 use apis::project::{
-    CreateProjectRequest, ProjectApiError, ProjectService, TagData, UpdateProjectRequest,
+    CreateProjectRequest, ProjectApiError, ProjectConfigurationData, ProjectService, TagData,
+    UpdateProjectRequest,
 };
 
 use crate::adapter::facade::in_memory::ProjectServiceImpl;
 use crate::domain::{
-    DomainError, Project, ProjectMember, ProjectNew, ProjectRepository, ProjectTag, ProjectUpdate,
-    RoleType, TeamType, UserService, UserSummary,
+    DomainError, Project, ProjectMember, ProjectNew, ProjectRepository,
+    ProjectTag, ProjectUpdate, RoleType, TeamType, UserService, UserSummary,
 };
 use crate::usecase::{ProjectUsecase, ProjectUsecaseConfig};
 
@@ -60,14 +61,14 @@ impl ProjectRepository for InMemProjectRepo {
         let now = mock_now();
         let members = input.members.clone().unwrap_or_default();
         let unblind = input.unblind_members.clone().unwrap_or_default();
-        let tags = input.tags.clone().unwrap_or_default();
+        let configuration = input.configuration.clone().unwrap_or_default();
         let project = Project::for_repository(
             id,
             input.code,
             input.description,
             members,
             unblind,
-            tags,
+            configuration,
             true,
             now,
             now,
@@ -127,8 +128,8 @@ impl ProjectRepository for InMemProjectRepo {
         if let Some(ref m) = input.unblind_members {
             p.unblind_members = m.clone();
         }
-        if let Some(ref t) = input.tags {
-            p.tags = t.clone();
+        if let Some(ref t) = input.configuration {
+            p.configurations = t.clone();
         }
         Ok(p.clone())
     }
@@ -193,6 +194,10 @@ fn tag(key: &str, value: &str) -> TagData {
     }
 }
 
+fn configuration_with_tags(tags: Vec<TagData>) -> ProjectConfigurationData {
+    ProjectConfigurationData { language: None, tags }
+}
+
 #[tokio::test]
 async fn create_project_with_none_membership_returns_empty_views() {
     let service = make_service();
@@ -202,7 +207,7 @@ async fn create_project_with_none_membership_returns_empty_views() {
             description: "".into(),
             members: None,
             unblind_members: None,
-            tags: None,
+            configurations: None,
         })
         .await
         .expect("create");
@@ -210,7 +215,7 @@ async fn create_project_with_none_membership_returns_empty_views() {
     assert!(view.members.workers.is_empty());
     assert!(view.unblind_members.leaders.is_empty());
     assert!(view.unblind_members.workers.is_empty());
-    assert!(view.tags.is_empty());
+    assert!(view.configurations.tags.is_empty());
 }
 
 #[tokio::test]
@@ -222,7 +227,7 @@ async fn create_project_with_some_empty_membership_equivalent_to_none() {
             description: "".into(),
             members: Some(Default::default()),
             unblind_members: Some(Default::default()),
-            tags: None,
+            configurations: None,
         })
         .await
         .expect("create");
@@ -245,7 +250,7 @@ async fn create_project_hydrates_full_membership() {
                 leaders: vec!["u3".into()],
                 workers: vec![],
             }),
-            tags: None,
+            configurations: None,
         })
         .await
         .expect("create");
@@ -266,7 +271,7 @@ async fn create_project_with_unknown_member_returns_user_not_found() {
                 workers: vec![],
             }),
             unblind_members: None,
-            tags: None,
+            configurations: None,
         })
         .await
         .expect_err("unknown member");
@@ -274,7 +279,7 @@ async fn create_project_with_unknown_member_returns_user_not_found() {
 }
 
 #[tokio::test]
-async fn create_project_with_tags_round_trips_through_ap_view() {
+async fn create_project_with_configuration_round_trips_through_ap_view() {
     let service = make_service();
     let view = service
         .create_project(CreateProjectRequest {
@@ -282,17 +287,17 @@ async fn create_project_with_tags_round_trips_through_ap_view() {
             description: "".into(),
             members: None,
             unblind_members: None,
-            tags: Some(vec![
+            configurations: Some(configuration_with_tags(vec![
                 tag("Product", "DEMO-001"),
                 tag("Region", "EU"),
-            ]),
+            ])),
         })
         .await
         .expect("create");
-    assert_eq!(view.tags.len(), 2);
-    assert_eq!(view.tags[0].key, "Product");
-    assert_eq!(view.tags[0].value, "DEMO-001");
-    assert_eq!(view.tags[1].key, "Region");
+    assert_eq!(view.configurations.tags.len(), 2);
+    assert_eq!(view.configurations.tags[0].key, "Product");
+    assert_eq!(view.configurations.tags[0].value, "DEMO-001");
+    assert_eq!(view.configurations.tags[1].key, "Region");
 }
 
 #[tokio::test]
@@ -307,7 +312,7 @@ async fn update_project_replaces_membership_whole_list() {
                 workers: vec![],
             }),
             unblind_members: None,
-            tags: None,
+            configurations: None,
         })
         .await
         .expect("create");
@@ -328,7 +333,7 @@ async fn update_project_replaces_membership_whole_list() {
 }
 
 #[tokio::test]
-async fn update_project_replaces_tags_whole_list() {
+async fn update_project_replaces_configuration_whole_list() {
     let service = make_service();
     let created = service
         .create_project(CreateProjectRequest {
@@ -336,20 +341,23 @@ async fn update_project_replaces_tags_whole_list() {
             description: "".into(),
             members: None,
             unblind_members: None,
-            tags: Some(vec![tag("k1", "v1")]),
+            configurations: Some(configuration_with_tags(vec![tag("k1", "v1")])),
         })
         .await
         .expect("create");
     let updated = service
         .update_project(UpdateProjectRequest {
             id: created.id,
-            tags: Some(vec![tag("k2", "v2"), tag("k3", "v3")]),
+            configurations: Some(configuration_with_tags(vec![
+                tag("k2", "v2"),
+                tag("k3", "v3"),
+            ])),
             ..Default::default()
         })
         .await
         .expect("update");
-    assert_eq!(updated.tags.len(), 2);
-    assert_eq!(updated.tags[0].key, "k2");
+    assert_eq!(updated.configurations.tags.len(), 2);
+    assert_eq!(updated.configurations.tags[0].key, "k2");
 }
 
 #[tokio::test]

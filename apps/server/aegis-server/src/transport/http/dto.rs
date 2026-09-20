@@ -278,7 +278,7 @@ impl From<apis::auth::RegisterUserResponse> for RegisterUserResponse {
 /// Wire-level request body for a single tag. Mirrors
 /// `apis::project::TagData` field-for-field. Two strings, both
 /// required (and validated non-empty after trim by the domain layer).
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TagDataRequest {
     pub key: String,
@@ -287,7 +287,7 @@ pub struct TagDataRequest {
 
 /// Wire-level projection of a single tag. Mirrors
 /// `apis::project::TagView` field-for-field.
-#[derive(Serialize, Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TagViewResponse {
     pub key: String,
@@ -299,6 +299,88 @@ impl From<apis::project::TagView> for TagViewResponse {
         Self {
             key: view.key,
             value: view.value,
+        }
+    }
+}
+
+// -- project configuration DTOs ---------------------------------------------
+
+/// Wire-level mirror of [`apis::project::ProjectLanguage`]. The two
+/// enums have identical variants; the wire spelling follows the IETF
+/// language-tag contract (`"en"`, `"zh-CN"`) used by the apis layer's
+/// `as_str`. Conversion between the two layers is a single 2-arm
+/// `match`. Kept separate so the apis crate stays free of serde /
+/// utoipa derives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum ProjectLanguage {
+    #[serde(rename = "en")]
+    English,
+    #[serde(rename = "zh-CN")]
+    SimplifiedChinese,
+}
+
+impl From<apis::project::ProjectLanguage> for ProjectLanguage {
+    fn from(l: apis::project::ProjectLanguage) -> Self {
+        match l {
+            apis::project::ProjectLanguage::English => Self::English,
+            apis::project::ProjectLanguage::SimplifiedChinese => Self::SimplifiedChinese,
+        }
+    }
+}
+
+impl From<ProjectLanguage> for apis::project::ProjectLanguage {
+    fn from(l: ProjectLanguage) -> Self {
+        match l {
+            ProjectLanguage::English => apis::project::ProjectLanguage::English,
+            ProjectLanguage::SimplifiedChinese => apis::project::ProjectLanguage::SimplifiedChinese,
+        }
+    }
+}
+
+/// Wire-level request body for a project's configuration. Mirrors
+/// `apis::project::ProjectConfigurationData` field-for-field. The
+/// `language` and `tags` fields are individually optional on the
+/// wire so absent values stay absent on re-serialization.
+#[derive(Serialize, Deserialize, ToSchema, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectConfigurationDataRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<ProjectLanguage>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<TagDataRequest>,
+}
+
+impl From<ProjectConfigurationDataRequest> for apis::project::ProjectConfigurationData {
+    fn from(c: ProjectConfigurationDataRequest) -> Self {
+        Self {
+            language: c.language.map(Into::into),
+            tags: c
+                .tags
+                .into_iter()
+                .map(|t| apis::project::TagData {
+                    key: t.key,
+                    value: t.value,
+                })
+                .collect(),
+        }
+    }
+}
+
+/// Wire-level projection of a project's configuration. Mirrors
+/// `apis::project::ProjectConfigurationView` field-for-field.
+#[derive(Serialize, Deserialize, ToSchema, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectConfigurationViewResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<ProjectLanguage>,
+    pub tags: Vec<TagViewResponse>,
+}
+
+impl From<apis::project::ProjectConfigurationView> for ProjectConfigurationViewResponse {
+    fn from(c: apis::project::ProjectConfigurationView) -> Self {
+        Self {
+            language: c.language.map(Into::into),
+            tags: c.tags.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -365,7 +447,7 @@ pub struct CreateProjectRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unblind_members: Option<ProjectMemberDataRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Vec<TagDataRequest>>,
+    pub configurations: Option<ProjectConfigurationDataRequest>,
 }
 
 /// Wire-level request body for `PATCH /api/project/{code}`.
@@ -375,9 +457,9 @@ pub struct CreateProjectRequest {
 /// `Some(empty)` (a present `{}`) wipes the team. Both vector
 /// fields use `#[serde(default)]` so a present `{}` deserializes to
 /// `Some(ProjectMemberDataRequest { leaders: vec![], workers: vec![] })`
-/// rather than failing on missing keys. `tags` follows the same
-/// `None`-vs-`Some(empty)` semantics: missing leaves the tag list
-/// alone, present-with-vec replaces it whole-list.
+/// rather than failing on missing keys. `configurations` follows
+/// the same `None`-vs-`Some(empty)` semantics: missing leaves the
+/// configuration alone, present-with-payload replaces it whole.
 #[derive(Serialize, Deserialize, ToSchema, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateProjectRequest {
@@ -392,7 +474,7 @@ pub struct UpdateProjectRequest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unblind_members: Option<ProjectMemberDataRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Vec<TagDataRequest>>,
+    pub configurations: Option<ProjectConfigurationDataRequest>,
 }
 
 #[derive(Serialize, Deserialize, ToSchema)]
@@ -403,7 +485,7 @@ pub struct ProjectViewResponse {
     pub description: String,
     pub members: ProjectMemberViewResponse,
     pub unblind_members: ProjectMemberViewResponse,
-    pub tags: Vec<TagViewResponse>,
+    pub configurations: ProjectConfigurationViewResponse,
     pub active: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
@@ -417,7 +499,7 @@ impl From<apis::project::ProjectView> for ProjectViewResponse {
             description: view.description,
             members: view.members.into(),
             unblind_members: view.unblind_members.into(),
-            tags: view.tags.into_iter().map(Into::into).collect(),
+            configurations: view.configurations.into(),
             active: view.active,
             created_at: view.created_at,
             updated_at: view.updated_at,
@@ -2298,16 +2380,19 @@ mod tests {
                     name: "Worker Two".into(),
                 }],
             },
-            tags: vec![
-                apis::project::TagView {
-                    key: "Product".into(),
-                    value: "DEMO-001".into(),
-                },
-                apis::project::TagView {
-                    key: "Region".into(),
-                    value: "EU".into(),
-                },
-            ],
+            configurations: apis::project::ProjectConfigurationView {
+                language: Some(apis::project::ProjectLanguage::English),
+                tags: vec![
+                    apis::project::TagView {
+                        key: "Product".into(),
+                        value: "DEMO-001".into(),
+                    },
+                    apis::project::TagView {
+                        key: "Region".into(),
+                        value: "EU".into(),
+                    },
+                ],
+            },
             active: true,
             created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
                 .unwrap()
@@ -2326,7 +2411,7 @@ mod tests {
         assert_eq!(req.description, "x");
         assert!(req.members.is_none());
         assert!(req.unblind_members.is_none());
-        assert!(req.tags.is_none());
+        assert!(req.configurations.is_none());
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
     }
 
@@ -2341,14 +2426,17 @@ mod tests {
     }
 
     #[test]
-    fn create_project_request_with_tags_roundtrip() {
-        let json =
-            r#"{"code":"pr1","description":"x","tags":[{"key":"Product","value":"DEMO-001"}]}"#;
+    fn create_project_request_with_configuration_roundtrip() {
+        let json = r#"{"code":"pr1","description":"x","configurations":{"language":"en","tags":[{"key":"Product","value":"DEMO-001"}]}}"#;
         let req: CreateProjectRequest = serde_json::from_str(json).unwrap();
-        let tags = req.tags.as_ref().expect("tags present");
-        assert_eq!(tags.len(), 1);
-        assert_eq!(tags[0].key, "Product");
-        assert_eq!(tags[0].value, "DEMO-001");
+        let configurations = req.configurations.as_ref().expect("configurations present");
+        assert!(matches!(
+            configurations.language,
+            Some(ProjectLanguage::English)
+        ));
+        assert_eq!(configurations.tags.len(), 1);
+        assert_eq!(configurations.tags[0].key, "Product");
+        assert_eq!(configurations.tags[0].value, "DEMO-001");
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
     }
 
@@ -2358,7 +2446,7 @@ mod tests {
         let req: UpdateProjectRequest = serde_json::from_str(json).unwrap();
         assert!(req.members.is_none());
         assert!(req.unblind_members.is_none());
-        assert!(req.tags.is_none());
+        assert!(req.configurations.is_none());
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
     }
 
@@ -2392,11 +2480,12 @@ mod tests {
     }
 
     #[test]
-    fn update_project_request_empty_tags_becomes_some_empty() {
-        let json = r#"{"tags":[]}"#;
+    fn update_project_request_empty_configuration_becomes_some_empty() {
+        let json = r#"{"configurations":{}}"#;
         let req: UpdateProjectRequest = serde_json::from_str(json).unwrap();
-        let tags = req.tags.as_ref().expect("tags present");
-        assert!(tags.is_empty());
+        let configurations = req.configurations.as_ref().expect("configurations present");
+        assert!(configurations.language.is_none());
+        assert!(configurations.tags.is_empty());
         assert_eq!(serde_json::to_string(&req).unwrap(), json);
     }
 
@@ -2453,9 +2542,13 @@ mod tests {
         assert!(resp.unblind_members.leaders.is_empty());
         assert_eq!(resp.unblind_members.workers.len(), 1);
         assert_eq!(resp.unblind_members.workers[0].code, "worker-2");
-        assert_eq!(resp.tags.len(), 2);
-        assert_eq!(resp.tags[0].key, "Product");
-        assert_eq!(resp.tags[1].value, "EU");
+        assert!(matches!(
+            resp.configurations.language,
+            Some(ProjectLanguage::English)
+        ));
+        assert_eq!(resp.configurations.tags.len(), 2);
+        assert_eq!(resp.configurations.tags[0].key, "Product");
+        assert_eq!(resp.configurations.tags[1].value, "EU");
     }
 
     #[test]

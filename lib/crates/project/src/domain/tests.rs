@@ -87,7 +87,7 @@ fn project_new_rejects_empty_code() {
         "desc".into(),
         m.clone(),
         m,
-        vec![],
+        ProjectConfiguration::default(),
         true,
         test_now(),
         test_now(),
@@ -105,14 +105,15 @@ fn project_new_accepts_valid_input() {
         "desc".into(),
         m.clone(),
         m,
-        vec![],
+        ProjectConfiguration::default(),
         true,
         test_now(),
         test_now(),
     )
     .unwrap();
     assert_eq!(p.id, 9);
-    assert_eq!(p.tags, vec![]);
+    assert!(p.configurations.tags.is_empty());
+    assert!(p.configurations.language.is_none());
 }
 
 #[test]
@@ -132,4 +133,46 @@ fn project_tag_new_accepts_valid_input() {
     let t = ProjectTag::new("Product".into(), "DEMO-001".into()).unwrap();
     assert_eq!(t.key, "Product");
     assert_eq!(t.value, "DEMO-001");
+}
+
+#[test]
+fn project_language_as_str_maps_to_wire_codes() {
+    assert_eq!(ProjectLanguage::English.as_str(), "en");
+    assert_eq!(ProjectLanguage::SimplifiedChinese.as_str(), "zh-CN");
+}
+
+#[test]
+fn project_language_try_from_str_parses_known_values() {
+    assert_eq!(
+        ProjectLanguage::try_from("en").unwrap(),
+        ProjectLanguage::English
+    );
+    assert_eq!(
+        ProjectLanguage::try_from("zh-CN").unwrap(),
+        ProjectLanguage::SimplifiedChinese
+    );
+}
+
+#[test]
+fn project_language_try_from_str_rejects_unknown_value() {
+    let err = ProjectLanguage::try_from("ja").unwrap_err();
+    assert!(matches!(err, DomainError::UnknownLanguage(ref s) if s == "ja"));
+}
+
+#[test]
+fn project_configuration_default_has_no_language_and_no_tags() {
+    let c = ProjectConfiguration::default();
+    assert!(c.language.is_none());
+    assert!(c.tags.is_empty());
+}
+
+#[test]
+fn project_configuration_for_repository_carries_language_and_tags() {
+    let c = ProjectConfiguration::for_repository(
+        Some(ProjectLanguage::SimplifiedChinese),
+        vec![ProjectTag::for_repository("k".into(), "v".into())],
+    );
+    assert_eq!(c.language, Some(ProjectLanguage::SimplifiedChinese));
+    assert_eq!(c.tags.len(), 1);
+    assert_eq!(c.tags[0].key, "k");
 }

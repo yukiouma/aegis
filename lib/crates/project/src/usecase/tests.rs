@@ -11,8 +11,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 
 use crate::domain::{
-    DomainError, Project, ProjectMember, ProjectNew, ProjectRepository, ProjectTag, ProjectUpdate,
-    UserService, UserSummary,
+    DomainError, Project, ProjectConfiguration, ProjectMember, ProjectNew, ProjectRepository,
+    ProjectTag, ProjectUpdate, UserService, UserSummary,
 };
 use crate::usecase::commands::{CreateProject, UpdateProject};
 use crate::usecase::error::UsecaseError;
@@ -60,14 +60,14 @@ impl ProjectRepository for MockProjectRepo {
         let now = mock_now();
         let members = input.members.unwrap_or_default();
         let unblind_members = input.unblind_members.unwrap_or_default();
-        let tags = input.tags.unwrap_or_default();
+        let configuration = input.configuration.unwrap_or_default();
         let project = Project::for_repository(
             id,
             input.code,
             input.description,
             members,
             unblind_members,
-            tags,
+            configuration,
             true,
             now,
             now,
@@ -134,8 +134,8 @@ impl ProjectRepository for MockProjectRepo {
         if let Some(ref m) = input.unblind_members {
             p.unblind_members = m.clone();
         }
-        if let Some(ref tags) = input.tags {
-            p.tags = tags.clone();
+        if let Some(ref configuration) = input.configuration {
+            p.configurations = configuration.clone();
         }
         Ok(p.clone())
     }
@@ -212,7 +212,7 @@ async fn create_project_without_membership_succeeds() {
             description: "".into(),
             members: None,
             unblind_members: None,
-            tags: None,
+            configuration: None,
         })
         .await
         .expect("create");
@@ -221,7 +221,7 @@ async fn create_project_without_membership_succeeds() {
     assert!(view.members.workers.is_empty());
     assert!(view.unblind_members.leaders.is_empty());
     assert!(view.unblind_members.workers.is_empty());
-    assert!(view.tags.is_empty());
+    assert!(view.configurations.tags.is_empty());
 }
 
 #[tokio::test]
@@ -236,7 +236,7 @@ async fn create_project_hydrates_membership() {
                 workers: vec!["u2".into()],
             }),
             unblind_members: Some(ProjectMember::default()),
-            tags: None,
+            configuration: None,
         })
         .await
         .expect("create");
@@ -257,7 +257,7 @@ async fn create_project_with_unknown_member_returns_user_not_found() {
                 workers: vec![],
             }),
             unblind_members: None,
-            tags: None,
+            configuration: None,
         })
         .await
         .expect_err("unknown member rejected");
@@ -268,7 +268,7 @@ async fn create_project_with_unknown_member_returns_user_not_found() {
 }
 
 #[tokio::test]
-async fn create_project_with_tags_succeeds() {
+async fn create_project_with_configuration_succeeds() {
     let (_projects, _users, usecase) = make_usecase();
     let view = usecase
         .create_project(CreateProject {
@@ -276,18 +276,21 @@ async fn create_project_with_tags_succeeds() {
             description: "".into(),
             members: None,
             unblind_members: None,
-            tags: Some(vec![
-                ProjectTag::for_repository("Product".into(), "DEMO-001".into()),
-                ProjectTag::for_repository("Region".into(), "EU".into()),
-            ]),
+            configuration: Some(ProjectConfiguration::for_repository(
+                None,
+                vec![
+                    ProjectTag::for_repository("Product".into(), "DEMO-001".into()),
+                    ProjectTag::for_repository("Region".into(), "EU".into()),
+                ],
+            )),
         })
         .await
         .expect("create");
-    assert_eq!(view.tags.len(), 2);
-    assert_eq!(view.tags[0].key, "Product");
-    assert_eq!(view.tags[0].value, "DEMO-001");
-    assert_eq!(view.tags[1].key, "Region");
-    assert_eq!(view.tags[1].value, "EU");
+    assert_eq!(view.configurations.tags.len(), 2);
+    assert_eq!(view.configurations.tags[0].key, "Product");
+    assert_eq!(view.configurations.tags[0].value, "DEMO-001");
+    assert_eq!(view.configurations.tags[1].key, "Region");
+    assert_eq!(view.configurations.tags[1].value, "EU");
 }
 
 #[tokio::test]
@@ -299,16 +302,19 @@ async fn create_project_with_duplicate_tag_keys_succeeds() {
             description: "".into(),
             members: None,
             unblind_members: None,
-            tags: Some(vec![
-                ProjectTag::for_repository("Product".into(), "DEMO-001".into()),
-                ProjectTag::for_repository("Product".into(), "DEMO-002".into()),
-            ]),
+            configuration: Some(ProjectConfiguration::for_repository(
+                None,
+                vec![
+                    ProjectTag::for_repository("Product".into(), "DEMO-001".into()),
+                    ProjectTag::for_repository("Product".into(), "DEMO-002".into()),
+                ],
+            )),
         })
         .await
         .expect("create");
-    assert_eq!(view.tags.len(), 2);
-    assert_eq!(view.tags[0].value, "DEMO-001");
-    assert_eq!(view.tags[1].value, "DEMO-002");
+    assert_eq!(view.configurations.tags.len(), 2);
+    assert_eq!(view.configurations.tags[0].value, "DEMO-001");
+    assert_eq!(view.configurations.tags[1].value, "DEMO-002");
 }
 
 #[tokio::test]
@@ -320,7 +326,10 @@ async fn create_project_with_empty_tag_key_returns_validation_error() {
             description: "".into(),
             members: None,
             unblind_members: None,
-            tags: Some(vec![ProjectTag::for_repository("".into(), "v".into())]),
+            configuration: Some(ProjectConfiguration::for_repository(
+                None,
+                vec![ProjectTag::for_repository("".into(), "v".into())],
+            )),
         })
         .await
         .expect_err("empty key rejected");
@@ -339,7 +348,10 @@ async fn create_project_with_empty_tag_value_returns_validation_error() {
             description: "".into(),
             members: None,
             unblind_members: None,
-            tags: Some(vec![ProjectTag::for_repository("k".into(), "   ".into())]),
+            configuration: Some(ProjectConfiguration::for_repository(
+                None,
+                vec![ProjectTag::for_repository("k".into(), "   ".into())],
+            )),
         })
         .await
         .expect_err("empty value rejected");
@@ -361,7 +373,7 @@ async fn update_project_replaces_membership_whole_list() {
                 workers: vec![],
             }),
             unblind_members: None,
-            tags: None,
+            configuration: None,
         })
         .await
         .expect("create");
@@ -382,7 +394,7 @@ async fn update_project_replaces_membership_whole_list() {
 }
 
 #[tokio::test]
-async fn update_project_replaces_tags_whole_list() {
+async fn update_project_replaces_configuration_whole_list() {
     let (_projects, _users, usecase) = make_usecase();
     let created = usecase
         .create_project(CreateProject {
@@ -390,30 +402,36 @@ async fn update_project_replaces_tags_whole_list() {
             description: "".into(),
             members: None,
             unblind_members: None,
-            tags: Some(vec![ProjectTag::for_repository("k1".into(), "v1".into())]),
+            configuration: Some(ProjectConfiguration::for_repository(
+                None,
+                vec![ProjectTag::for_repository("k1".into(), "v1".into())],
+            )),
         })
         .await
         .expect("create");
-    assert_eq!(created.tags.len(), 1);
+    assert_eq!(created.configurations.tags.len(), 1);
 
     let updated = usecase
         .update_project(UpdateProject {
             id: created.id,
-            tags: Some(vec![
-                ProjectTag::for_repository("k2".into(), "v2".into()),
-                ProjectTag::for_repository("k3".into(), "v3".into()),
-            ]),
+            configuration: Some(ProjectConfiguration::for_repository(
+                None,
+                vec![
+                    ProjectTag::for_repository("k2".into(), "v2".into()),
+                    ProjectTag::for_repository("k3".into(), "v3".into()),
+                ],
+            )),
             ..Default::default()
         })
         .await
         .expect("update");
-    assert_eq!(updated.tags.len(), 2);
-    assert_eq!(updated.tags[0].key, "k2");
-    assert_eq!(updated.tags[1].key, "k3");
+    assert_eq!(updated.configurations.tags.len(), 2);
+    assert_eq!(updated.configurations.tags[0].key, "k2");
+    assert_eq!(updated.configurations.tags[1].key, "k3");
 }
 
 #[tokio::test]
-async fn update_project_leaves_tags_unchanged_when_none() {
+async fn update_project_leaves_configuration_unchanged_when_none() {
     let (_projects, _users, usecase) = make_usecase();
     let created = usecase
         .create_project(CreateProject {
@@ -421,7 +439,10 @@ async fn update_project_leaves_tags_unchanged_when_none() {
             description: "".into(),
             members: None,
             unblind_members: None,
-            tags: Some(vec![ProjectTag::for_repository("k1".into(), "v1".into())]),
+            configuration: Some(ProjectConfiguration::for_repository(
+                None,
+                vec![ProjectTag::for_repository("k1".into(), "v1".into())],
+            )),
         })
         .await
         .expect("create");
@@ -433,8 +454,8 @@ async fn update_project_leaves_tags_unchanged_when_none() {
         })
         .await
         .expect("update");
-    assert_eq!(updated.tags.len(), 1);
-    assert_eq!(updated.tags[0].key, "k1");
+    assert_eq!(updated.configurations.tags.len(), 1);
+    assert_eq!(updated.configurations.tags[0].key, "k1");
 }
 
 #[tokio::test]
@@ -446,7 +467,7 @@ async fn list_projects_returns_all_views() {
             description: "".into(),
             members: None,
             unblind_members: None,
-            tags: None,
+            configuration: None,
         })
         .await
         .unwrap();
@@ -456,7 +477,7 @@ async fn list_projects_returns_all_views() {
             description: "".into(),
             members: None,
             unblind_members: None,
-            tags: None,
+            configuration: None,
         })
         .await
         .unwrap();

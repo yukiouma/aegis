@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-use crate::domain::{Project, ProjectTag, UserSummary};
+use crate::domain::{Project, ProjectConfiguration, ProjectTag, UserSummary};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserSummaryView {
@@ -38,6 +38,25 @@ impl From<ProjectTag> for TagView {
     }
 }
 
+/// Server-side projection of the project's configuration: an
+/// optional locale plus the tag list. Mirrors the apis
+/// `ProjectConfigurationView` so the facade `From` impl is a
+/// straight rename.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ProjectConfigurationView {
+    pub language: Option<crate::domain::ProjectLanguage>,
+    pub tags: Vec<TagView>,
+}
+
+impl From<ProjectConfiguration> for ProjectConfigurationView {
+    fn from(c: ProjectConfiguration) -> Self {
+        Self {
+            language: c.language,
+            tags: c.tags.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectView {
     pub id: i32,
@@ -45,7 +64,7 @@ pub struct ProjectView {
     pub description: String,
     pub members: ProjectMemberView,
     pub unblind_members: ProjectMemberView,
-    pub tags: Vec<TagView>,
+    pub configurations: ProjectConfigurationView,
     pub active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -54,7 +73,8 @@ pub struct ProjectView {
 impl ProjectView {
     /// Build the view around a domain `Project`. Membership lists
     /// must already be hydrated to `ProjectMemberView` (look up user
-    /// summaries before calling). Tags pass straight through.
+    /// summaries before calling). Configuration passes through as
+    /// `ProjectConfigurationView`.
     pub fn from_project(
         project: Project,
         members: ProjectMemberView,
@@ -66,7 +86,7 @@ impl ProjectView {
             description: project.description,
             members,
             unblind_members,
-            tags: project.tags.into_iter().map(Into::into).collect(),
+            configurations: project.configurations.into(),
             active: project.active,
             created_at: project.created_at,
             updated_at: project.updated_at,

@@ -1,5 +1,7 @@
 mod error;
 mod project;
+mod project_configuration;
+mod project_language;
 mod project_member;
 mod project_tag;
 mod team_role;
@@ -9,6 +11,8 @@ mod user;
 
 pub use error::DomainError;
 pub use project::{Project, ProjectNew, ProjectRepository, ProjectUpdate};
+pub use project_configuration::ProjectConfiguration;
+pub use project_language::ProjectLanguage;
 pub use project_member::ProjectMember;
 pub use project_tag::ProjectTag;
 pub use team_role::{RoleType, TeamType};

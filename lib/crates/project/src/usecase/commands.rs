@@ -1,4 +1,4 @@
-use crate::domain::{ProjectMember, ProjectTag};
+use crate::domain::{ProjectConfiguration, ProjectMember};
 
 #[derive(Debug, Clone)]
 pub struct CreateProject {
@@ -7,7 +7,10 @@ pub struct CreateProject {
     /// Optional. `None` and `Some(empty)` are equivalent on create.
     pub members: Option<ProjectMember>,
     pub unblind_members: Option<ProjectMember>,
-    pub tags: Option<Vec<ProjectTag>>,
+    /// Optional. `None` defaults to an empty configuration (no
+    /// language, no tags); `Some(config)` writes the whole
+    /// configuration on create.
+    pub configuration: Option<ProjectConfiguration>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -19,6 +22,7 @@ pub struct UpdateProject {
     /// `None` = leave that team unchanged; `Some(empty)` = wipe.
     pub members: Option<ProjectMember>,
     pub unblind_members: Option<ProjectMember>,
-    /// `None` = leave tags unchanged; `Some(vec)` = whole-list replace.
-    pub tags: Option<Vec<ProjectTag>>,
+    /// `None` = leave configuration unchanged; `Some(config)` =
+    /// whole-configuration replace.
+    pub configuration: Option<ProjectConfiguration>,
 }

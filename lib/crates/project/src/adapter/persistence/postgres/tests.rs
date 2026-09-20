@@ -41,7 +41,6 @@ fn projects_migration_has_required_columns() {
         "CODE TEXT",
         "DESCRIPTION TEXT",
         "ACTIVE BOOLEAN",
-        "TAGS JSONB NOT NULL DEFAULT '[]'::JSONB",
         "CREATED_AT TIMESTAMPTZ NOT NULL DEFAULT NOW()",
         "UPDATED_AT TIMESTAMPTZ NOT NULL DEFAULT NOW()",
     ] {
@@ -78,13 +77,42 @@ fn projects_migration_no_longer_has_product_id() {
 }
 
 #[test]
-fn projects_migration_has_tags_array_check() {
-    let sql = load_migration("0001_create_projects.sql");
+fn projects_migration_no_longer_has_tags_column() {
+    // The legacy `tags` JSONB column is dropped in 0002; the
+    // CREATE TABLE block in 0001 still declares it (that block
+    // remains so the table can be built fresh in environments
+    // without 0002 applied). This test confirms 0002 has actually
+    // dropped the column.
+    let sql = load_migration("0002_add_project_configuration.sql");
     let upper = sql.to_uppercase();
     assert!(
-        upper.contains("JSONB_TYPEOF(TAGS) = 'ARRAY'"),
-        "projects table must enforce jsonb_typeof(tags) = 'array'; got:\n{sql}"
+        upper.contains("DROP COLUMN TAGS"),
+        "the 0002 migration must drop the legacy tags column; got:\n{sql}"
     );
+}
+
+#[test]
+fn configuration_migration_has_configuration_object_check() {
+    let sql = load_migration("0002_add_project_configuration.sql");
+    let upper = sql.to_uppercase();
+    assert!(
+        upper.contains("JSONB_TYPEOF(CONFIGURATION) = 'OBJECT'"),
+        "the 0002 migration must enforce jsonb_typeof(configuration) = 'object'; got:\n{sql}"
+    );
+}
+
+#[test]
+fn configuration_migration_drops_legacy_tags() {
+    let sql = load_migration("0002_add_project_configuration.sql");
+    let upper = sql.to_uppercase();
+    assert!(
+        upper.contains("DROP COLUMN TAGS"),
+        "the 0002 migration must drop the legacy tags column"
+    );
+    // PostgreSQL drops the `projects_tags_is_array` CHECK
+    // automatically when its `tags` column is dropped; the explicit
+    // `DROP CONSTRAINT` is unnecessary and was deliberately omitted
+    // from the migration to keep the SQL compact.
 }
 
 #[test]
@@ -120,20 +148,20 @@ mod row_tests {
     use chrono::{TimeZone, Utc};
 
     use super::super::row::{ProjectMemberRow, ProjectRow};
-    use crate::domain::{ProjectMember, ProjectTag, RoleType, TeamType};
+    use crate::domain::{ProjectConfiguration, ProjectLanguage, ProjectMember, ProjectTag, RoleType, TeamType};
 
     fn ts() -> chrono::DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 8, 9, 0, 0, 0).unwrap()
     }
 
     #[test]
-    fn project_row_converts_to_project_with_empty_members_and_tags() {
+    fn project_row_converts_to_project_with_empty_configuration() {
         let row = ProjectRow {
             id: 1,
             code: "proj1".into(),
             description: "".into(),
             active: true,
-            tags: sqlx::types::Json(vec![]),
+            configuration: sqlx::types::Json(ProjectConfiguration::default()),
             created_at: ts(),
             updated_at: ts(),
         };
@@ -141,27 +169,32 @@ mod row_tests {
         assert_eq!(p.id, 1);
         assert_eq!(p.members, ProjectMember::default());
         assert_eq!(p.unblind_members, ProjectMember::default());
-        assert!(p.tags.is_empty());
+        assert!(p.configurations.tags.is_empty());
+        assert!(p.configurations.language.is_none());
     }
 
     #[test]
-    fn project_row_converts_to_project_with_tags() {
+    fn project_row_converts_to_project_with_configuration() {
         let row = ProjectRow {
             id: 1,
             code: "proj1".into(),
             description: "".into(),
             active: true,
-            tags: sqlx::types::Json(vec![
-                ProjectTag::for_repository("Product".into(), "DEMO-001".into()),
-                ProjectTag::for_repository("Region".into(), "EU".into()),
-            ]),
+            configuration: sqlx::types::Json(ProjectConfiguration::for_repository(
+                Some(ProjectLanguage::English),
+                vec![
+                    ProjectTag::for_repository("Product".into(), "DEMO-001".into()),
+                    ProjectTag::for_repository("Region".into(), "EU".into()),
+                ],
+            )),
             created_at: ts(),
             updated_at: ts(),
         };
         let p: crate::domain::Project = row.try_into().expect("convert");
-        assert_eq!(p.tags.len(), 2);
-        assert_eq!(p.tags[0].key, "Product");
-        assert_eq!(p.tags[1].value, "EU");
+        assert_eq!(p.configurations.language, Some(ProjectLanguage::English));
+        assert_eq!(p.configurations.tags.len(), 2);
+        assert_eq!(p.configurations.tags[0].key, "Product");
+        assert_eq!(p.configurations.tags[1].value, "EU");
     }
 
     #[test]

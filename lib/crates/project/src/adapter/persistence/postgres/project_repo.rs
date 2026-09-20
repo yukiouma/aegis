@@ -28,10 +28,10 @@ impl ProjectRepository for ProjectRepo {
     async fn create(&self, input: ProjectNew) -> Result<Project, DomainError> {
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
 
-        let tags_json = sqlx::types::Json(&input.tags.unwrap_or_default());
+        let configuration_json = sqlx::types::Json(&input.configuration.unwrap_or_default());
 
         let row: ProjectRow = sqlx::QueryBuilder::new(
-            "INSERT INTO projects (code, description, active, tags) VALUES (",
+            "INSERT INTO projects (code, description, active, configuration) VALUES (",
         )
         .push_bind(&input.code)
         .push(", ")
@@ -39,8 +39,10 @@ impl ProjectRepository for ProjectRepo {
         .push(", ")
         .push_bind(true)
         .push(", ")
-        .push_bind(tags_json)
-        .push(") RETURNING id, code, description, active, tags, created_at, updated_at")
+        .push_bind(configuration_json)
+        .push(
+            ") RETURNING id, code, description, active, configuration, created_at, updated_at",
+        )
         .build_query_as::<ProjectRow>()
         .fetch_one(&mut *tx)
         .await
@@ -64,7 +66,7 @@ impl ProjectRepository for ProjectRepo {
 
     async fn find_by_id(&self, id: i32) -> Result<Project, DomainError> {
         let row: ProjectRow = sqlx::QueryBuilder::new(
-            "SELECT id, code, description, active, tags, created_at, updated_at \
+            "SELECT id, code, description, active, configuration, created_at, updated_at \
              FROM projects WHERE id = ",
         )
         .push_bind(id)
@@ -82,7 +84,7 @@ impl ProjectRepository for ProjectRepo {
 
     async fn find_by_code(&self, code: &str) -> Result<Project, DomainError> {
         let row: ProjectRow = sqlx::QueryBuilder::new(
-            "SELECT id, code, description, active, tags, created_at, updated_at \
+            "SELECT id, code, description, active, configuration, created_at, updated_at \
              FROM projects WHERE code = ",
         )
         .push_bind(code)
@@ -101,7 +103,7 @@ impl ProjectRepository for ProjectRepo {
 
     async fn list(&self) -> Result<Vec<Project>, DomainError> {
         let rows: Vec<ProjectRow> = sqlx::QueryBuilder::new(
-            "SELECT id, code, description, active, tags, created_at, updated_at \
+            "SELECT id, code, description, active, configuration, created_at, updated_at \
              FROM projects ORDER BY id",
         )
         .build_query_as::<ProjectRow>()
@@ -123,7 +125,7 @@ impl ProjectRepository for ProjectRepo {
         let mut tx = self.pool.begin().await.map_err(map_db_error)?;
 
         // Apply metadata first. If the metadata update fails we never
-        // touch membership or tags.
+        // touch membership or configuration.
         let mut qb = sqlx::QueryBuilder::new("UPDATE projects SET ");
         let mut first = true;
         let mut sep = |qb: &mut sqlx::QueryBuilder<sqlx::Postgres>| {
@@ -148,7 +150,7 @@ impl ProjectRepository for ProjectRepo {
         if !first {
             qb.push(" WHERE id = ").push_bind(input.id);
             qb.push(
-                " RETURNING id, code, description, active, tags, created_at, updated_at",
+                " RETURNING id, code, description, active, configuration, created_at, updated_at",
             );
             let row: ProjectRow = qb
                 .build_query_as::<ProjectRow>()
@@ -183,8 +185,8 @@ impl ProjectRepository for ProjectRepo {
             replace_team(&mut tx, input.id, TeamType::UnblindMembers, members).await?;
         }
 
-        // Whole-list replace for tags, in the same transaction.
-        if let Some(ref tags) = input.tags {
+        // Whole-configuration replace, in the same transaction.
+        if let Some(ref configuration) = input.configuration {
             let exists: Option<(i32,)> =
                 sqlx::QueryBuilder::new("SELECT id FROM projects WHERE id = ")
                     .push_bind(input.id)
@@ -195,8 +197,8 @@ impl ProjectRepository for ProjectRepo {
             if exists.is_none() {
                 return Err(DomainError::NotFound);
             }
-            sqlx::QueryBuilder::new("UPDATE projects SET tags = ")
-                .push_bind(sqlx::types::Json(tags))
+            sqlx::QueryBuilder::new("UPDATE projects SET configuration = ")
+                .push_bind(sqlx::types::Json(configuration))
                 .push(" WHERE id = ")
                 .push_bind(input.id)
                 .build()

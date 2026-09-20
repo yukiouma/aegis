@@ -33,21 +33,24 @@ migrations/                     # SQLx migrations applied to the database
 
 The crate root re-exports the public surface (`Product`, `ProductNew`,
 `ProductUpdate`, `Project`, `ProjectNew`, `ProjectUpdate`,
-`ProjectMember`, `TeamType`, `RoleType`, `UserSummary`,
-`UserService`, `DomainError`, the ports `ProductRepository` /
-`ProjectRepository`, the Postgres adapters `ProductRepo` /
-`ProjectRepo`, the apis adapter `UserServiceImpl`, the usecase
-`ProjectUsecase` + `ProjectUsecaseConfig`, the command DTOs
-`CreateProduct` / `UpdateProduct` / `CreateProject` / `UpdateProject`,
-the view DTOs `ProductView` / `ProjectView` / `ProjectMemberView` /
-`UserSummaryView`, the error `UsecaseError`, and the facade
-`ProjectServiceImpl`) so consumers can `use project::*;` without
-reaching into the sub-modules.
+`ProjectConfiguration`, `ProjectLanguage`, `ProjectMember`,
+`ProjectTag`, `TeamType`, `RoleType`, `UserSummary`, `UserService`,
+`DomainError`, the ports `ProductRepository` / `ProjectRepository`,
+the Postgres adapters `ProductRepo` / `ProjectRepo`, the apis
+adapter `UserServiceImpl`, the usecase `ProjectUsecase` +
+`ProjectUsecaseConfig`, the command DTOs `CreateProduct` /
+`UpdateProduct` / `CreateProject` / `UpdateProject`, the view DTOs
+`ProductView` / `ProjectView` / `ProjectConfigurationView` /
+`ProjectMemberView` / `UserSummaryView`, the error `UsecaseError`,
+and the facade `ProjectServiceImpl`) so consumers can
+`use project::*;` without reaching into the sub-modules.
 
 ## Domain model
 
 - `Product { id, code, name, description, active, created_at, updated_at }`
-- `Project { id, code, description, product_id, members, unblind_members, active, created_at, updated_at }`
+- `Project { id, code, description, product_id, members, unblind_members, configurations, active, created_at, updated_at }`
+- `ProjectConfiguration { language: Option<ProjectLanguage>, tags: Vec<ProjectTag> }` — language hint + tag list, persisted as a single JSONB column on `projects.configuration`. `language` is optional (no default); `tags` defaults to empty.
+- `ProjectLanguage { English, SimplifiedChinese }` — locale hint with a stable `as_str` (`"en"`, `"zh-CN"`). Unknown values on the wire surface as `DomainError::UnknownLanguage` after the migration lands.
 - `ProjectMember { leaders: Vec<String>, workers: Vec<String> }` — user *codes* (not full user records). The usecase layer hydrates these into `UserSummaryView` on read.
 
 `members` and `unblind_members` are two independent teams that share
@@ -55,6 +58,11 @@ the same `leaders` / `workers` shape. `create_project` accepts both as
 optional (`None` and `Some(empty)` are equivalent on create). On
 update, `None` leaves the team unchanged; `Some(empty)` wipes it
 (whole-list replacement).
+
+`configurations` follows the same optionality rules. On create,
+`None` and `Some(ProjectConfiguration::default())` are equivalent. On
+update, `None` leaves the configuration alone; `Some(_)` replaces the
+whole configuration (language + tag list).
 
 ## Database setup
 
@@ -138,8 +146,9 @@ The crate enforces the test-tier order from the guideline:
 2. **adapter unit** — `src/adapter/persistence/postgres/tests.rs`:
    row conversions, schema snapshots.
 3. **usecase unit** — `src/usecase/tests.rs`: mock repos + user
-   service; covers validation paths, optional membership, hydration,
-   whole-list replacement.
+   service; covers validation paths, optional membership,
+   `ProjectConfiguration` (language + tag-list) hydration, and
+   whole-list replacement of membership + configuration.
 4. **facade unit** — `src/adapter/facade/in_memory/tests.rs`: in-memory
    repo + user-service fakes; end-to-end CRUD through the apis port,
    including `Box<dyn ProjectService>` object-safe dispatch.

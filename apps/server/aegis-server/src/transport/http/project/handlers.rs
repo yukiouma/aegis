@@ -22,13 +22,24 @@ fn member_data(value: dto::ProjectMemberDataRequest) -> apis::project::ProjectMe
     }
 }
 
-/// Translate a wire tag DTO into the apis DTO. Validation (non-empty
-/// key/value) is delegated to the domain layer — the handler just
+/// Translate a wire configuration DTO into the apis DTO. The
+/// configuration carries an optional language and a list of tags;
+/// validation (non-empty key/value for each tag, known language
+/// value) is delegated to the domain layer — the handler just
 /// passes through whatever the client supplied.
-fn tag_data(value: dto::TagDataRequest) -> apis::project::TagData {
-    apis::project::TagData {
-        key: value.key,
-        value: value.value,
+fn configuration_data(
+    value: dto::ProjectConfigurationDataRequest,
+) -> apis::project::ProjectConfigurationData {
+    apis::project::ProjectConfigurationData {
+        language: value.language.map(Into::into),
+        tags: value
+            .tags
+            .into_iter()
+            .map(|t| apis::project::TagData {
+                key: t.key,
+                value: t.value,
+            })
+            .collect(),
     }
 }
 
@@ -63,7 +74,7 @@ pub async fn create_project(
             description: req.description,
             members: req.members.map(member_data),
             unblind_members: req.unblind_members.map(member_data),
-            tags: req.tags.map(|ts| ts.into_iter().map(tag_data).collect()),
+            configurations: req.configurations.map(configuration_data),
         })
         .await?;
     Ok((StatusCode::CREATED, Json(view.into())))
@@ -121,9 +132,9 @@ pub async fn get_project_by_code(
 /// - `Some(empty)` (a present `{}`) wipes the corresponding team's
 ///   rows.
 ///
-/// `tags` follows the same missing-vs-empty distinction. Missing
-/// leaves the tag list alone; a present (possibly empty) list
-/// replaces the whole tag array.
+/// `configurations` follows the same missing-vs-empty distinction.
+/// Missing leaves the configuration alone; a present (possibly
+/// empty) configuration replaces the whole configuration object.
 #[utoipa::path(
     patch, path = "/{code}", tag = "project",
     operation_id = "project_update",
@@ -159,7 +170,7 @@ pub async fn update_project(
             active: req.active,
             members: req.members.map(member_data),
             unblind_members: req.unblind_members.map(member_data),
-            tags: req.tags.map(|ts| ts.into_iter().map(tag_data).collect()),
+            configurations: req.configurations.map(configuration_data),
         })
         .await?;
     Ok(Json(view.into()))
@@ -216,7 +227,7 @@ mod tests {
             description: "sample".to_string(),
             members: apis::project::ProjectMemberView::default(),
             unblind_members: apis::project::ProjectMemberView::default(),
-            tags: vec![],
+            configurations: apis::project::ProjectConfigurationView::default(),
             active: true,
             created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
                 .unwrap()
@@ -488,7 +499,7 @@ mod tests {
                 "POST",
                 "/api/project",
                 Some(
-                    r#"{"code":"pr1","description":"x","members":{"leaders":["l1"]},"tags":[{"key":"Product","value":"DEMO-001"}]}"#
+                    r#"{"code":"pr1","description":"x","members":{"leaders":["l1"]},"configurations":{"language":"en","tags":[{"key":"Product","value":"DEMO-001"}]}}"#
                         .to_string(),
                 ),
                 Some("Bearer good"),
@@ -508,10 +519,14 @@ mod tests {
         let members = captured.members.expect("members present");
         assert_eq!(members.leaders, vec!["l1".to_string()]);
         assert!(members.workers.is_empty());
-        let tags = captured.tags.expect("tags present");
-        assert_eq!(tags.len(), 1);
-        assert_eq!(tags[0].key, "Product");
-        assert_eq!(tags[0].value, "DEMO-001");
+        let configurations = captured.configurations.expect("configurations present");
+        assert!(matches!(
+            configurations.language,
+            Some(apis::project::ProjectLanguage::English)
+        ));
+        assert_eq!(configurations.tags.len(), 1);
+        assert_eq!(configurations.tags[0].key, "Product");
+        assert_eq!(configurations.tags[0].value, "DEMO-001");
     }
 
     #[tokio::test]

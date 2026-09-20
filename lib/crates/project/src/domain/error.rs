@@ -23,6 +23,9 @@ pub enum DomainError {
     #[error("unknown role type: {0}")]
     UnknownRoleType(String),
 
+    #[error("unknown project language: {0}")]
+    UnknownLanguage(String),
+
     #[error("not found")]
     NotFound,
 

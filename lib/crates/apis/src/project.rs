@@ -1,10 +1,10 @@
 //! Outbound port for project lifecycle operations.
 //!
 //! See [`ProjectService`] for the trait surface. All supporting types
-//! (`ProjectApiError`, `ProjectView`, `ProjectMemberView`,
-//! `UserSummaryView`, `TagData`, `TagView`, `*Request`) are defined
-//! alongside the trait so a single `use apis::project::*;` brings the
-//! whole contract into scope.
+//! (`ProjectApiError`, `ProjectView`, `ProjectConfigurationView`,
+//! `ProjectMemberView`, `UserSummaryView`, `TagData`, `TagView`,
+//! `*Request`) are defined alongside the trait so a single
+//! `use apis::project::*;` brings the whole contract into scope.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -33,6 +33,25 @@ pub enum ProjectApiError {
     Repository(String),
 }
 
+/// Locale hint. Carried on the project configuration so a project
+/// can pin its UI to English or Simplified Chinese. The wire code
+/// is the lowercase IETF tag (`"en"` or `"zh-CN"`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ProjectLanguage {
+    English,
+    SimplifiedChinese,
+}
+
+impl ProjectLanguage {
+    /// Stable wire code. New locales land here as new variants.
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ProjectLanguage::English => "en",
+            ProjectLanguage::SimplifiedChinese => "zh-CN",
+        }
+    }
+}
+
 /// Wire-shaped tag data. `key` and `value` are both required and
 /// non-empty; the backend enforces that contract.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -50,8 +69,25 @@ pub struct TagView {
     pub value: String,
 }
 
+/// Request-side configuration: optional locale plus the tag list.
+/// Carries `TagData` because it travels into the backend.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectConfigurationData {
+    pub language: Option<ProjectLanguage>,
+    pub tags: Vec<TagData>,
+}
+
+/// Server-side projection of the configuration. Carries `TagView`
+/// because it travels back to clients.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectConfigurationView {
+    pub language: Option<ProjectLanguage>,
+    pub tags: Vec<TagView>,
+}
+
 /// Safe projection of a project: membership lists are hydrated to
-/// `Vec<UserSummaryView>`; tags are passed through as `Vec<TagView>`.
+/// `Vec<UserSummaryView>`; the configuration (locale + tags) is
+/// projected to `ProjectConfigurationView`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProjectView {
     pub id: i32,
@@ -59,7 +95,7 @@ pub struct ProjectView {
     pub description: String,
     pub members: ProjectMemberView,
     pub unblind_members: ProjectMemberView,
-    pub tags: Vec<TagView>,
+    pub configurations: ProjectConfigurationView,
     pub active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -95,8 +131,9 @@ pub struct CreateProjectRequest {
     /// via a later `update_project` call.
     pub members: Option<ProjectMemberData>,
     pub unblind_members: Option<ProjectMemberData>,
-    /// Optional. `None` and `Some(empty)` both mean "no tags on create".
-    pub tags: Option<Vec<TagData>>,
+    /// Optional. `None` and `Some(empty)` both mean "default empty
+    /// configuration (no language, no tags)".
+    pub configurations: Option<ProjectConfigurationData>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -108,8 +145,9 @@ pub struct UpdateProjectRequest {
     /// `None` = leave that team unchanged; `Some(empty)` = wipe.
     pub members: Option<ProjectMemberData>,
     pub unblind_members: Option<ProjectMemberData>,
-    /// `None` = leave tags unchanged; `Some(vec)` = whole-list replace.
-    pub tags: Option<Vec<TagData>>,
+    /// `None` = leave configuration unchanged; `Some(config)` =
+    /// whole-configuration replace.
+    pub configurations: Option<ProjectConfigurationData>,
 }
 
 /// Outbound port for project lifecycle operations.

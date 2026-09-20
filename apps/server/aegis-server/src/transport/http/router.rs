@@ -314,7 +314,7 @@ mod tests {
             description: "sample".to_string(),
             members: apis::project::ProjectMemberView::default(),
             unblind_members: apis::project::ProjectMemberView::default(),
-            tags: vec![],
+            configurations: apis::project::ProjectConfigurationView::default(),
             active: true,
             created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
                 .unwrap()
