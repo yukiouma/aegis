@@ -87,7 +87,7 @@ const projectLeader: ProjectView = {
     workers: [],
   },
   unblindMembers: { leaders: [], workers: [] },
-  tags: [],
+  configurations: { language: null, tags: [] },
   active: true,
   createdAt: "",
   updatedAt: "",

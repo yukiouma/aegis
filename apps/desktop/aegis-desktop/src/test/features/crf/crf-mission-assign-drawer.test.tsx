@@ -53,7 +53,7 @@ const project: ProjectView = {
     workers: [{ code: "bob", name: "Bob" }],
   },
   unblindMembers: { leaders: [], workers: [] },
-  tags: [],
+  configurations: { language: null, tags: [] },
   active: true,
   createdAt: "",
   updatedAt: "",

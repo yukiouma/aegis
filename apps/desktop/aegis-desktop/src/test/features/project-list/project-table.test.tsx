@@ -20,7 +20,7 @@ const baseRow: ProjectView = {
     leaders: [{ code: "bob", name: "Bob" }],
     workers: [],
   },
-  tags: [],
+  configurations: { language: null, tags: [] },
   active: true,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
@@ -113,10 +113,13 @@ describe("ProjectTable — column rendering", () => {
       rows: [
         {
           ...baseRow,
-          tags: [
-            { key: "Product", value: "DEMO-001" },
-            { key: "Client", value: "ACME" },
-          ],
+          configurations: {
+            language: null,
+            tags: [
+              { key: "Product", value: "DEMO-001" },
+              { key: "Client", value: "ACME" },
+            ],
+          },
         },
       ],
     });
@@ -126,7 +129,7 @@ describe("ProjectTable — column rendering", () => {
     expect(screen.getByTitle("Client")).toBeInTheDocument();
   });
 
-  it("renders an em-dash in the tags cell when tags is empty", () => {
+  it("renders an em-dash in the tags cell when configurations.tags is empty", () => {
     renderTable({
       rows: [
         {
@@ -135,7 +138,7 @@ describe("ProjectTable — column rendering", () => {
           // so we have multiple dashes; the test asserts only the count.
           members: { leaders: [], workers: [] },
           unblindMembers: { leaders: [], workers: [] },
-          tags: [],
+          configurations: { language: null, tags: [] },
         },
       ],
     });

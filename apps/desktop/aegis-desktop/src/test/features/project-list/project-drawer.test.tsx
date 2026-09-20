@@ -50,7 +50,7 @@ const projectFixture: ProjectView = {
     leaders: [],
     workers: [],
   },
-  tags: [],
+  configurations: { language: null, tags: [] },
   active: true,
   createdAt: "2026-01-01T00:00:00Z",
   updatedAt: "2026-01-01T00:00:00Z",
@@ -234,7 +234,7 @@ describe("ProjectDrawer — tags", () => {
       list_users: () => [userFixture],
       get_project_by_code: () => ({
         ...projectFixture,
-        tags: [{ key: "Product", value: "DEMO-001" }],
+        configurations: { language: null, tags: [{ key: "Product", value: "DEMO-001" }] },
       }),
     });
     await renderDrawer("edit", "alpha");
@@ -243,7 +243,7 @@ describe("ProjectDrawer — tags", () => {
     );
   });
 
-  it("create-mode submit includes the assembled tags array on the body", async () => {
+  it("create-mode submit includes the assembled configurations.tags array on the body", async () => {
     mockCommands({
       list_users: () => [userFixture],
       create_project: () => projectFixture,
@@ -261,18 +261,21 @@ describe("ProjectDrawer — tags", () => {
       expect(invoke).toHaveBeenCalledWith(
         "create_project",
         expect.objectContaining({
-          tags: [{ key: "Product", value: "DEMO-007" }],
+          configurations: expect.objectContaining({
+            language: null,
+            tags: [{ key: "Product", value: "DEMO-007" }],
+          }),
         }),
       ),
     );
   });
 
-  it("edit-mode submit omits tags from the body when user did NOT touch the editor", async () => {
+  it("edit-mode submit omits configurations from the body when user did NOT touch the editor", async () => {
     mockCommands({
       list_users: () => [userFixture],
       get_project_by_code: () => ({
         ...projectFixture,
-        tags: [{ key: "Product", value: "DEMO-001" }],
+        configurations: { language: null, tags: [{ key: "Product", value: "DEMO-001" }] },
       }),
       update_project: () => projectFixture,
     });
@@ -281,8 +284,8 @@ describe("ProjectDrawer — tags", () => {
     await waitFor(() =>
       expect(descriptionField).toHaveValue("Alpha description"),
     );
-    // Edit the description (which does NOT touch the tag editor) — the
-    // body should omit `tags` so the server leaves them alone.
+    // Edit the description (which does NOT touch the configuration) — the
+    // body should omit `configurations` so the server leaves them alone.
     fireEvent.change(descriptionField, { target: { value: "Edited" } });
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
     await waitFor(() => {
@@ -291,16 +294,16 @@ describe("ProjectDrawer — tags", () => {
       );
       expect(call).toBeDefined();
       const body = call![1].body as UpdateProjectBody;
-      expect(body).not.toHaveProperty("tags");
+      expect(body).not.toHaveProperty("configurations");
     });
   });
 
-  it("edit-mode submit sends the new tags array when user edited the editor", async () => {
+  it("edit-mode submit sends the new configurations.tags array when user edited the editor", async () => {
     mockCommands({
       list_users: () => [userFixture],
       get_project_by_code: () => ({
         ...projectFixture,
-        tags: [{ key: "Product", value: "DEMO-001" }],
+        configurations: { language: null, tags: [{ key: "Product", value: "DEMO-001" }] },
       }),
       update_project: () => projectFixture,
     });
@@ -317,7 +320,10 @@ describe("ProjectDrawer — tags", () => {
       );
       expect(call).toBeDefined();
       const body = call![1].body as UpdateProjectBody;
-      expect(body.tags).toEqual([{ key: "Product", value: "DEMO-002" }]);
+      expect(body.configurations).toEqual({
+        language: null,
+        tags: [{ key: "Product", value: "DEMO-002" }],
+      });
     });
   });
 });
