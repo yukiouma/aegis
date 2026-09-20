@@ -87,7 +87,7 @@ fn project_new_rejects_empty_code() {
         "desc".into(),
         m.clone(),
         m,
-        vec![],
+        ProjectConfiguration::default(),
         true,
         test_now(),
         test_now(),
@@ -105,14 +105,15 @@ fn project_new_accepts_valid_input() {
         "desc".into(),
         m.clone(),
         m,
-        vec![],
+        ProjectConfiguration::default(),
         true,
         test_now(),
         test_now(),
     )
     .unwrap();
     assert_eq!(p.id, 9);
-    assert_eq!(p.tags, vec![]);
+    assert!(p.configurations.tags.is_empty());
+    assert!(p.configurations.language.is_none());
 }
 
 #[test]

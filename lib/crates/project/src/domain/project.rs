@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 
 use super::error::DomainError;
+use super::project_configuration::ProjectConfiguration;
 use super::project_member::ProjectMember;
-use super::project_tag::ProjectTag;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Project {
@@ -12,7 +12,7 @@ pub struct Project {
     pub description: String,
     pub members: ProjectMember,
     pub unblind_members: ProjectMember,
-    pub tags: Vec<ProjectTag>,
+    pub configurations: ProjectConfiguration,
     pub active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -28,7 +28,7 @@ impl Project {
         description: String,
         members: ProjectMember,
         unblind_members: ProjectMember,
-        tags: Vec<ProjectTag>,
+        configurations: ProjectConfiguration,
         active: bool,
         created_at: DateTime<Utc>,
         updated_at: DateTime<Utc>,
@@ -42,7 +42,7 @@ impl Project {
             description,
             members,
             unblind_members,
-            tags,
+            configurations,
             active,
             created_at,
             updated_at,
@@ -58,7 +58,7 @@ impl Project {
         description: String,
         members: ProjectMember,
         unblind_members: ProjectMember,
-        tags: Vec<ProjectTag>,
+        configurations: ProjectConfiguration,
         active: bool,
         created_at: DateTime<Utc>,
         updated_at: DateTime<Utc>,
@@ -69,7 +69,7 @@ impl Project {
             description,
             members,
             unblind_members,
-            tags,
+            configurations,
             active,
             created_at,
             updated_at,
@@ -85,7 +85,7 @@ impl std::fmt::Debug for Project {
             .field("description", &self.description)
             .field("members", &self.members)
             .field("unblind_members", &self.unblind_members)
-            .field("tags", &self.tags)
+            .field("configurations", &self.configurations)
             .field("active", &self.active)
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
@@ -104,9 +104,10 @@ pub struct ProjectNew {
     /// flow ergonomic.
     pub members: Option<ProjectMember>,
     pub unblind_members: Option<ProjectMember>,
-    /// Optional. `None` and `Some(empty)` are equivalent — neither
-    /// inserts any tags. Same ergonomics as `members`.
-    pub tags: Option<Vec<ProjectTag>>,
+    /// Optional configuration. `None` defaults to an empty
+    /// configuration (no language, no tags). `Some(config)` writes
+    /// the whole configuration on create.
+    pub configuration: Option<ProjectConfiguration>,
 }
 
 /// Input DTO for `ProjectRepository::update`. Every field is optional
@@ -121,8 +122,9 @@ pub struct ProjectUpdate {
     /// team's rows. The two are distinct on update.
     pub members: Option<ProjectMember>,
     pub unblind_members: Option<ProjectMember>,
-    /// `None` = leave tags unchanged; `Some(vec)` = whole-list replace.
-    pub tags: Option<Vec<ProjectTag>>,
+    /// `None` = leave configuration unchanged; `Some(config)` =
+    /// whole-configuration replace (language and tags together).
+    pub configuration: Option<ProjectConfiguration>,
 }
 
 /// Outbound port for persistence of `Project` aggregates.
