@@ -115,7 +115,7 @@ export const zhCN = {
   'project.field.tags.add': '新增标签',
   'project.field.language': '首选语言',
   'project.field.language.none': '（无）',
-  'project.configuration.heading': '配置 — {projectCode}',
+  'project.configuration.heading': '配置',
   'project.configuration.section.general': '通用',
   'project.configuration.section.members': '成员',
   'project.configuration.section.filepath': '文件路径',

@@ -84,10 +84,10 @@ describe("ProjectConfigurationPage — leader view", () => {
     });
   });
 
-  it("renders the heading + project code", async () => {
+  it("renders the heading", async () => {
     await renderPage();
     expect(
-      await screen.findByRole("heading", { name: /Configuration — alpha/i }),
+      await screen.findByRole("heading", { name: /configuration/i }),
     ).toBeInTheDocument();
   });
 

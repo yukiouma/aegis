@@ -76,7 +76,7 @@ export function ProjectConfigurationPage() {
         }}
       >
         <Typography variant="h4" gutterBottom>
-          {t("project.configuration.heading", { projectCode })}
+          {t("project.configuration.heading")}
         </Typography>
         {readonly && (
           <Alert severity="info" data-testid="config-readonly">

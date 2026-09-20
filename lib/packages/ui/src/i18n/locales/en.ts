@@ -117,7 +117,7 @@ export const en = {
   'project.field.tags.add': 'Add tag',
   'project.field.language': 'Preferred language',
   'project.field.language.none': '(none)',
-  'project.configuration.heading': 'Configuration — {projectCode}',
+  'project.configuration.heading': 'Configuration',
   'project.configuration.section.general': 'General',
   'project.configuration.section.members': 'Members',
   'project.configuration.section.filepath': 'Filepath',
