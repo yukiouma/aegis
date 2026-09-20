@@ -510,6 +510,8 @@ export type {
   PagedCodeListListResponse,
   ProjectMembers,
   ProjectMembersView,
+  ProjectConfiguration,
+  ProjectLanguage,
   ProjectView,
   Role,
   RegisterUserInput,
