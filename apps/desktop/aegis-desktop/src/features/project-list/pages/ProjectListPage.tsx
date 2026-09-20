@@ -46,7 +46,7 @@ export function ProjectListPage() {
         const inLeaders =
           leaderMatches(row.members.leaders, q) ||
           leaderMatches(row.unblindMembers.leaders, q);
-        const inTag = row.tags.some((tag) =>
+        const inTag = row.configurations.tags.some((tag) =>
           tag.value.toLowerCase().includes(q),
         );
         if (!inCode && !inDescription && !inLeaders && !inTag) return false;

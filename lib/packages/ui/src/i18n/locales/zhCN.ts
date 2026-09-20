@@ -113,6 +113,8 @@ export const zhCN = {
   'project.field.tags.key': '标签键',
   'project.field.tags.value': '标签值',
   'project.field.tags.add': '新增标签',
+  'project.field.language': '首选语言',
+  'project.field.language.none': '（无）',
   'project.field.active': '已启用',
   'project.field.members.leaders': '负责人',
   'project.field.members.workers': '项目成员',

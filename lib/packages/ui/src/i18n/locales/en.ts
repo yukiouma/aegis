@@ -115,6 +115,8 @@ export const en = {
   'project.field.tags.key': 'Tag key',
   'project.field.tags.value': 'Tag value',
   'project.field.tags.add': 'Add tag',
+  'project.field.language': 'Preferred language',
+  'project.field.language.none': '(none)',
   'project.field.active': 'Active',
   'project.field.members.leaders': 'Members — leaders',
   'project.field.members.workers': 'Members — workers',
