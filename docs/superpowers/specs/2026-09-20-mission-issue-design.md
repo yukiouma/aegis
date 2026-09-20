@@ -18,22 +18,28 @@ label, an `issuer` (the user_code that opened it), a state
 Postgres). Authorisation gates writes:
 
 - **Create** — project leader *or* mission's QC assignee.
+- **Update description** — project leader *or* mission's QC assignee.
+  Only the `description` field is mutable after creation; `target_item`,
+  `issuer`, `state`, and `comments` are not editable through this path.
 - **Append a comment** — project leader *or* mission's DEV *or*
   mission's QC assignee. Append-only: no edit or delete endpoints.
-- **Close** — project leader *or* mission's QC assignee.
+- **Close** — project leader *or* mission's QC assignee. Idempotent
+  on already-closed issues.
+- **Reopen** — project leader *or* mission's QC assignee. Idempotent
+  on already-opened issues. Same authorisation shape as close;
+  reuses `ensure_can_create_or_close`.
 - **List** — any authenticated caller (no extra auth helper; the
   existing JWT gate is sufficient).
 
 **Non-goals (this round).**
 
 - Desktop tauri commands and TS client surface for issues.
-- Updating the issue `description`, `target_item`, or `issuer` after
-  creation. (PATCH exists only for state transitions.)
-- Re-opening a closed issue (single direction: opened → closed).
+- Updating the issue `target_item` or `issuer` after creation.
 - Editing or deleting individual comments.
 - Bulk create / batch operations.
 - Notification fan-out when an issue is opened or commented on.
 - Search / full-text indexing of `description` or `comments`.
+- An audit log of state transitions (close/reopen history).
 
 ## 2. Data model
 
@@ -68,7 +74,10 @@ pub enum IssueState { Opened, Closed }
 - `mission_id` references `missions(id) ON DELETE CASCADE`. Deleting
   a mission deletes its issues.
 - `description` is non-empty / non-whitespace (rejected by
-  `MissionIssue::new`).
+  `MissionIssue::new` *and* by `MissionIssue::update_description`).
+  `description` is the only mutable text field after creation;
+  `target_item`, `issuer`, and `state` are not editable through the
+  update path.
 - `issuer` is non-empty / non-whitespace.
 - `state` is `'opened' | 'closed'` — DB CHECK + Rust `IssueState::try_from`
   enforce the closed set.
@@ -82,6 +91,14 @@ pub enum IssueState { Opened, Closed }
   The SQL `UPDATE` does not filter on the prior state; the row's
   `updated_at` is still refreshed, but the comment list is not
   mutated.
+- Reopening an already-opened issue is **idempotent** (no-op
+  success) — symmetric with close. The SQL `UPDATE` does not
+  filter on the prior state; the row's `updated_at` is refreshed
+  but the comment list is not mutated.
+- Updating the `description` of an already-closed issue is allowed.
+  The state stays `closed`; only `description` and `updated_at`
+  change. This matches the create/close authorisation shape (leader
+  or mission QC).
 
 ### Two-constructor rule (per lib-crate convention)
 
@@ -176,6 +193,20 @@ pub trait MissionIssueRepository: Send + Sync {
 
     /// Idempotent — succeeds regardless of the prior state.
     async fn close(&self, id: i64) -> Result<MissionIssue, DomainError>;
+
+    /// Idempotent — succeeds regardless of the prior state. Mirror
+    /// of [`close`](Self::close).
+    async fn open(&self, id: i64) -> Result<MissionIssue, DomainError>;
+
+    /// Update the issue's `description`. Allowed regardless of the
+    /// current state (a closed issue's description is still mutable).
+    /// The DB-level CHECK on `length(btrim(description)) > 0` remains
+    /// the safety net for non-empty input.
+    async fn update_description(
+        &self,
+        id: i64,
+        description: String,
+    ) -> Result<MissionIssue, DomainError>;
 
     async fn append_comment(
         &self,
@@ -313,6 +344,19 @@ where
         issue_id: i64,
     ) -> Result<IssueView, UsecaseError>;
 
+    pub async fn reopen_issue(
+        &self,
+        actor: &Actor,
+        issue_id: i64,
+    ) -> Result<IssueView, UsecaseError>;
+
+    pub async fn update_issue_description(
+        &self,
+        actor: &Actor,
+        issue_id: i64,
+        description: String,
+    ) -> Result<IssueView, UsecaseError>;
+
     pub async fn append_comment(
         &self,
         actor: &Actor,
@@ -378,6 +422,26 @@ async fn ensure_can_comment(
   2. Call `mission_repo.find_by_id(issue.mission_id)` to get `project_code`.
   3. Run `ensure_can_create_or_close`.
   4. Call `issue_repo.close(id)` (idempotent at the SQL layer).
+- **reopen_issue**:
+  1. Call `issue_repo.find_by_id(issue_id)` → `MissionIssueNotFound` if missing.
+  2. Call `mission_repo.find_by_id(issue.mission_id)` to get `project_code`.
+  3. Run `ensure_can_create_or_close` (same auth shape as
+     create + close + update-description: leader or mission QC).
+  4. Call `issue_repo.open(id)` (idempotent at the SQL layer).
+  5. Project → `IssueView`.
+- **update_issue_description**:
+  1. Validate non-empty `description` (whitespace rejected; surfaces
+     as `Domain(EmptyIssueDescription)` before any repo call).
+  2. Call `issue_repo.find_by_id(issue_id)` → `MissionIssueNotFound`
+     if missing.
+  3. Call `mission_repo.find_by_id(issue.mission_id)` to get
+     `project_code`.
+  4. Run `ensure_can_create_or_close` (same auth shape as
+     create + close: leader or mission QC).
+  5. Call `issue_repo.update_description(id, description)`, project
+     → `IssueView`.
+  6. The state of the issue is irrelevant: closed issues are still
+     editable for `description` (per the invariants above).
 - **append_comment**:
   1. `issue_repo.find_by_id(issue_id)` → error if missing.
   2. `mission_repo.find_by_id(issue.mission_id)` → error if missing.
@@ -451,6 +515,18 @@ UPDATE mission_issues
  WHERE id = $1
 RETURNING …;
 
+-- open / reopen (idempotent — mirror of close)
+UPDATE mission_issues
+   SET state = 'opened', updated_at = NOW()
+ WHERE id = $1
+RETURNING …;
+
+-- update_description (allowed regardless of state)
+UPDATE mission_issues
+   SET description = $2, updated_at = NOW()
+ WHERE id = $1
+RETURNING …;
+
 -- append_comment (read-modify-write; the append happens in Rust)
 UPDATE mission_issues
    SET comments = $2::jsonb,
@@ -458,6 +534,13 @@ UPDATE mission_issues
  WHERE id = $1
 RETURNING …;
 ```
+
+The `update_description` SQL is intentionally *not* filtered on the
+prior state — a closed issue's description is still editable per the
+invariants above. The DB-level CHECK on
+`length(btrim(description)) > 0` is the safety net against an empty
+write; the Rust validator rejects the request before reaching the
+repo.
 
 The `append_comment` implementation does not rely on Postgres's
 `jsonb || jsonb` operator (which does a *shallow merge* and would
@@ -511,12 +594,15 @@ In-memory `MissionIssueRepository` backed by
 
 Add tests asserting:
 
-- A project leader can create, comment, and close.
-- A mission's QC assignee can create, comment, and close.
-- A mission's DEV assignee can comment but not create or close.
+- A project leader can create, comment, close, reopen, and update description.
+- A mission's QC assignee can create, comment, close, reopen, and update description.
+- A mission's DEV assignee can comment but not create, close, reopen, or update description.
 - A user who is only an unrelated DEV on another mission is rejected.
 - A non-leader who is not on the mission at all is rejected.
 - Closing an already-closed issue is a successful no-op.
+- Reopening an already-opened issue is a successful no-op.
+- Updating the description of a closed issue is allowed.
+- `update_description` rejects whitespace-only description.
 - `append_comment` rejects whitespace-only content.
 
 ## 9. `apis::mission` additions
@@ -568,6 +654,11 @@ pub struct AppendCommentRequest {
     pub content: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct UpdateIssueDescriptionRequest {
+    pub description: String,
+}
+
 #[derive(Debug, Clone, Error)]
 pub enum MissionApiError {
     // … existing variants …
@@ -577,7 +668,7 @@ pub enum MissionApiError {
     MissionNotFoundForIssue(i64),
 }
 
-// Trait gets four new methods:
+// Trait gets six new methods:
 #[async_trait]
 pub trait MissionService: Send + Sync {
     // … existing methods …
@@ -599,6 +690,19 @@ pub trait MissionService: Send + Sync {
         issue_id: i64,
     ) -> Result<IssueView, MissionApiError>;
 
+    async fn reopen_issue(
+        &self,
+        actor: &Actor,
+        issue_id: i64,
+    ) -> Result<IssueView, MissionApiError>;
+
+    async fn update_issue_description(
+        &self,
+        actor: &Actor,
+        issue_id: i64,
+        req: UpdateIssueDescriptionRequest,
+    ) -> Result<IssueView, MissionApiError>;
+
     async fn append_comment(
         &self,
         actor: &Actor,
@@ -608,10 +712,13 @@ pub trait MissionService: Send + Sync {
 }
 ```
 
-`update_issue_state` is *not* added to the trait this round — the
-single `close_issue` method covers the only state transition the spec
-calls out. Adding a generic `update_issue_state` would imply a future
-`reopen` route that we have not designed.
+`close_issue` and `reopen_issue` are kept as separate trait methods
+rather than collapsing into a single `set_state(actor, issue_id,
+IssueState)` for two reasons: (1) the authorisation shape is
+identical for both and a single method would invite a caller to
+pass an arbitrary `IssueState` without thinking; (2) the HTTP
+handler can dispatch on the request body's `state` field and call
+the matching method, keeping the apis surface explicit.
 
 ## 10. Server HTTP additions
 
@@ -622,20 +729,29 @@ Mounted under `/api/mission` (the existing `transport::http::mission::router`).
 | GET    | `/by-mission/{mission_id}/issue?state=opened\|closed` | list issues for a mission |
 | POST   | `/by-mission/{mission_id}/issue`                    | create issue       |
 | PATCH  | `/issue/{issue_id}/state` (body `{"state":"closed"}`) | close issue        |
+| PATCH  | `/issue/{issue_id}/description` (body `{"description":"..."}`) | update description |
 | POST   | `/issue/{issue_id}/comment`                          | append comment     |
 
-The `PATCH /issue/{id}/state` shape leaves room for a future reopen
-without a new path. The handler validates `state == "closed"` and
-rejects anything else with 400.
+The `PATCH /issue/{id}/state` body is `{"state":"closed"|"opened"}`.
+The handler parses `state` into `apis::mission::IssueState` and
+dispatches:
+- `"closed"` → `state.mission.close_issue(actor, issue_id)`
+- `"opened"` → `state.mission.reopen_issue(actor, issue_id)`
+Anything else (including a missing `state` field) is rejected with
+400 by the handler before reaching the usecase. The single endpoint
+shape keeps the URL stable as the state machine grows; the
+authorship shape is identical for both transitions (leader or
+mission QC).
 
 ### Handlers (`transport/http/mission/handlers.rs` — extend)
 
 - `list_issues_by_mission` — extract `mission_id` + optional `?state=` query string, call `state.mission.list_issues_by_mission(...)`, project → `dto::IssueListResponse`.
 - `create_issue` — extract `mission_id` from path and the request body, build `CreateIssueRequest`, call `state.mission.create_issue(actor, req)`, return 201 + view.
-- `close_issue` — extract `issue_id` from path, call `state.mission.close_issue(actor, issue_id)`, return 200 + view.
+- `update_issue_state` — extract `issue_id` from path, parse `dto::UpdateIssueStateRequest` (one `state: String` field), dispatch to `close_issue` or `reopen_issue` based on the parsed `IssueState`. Returns 200 + view.
+- `update_issue_description` — extract `issue_id` from path, parse `dto::UpdateIssueDescriptionRequest`, call `state.mission.update_issue_description(actor, issue_id, req)`, return 200 + view.
 - `append_comment` — extract `issue_id` from path, parse `dto::AppendCommentRequest`, call `state.mission.append_comment(...)`, return 201 + view.
 
-All four handlers return `Result<_, ApiError>`; `MissionApiError` is
+All five handlers return `Result<_, ApiError>`; `MissionApiError` is
 mapped through `ApiError::from` like every other mission error.
 
 ### DTOs (`transport/http/mission/dto.rs` — extend)
@@ -650,6 +766,11 @@ pub struct CreateIssueRequest {
 #[derive(Deserialize, ToSchema)]
 pub struct AppendCommentRequest {
     pub content: String,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct UpdateIssueDescriptionRequest {
+    pub description: String,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -669,7 +790,9 @@ pub struct IssueListResponse { pub issues: Vec<IssueViewResponse> }
 
 ### `state::test_support::NullMissionService` (extend)
 
-The router-level tests' null double gains four methods, each
+The router-level tests' null double gains six methods
+(`list_issues_by_mission`, `create_issue`, `close_issue`,
+`reopen_issue`, `update_issue_description`, `append_comment`), each
 `unimplemented!()` — every test module that does not exercise the
 issue surface is unaffected.
 
@@ -798,11 +921,17 @@ Following the five-tier rule from
    - Round-trips:
      - `create_issue` (leader) → row exists with `state='opened'`,
        `comments='[]'`.
+     - `update_issue_description` (qc assignee) → row's
+       `description` updated, `updated_at > created_at`.
      - `append_comment` (dev assignee) → row's `comments` has one
        entry.
      - `close_issue` (qc assignee) → row's `state='closed'`,
        `updated_at > created_at`.
      - Closing a closed issue succeeds.
+     - `reopen_issue` (qc assignee) → row's `state='opened'`,
+       `comments` unchanged.
+     - Reopening an already-opened issue succeeds.
+     - Updating the description of a closed issue succeeds.
      - `list_by_mission` with and without `state` filter.
    - Use a per-run unique value (atomic counter + nanoseconds) for
      any unique-collision-sensitive column — none today, but the
@@ -842,8 +971,7 @@ cargo check --workspace
 ## 16. Out-of-scope follow-ups (logged, not planned)
 
 - Desktop tauri commands + TS client for issues.
-- Issue reopen (`PATCH …/state` with `state: "opened"`).
 - Comment edit / delete (explicitly rejected by the spec).
 - Notification fan-out.
 - Full-text search on `description` or `comments`.
-- Soft delete + audit log.
+- Soft delete + audit log of state transitions.
