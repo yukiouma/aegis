@@ -43,13 +43,45 @@ pub struct ProjectMemberViewResponse {
     pub workers: Vec<UserSummaryViewResponse>,
 }
 
+/// Wire-level project language code. Two variants; per-variant
+/// `#[serde(rename = ...)]` so the wire codes are exactly `"en"` and
+/// `"zh-CN"` — matching the i18n `Locale` values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ProjectLanguage {
+    #[serde(rename = "en")]
+    English,
+    #[serde(rename = "zh-CN")]
+    SimplifiedChinese,
+}
+
+/// Wire-level request body for a project's configuration. `language`
+/// and `tags` are individually optional / empty-skippable so a
+/// present-but-empty config round-trips as `{}`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectConfigurationDataRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<ProjectLanguage>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<TagDataRequest>,
+}
+
+/// Wire-level projection of a project's configuration.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectConfigurationViewResponse {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<ProjectLanguage>,
+    pub tags: Vec<TagViewResponse>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectViewResponse {
     pub id: i32,
     pub code: String,
     pub description: String,
-    pub tags: Vec<TagViewResponse>,
+    pub configurations: ProjectConfigurationViewResponse,
     pub members: ProjectMemberViewResponse,
     pub unblind_members: ProjectMemberViewResponse,
     pub active: bool,
@@ -69,7 +101,7 @@ pub struct CreateProjectRequest {
     pub code: String,
     pub description: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Vec<TagDataRequest>>,
+    pub configurations: Option<ProjectConfigurationDataRequest>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub members: Option<ProjectMemberDataRequest>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -84,9 +116,9 @@ pub struct UpdateProjectRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Vec<TagDataRequest>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub active: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub configurations: Option<ProjectConfigurationDataRequest>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub members: Option<ProjectMemberDataRequest>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -156,9 +188,10 @@ mod tests {
                         serde_json::json!({
                             "projects": [{
                                 "id": 1, "code": "p", "description": "",
-                                "tags": [
-                                    { "key": "Product", "value": "DEMO-001" }
-                                ],
+                                "configurations": {
+                                    "language": "en",
+                                    "tags": [{ "key": "Product", "value": "DEMO-001" }]
+                                },
                                 "members": { "leaders": [], "workers": [] },
                                 "unblindMembers": { "leaders": [], "workers": [] },
                                 "active": true,
@@ -173,8 +206,12 @@ mod tests {
         let projects = list(&c).await.unwrap();
         assert_eq!(projects.len(), 1);
         assert_eq!(projects[0].code, "p");
-        assert_eq!(projects[0].tags.len(), 1);
-        assert_eq!(projects[0].tags[0].key, "Product");
+        assert_eq!(
+            projects[0].configurations.language,
+            Some(ProjectLanguage::English)
+        );
+        assert_eq!(projects[0].configurations.tags.len(), 1);
+        assert_eq!(projects[0].configurations.tags[0].key, "Product");
     }
 
     #[test]
@@ -185,6 +222,39 @@ mod tests {
         };
         let j = serde_json::to_string(&body).unwrap();
         assert_eq!(j, r#"{"active":false}"#);
+        assert!(!j.contains("configurations"));
+    }
+
+    #[test]
+    fn project_language_serializes_to_wire_codes() {
+        assert_eq!(
+            serde_json::to_string(&ProjectLanguage::English).unwrap(),
+            "\"en\""
+        );
+        assert_eq!(
+            serde_json::to_string(&ProjectLanguage::SimplifiedChinese).unwrap(),
+            "\"zh-CN\""
+        );
+    }
+
+    #[test]
+    fn project_configuration_data_request_omits_empty() {
+        let body = ProjectConfigurationDataRequest::default();
+        let j = serde_json::to_string(&body).unwrap();
+        assert_eq!(j, "{}");
+
+        let body = ProjectConfigurationDataRequest {
+            language: Some(ProjectLanguage::SimplifiedChinese),
+            tags: vec![TagDataRequest {
+                key: "Product".into(),
+                value: "DEMO-001".into(),
+            }],
+        };
+        let j = serde_json::to_string(&body).unwrap();
+        assert_eq!(
+            j,
+            r#"{"language":"zh-CN","tags":[{"key":"Product","value":"DEMO-001"}]}"#
+        );
     }
 
     #[test]
