@@ -1,14 +1,18 @@
 use async_trait::async_trait;
 
 use apis::project::{
-    CreateProjectRequest, ProjectApiError, ProjectMemberData, ProjectMemberView as ApiProjectMemberView,
-    ProjectService, ProjectView, TagData, TagView, UpdateProjectRequest,
-    UserSummaryView as ApiUserSummaryView,
+    CreateProjectRequest, ProjectApiError, ProjectConfigurationData, ProjectLanguage as ApiProjectLanguage,
+    ProjectMemberData, ProjectMemberView as ApiProjectMemberView, ProjectService, ProjectView,
+    TagData, UpdateProjectRequest, UserSummaryView as ApiUserSummaryView,
 };
 
-use crate::domain::{ProjectMember, ProjectRepository, ProjectTag, UserService};
+use crate::domain::{
+    ProjectConfiguration, ProjectLanguage, ProjectMember, ProjectRepository, ProjectTag,
+    UserService,
+};
 use crate::usecase::{
-    CreateProject, ProjectUsecase, UpdateProject, UserSummaryView as DomainUserSummaryView,
+    CreateProject, ProjectConfigurationView, ProjectUsecase, UpdateProject,
+    UserSummaryView as DomainUserSummaryView,
 };
 
 /// Facade adapting `ProjectUsecase<R, U>` to
@@ -50,7 +54,7 @@ where
                 description: req.description,
                 members: req.members.map(member_data_to_domain),
                 unblind_members: req.unblind_members.map(member_data_to_domain),
-                tags: req.tags.map(|ts| ts.into_iter().map(tag_data_to_domain).collect()),
+                configuration: req.configurations.map(configuration_data_to_domain),
             })
             .await
             .map_err(map_error)?;
@@ -89,7 +93,7 @@ where
                 active: req.active,
                 members: req.members.map(member_data_to_domain),
                 unblind_members: req.unblind_members.map(member_data_to_domain),
-                tags: req.tags.map(|ts| ts.into_iter().map(tag_data_to_domain).collect()),
+                configuration: req.configurations.map(configuration_data_to_domain),
             })
             .await
             .map_err(map_error)?;
@@ -101,13 +105,30 @@ fn member_data_to_domain(d: ProjectMemberData) -> ProjectMember {
     ProjectMember::for_repository(d.leaders, d.workers)
 }
 
-/// Bridge for the request-side `TagData` so the apis port doesn't need
-/// to reach into the domain types. The usecase / domain layer
-/// re-validates via `ProjectTag::new`; if the wire payload violated
-/// the non-empty contract, that re-validation surfaces as
+/// Bridge for the request-side `ProjectConfigurationData` so the
+/// apis port doesn't need to reach into the domain types. The
+/// usecase / domain layer re-validates the inner tags via
+/// `ProjectTag::new`; if the wire payload violated the non-empty
+/// contract, that re-validation surfaces as
 /// `UsecaseError::Validation(EmptyTagKey | EmptyTagValue)`.
-fn tag_data_to_domain(t: TagData) -> ProjectTag {
-    ProjectTag::for_repository(t.key, t.value)
+fn configuration_data_to_domain(d: ProjectConfigurationData) -> ProjectConfiguration {
+    ProjectConfiguration::for_repository(
+        d.language.map(api_language_to_domain),
+        tag_data_vec_to_domain(d.tags),
+    )
+}
+
+fn api_language_to_domain(l: ApiProjectLanguage) -> ProjectLanguage {
+    match l {
+        ApiProjectLanguage::English => ProjectLanguage::English,
+        ApiProjectLanguage::SimplifiedChinese => ProjectLanguage::SimplifiedChinese,
+    }
+}
+
+fn tag_data_vec_to_domain(tags: Vec<TagData>) -> Vec<ProjectTag> {
+    tags.into_iter()
+        .map(|t| ProjectTag::for_repository(t.key, t.value))
+        .collect()
 }
 
 fn map_error(err: crate::usecase::UsecaseError) -> ProjectApiError {
@@ -134,7 +155,7 @@ impl From<crate::usecase::ProjectView> for ProjectView {
             description: v.description,
             members: v.members.into(),
             unblind_members: v.unblind_members.into(),
-            tags: v.tags.into_iter().map(TagView::from).collect(),
+            configurations: v.configurations.into(),
             active: v.active,
             created_at: v.created_at,
             updated_at: v.updated_at,
@@ -142,7 +163,23 @@ impl From<crate::usecase::ProjectView> for ProjectView {
     }
 }
 
-impl From<crate::usecase::TagView> for TagView {
+impl From<ProjectConfigurationView> for apis::project::ProjectConfigurationView {
+    fn from(v: ProjectConfigurationView) -> Self {
+        Self {
+            language: v.language.map(domain_language_to_api),
+            tags: v.tags.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+fn domain_language_to_api(l: ProjectLanguage) -> ApiProjectLanguage {
+    match l {
+        ProjectLanguage::English => ApiProjectLanguage::English,
+        ProjectLanguage::SimplifiedChinese => ApiProjectLanguage::SimplifiedChinese,
+    }
+}
+
+impl From<crate::usecase::TagView> for apis::project::TagView {
     fn from(v: crate::usecase::TagView) -> Self {
         Self {
             key: v.key,
