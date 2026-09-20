@@ -9,7 +9,6 @@ import {
   TextField,
   Typography,
 } from "@aegis/ui/mui";
-import { Close } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
 
 import {
@@ -99,7 +98,7 @@ export function ConfigurationMembersSection({
           data-testid="config-leaders"
         >
           {leaders.map((u) => (
-            <Chip key={u.code} variant="outlined" label={`${u.code} — ${u.name}`} />
+            <Chip key={u.code} variant="outlined" label={u.name} />
           ))}
           {leaders.length === 0 && (
             <Typography color="text.secondary">—</Typography>
@@ -111,11 +110,35 @@ export function ConfigurationMembersSection({
         <Typography variant="subtitle2" gutterBottom>
           {t("project.configuration.members.workersHeading")}
         </Typography>
-        {!readonly && (
+        {readonly ? (
+          // In read-only mode there's no Autocomplete to host the
+          // selected chips; render the current workers as a static
+          // chip list so the user still sees who's on the team.
+          <Stack
+            direction="row"
+            spacing={0.5}
+            sx={{ flexWrap: "wrap", gap: 0.5 }}
+            data-testid="config-workers"
+          >
+            {workers.map((u) => (
+              <Chip key={u.code} variant="filled" label={u.name} />
+            ))}
+            {workers.length === 0 && (
+              <Typography color="text.secondary">
+                {t("project.configuration.members.empty")}
+              </Typography>
+            )}
+          </Stack>
+        ) : (
+          // Editable mode: the multiple Autocomplete already shows
+          // each selected worker as a chip inside the input area, so
+          // we don't render a second list below.
           <Autocomplete<UserSummary, true>
             multiple
             options={usersExceptTeam}
-            getOptionLabel={(u) => `${u.code} — ${u.name}`}
+            value={workers}
+            getOptionLabel={(u) => u.name}
+            isOptionEqualToValue={(option, value) => option.code === value.code}
             onChange={(_e, value) => {
               setWorkers(value);
               membersTouchedRef.current = true;
@@ -127,43 +150,9 @@ export function ConfigurationMembersSection({
                 placeholder={t("project.configuration.members.add")}
               />
             )}
-            sx={{ mb: 1 }}
+            data-testid="config-workers"
           />
         )}
-        <Stack
-          direction="row"
-          spacing={0.5}
-          sx={{ flexWrap: "wrap", gap: 0.5 }}
-          data-testid="config-workers"
-        >
-          {workers.map((u) =>
-            readonly ? (
-              <Chip
-                key={u.code}
-                variant="filled"
-                label={`${u.code} — ${u.name}`}
-              />
-            ) : (
-              <Chip
-                key={u.code}
-                variant="filled"
-                label={`${u.code} — ${u.name}`}
-                onDelete={() => {
-                  setWorkers((prev) =>
-                    prev.filter((w) => w.code !== u.code),
-                  );
-                  membersTouchedRef.current = true;
-                }}
-                deleteIcon={<Close />}
-              />
-            ),
-          )}
-          {workers.length === 0 && (
-            <Typography color="text.secondary">
-              {t("project.configuration.members.empty")}
-            </Typography>
-          )}
-        </Stack>
       </Box>
 
       {!readonly && (
