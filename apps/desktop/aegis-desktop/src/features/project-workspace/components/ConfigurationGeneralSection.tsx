@@ -96,9 +96,7 @@ export function ConfigurationGeneralSection({
             setLanguage(v === "" ? null : (v as ProjectLanguage));
             languageTouchedRef.current = true;
           }}
-          inputProps={{
-            "data-testid": "config-language-input",
-          }}
+          inputProps={{ "data-testid": "config-language-input" }}
         >
           <MenuItem value="">
             {t("project.configuration.general.language.none")}

@@ -125,10 +125,6 @@ export function ConfigurationMembersSection({
                 {...params}
                 size="small"
                 placeholder={t("project.configuration.members.add")}
-                inputProps={{
-                  ...params.inputProps,
-                  "data-testid": "config-workers-input",
-                }}
               />
             )}
             sx={{ mb: 1 }}
