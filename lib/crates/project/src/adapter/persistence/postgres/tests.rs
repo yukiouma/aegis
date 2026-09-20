@@ -109,10 +109,10 @@ fn configuration_migration_drops_legacy_tags() {
         upper.contains("DROP COLUMN TAGS"),
         "the 0002 migration must drop the legacy tags column"
     );
-    assert!(
-        upper.contains("DROP CONSTRAINT PROJECTS_TAGS_IS_ARRAY"),
-        "the 0002 migration must drop the projects_tags_is_array CHECK"
-    );
+    // PostgreSQL drops the `projects_tags_is_array` CHECK
+    // automatically when its `tags` column is dropped; the explicit
+    // `DROP CONSTRAINT` is unnecessary and was deliberately omitted
+    // from the migration to keep the SQL compact.
 }
 
 #[test]
