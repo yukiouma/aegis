@@ -281,7 +281,10 @@ fn mission_status(e: &apis::mission::MissionApiError) -> StatusCode {
     use apis::mission::MissionApiError;
     match e {
         MissionApiError::Validation(_) => StatusCode::BAD_REQUEST,
-        MissionApiError::NotFound | MissionApiError::AssigneeNotFound => StatusCode::NOT_FOUND,
+        MissionApiError::NotFound
+        | MissionApiError::AssigneeNotFound
+        | MissionApiError::IssueNotFound
+        | MissionApiError::MissionNotFoundForIssue(_) => StatusCode::NOT_FOUND,
         MissionApiError::ProjectNotFound(_) | MissionApiError::UserNotFound(_) => {
             StatusCode::NOT_FOUND
         }
@@ -299,6 +302,8 @@ fn mission_code(e: &apis::mission::MissionApiError) -> &'static str {
         MissionApiError::Validation(_) => "validation_failed",
         MissionApiError::NotFound => "not_found",
         MissionApiError::AssigneeNotFound => "assignee_not_found",
+        MissionApiError::IssueNotFound => "issue_not_found",
+        MissionApiError::MissionNotFoundForIssue(_) => "mission_not_found_for_issue",
         MissionApiError::ProjectNotFound(_) => "project_not_found",
         MissionApiError::UserNotFound(_) => "user_not_found",
         MissionApiError::Forbidden { .. } => "forbidden",
@@ -839,5 +844,33 @@ mod tests {
         let (status, body) = render_crf(apis::crf::CrfApiError::Repository("db down".into())).await;
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
         assert_eq!(body.code, "repository_error");
+    }
+
+    // ---- MissionApiError mapping (issue variants) -----
+
+    async fn render_mission(err: apis::mission::MissionApiError) -> (StatusCode, ErrorBody) {
+        let api = ApiError::from(err);
+        let response = api.into_response();
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap();
+        let parsed: ErrorBody = serde_json::from_slice(&body).unwrap();
+        (status, parsed)
+    }
+
+    #[tokio::test]
+    async fn mission_issue_not_found_maps_to_404() {
+        let (status, body) = render_mission(apis::mission::MissionApiError::IssueNotFound).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "issue_not_found");
+    }
+
+    #[tokio::test]
+    async fn mission_not_found_for_issue_maps_to_404() {
+        let (status, body) =
+            render_mission(apis::mission::MissionApiError::MissionNotFoundForIssue(42)).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "mission_not_found_for_issue");
     }
 }

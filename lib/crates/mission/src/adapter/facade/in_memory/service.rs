@@ -54,32 +54,30 @@ where
     /// the legacy `from_repos(mission_repo, assignee_repo,
     /// projects, users)` so the server wiring stays a one-liner.
     pub fn from_repos(
-        mission_repo: M,
-        assignee_repo: A,
+        mission_repo: std::sync::Arc<M>,
+        assignee_repo: std::sync::Arc<A>,
         projects: std::sync::Arc<P>,
         users: std::sync::Arc<U>,
-        issue_repo: I,
+        issue_repo: std::sync::Arc<I>,
     ) -> Self
     where
         M: Clone,
         A: Clone,
         P: Clone,
         U: Clone,
+        I: Clone,
     {
-        let mission_repo_issue = mission_repo.clone();
-        let assignee_repo_issue = assignee_repo.clone();
-        let projects_issue = (*projects).clone();
         let mission_usecase = MissionUsecase::new(MissionUsecaseConfig {
-            mission_repo,
-            assignee_repo,
+            mission_repo: (*mission_repo).clone(),
+            assignee_repo: (*assignee_repo).clone(),
             project_lookup: (*projects).clone(),
             user_lookup: (*users).clone(),
         });
         let issue_usecase = MissionIssueUsecase::new(MissionIssueUsecaseConfig {
-            mission_repo: mission_repo_issue,
-            assignee_repo: assignee_repo_issue,
-            project_lookup: projects_issue,
-            issue_repo,
+            mission_repo: (*mission_repo).clone(),
+            assignee_repo: (*assignee_repo).clone(),
+            project_lookup: (*projects).clone(),
+            issue_repo: (*issue_repo).clone(),
         });
         Self::from_usecase(mission_usecase, issue_usecase)
     }

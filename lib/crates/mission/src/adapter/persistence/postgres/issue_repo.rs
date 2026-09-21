@@ -7,6 +7,7 @@ use crate::domain::{DomainError, IssueComment, IssueState, MissionIssue, Mission
 use super::map_db_error;
 use super::row::IssueRow;
 
+#[derive(Clone)]
 pub struct IssueRepo {
     pool: PgPool,
 }

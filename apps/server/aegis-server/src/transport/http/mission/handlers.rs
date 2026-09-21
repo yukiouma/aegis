@@ -15,8 +15,9 @@ use axum::extract::{Path, State};
 use axum::http::StatusCode;
 
 use apis::mission::{
-    Actor, AssigneeData, CreateMissionRequest, ListMissionsByProjectRequest,
-    ListMissionsByUserRequest,
+    Actor, AssigneeData, CloseIssueRequest, CreateIssueRequest, CreateMissionRequest,
+    ListIssuesByMissionRequest, ListMissionsByProjectRequest, ListMissionsByUserRequest,
+    ReopenIssueRequest, UpdateIssueDescriptionRequest,
 };
 
 use crate::state::AppState;
@@ -249,4 +250,246 @@ pub async fn remove_assignee(
         .remove_assignee(&to_actor(&claims), mission_id, assignee_id)
         .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ===========================================================================
+// Mission-issue routes (new)
+//
+// Each route maps a single `MissionService` issue method onto a
+// `/api/mission/by-mission/{mission_id}/issues/...` or
+// `/api/mission/issues/{issue_id}/...` URL. State changes (close /
+// reopen) accept an optional `?state=opened|closed` query so the same
+// PATCH path serves both directions.
+// ===========================================================================
+
+/// `GET /api/mission/by-mission/{mission_id}/issues` — list issues for
+/// a mission. Optional `?state=opened|closed` filter.
+#[utoipa::path(
+    get, path = "/by-mission/{mission_id}/issues", tag = "mission",
+    operation_id = "mission_list_issues_by_mission",
+    params(
+        ("mission_id" = i64, Path, description = "Mission id"),
+        ("state" = Option<String>, Query, description = "Filter by issue state"),
+    ),
+    responses(
+        (status = 200, description = "issues list", body = dto::IssueListResponse),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
+    ),
+    security(("BearerAuth" = [])),
+)]
+pub async fn list_issues_by_mission(
+    State(state): State<AppState>,
+    _claims: AuthClaims,
+    Path(mission_id): Path<i64>,
+    axum::extract::Query(q): axum::extract::Query<dto::IssueListQuery>,
+) -> Result<Json<dto::IssueListResponse>, ApiError> {
+    let state_filter = q
+        .state
+        .map(|s| match s.as_str() {
+            "opened" => Ok(apis::mission::IssueState::Opened),
+            "closed" => Ok(apis::mission::IssueState::Closed),
+            other => Err(ApiError::Mission(
+                apis::mission::MissionApiError::Validation(format!(
+                    "unknown issue state: {}",
+                    other
+                )),
+            )),
+        })
+        .transpose()?;
+    let views = state
+        .mission
+        .list_issues_by_mission(ListIssuesByMissionRequest {
+            mission_id,
+            state: state_filter,
+        })
+        .await?;
+    Ok(Json(dto::IssueListResponse {
+        issues: views.into_iter().map(Into::into).collect(),
+    }))
+}
+
+/// `POST /api/mission/by-mission/{mission_id}/issues` — open a new
+/// issue against a mission. Caller must be the project's leader or
+/// a mission QC.
+#[utoipa::path(
+    post, path = "/by-mission/{mission_id}/issues", tag = "mission",
+    operation_id = "mission_create_issue",
+    params(
+        ("mission_id" = i64, Path, description = "Mission id"),
+    ),
+    request_body = dto::CreateIssueRequest,
+    responses(
+        (status = 201, description = "issue created", body = dto::IssueViewResponse),
+        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 403, description = "Caller is not a leader of the mission's project or a mission QC", body = crate::transport::http::error::ErrorBody),
+        (status = 404, description = "Mission not found", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
+    ),
+    security(("BearerAuth" = [])),
+)]
+pub async fn create_issue(
+    State(state): State<AppState>,
+    claims: AuthClaims,
+    Path(mission_id): Path<i64>,
+    Json(req): Json<dto::CreateIssueRequest>,
+) -> Result<(StatusCode, Json<dto::IssueViewResponse>), ApiError> {
+    let view = state
+        .mission
+        .create_issue(
+            &to_actor(&claims),
+            CreateIssueRequest {
+                mission_id,
+                target_item: req.target_item,
+                description: req.description,
+            },
+        )
+        .await?;
+    Ok((StatusCode::CREATED, Json(view.into())))
+}
+
+/// `PATCH /api/mission/issues/{issue_id}/state?state=closed|opened` —
+/// flip an issue's open/closed state. Empty body. The
+/// `?state=closed` query selects the close path; `?state=opened`
+/// selects the reopen path. Anything else surfaces as `400`.
+#[utoipa::path(
+    patch, path = "/issues/{issue_id}/state", tag = "mission",
+    operation_id = "mission_patch_issue_state",
+    params(
+        ("issue_id" = i64, Path, description = "Issue id"),
+        ("state" = String, Query, description = "Target state — `opened` or `closed`"),
+    ),
+    request_body = dto::PatchIssueStateRequest,
+    responses(
+        (status = 200, description = "issue updated", body = dto::IssueViewResponse),
+        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 403, description = "Caller is not authorised to flip state on this issue", body = crate::transport::http::error::ErrorBody),
+        (status = 404, description = "Issue not found", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
+    ),
+    security(("BearerAuth" = [])),
+)]
+pub async fn patch_issue_state(
+    State(state): State<AppState>,
+    claims: AuthClaims,
+    Path(issue_id): Path<i64>,
+    axum::extract::Query(q): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Result<Json<dto::IssueViewResponse>, ApiError> {
+    let target = q
+        .get("state")
+        .map(|s| s.as_str())
+        .ok_or_else(|| {
+            ApiError::Mission(apis::mission::MissionApiError::Validation(
+                "missing `state` query parameter".into(),
+            ))
+        })?;
+    let view = match target {
+        "closed" => {
+            state
+                .mission
+                .close_issue(
+                    &to_actor(&claims),
+                    CloseIssueRequest::default(),
+                    issue_id,
+                )
+                .await?
+        }
+        "opened" => {
+            state
+                .mission
+                .reopen_issue(
+                    &to_actor(&claims),
+                    ReopenIssueRequest::default(),
+                    issue_id,
+                )
+                .await?
+        }
+        other => {
+            return Err(ApiError::Mission(
+                apis::mission::MissionApiError::Validation(format!(
+                    "unknown issue state: {}",
+                    other
+                )),
+            ));
+        }
+    };
+    Ok(Json(view.into()))
+}
+
+/// `PATCH /api/mission/issues/{issue_id}/description` — replace the
+/// issue's description. Allowed on issues in any state.
+#[utoipa::path(
+    patch, path = "/issues/{issue_id}/description", tag = "mission",
+    operation_id = "mission_update_issue_description",
+    params(
+        ("issue_id" = i64, Path, description = "Issue id"),
+    ),
+    request_body = dto::UpdateIssueDescriptionRequest,
+    responses(
+        (status = 200, description = "issue updated", body = dto::IssueViewResponse),
+        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 403, description = "Caller is not authorised to update this issue", body = crate::transport::http::error::ErrorBody),
+        (status = 404, description = "Issue not found", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
+    ),
+    security(("BearerAuth" = [])),
+)]
+pub async fn update_issue_description(
+    State(state): State<AppState>,
+    claims: AuthClaims,
+    Path(issue_id): Path<i64>,
+    Json(req): Json<dto::UpdateIssueDescriptionRequest>,
+) -> Result<Json<dto::IssueViewResponse>, ApiError> {
+    let view = state
+        .mission
+        .update_issue_description(
+            &to_actor(&claims),
+            issue_id,
+            UpdateIssueDescriptionRequest {
+                description: req.description,
+            },
+        )
+        .await?;
+    Ok(Json(view.into()))
+}
+
+/// `POST /api/mission/issues/{issue_id}/comments` — append a comment
+/// to an issue's thread.
+#[utoipa::path(
+    post, path = "/issues/{issue_id}/comments", tag = "mission",
+    operation_id = "mission_append_comment",
+    params(
+        ("issue_id" = i64, Path, description = "Issue id"),
+    ),
+    request_body = dto::AppendCommentRequest,
+    responses(
+        (status = 201, description = "comment appended", body = dto::IssueViewResponse),
+        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 403, description = "Caller is not authorised to comment on this issue", body = crate::transport::http::error::ErrorBody),
+        (status = 404, description = "Issue not found", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
+    ),
+    security(("BearerAuth" = [])),
+)]
+pub async fn append_comment(
+    State(state): State<AppState>,
+    claims: AuthClaims,
+    Path(issue_id): Path<i64>,
+    Json(req): Json<dto::AppendCommentRequest>,
+) -> Result<(StatusCode, Json<dto::IssueViewResponse>), ApiError> {
+    let view = state
+        .mission
+        .append_comment(
+            &to_actor(&claims),
+            issue_id,
+            apis::mission::AppendCommentRequest {
+                content: req.content,
+            },
+        )
+        .await?;
+    Ok((StatusCode::CREATED, Json(view.into())))
 }

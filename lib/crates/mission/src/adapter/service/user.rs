@@ -8,6 +8,7 @@ use crate::domain::{DomainError, UserLookup};
 
 /// Adapter that maps the apis `UserService` port onto the narrow
 /// domain `UserLookup` port.
+#[derive(Clone)]
 pub struct UserLookupImpl {
     users: Arc<dyn UserService>,
 }

@@ -14,6 +14,7 @@ use super::row::{AssigneeRow, MissionRow};
 /// PostgreSQL SQLSTATE for unique-violation.
 const SQLSTATE_UNIQUE_VIOLATION: &str = "23505";
 
+#[derive(Clone)]
 pub struct MissionRepo {
     pool: PgPool,
 }
