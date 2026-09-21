@@ -54,6 +54,7 @@ function renderRow(overrides: Partial<React.ComponentProps<typeof CrfItemRow>> =
   const onEditAnnotation = vi.fn();
   const onDeleteAnnotation = vi.fn();
   const onClearNotSubmitted = vi.fn();
+  const onOpenIssues = vi.fn();
   const utils = render(
     <AegisI18nProvider>
       <CrfItemRow
@@ -66,6 +67,9 @@ function renderRow(overrides: Partial<React.ComponentProps<typeof CrfItemRow>> =
         formNotSubmitted={false}
         itemNotSubmitted={false}
         noDomainAnnotations={false}
+        hasOpenIssue={false}
+        onOpenIssues={onOpenIssues}
+        missionExists={true}
         {...overrides}
       />
     </AegisI18nProvider>,
@@ -75,6 +79,7 @@ function renderRow(overrides: Partial<React.ComponentProps<typeof CrfItemRow>> =
     onEditAnnotation,
     onDeleteAnnotation,
     onClearNotSubmitted,
+    onOpenIssues,
     ...utils,
   };
 }
@@ -264,6 +269,30 @@ describe("CrfItemRow", () => {
       expect(screen.getByTestId("crf-unit-41")).not.toHaveStyle({
         cursor: "pointer",
       });
+    });
+  });
+
+  describe("mission-issue chip", () => {
+    it("renders the item code chip with the item's code", () => {
+      renderRow();
+      expect(screen.getByTestId("crf-item-code-21")).toBeInTheDocument();
+      expect(screen.getByTestId("crf-item-code-21")).toHaveTextContent(
+        "AETERM",
+      );
+    });
+
+    it("clicking the item code chip calls onOpenIssues", () => {
+      const { onOpenIssues } = renderRow();
+      fireEvent.click(screen.getByTestId("crf-item-code-21"));
+      expect(onOpenIssues).toHaveBeenCalled();
+    });
+
+    it("disables the chip when missionExists is false", () => {
+      renderRow({ missionExists: false });
+      expect(screen.getByTestId("crf-item-code-21")).toHaveAttribute(
+        "aria-disabled",
+        "true",
+      );
     });
   });
 });
