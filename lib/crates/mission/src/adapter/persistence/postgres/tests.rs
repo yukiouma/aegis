@@ -2,10 +2,13 @@ use std::convert::TryFrom;
 use std::fs;
 
 use chrono::{DateTime, Utc};
+use sqlx::types::Json;
 
-use crate::domain::{Assignee, Mission, MissionKind, MissionRole};
+use crate::domain::{
+    Assignee, IssueComment, IssueState, Mission, MissionIssue, MissionKind, MissionRole,
+};
 
-use super::row::{AssigneeRow, MissionRow};
+use super::row::{AssigneeRow, IssueRow, MissionRow};
 
 #[test]
 fn mission_row_to_domain() {
@@ -73,6 +76,67 @@ fn assignee_migration_has_per_mission_unique_and_cascade() {
     assert!(sql.contains("assignees_set_updated_at"));
     assert!(sql.contains("BEFORE UPDATE ON assignees"));
     assert!(sql.contains("REFERENCES missions(id) ON DELETE CASCADE"));
+}
+
+#[test]
+fn issue_row_to_domain() {
+    let now = DateTime::<Utc>::from_timestamp(0, 0).unwrap();
+    let row = IssueRow {
+        id: 1,
+        mission_id: 2,
+        target_item: Some("form AE".into()),
+        issuer: "u1".into(),
+        description: "desc".into(),
+        state: "opened".into(),
+        comments: Json(vec![IssueComment {
+            user: "u1".into(),
+            content: "first".into(),
+            created_at: now,
+        }]),
+        created_at: now,
+        updated_at: now,
+    };
+    let issue: MissionIssue = MissionIssue::try_from(row).unwrap();
+    assert_eq!(issue.id, 1);
+    assert_eq!(issue.mission_id, 2);
+    assert_eq!(issue.target_item.as_deref(), Some("form AE"));
+    assert_eq!(issue.issuer, "u1");
+    assert_eq!(issue.state, IssueState::Opened);
+    assert_eq!(issue.comments.len(), 1);
+    assert_eq!(issue.comments[0].user, "u1");
+}
+
+#[test]
+fn issue_row_rejects_unknown_state() {
+    let now = DateTime::<Utc>::from_timestamp(0, 0).unwrap();
+    let row = IssueRow {
+        id: 1,
+        mission_id: 2,
+        target_item: None,
+        issuer: "u1".into(),
+        description: "desc".into(),
+        state: "pending".into(),
+        comments: Json(vec![]),
+        created_at: now,
+        updated_at: now,
+    };
+    assert!(MissionIssue::try_from(row).is_err());
+}
+
+#[test]
+fn mission_issues_migration_has_checks_and_trigger() {
+    let sql = read_migration("0003_create_mission_issues.sql");
+    assert!(sql.contains("CREATE TABLE mission_issues"));
+    assert!(sql.contains("REFERENCES missions(id) ON DELETE CASCADE"));
+    assert!(sql.contains("mission_issues_state_check"));
+    assert!(sql.contains("CHECK (state IN ('opened', 'closed'))"));
+    assert!(sql.contains("mission_issues_description_nonempty"));
+    assert!(sql.contains("length(btrim(description)) > 0"));
+    assert!(sql.contains("mission_issues_issuer_nonempty"));
+    assert!(sql.contains("JSONB NOT NULL DEFAULT '[]'::jsonb"));
+    assert!(sql.contains("mission_issues_set_updated_at"));
+    assert!(sql.contains("BEFORE UPDATE ON mission_issues"));
+    assert!(sql.contains("mission_issues_by_mission_state"));
 }
 
 fn read_migration(name: &str) -> String {
