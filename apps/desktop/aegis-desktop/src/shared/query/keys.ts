@@ -75,5 +75,7 @@ export const queryKeys = {
   mission: {
     byProject: (projectCode: string, kind: string) =>
       ["mission", "byProject", projectCode, kind] as const,
+    issuesByMission: (missionId: number) =>
+      ["mission", "issuesByMission", missionId] as const,
   },
 } as const;

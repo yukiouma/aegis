@@ -632,3 +632,46 @@ export interface CreateMissionInput {
   missionCode: string;
   assignees: AssigneeDataArg[];
 }
+
+// Mission issue
+
+export type IssueState = "opened" | "closed";
+
+export interface IssueCommentViewResponse {
+  user: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface IssueViewResponse {
+  id: number;
+  missionId: number;
+  targetItem?: string;
+  issuer: string;
+  description: string;
+  state: IssueState;
+  comments: IssueCommentViewResponse[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IssueListResponse {
+  issues: IssueViewResponse[];
+}
+
+export interface IssueListQuery {
+  state?: IssueState;
+}
+
+export interface CreateIssueInput {
+  targetItem?: string;
+  description: string;
+}
+
+export interface UpdateIssueDescriptionInput {
+  description: string;
+}
+
+export interface AppendCommentInput {
+  content: string;
+}

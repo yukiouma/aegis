@@ -67,6 +67,73 @@ pub struct CreateMissionRequest {
     pub assignees: Vec<AssigneeDataArg>,
 }
 
+// ===========================================================================
+// Mission-issue wire DTOs — mirror `apps/server/aegis-server/src/transport/
+// http/dto.rs` lines 2112-2249. State is snake_case so the TS client can
+// `switch` directly; the rest is camelCase per CLAUDE.md §"Wire DTOs are
+// duplicated by hand".
+// ===========================================================================
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueState {
+    Opened,
+    Closed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IssueCommentViewResponse {
+    pub user: String,
+    pub content: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IssueViewResponse {
+    pub id: i64,
+    pub mission_id: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_item: Option<String>,
+    pub issuer: String,
+    pub description: String,
+    pub state: IssueState,
+    pub comments: Vec<IssueCommentViewResponse>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IssueListResponse {
+    pub issues: Vec<IssueViewResponse>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateIssueRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_item: Option<String>,
+    pub description: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PatchIssueStateRequest {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateIssueDescriptionRequest {
+    pub description: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppendCommentRequest {
+    pub content: String,
+}
+
 pub async fn list_by_project(
     c: &HttpClient,
     project_code: &str,
@@ -130,6 +197,93 @@ pub async fn create_mission(
     body: CreateMissionRequest,
 ) -> Result<MissionViewResponse, ApiError> {
     c.request(reqwest::Method::POST, "/api/mission", Some(&body))
+        .await
+}
+
+// ===========================================================================
+// Mission-issue HTTP adapters. Server endpoints (mounted at /api/mission):
+//   GET    /by-mission/{mission_id}/issues?state=opened|closed
+//   POST   /by-mission/{mission_id}/issues
+//   PATCH  /issues/{issue_id}/state?state=closed|opened  (empty body)
+//   PATCH  /issues/{issue_id}/description
+//   POST   /issues/{issue_id}/comments
+//
+// State-flip uses the `?state=` QUERY parameter (not body) — matches the
+// as-built server, which deviates from the 2026-09-20 spec's "body
+// {state:closed}" plan. See spec §"URL → Tauri command → server route".
+// ===========================================================================
+
+pub async fn list_issues_by_mission(
+    c: &HttpClient,
+    mission_id: i64,
+    state: Option<IssueState>,
+) -> Result<Vec<IssueViewResponse>, ApiError> {
+    let mut url = format!("/api/mission/by-mission/{mission_id}/issues");
+    if let Some(s) = state {
+        let state_str = serde_json::to_string(&s)
+            .map_err(|e| ApiError::Parse { message: e.to_string() })?
+            .trim_matches('"')
+            .to_string();
+        url.push_str("?state=");
+        url.push_str(&state_str);
+    }
+    let resp: IssueListResponse = c
+        .request(reqwest::Method::GET, &url, None::<&()>)
+        .await?;
+    Ok(resp.issues)
+}
+
+pub async fn create_issue(
+    c: &HttpClient,
+    mission_id: i64,
+    body: CreateIssueRequest,
+) -> Result<IssueViewResponse, ApiError> {
+    c.request(
+        reqwest::Method::POST,
+        &format!("/api/mission/by-mission/{mission_id}/issues"),
+        Some(&body),
+    )
+    .await
+}
+
+pub async fn patch_issue_state(
+    c: &HttpClient,
+    issue_id: i64,
+    target: IssueState,
+) -> Result<IssueViewResponse, ApiError> {
+    let state_str = serde_json::to_string(&target)
+        .map_err(|e| ApiError::Parse { message: e.to_string() })?
+        .trim_matches('"')
+        .to_string();
+    let url = format!("/api/mission/issues/{issue_id}/state?state={state_str}");
+    // Empty body — matches the server's `PatchIssueStateRequest {}`.
+    let body = PatchIssueStateRequest {};
+    c.request(reqwest::Method::PATCH, &url, Some(&body)).await
+}
+
+pub async fn update_issue_description(
+    c: &HttpClient,
+    issue_id: i64,
+    body: UpdateIssueDescriptionRequest,
+) -> Result<IssueViewResponse, ApiError> {
+    c.request(
+        reqwest::Method::PATCH,
+        &format!("/api/mission/issues/{issue_id}/description"),
+        Some(&body),
+    )
+    .await
+}
+
+pub async fn append_comment(
+    c: &HttpClient,
+    issue_id: i64,
+    body: AppendCommentRequest,
+) -> Result<IssueViewResponse, ApiError> {
+    c.request(
+        reqwest::Method::POST,
+        &format!("/api/mission/issues/{issue_id}/comments"),
+        Some(&body),
+    )
         .await
 }
 
@@ -254,5 +408,44 @@ mod tests {
         assert_eq!(m.mission_kind, MissionKind::Crf);
         assert_eq!(m.assignees.len(), 1);
         assert_eq!(m.assignees[0].role, MissionRole::Qc);
+    }
+
+    #[test]
+    fn issue_state_serializes_snake_case() {
+        assert_eq!(
+            serde_json::to_string(&IssueState::Opened).unwrap(),
+            "\"opened\""
+        );
+        assert_eq!(
+            serde_json::to_string(&IssueState::Closed).unwrap(),
+            "\"closed\""
+        );
+    }
+
+    #[test]
+    fn issue_view_response_parses_full_wire_shape() {
+        let j = r#"{
+            "id": 7,
+            "missionId": 10,
+            "targetItem": "AE",
+            "issuer": "carol",
+            "description": "Missing CRF row in AE form",
+            "state": "opened",
+            "comments": [
+                {
+                    "user": "bob",
+                    "content": "will fix by EOD",
+                    "createdAt": "2026-01-01T00:00:00Z"
+                }
+            ],
+            "createdAt": "2026-01-01T00:00:00Z",
+            "updatedAt": "2026-01-01T00:00:00Z"
+        }"#;
+        let issue: IssueViewResponse = serde_json::from_str(j).unwrap();
+        assert_eq!(issue.id, 7);
+        assert_eq!(issue.state, IssueState::Opened);
+        assert_eq!(issue.target_item.as_deref(), Some("AE"));
+        assert_eq!(issue.comments.len(), 1);
+        assert_eq!(issue.comments[0].user, "bob");
     }
 }

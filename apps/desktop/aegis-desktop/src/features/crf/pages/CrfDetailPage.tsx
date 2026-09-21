@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   Alert,
+  Badge,
   Box,
   Chip,
   CircularProgress,
@@ -26,6 +27,18 @@ import {
   DomainAnnotationDialog,
   NotSubmittedChip,
 } from "../components";
+import {
+  MissionIssueDialog,
+  useAppendComment,
+  useCreateIssue,
+  useIsProjectLeader,
+  useListIssuesByMission,
+  useListMissionsByProject,
+  usePatchIssueState,
+  type IssueScope,
+} from "../../mission";
+import { useCurrentUser } from "../../auth";
+import { useUserNameMap } from "../../user";
 import { annotationColor } from "../components/AnnotationChip";
 import { useGetCrfForm } from "../data/list";
 import {
@@ -216,6 +229,55 @@ export function CrfDetailPage() {
   const noDomainAnnotations =
     (detail?.domainAnnotations.length ?? 0) === 0;
 
+  // Mission-issue wiring. The form → mission lookup mirrors
+  // CrfMissionAssignDrawer: filter the project's `crf` missions by
+  // `missionCode === form.code`. The mission is shared between the
+  // dialog's title and the per-chip dot badge — derive once here.
+  // `useIsProjectLeader` returns `boolean | null` (null = still
+  // loading). The RBAC booleans therefore default to `false`
+  // while project data is resolving — controls flip on once the
+  // check resolves to `true`.
+  const isProjectLeader = useIsProjectLeader(projectCode);
+  const resolveName = useUserNameMap();
+  const missionList =
+    useListMissionsByProject(projectCode, "crf").data ?? [];
+  const formMission = useMemo(
+    () => missionList.find((m) => m.missionCode === form?.code) ?? null,
+    [missionList, form?.code],
+  );
+  const issuesQuery = useListIssuesByMission(formMission?.id ?? null);
+  const openIssueCountByTarget = useMemo(() => {
+    const map = new Map<string | null, number>();
+    for (const i of issuesQuery.data ?? []) {
+      if (i.state !== "opened") continue;
+      map.set(
+        i.targetItem ?? null,
+        (map.get(i.targetItem ?? null) ?? 0) + 1,
+      );
+    }
+    return map;
+  }, [issuesQuery.data]);
+
+  const currentUser = useCurrentUser().data;
+  const isMissionQc = !!formMission?.assignees.some(
+    (a) => a.userCode === currentUser?.code && a.role === "qc",
+  );
+  const isMissionDev = !!formMission?.assignees.some(
+    (a) => a.userCode === currentUser?.code && a.role === "dev",
+  );
+  const canCreate = isProjectLeader === true || isMissionQc;
+  const canActOnIssue = isProjectLeader === true || isMissionQc;
+  const canComment = canActOnIssue || isMissionDev;
+
+  const createIssue = useCreateIssue();
+  const patchIssueState = usePatchIssueState();
+  const appendComment = useAppendComment();
+
+  const [issueDialog, setIssueDialog] = useState<
+    | { scope: IssueScope; missionId: number }
+    | null
+  >(null);
+
   const activeDomainMutation =
     createDomain.error ?? updateDomain.error ?? deleteDomain.error ?? null;
   const domainMutationPending =
@@ -266,16 +328,44 @@ export function CrfDetailPage() {
           <ArrowBackIcon />
         </IconButton>
         {form?.code && (
-          <Chip
-            sx={{ minWidth: 70 }}
-            size="small"
-            label={form.code}
-            variant="outlined"
-            // Stable anchor for `?focus=form-<id>` from the global
-            // search page. Sits next to the form-name Typography so
-            // scrolling here lands the user on the form header.
-            data-testid={`crf-form-${id}`}
-          />
+          <Tooltip
+            title={
+              formMission
+                ? ""
+                : t("crf.missionIssue.tooltip.noMission")
+            }
+            disableHoverListener={Boolean(formMission)}
+            disableFocusListener={Boolean(formMission)}
+            disableTouchListener={Boolean(formMission)}
+          >
+            <span>
+              <Badge
+                color="error"
+                badgeContent={openIssueCountByTarget.get(null) ?? 0}
+                invisible={!formMission}
+                overlap="circular"
+              >
+                <Chip
+                  sx={{ minWidth: 70 }}
+                  size="small"
+                  label={form.code}
+                  variant="outlined"
+                  disabled={!formMission}
+                  onClick={() =>
+                    formMission &&
+                    setIssueDialog({
+                      scope: { kind: "form" },
+                      missionId: formMission.id,
+                    })
+                  }
+                  // Stable anchor for `?focus=form-<id>` from the global
+                  // search page. Sits next to the form-name Typography so
+                  // scrolling here lands the user on the form header.
+                  data-testid={`crf-form-${id}`}
+                />
+              </Badge>
+            </span>
+          </Tooltip>
         )}
         <Typography
           variant="h5"
@@ -484,6 +574,21 @@ export function CrfDetailPage() {
                 formNotSubmitted={Boolean(form?.notSubmitted)}
                 itemNotSubmitted={Boolean(itemDetail.item.notSubmitted)}
                 noDomainAnnotations={noDomainAnnotations}
+                openIssueCount={
+                  openIssueCountByTarget.get(itemDetail.item.code) ?? 0
+                }
+                onOpenIssues={() =>
+                  formMission &&
+                  setIssueDialog({
+                    scope: {
+                      kind: "item",
+                      itemId: itemDetail.item.id,
+                      itemCode: itemDetail.item.code,
+                    },
+                    missionId: formMission.id,
+                  })
+                }
+                missionExists={Boolean(formMission)}
               />
             ))
           )}
@@ -625,6 +730,58 @@ export function CrfDetailPage() {
         mutationError={deleteAnnotation.error}
         mutationPending={deleteAnnotation.isPending}
       />
+
+      {issueDialog && formMission && (
+        <MissionIssueDialog
+          open
+          scope={issueDialog.scope}
+          mission={formMission}
+          resolveName={resolveName}
+          issues={(issuesQuery.data ?? []).filter((i) => {
+            if (issueDialog.scope.kind === "form") return i.targetItem == null;
+            return i.targetItem === issueDialog.scope.itemCode;
+          })}
+          currentUser={currentUser}
+          canCreate={canCreate}
+          canActOnIssue={canActOnIssue}
+          canComment={canComment}
+          createPending={createIssue.isPending}
+          createError={createIssue.error}
+          onCreate={(description) =>
+            createIssue.mutate(
+              {
+                missionId: issueDialog.missionId,
+                body: {
+                  description,
+                  targetItem:
+                    issueDialog.scope.kind === "item"
+                      ? issueDialog.scope.itemCode
+                      : undefined,
+                },
+              },
+              { onSuccess: () => undefined },
+            )
+          }
+          patchPending={patchIssueState.isPending}
+          onPatchState={(issueId, next) =>
+            patchIssueState.mutate({
+              missionId: issueDialog.missionId,
+              issueId,
+              next,
+            })
+          }
+          commentPending={appendComment.isPending}
+          commentError={appendComment.error}
+          onAppendComment={(issueId, content) =>
+            appendComment.mutate({
+              missionId: issueDialog.missionId,
+              issueId,
+              body: { content },
+            })
+          }
+          onClose={() => setIssueDialog(null)}
+        />
+      )}
     </Box>
   );
 }

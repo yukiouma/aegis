@@ -4,6 +4,7 @@ import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type {
   Annotation,
   AnnotationListResponse,
+  AppendCommentInput,
   AssigneeDataArg,
   AssigneeViewResponse,
   CodeItemListQuery,
@@ -14,6 +15,7 @@ import type {
   CreateAnnotationInput,
   CreateCodeItemInput,
   CreateCodeListInput,
+  CreateIssueInput,
   CreateCrfFormInput,
   CreateDomainAnnotationInput,
   CreateMissionInput,
@@ -36,6 +38,9 @@ import type {
   DomainAnnotation,
   DomainAnnotationListResponse,
   Identity,
+  IssueListQuery,
+  IssueState,
+  IssueViewResponse,
   MissionKind,
   MissionViewResponse,
   PagedCodeItemListResponse,
@@ -461,11 +466,37 @@ export const api = {
     call<void>("remove_assignee", { missionId, assigneeId }),
   createMission: (input: CreateMissionInput): Promise<MissionViewResponse> =>
     call<MissionViewResponse>("create_mission", { ...input }),
+
+  // mission issues
+  listIssuesByMission: (
+    missionId: number,
+    options: IssueListQuery = {},
+  ): Promise<IssueViewResponse[]> =>
+    call<IssueViewResponse[]>("list_issues_by_mission", {
+      missionId,
+      state: options.state,
+    }),
+  createIssue: (
+    missionId: number,
+    body: CreateIssueInput,
+  ): Promise<IssueViewResponse> =>
+    call<IssueViewResponse>("create_issue", { missionId, body: { ...body } }),
+  patchIssueState: (
+    issueId: number,
+    state: IssueState,
+  ): Promise<IssueViewResponse> =>
+    call<IssueViewResponse>("patch_issue_state", { issueId, state }),
+  appendComment: (
+    issueId: number,
+    body: AppendCommentInput,
+  ): Promise<IssueViewResponse> =>
+    call<IssueViewResponse>("append_comment", { issueId, body: { ...body } }),
 } as const;
 
 export type { ApiError } from "./types";
 export type {
   Annotation,
+  AppendCommentInput,
   AssigneeDataArg,
   AssigneeViewResponse,
   AnnotationOwner,
@@ -478,6 +509,7 @@ export type {
   CreateAnnotationInput,
   CreateCodeItemInput,
   CreateCodeListInput,
+  CreateIssueInput,
   CreateCrfFormInput,
   CreateDomainAnnotationInput,
   CreateMissionInput,
@@ -503,6 +535,11 @@ export type {
   DomainCategory,
   Identity,
   ImportAlsInput,
+  IssueCommentViewResponse,
+  IssueListQuery,
+  IssueListResponse,
+  IssueState,
+  IssueViewResponse,
   MissionKind,
   MissionRole,
   MissionViewResponse,

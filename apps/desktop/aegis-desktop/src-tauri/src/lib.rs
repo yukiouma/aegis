@@ -80,6 +80,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::mission::add_assignee,
             commands::mission::remove_assignee,
             commands::mission::create_mission,
+            commands::mission::list_issues_by_mission,
+            commands::mission::create_issue,
+            commands::mission::patch_issue_state,
+            commands::mission::update_issue_description,
+            commands::mission::append_comment,
             // crf
             commands::crf::version::list_crf_versions,
             commands::crf::version::import_als,

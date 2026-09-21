@@ -1,4 +1,4 @@
-import { Box, Chip, Stack, Typography } from "@aegis/ui/mui";
+import { Badge, Box, Chip, Stack, Tooltip, Typography } from "@aegis/ui/mui";
 import { RadioButtonUnchecked as RadioButtonUncheckedIcon } from "@aegis/ui/icons";
 
 import type { Annotation, AnnotationOwner, CrfItemDetail } from "../../../shared/api";
@@ -53,6 +53,26 @@ interface Props {
    * item on the same condition; this prop keeps the row in sync.
    */
   noDomainAnnotations: boolean;
+  /**
+   * Number of mission issues with `state: opened` for this item's
+   * code (the same scope as `targetItem`). The page derives this
+   * from the cached issues list. Drives the count Badge on the
+   * item code chip — `0` hides the badge (MUI's default `showZero:
+   * false` behavior).
+   */
+  openIssueCount: number;
+  /**
+   * Open the mission-issue dialog scoped to this item. Wired by
+   * the page to `setIssueDialog({ scope: { kind: "item", ... } })`.
+   */
+  onOpenIssues: () => void;
+  /**
+   * Whether a mission exists for the owning form. When false the
+   * code chip is disabled with a tooltip — there's no scope to open
+   * an issue against. The Badge still renders (with `invisible`)
+   * so the chip doesn't reflow when the mission shows up.
+   */
+  missionExists: boolean;
 }
 
 export function CrfItemRow({
@@ -65,6 +85,9 @@ export function CrfItemRow({
   formNotSubmitted,
   itemNotSubmitted,
   noDomainAnnotations,
+  openIssueCount,
+  onOpenIssues,
+  missionExists,
 }: Props) {
   const { t } = useI18n();
   const { item, options, units, annotations } = itemDetail;
@@ -122,12 +145,35 @@ export function CrfItemRow({
             chip so the row reads as static text rather than as a
             field that can be annotated. */}
         {!isLabel && (
-          <Chip
-            sx={{ width: 92 }}
-            label={item.code}
-            variant="outlined"
-            size="small"
-          />
+          <Tooltip
+            title={
+              missionExists
+                ? ""
+                : t("crf.missionIssue.tooltip.noMission")
+            }
+            disableHoverListener={missionExists}
+            disableFocusListener={missionExists}
+            disableTouchListener={missionExists}
+          >
+            <span>
+              <Badge
+                color="error"
+                badgeContent={openIssueCount}
+                invisible={!missionExists}
+                overlap="circular"
+              >
+                <Chip
+                  sx={{ width: 92 }}
+                  label={item.code}
+                  variant="outlined"
+                  size="small"
+                  onClick={onOpenIssues}
+                  disabled={!missionExists}
+                  data-testid={`crf-item-code-${item.id}`}
+                />
+              </Badge>
+            </span>
+          </Tooltip>
         )}
         <Typography
           variant="subtitle1"
