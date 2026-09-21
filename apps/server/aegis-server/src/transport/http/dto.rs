@@ -2109,6 +2109,145 @@ pub struct MissionByProjectQuery {
     pub kind: Option<String>,
 }
 
+// ===========================================================================
+// Mission issue DTOs
+// ===========================================================================
+//
+// Wire projections of `apis::mission::{IssueState, IssueView,
+// IssueCommentView}`. The open/closed state uses `snake_case` so the
+// TS client can `switch (state)` on the string directly; the rest of
+// the response follows the camelCase convention used elsewhere.
+
+/// Wire enum mirroring [`apis::mission::IssueState`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum IssueState {
+    Opened,
+    Closed,
+}
+
+impl From<apis::mission::IssueState> for IssueState {
+    fn from(s: apis::mission::IssueState) -> Self {
+        match s {
+            apis::mission::IssueState::Opened => Self::Opened,
+            apis::mission::IssueState::Closed => Self::Closed,
+        }
+    }
+}
+
+impl From<IssueState> for apis::mission::IssueState {
+    fn from(s: IssueState) -> Self {
+        match s {
+            IssueState::Opened => apis::mission::IssueState::Opened,
+            IssueState::Closed => apis::mission::IssueState::Closed,
+        }
+    }
+}
+
+/// Wire projection of [`apis::mission::IssueCommentView`]. Each
+/// comment is an immutable record of "who said what when" appended to
+/// the issue's thread.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct IssueCommentViewResponse {
+    pub user: String,
+    pub content: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::mission::IssueCommentView> for IssueCommentViewResponse {
+    fn from(c: apis::mission::IssueCommentView) -> Self {
+        Self {
+            user: c.user,
+            content: c.content,
+            created_at: c.created_at,
+        }
+    }
+}
+
+/// Wire projection of [`apis::mission::IssueView`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct IssueViewResponse {
+    pub id: i64,
+    pub mission_id: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_item: Option<String>,
+    pub issuer: String,
+    pub description: String,
+    pub state: IssueState,
+    pub comments: Vec<IssueCommentViewResponse>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<apis::mission::IssueView> for IssueViewResponse {
+    fn from(v: apis::mission::IssueView) -> Self {
+        Self {
+            id: v.id,
+            mission_id: v.mission_id,
+            target_item: v.target_item,
+            issuer: v.issuer,
+            description: v.description,
+            state: v.state.into(),
+            comments: v.comments.into_iter().map(Into::into).collect(),
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+/// Wrapper for `GET /api/mission/by-mission/{mission_id}/issues`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct IssueListResponse {
+    pub issues: Vec<IssueViewResponse>,
+}
+
+/// Body for `POST /api/mission/by-mission/{mission_id}/issues`.
+/// `targetItem` is optional on the wire — an issue can describe the
+/// whole mission (no specific row) or a single row inside it.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateIssueRequest {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_item: Option<String>,
+    pub description: String,
+}
+
+/// Body for `PATCH /api/mission/issues/{issue_id}/state`. Empty
+/// marker struct — the state is supplied via the `?state=opened|closed`
+/// query parameter, and the body is left empty.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PatchIssueStateRequest {}
+
+/// Body for `PATCH /api/mission/issues/{issue_id}/description`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateIssueDescriptionRequest {
+    pub description: String,
+}
+
+/// Body for `POST /api/mission/issues/{issue_id}/comments`.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AppendCommentRequest {
+    pub content: String,
+}
+
+/// Query for `GET /api/mission/by-mission/{mission_id}/issues`. The
+/// optional `state` query parameter narrows the result set to a single
+/// `IssueState`. `state` is captured as `String` at the wire so a
+/// malformed value can be surfaced as a `400` via
+/// `MissionApiError::Validation` instead of a deserializer 422.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct IssueListQuery {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub state: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2873,5 +3012,140 @@ mod tests {
         assert_eq!(resp.codelist_id, 11);
         assert_eq!(resp.version_id, 1);
         assert_eq!(serde_json::to_string(&resp).unwrap(), json);
+    }
+
+    // ---- mission issue DTO round-trips (new) -----
+
+    #[test]
+    fn issue_state_round_trip_all_variants() {
+        for s in [IssueState::Opened, IssueState::Closed] {
+            let json = serde_json::to_string(&s).unwrap();
+            let back: IssueState = serde_json::from_str(&json).unwrap();
+            assert_eq!(format!("{s:?}"), format!("{back:?}"));
+        }
+    }
+
+    #[test]
+    fn issue_state_from_apis_state_all_variants() {
+        assert!(matches!(
+            IssueState::from(apis::mission::IssueState::Opened),
+            IssueState::Opened
+        ));
+        assert!(matches!(
+            IssueState::from(apis::mission::IssueState::Closed),
+            IssueState::Closed
+        ));
+    }
+
+    #[test]
+    fn create_issue_request_roundtrip() {
+        let json = r#"{"targetItem":"dm.x","description":"d"}"#;
+        let req: CreateIssueRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.target_item.as_deref(), Some("dm.x"));
+        assert_eq!(req.description, "d");
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn create_issue_request_omits_target_item_when_none() {
+        let req = CreateIssueRequest {
+            target_item: None,
+            description: "d".into(),
+        };
+        let out = serde_json::to_string(&req).unwrap();
+        assert_eq!(out, r#"{"description":"d"}"#);
+    }
+
+    #[test]
+    fn update_issue_description_request_roundtrip() {
+        let json = r#"{"description":"d"}"#;
+        let req: UpdateIssueDescriptionRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.description, "d");
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn append_comment_request_roundtrip() {
+        let json = r#"{"content":"c"}"#;
+        let req: AppendCommentRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.content, "c");
+        assert_eq!(serde_json::to_string(&req).unwrap(), json);
+    }
+
+    #[test]
+    fn issue_list_query_round_trips_state() {
+        let json = r#"{"state":"closed"}"#;
+        let q: IssueListQuery = serde_json::from_str(json).unwrap();
+        assert_eq!(q.state.as_deref(), Some("closed"));
+        assert_eq!(serde_json::to_string(&q).unwrap(), json);
+    }
+
+    #[test]
+    fn issue_list_query_omits_state_when_none() {
+        let q = IssueListQuery::default();
+        assert_eq!(serde_json::to_string(&q).unwrap(), "{}");
+    }
+
+    #[test]
+    fn issue_view_response_roundtrip() {
+        let json = r#"{"id":1,"missionId":1,"targetItem":"dm.x","issuer":"u1","description":"d","state":"opened","comments":[{"user":"u2","content":"c","createdAt":"2026-01-02T03:04:05Z"}],"createdAt":"2026-01-02T03:04:05Z","updatedAt":"2026-01-02T03:04:05Z"}"#;
+        let v: IssueViewResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(v.id, 1);
+        assert_eq!(v.mission_id, 1);
+        assert_eq!(v.target_item.as_deref(), Some("dm.x"));
+        assert_eq!(v.issuer, "u1");
+        assert_eq!(v.description, "d");
+        assert!(matches!(v.state, IssueState::Opened));
+        assert_eq!(v.comments.len(), 1);
+        assert_eq!(v.comments[0].user, "u2");
+        assert_eq!(serde_json::to_string(&v).unwrap(), json);
+    }
+
+    #[test]
+    fn issue_view_response_omits_target_item_when_none() {
+        let json = r#"{"id":1,"missionId":1,"issuer":"u1","description":"d","state":"closed","comments":[],"createdAt":"2026-01-02T03:04:05Z","updatedAt":"2026-01-02T03:04:05Z"}"#;
+        let v: IssueViewResponse = serde_json::from_str(json).unwrap();
+        assert!(v.target_item.is_none());
+        assert!(matches!(v.state, IssueState::Closed));
+        assert_eq!(serde_json::to_string(&v).unwrap(), json);
+    }
+
+    #[test]
+    fn issue_view_response_from_apis_issue_view() {
+        let apis_view = apis::mission::IssueView {
+            id: 7,
+            mission_id: 1,
+            target_item: None,
+            issuer: "u7".into(),
+            description: "d".into(),
+            state: apis::mission::IssueState::Closed,
+            comments: vec![apis::mission::IssueCommentView {
+                user: "u9".into(),
+                content: "c".into(),
+                created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                    .unwrap()
+                    .with_timezone(&chrono::Utc),
+            }],
+            created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+            updated_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        };
+        let resp: IssueViewResponse = apis_view.into();
+        assert_eq!(resp.id, 7);
+        assert!(resp.target_item.is_none());
+        assert!(matches!(resp.state, IssueState::Closed));
+        assert_eq!(resp.comments.len(), 1);
+        assert_eq!(resp.comments[0].user, "u9");
+    }
+
+    #[test]
+    fn issue_list_response_roundtrip() {
+        let json = r#"{"issues":[]}"#;
+        let r: IssueListResponse = serde_json::from_str(json).unwrap();
+        assert!(r.issues.is_empty());
+        assert_eq!(serde_json::to_string(&r).unwrap(), json);
     }
 }

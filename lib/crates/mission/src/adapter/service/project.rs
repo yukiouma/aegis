@@ -11,6 +11,7 @@ use crate::domain::{DomainError, ProjectLookup};
 /// reaches apis `project` types directly; everything flows
 /// through this struct so the domain layer stays free of `apis`
 /// references.
+#[derive(Clone)]
 pub struct ProjectLookupImpl {
     projects: Arc<dyn ProjectService>,
 }

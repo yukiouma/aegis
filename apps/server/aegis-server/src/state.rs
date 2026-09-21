@@ -321,6 +321,51 @@ pub(crate) mod test_support {
         ) -> Result<(), apis::mission::MissionApiError> {
             unimplemented!()
         }
+        async fn list_issues_by_mission(
+            &self,
+            _req: apis::mission::ListIssuesByMissionRequest,
+        ) -> Result<Vec<apis::mission::IssueView>, apis::mission::MissionApiError> {
+            unimplemented!()
+        }
+        async fn create_issue(
+            &self,
+            _actor: &apis::mission::Actor,
+            _req: apis::mission::CreateIssueRequest,
+        ) -> Result<apis::mission::IssueView, apis::mission::MissionApiError> {
+            unimplemented!()
+        }
+        async fn close_issue(
+            &self,
+            _actor: &apis::mission::Actor,
+            _req: apis::mission::CloseIssueRequest,
+            _issue_id: i64,
+        ) -> Result<apis::mission::IssueView, apis::mission::MissionApiError> {
+            unimplemented!()
+        }
+        async fn reopen_issue(
+            &self,
+            _actor: &apis::mission::Actor,
+            _req: apis::mission::ReopenIssueRequest,
+            _issue_id: i64,
+        ) -> Result<apis::mission::IssueView, apis::mission::MissionApiError> {
+            unimplemented!()
+        }
+        async fn update_issue_description(
+            &self,
+            _actor: &apis::mission::Actor,
+            _issue_id: i64,
+            _req: apis::mission::UpdateIssueDescriptionRequest,
+        ) -> Result<apis::mission::IssueView, apis::mission::MissionApiError> {
+            unimplemented!()
+        }
+        async fn append_comment(
+            &self,
+            _actor: &apis::mission::Actor,
+            _issue_id: i64,
+            _req: apis::mission::AppendCommentRequest,
+        ) -> Result<apis::mission::IssueView, apis::mission::MissionApiError> {
+            unimplemented!()
+        }
     }
 
     /// Null CRF service for tests that don't exercise the

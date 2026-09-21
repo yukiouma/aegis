@@ -5,15 +5,19 @@
 //! `cargo test -p mission` time.
 
 use apis::mission::{
-    Actor, AssigneeData, AssigneeView as ApiAssigneeView, CreateMissionRequest, MissionApiError,
-    MissionKind as ApiMissionKind, MissionRole as ApiMissionRole, MissionService,
-    MissionView as ApiMissionView,
+    Actor, AppendCommentRequest, AssigneeData, AssigneeView as ApiAssigneeView, CloseIssueRequest,
+    CreateIssueRequest, CreateMissionRequest, IssueCommentView as ApiIssueCommentView,
+    IssueState as ApiIssueState, IssueView as ApiIssueView, ListIssuesByMissionRequest,
+    MissionApiError, MissionKind as ApiMissionKind, MissionRole as ApiMissionRole, MissionService,
+    MissionView as ApiMissionView, ReopenIssueRequest, UpdateIssueDescriptionRequest,
 };
 use chrono::{TimeZone, Utc};
 use mission::{
-    Assignee, AssigneeRepo, AssigneeRepository, DomainError, Mission, MissionKind, MissionRepo,
-    MissionRepository, MissionRole, MissionServiceImpl, MissionUsecase, MissionUsecaseConfig,
-    ProjectLookup, ProjectLookupImpl, UsecaseError, UserLookup, UserLookupImpl,
+    Assignee, AssigneeRepo, AssigneeRepository, CreateIssue, DomainError, IssueComment, IssueRepo,
+    IssueState, Mission, MissionIssue, MissionIssueRepository, MissionIssueUsecase,
+    MissionIssueUsecaseConfig, MissionKind, MissionRepo, MissionRepository, MissionRole,
+    MissionServiceImpl, MissionUsecase, MissionUsecaseConfig, ProjectLookup, ProjectLookupImpl,
+    UsecaseError, UserLookup, UserLookupImpl,
 };
 use sqlx::PgPool;
 
@@ -21,8 +25,11 @@ use sqlx::PgPool;
 fn domain_types_are_nameable_from_crate_root() {
     fn assert_mission(_: Mission) {}
     fn assert_assignee(_: Assignee) {}
+    fn assert_mission_issue(_: MissionIssue) {}
+    fn assert_issue_comment(_: IssueComment) {}
     fn assert_mission_kind(_: MissionKind) {}
     fn assert_mission_role(_: MissionRole) {}
+    fn assert_issue_state(_: IssueState) {}
 
     assert_mission_kind(MissionKind::Crf);
     assert_mission_kind(MissionKind::Sdtm);
@@ -30,8 +37,12 @@ fn domain_types_are_nameable_from_crate_root() {
     assert_mission_kind(MissionKind::Tfl);
     assert_mission_role(MissionRole::Dev);
     assert_mission_role(MissionRole::Qc);
+    assert_issue_state(IssueState::Opened);
+    assert_issue_state(IssueState::Closed);
     let _ = assert_mission;
     let _ = assert_assignee;
+    let _ = assert_mission_issue;
+    let _ = assert_issue_comment;
 }
 
 #[test]
@@ -43,6 +54,10 @@ fn domain_error_variants_are_nameable() {
     assert_dom(DomainError::UnknownMissionRole("dev".into()));
     assert_dom(DomainError::NotFound);
     assert_dom(DomainError::AssigneeNotFound);
+    assert_dom(DomainError::MissionIssueNotFound);
+    assert_dom(DomainError::EmptyIssueDescription);
+    assert_dom(DomainError::EmptyIssueIssuer);
+    assert_dom(DomainError::EmptyCommentContent);
     assert_dom(DomainError::ProjectNotFound("p1".into()));
     assert_dom(DomainError::UserNotFound("u1".into()));
     assert_dom(DomainError::Repository("boom".into()));
@@ -74,20 +89,35 @@ fn usecase_config_has_expected_field_shape() {
 }
 
 #[test]
+fn issue_usecase_config_has_expected_field_shape() {
+    let _assert_config_shape: fn(
+        MissionIssueUsecaseConfig<MissionRepo, AssigneeRepo, ProjectLookupImpl, IssueRepo>,
+    ) = |cfg| {
+        let _: &MissionRepo = &cfg.mission_repo;
+        let _: &AssigneeRepo = &cfg.assignee_repo;
+        let _: &ProjectLookupImpl = &cfg.project_lookup;
+        let _: &IssueRepo = &cfg.issue_repo;
+    };
+}
+
+#[test]
 fn repo_constructors_accept_a_pg_pool() {
     let ctor_m: fn(PgPool) -> MissionRepo = MissionRepo::new;
     let ctor_a: fn(PgPool) -> AssigneeRepo = AssigneeRepo::new;
-    let _ = (ctor_m, ctor_a);
+    let ctor_i: fn(PgPool) -> IssueRepo = IssueRepo::new;
+    let _ = (ctor_m, ctor_a, ctor_i);
 }
 
 #[test]
 fn ports_can_be_dispatched_dynamically() {
     fn assert_box_dyn_mr<R: MissionRepository + 'static>() {}
     fn assert_box_dyn_ar<R: AssigneeRepository + 'static>() {}
+    fn assert_box_dyn_ir<R: MissionIssueRepository + 'static>() {}
     fn assert_box_dyn_pl<P: ProjectLookup + 'static>() {}
     fn assert_box_dyn_ul<U: UserLookup + 'static>() {}
     assert_box_dyn_mr::<MissionRepo>();
     assert_box_dyn_ar::<AssigneeRepo>();
+    assert_box_dyn_ir::<IssueRepo>();
     assert_box_dyn_pl::<ProjectLookupImpl>();
     assert_box_dyn_ul::<UserLookupImpl>();
 }
@@ -96,11 +126,16 @@ fn ports_can_be_dispatched_dynamically() {
 fn api_view_dtos_are_nameable() {
     fn assert_mission(_: ApiMissionView) {}
     fn assert_assignee(_: ApiAssigneeView) {}
+    fn assert_issue(_: ApiIssueView) {}
+    fn assert_issue_comment(_: ApiIssueCommentView) {}
     fn assert_kind(_: ApiMissionKind) {}
     fn assert_role(_: ApiMissionRole) {}
+    fn assert_state(_: ApiIssueState) {}
     let now = Utc.timestamp_opt(0, 0).unwrap();
     assert_kind(ApiMissionKind::Crf);
-    assert_role(ApiMissionRole::Dev);
+    assert_role(ApiMissionRole::Qc);
+    assert_state(ApiIssueState::Opened);
+    assert_state(ApiIssueState::Closed);
     assert_mission(ApiMissionView {
         id: 1,
         project_code: "p1".into(),
@@ -117,6 +152,22 @@ fn api_view_dtos_are_nameable() {
         created_at: now,
         updated_at: now,
     });
+    assert_issue(ApiIssueView {
+        id: 1,
+        mission_id: 1,
+        target_item: None,
+        issuer: "u1".into(),
+        description: "d".into(),
+        state: ApiIssueState::Opened,
+        comments: vec![ApiIssueCommentView {
+            user: "u2".into(),
+            content: "c".into(),
+            created_at: now,
+        }],
+        created_at: now,
+        updated_at: now,
+    });
+    let _ = assert_issue_comment;
 }
 
 #[test]
@@ -125,6 +176,8 @@ fn api_error_variants_are_nameable() {
     assert_err(MissionApiError::Validation("bad".into()));
     assert_err(MissionApiError::NotFound);
     assert_err(MissionApiError::AssigneeNotFound);
+    assert_err(MissionApiError::IssueNotFound);
+    assert_err(MissionApiError::MissionNotFoundForIssue(1));
     assert_err(MissionApiError::ProjectNotFound("p1".into()));
     assert_err(MissionApiError::UserNotFound("u1".into()));
     assert_err(MissionApiError::Forbidden {
@@ -158,6 +211,26 @@ fn api_requests_have_expected_field_shape() {
     let _actor = Actor {
         user_code: "u1".into(),
     };
+    let _create_issue = CreateIssueRequest {
+        mission_id: 1,
+        target_item: Some("dm.x".into()),
+        description: "d".into(),
+    };
+    let _close = CloseIssueRequest::default();
+    let _reopen = ReopenIssueRequest::default();
+    let _upd_desc = UpdateIssueDescriptionRequest {
+        description: "d".into(),
+    };
+    let _append = AppendCommentRequest {
+        content: "c".into(),
+    };
+    let _list = ListIssuesByMissionRequest {
+        mission_id: 1,
+        state: Some(ApiIssueState::Closed),
+    };
+    // Lock the field shape of CreateIssue inside the usecase layer.
+    let _uc: fn(CreateIssue) -> (i64, Option<String>, String) =
+        |c| (c.mission_id, c.target_item, c.description);
 }
 
 #[test]
@@ -167,7 +240,7 @@ fn mission_service_impl_is_object_safe() {
     // object-safety is checked at compile time without ever
     // constructing an instance.
     let _: fn(
-        MissionServiceImpl<MissionRepo, AssigneeRepo, ProjectLookupImpl, UserLookupImpl>,
+        MissionServiceImpl<MissionRepo, AssigneeRepo, ProjectLookupImpl, UserLookupImpl, IssueRepo>,
     ) -> Box<dyn MissionService> = |s| Box::new(s);
 }
 
@@ -180,4 +253,13 @@ fn mission_usecase_can_be_built_from_config() {
         MissionUsecaseConfig<MissionRepo, AssigneeRepo, ProjectLookupImpl, UserLookupImpl>,
     ) -> MissionUsecase<MissionRepo, AssigneeRepo, ProjectLookupImpl, UserLookupImpl> =
         |cfg| MissionUsecase::new(cfg);
+}
+
+#[test]
+#[allow(clippy::type_complexity)]
+fn issue_usecase_can_be_built_from_config() {
+    let _: fn(
+        MissionIssueUsecaseConfig<MissionRepo, AssigneeRepo, ProjectLookupImpl, IssueRepo>,
+    ) -> MissionIssueUsecase<MissionRepo, AssigneeRepo, ProjectLookupImpl, IssueRepo> =
+        |cfg| MissionIssueUsecase::new(cfg);
 }

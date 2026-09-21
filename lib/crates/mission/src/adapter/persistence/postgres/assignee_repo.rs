@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::domain::{Assignee, AssigneeNew, AssigneeRepository, DomainError};
+use crate::domain::{Assignee, AssigneeNew, AssigneeRepository, DomainError, MissionRole};
 
 use super::map_db_error;
 use super::row::AssigneeRow;
@@ -9,6 +9,7 @@ use super::row::AssigneeRow;
 /// PostgreSQL SQLSTATE for unique-violation.
 const SQLSTATE_UNIQUE_VIOLATION: &str = "23505";
 
+#[derive(Clone)]
 pub struct AssigneeRepo {
     pool: PgPool,
 }
@@ -65,5 +66,26 @@ impl AssigneeRepository for AssigneeRepo {
             return Err(DomainError::AssigneeNotFound);
         }
         Ok(())
+    }
+
+    async fn is_assignee(
+        &self,
+        mission_id: i64,
+        user_code: &str,
+        role: MissionRole,
+    ) -> Result<bool, DomainError> {
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM assignees
+                            WHERE mission_id = $1
+                              AND user_code = $2
+                              AND role = $3)",
+        )
+        .bind(mission_id)
+        .bind(user_code)
+        .bind(role.as_str())
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| DomainError::Repository(e.to_string()))?;
+        Ok(exists)
     }
 }

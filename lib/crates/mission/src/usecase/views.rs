@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-use crate::domain::{Assignee, Mission};
+use crate::domain::{Assignee, IssueComment, IssueState, Mission, MissionIssue};
 
 /// Projection of `Mission` returned by the usecase to the facade.
 /// The facade converts this into `apis::mission::MissionView` via
@@ -47,6 +47,54 @@ impl From<Assignee> for AssigneeView {
             role: a.role,
             created_at: a.created_at,
             updated_at: a.updated_at,
+        }
+    }
+}
+
+/// Projection of `MissionIssue` returned by the issue usecase to
+/// the facade.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IssueView {
+    pub id: i64,
+    pub mission_id: i64,
+    pub target_item: Option<String>,
+    pub issuer: String,
+    pub description: String,
+    pub state: IssueState,
+    pub comments: Vec<IssueCommentView>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IssueCommentView {
+    pub user: String,
+    pub content: String,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<MissionIssue> for IssueView {
+    fn from(i: MissionIssue) -> Self {
+        IssueView {
+            id: i.id,
+            mission_id: i.mission_id,
+            target_item: i.target_item,
+            issuer: i.issuer,
+            description: i.description,
+            state: i.state,
+            comments: i.comments.into_iter().map(Into::into).collect(),
+            created_at: i.created_at,
+            updated_at: i.updated_at,
+        }
+    }
+}
+
+impl From<IssueComment> for IssueCommentView {
+    fn from(c: IssueComment) -> Self {
+        IssueCommentView {
+            user: c.user,
+            content: c.content,
+            created_at: c.created_at,
         }
     }
 }

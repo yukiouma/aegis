@@ -72,4 +72,12 @@ pub trait AssigneeRepository: Send + Sync {
     async fn add(&self, mission_id: i64, input: AssigneeNew) -> Result<Assignee, DomainError>;
 
     async fn remove(&self, mission_id: i64, assignee_id: i64) -> Result<(), DomainError>;
+
+    /// True iff `(mission_id, user_code, role)` exists in `assignees`.
+    async fn is_assignee(
+        &self,
+        mission_id: i64,
+        user_code: &str,
+        role: MissionRole,
+    ) -> Result<bool, DomainError>;
 }

@@ -1,5 +1,5 @@
-//! PostgreSQL-backed implementations of `MissionRepository` and
-//! `AssigneeRepository`.
+//! PostgreSQL-backed implementations of `MissionRepository`,
+//! `AssigneeRepository`, and `MissionIssueRepository`.
 //!
 //! This module intentionally uses SQLx's *runtime* query API
 //! (`sqlx::query_as` and `sqlx::QueryBuilder`) rather than the
@@ -7,24 +7,26 @@
 //! crates. `MissionRepo::create` opens a transaction so the
 //! mission row and every assignee row land atomically; the FK
 //! `ON DELETE CASCADE` makes mission deletion a single DELETE.
+//! `IssueRepo::append_comment` reads the existing row and
+//! rewrites the whole `comments` jsonb array — the Postgres
+//! `||` operator is intentionally avoided because it merges
+//! by index, not by append.
 //!
 //! `row` is private to `postgres/`. The `MissionRow` /
-//! `AssigneeRow` types are NOT re-exported at the crate root.
-//!
-//! The struct `new` constructors and the `MissionRow.mission_id`
-//! / `AssigneeRow` fields read here only by `TryFrom` impls
-//! are intentionally unreferenced until the usecase + facade
-//! layer (Task 4) wires them up.
+//! `AssigneeRow` / `IssueRow` types are NOT re-exported at the
+//! crate root.
 
 #![allow(dead_code, unused_imports)]
 
 pub(crate) mod assignee_repo;
+pub(crate) mod issue_repo;
 pub(crate) mod mission_repo;
 pub(crate) mod row;
 #[cfg(test)]
 mod tests;
 
 pub use assignee_repo::AssigneeRepo;
+pub use issue_repo::IssueRepo;
 pub use mission_repo::MissionRepo;
 
 use crate::domain::DomainError;

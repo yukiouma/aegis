@@ -3,8 +3,12 @@ use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
 use sqlx::FromRow;
+use sqlx::types::Json;
 
-use crate::domain::{Assignee, DomainError, Mission, MissionKind, MissionRole};
+use crate::domain::{
+    Assignee, DomainError, IssueComment, IssueState, Mission, MissionIssue, MissionKind,
+    MissionRole,
+};
 
 /// Raw row from `missions`. `mission_kind` is read as TEXT and
 /// parsed via `MissionKind::from_str` so the DB CHECK is the
@@ -27,6 +31,23 @@ pub(crate) struct AssigneeRow {
     pub mission_id: i64,
     pub user_code: String,
     pub role: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Raw row from `mission_issues`. `state` is read as TEXT and
+/// parsed via `IssueState::from_str`; `comments` is read as
+/// jsonb and decoded into `Vec<IssueComment>` so the row bridge
+/// is a single column deserialise.
+#[derive(FromRow)]
+pub(crate) struct IssueRow {
+    pub id: i64,
+    pub mission_id: i64,
+    pub target_item: Option<String>,
+    pub issuer: String,
+    pub description: String,
+    pub state: String,
+    pub comments: Json<Vec<IssueComment>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -59,6 +80,24 @@ impl TryFrom<AssigneeRow> for Assignee {
             row.id,
             row.user_code,
             role,
+            row.created_at,
+            row.updated_at,
+        ))
+    }
+}
+
+impl TryFrom<IssueRow> for MissionIssue {
+    type Error = DomainError;
+    fn try_from(row: IssueRow) -> Result<Self, Self::Error> {
+        let state = IssueState::from_str(&row.state)?;
+        Ok(MissionIssue::for_repository(
+            row.id,
+            row.mission_id,
+            row.target_item,
+            row.issuer,
+            row.description,
+            state,
+            row.comments.0,
             row.created_at,
             row.updated_at,
         ))

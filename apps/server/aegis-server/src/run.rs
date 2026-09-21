@@ -30,7 +30,7 @@ use domain_model::{
     SdtmVariableRepoPg, SdtmVersionRepoPg,
 };
 use mission::{
-    AssigneeRepo, MissionRepo, MissionServiceImpl, MissionUsecase, MissionUsecaseConfig,
+    AssigneeRepo, IssueRepo, MissionRepo, MissionServiceImpl,
     ProjectLookupImpl as MissionProjectLookupImpl, UserLookupImpl as MissionUserLookupImpl,
 };
 use sqlx::PgPool;
@@ -290,17 +290,18 @@ fn build_mission_service(
     project: Arc<dyn apis::project::ProjectService>,
     user: Arc<dyn UserService>,
 ) -> Arc<dyn MissionService> {
-    let mission_repo = MissionRepo::new(pool.clone());
-    let assignee_repo = AssigneeRepo::new(pool);
-    let projects = MissionProjectLookupImpl::new(project);
-    let users = MissionUserLookupImpl::new(user);
-    let usecase = MissionUsecase::new(MissionUsecaseConfig {
+    let mission_repo = Arc::new(MissionRepo::new(pool.clone()));
+    let assignee_repo = Arc::new(AssigneeRepo::new(pool.clone()));
+    let issue_repo = Arc::new(IssueRepo::new(pool));
+    let projects = Arc::new(MissionProjectLookupImpl::new(project));
+    let users = Arc::new(MissionUserLookupImpl::new(user));
+    Arc::new(MissionServiceImpl::from_repos(
         mission_repo,
         assignee_repo,
-        project_lookup: projects,
-        user_lookup: users,
-    });
-    Arc::new(MissionServiceImpl::from_usecase(usecase))
+        projects,
+        users,
+        issue_repo,
+    ))
 }
 
 #[cfg(test)]

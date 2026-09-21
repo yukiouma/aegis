@@ -1,6 +1,6 @@
 use super::{
-    AssigneeNew, DomainError, Mission, MissionKind, MissionRole,
-    assignees_within_mission_are_unique,
+    AssigneeNew, DomainError, IssueComment, IssueState, Mission, MissionIssue, MissionKind,
+    MissionRole, assignees_within_mission_are_unique,
 };
 
 #[test]
@@ -102,6 +102,91 @@ fn assignees_within_mission_are_unique_accepts_distinct_roles() {
         },
     ];
     assert!(assignees_within_mission_are_unique(&assignees).is_ok());
+}
+
+#[test]
+fn issue_state_round_trip() {
+    for s in [IssueState::Opened, IssueState::Closed] {
+        let str = s.as_str();
+        let parsed = IssueState::try_from(str).expect("parses");
+        assert_eq!(parsed, s);
+    }
+}
+
+#[test]
+fn issue_state_unknown_rejected() {
+    let err = IssueState::try_from("pending").unwrap_err();
+    assert!(matches!(err, DomainError::UnknownMissionRole(_)));
+}
+
+#[test]
+fn issue_comment_new_rejects_empty_user() {
+    let c = IssueComment::new("".into(), "content".into(), now());
+    assert!(matches!(c, Err(DomainError::EmptyUserCode)));
+}
+
+#[test]
+fn issue_comment_new_rejects_empty_content() {
+    let c = IssueComment::new("u1".into(), "   ".into(), now());
+    assert!(matches!(c, Err(DomainError::EmptyCommentContent)));
+}
+
+#[test]
+fn issue_comment_new_accepts_valid() {
+    let c = IssueComment::new("u1".into(), "hello".into(), now()).unwrap();
+    assert_eq!(c.user, "u1");
+    assert_eq!(c.content, "hello");
+}
+
+#[test]
+fn mission_issue_new_rejects_empty_description() {
+    let m = MissionIssue::new(
+        1,
+        1,
+        None,
+        "u1".into(),
+        "   ".into(),
+        IssueState::Opened,
+        vec![],
+        now(),
+        now(),
+    );
+    assert!(matches!(m, Err(DomainError::EmptyIssueDescription)));
+}
+
+#[test]
+fn mission_issue_new_rejects_empty_issuer() {
+    let m = MissionIssue::new(
+        1,
+        1,
+        None,
+        "".into(),
+        "desc".into(),
+        IssueState::Opened,
+        vec![],
+        now(),
+        now(),
+    );
+    assert!(matches!(m, Err(DomainError::EmptyIssueIssuer)));
+}
+
+#[test]
+fn mission_issue_new_accepts_valid() {
+    let m = MissionIssue::new(
+        1,
+        1,
+        Some("form AE".into()),
+        "u1".into(),
+        "desc".into(),
+        IssueState::Opened,
+        vec![],
+        now(),
+        now(),
+    )
+    .unwrap();
+    assert_eq!(m.issuer, "u1");
+    assert_eq!(m.target_item.as_deref(), Some("form AE"));
+    assert_eq!(m.state, IssueState::Opened);
 }
 
 fn now() -> chrono::DateTime<chrono::Utc> {
