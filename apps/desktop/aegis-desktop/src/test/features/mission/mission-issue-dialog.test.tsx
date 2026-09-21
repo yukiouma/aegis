@@ -172,3 +172,52 @@ describe("MissionIssueDialog (shell)", () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
+
+describe("MissionIssueDialog — create form", () => {
+  it("hides the create form when canCreate is false", () => {
+    renderDialog({ canCreate: false });
+    expect(
+      screen.queryByLabelText(/Issue description/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("create submit is disabled while description is empty", () => {
+    renderDialog();
+    const submit = screen.getByRole("button", { name: /^Create$/i });
+    expect(submit).toBeDisabled();
+  });
+
+  it("create submit is disabled when description is whitespace only", () => {
+    renderDialog();
+    fireEvent.change(screen.getByLabelText(/Issue description/i), {
+      target: { value: "   " },
+    });
+    expect(screen.getByRole("button", { name: /^Create$/i })).toBeDisabled();
+  });
+
+  it("create submit is enabled when description is non-empty", () => {
+    renderDialog();
+    fireEvent.change(screen.getByLabelText(/Issue description/i), {
+      target: { value: "missing CRF row in AE" },
+    });
+    expect(
+      screen.getByRole("button", { name: /^Create$/i }),
+    ).not.toBeDisabled();
+  });
+
+  it("clicking create invokes onCreate with the trimmed description", () => {
+    const { onCreate } = renderDialog();
+    fireEvent.change(screen.getByLabelText(/Issue description/i), {
+      target: { value: "  missing row  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^Create$/i }));
+    expect(onCreate).toHaveBeenCalledWith("missing row");
+  });
+
+  it("shows the create error inline below the description TextField", () => {
+    renderDialog({
+      createError: { kind: "network", message: "boom" } as never,
+    });
+    expect(screen.getByText(/boom/)).toBeInTheDocument();
+  });
+});

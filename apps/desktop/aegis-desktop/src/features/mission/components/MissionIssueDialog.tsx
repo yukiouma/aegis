@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Alert,
+  Box,
   Button,
   Chip,
   Dialog,
@@ -13,6 +14,7 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  TextField,
   Tooltip,
   Typography,
 } from "@aegis/ui/mui";
@@ -25,6 +27,7 @@ import type {
   MissionViewResponse,
   UserView,
 } from "../../../shared/api";
+import { errorMessage } from "../../../shared/api/error";
 
 export type IssueScope =
   | { kind: "form" }
@@ -68,12 +71,12 @@ export function MissionIssueDialog({
   scope,
   mission: _mission,
   issues,
-  canCreate: _canCreate,
+  canCreate,
   canActOnIssue: _canActOnIssue,
   canComment: _canComment,
-  createPending: _createPending,
-  createError: _createError,
-  onCreate: _onCreate,
+  createPending,
+  createError,
+  onCreate,
   patchPending: _patchPending,
   patchError: _patchError,
   onPatchState: _onPatchState,
@@ -88,7 +91,7 @@ export function MissionIssueDialog({
   const { t } = useI18n();
 
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [_newDescription, setNewDescription] = useState("");
+  const [newDescription, setNewDescription] = useState("");
   const [_editing, setEditing] = useState<{
     id: number;
     value: string;
@@ -115,6 +118,38 @@ export function MissionIssueDialog({
         {t("crf.missionIssue.dialog.title", { scope: scopeLabel(scope) })}
       </DialogTitle>
       <DialogContent>
+        {canCreate && (
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 1,
+              mb: 2,
+            }}
+          >
+            <TextField
+              multiline
+              minRows={2}
+              label={t("crf.missionIssue.create.field.description")}
+              value={newDescription}
+              onChange={(e) => setNewDescription(e.target.value)}
+              disabled={createPending}
+              data-testid="mission-issue-new-description"
+            />
+            {createError && (
+              <Alert severity="error">{errorMessage(createError)}</Alert>
+            )}
+            <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+              <Button
+                variant="contained"
+                onClick={() => onCreate(newDescription.trim())}
+                disabled={createPending || newDescription.trim() === ""}
+              >
+                {t("crf.missionIssue.create.submit")}
+              </Button>
+            </Box>
+          </Box>
+        )}
         {issues.length === 0 ? (
           <Alert severity="info">{t("crf.missionIssue.dialog.empty")}</Alert>
         ) : (
