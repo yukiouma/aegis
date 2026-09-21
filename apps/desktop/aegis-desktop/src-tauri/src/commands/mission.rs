@@ -34,6 +34,12 @@ fn parse_role(s: &str) -> Result<crate::http::mission::MissionRole, ApiError> {
     })
 }
 
+fn parse_issue_state(s: &str) -> Result<crate::http::mission::IssueState, ApiError> {
+    serde_json::from_value(serde_json::Value::String(s.to_string())).map_err(|e| ApiError::Parse {
+        message: e.to_string(),
+    })
+}
+
 #[tauri::command]
 pub async fn list_missions_by_project(
     client: State<'_, HttpClient>,
@@ -94,6 +100,55 @@ pub async fn create_mission(
     .await
 }
 
+#[tauri::command]
+pub async fn list_issues_by_mission(
+    client: State<'_, HttpClient>,
+    mission_id: i64,
+    state: Option<String>,
+) -> Result<Vec<mission::IssueViewResponse>, ApiError> {
+    let parsed = match state.as_deref() {
+        Some(s) => Some(parse_issue_state(s)?),
+        None => None,
+    };
+    mission::list_issues_by_mission(&client, mission_id, parsed).await
+}
+
+#[tauri::command]
+pub async fn create_issue(
+    client: State<'_, HttpClient>,
+    mission_id: i64,
+    body: mission::CreateIssueRequest,
+) -> Result<mission::IssueViewResponse, ApiError> {
+    mission::create_issue(&client, mission_id, body).await
+}
+
+#[tauri::command]
+pub async fn patch_issue_state(
+    client: State<'_, HttpClient>,
+    issue_id: i64,
+    state: String,
+) -> Result<mission::IssueViewResponse, ApiError> {
+    mission::patch_issue_state(&client, issue_id, parse_issue_state(&state)?).await
+}
+
+#[tauri::command]
+pub async fn update_issue_description(
+    client: State<'_, HttpClient>,
+    issue_id: i64,
+    body: mission::UpdateIssueDescriptionRequest,
+) -> Result<mission::IssueViewResponse, ApiError> {
+    mission::update_issue_description(&client, issue_id, body).await
+}
+
+#[tauri::command]
+pub async fn append_comment(
+    client: State<'_, HttpClient>,
+    issue_id: i64,
+    body: mission::AppendCommentRequest,
+) -> Result<mission::IssueViewResponse, ApiError> {
+    mission::append_comment(&client, issue_id, body).await
+}
+
 #[cfg(test)]
 mod tests {
     //! Wire-shape tests. Tauri routes JSON keys to function parameters
@@ -104,6 +159,11 @@ mod tests {
     //!   remove_assignee:          { missionId, assigneeId }
     //!   create_mission:           { projectCode, missionKind, missionCode,
     //!                              assignees: [{ userCode, role }] }
+    //!   list_issues_by_mission:   { missionId, state? }
+    //!   create_issue:             { missionId, body: { targetItem?, description } }
+    //!   patch_issue_state:        { issueId, state: "opened"|"closed" }
+    //!   update_issue_description: { issueId, body: { description } }
+    //!   append_comment:           { issueId, body: { content } }
     //!
     //! These tests pin the deserialization shape of the only nested
     //! struct (`CreateMissionAssigneeArg`) and assert the camelCase
@@ -131,5 +191,49 @@ mod tests {
             result.is_err(),
             "snake_case user_code must not parse against camelCase CreateMissionAssigneeArg"
         );
+    }
+
+    #[test]
+    fn create_issue_request_deserializes_camel_case_payload() {
+        // Frontend emits { missionId, body: { targetItem?, description } }.
+        let raw = json!({
+            "missionId": 10,
+            "body": { "targetItem": "AE", "description": "missing row" }
+        });
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Wrapper {
+            mission_id: i64,
+            body: mission::CreateIssueRequest,
+        }
+        let w: Wrapper = serde_json::from_value(raw).unwrap();
+        assert_eq!(w.mission_id, 10);
+        assert_eq!(w.body.target_item.as_deref(), Some("AE"));
+        assert_eq!(w.body.description, "missing row");
+    }
+
+    #[test]
+    fn create_issue_request_with_omitted_target_item_parses_as_none() {
+        // Frontend may omit `targetItem` for whole-mission issues;
+        // serde must accept that. Negative "rejects snake_case" test is
+        // not applicable here because `target_item: Option<String>` +
+        // `#[serde(default)]` make the snake_case key silently None
+        // (the `rename_all = "camelCase"` rule still pins the wire to
+        // `targetItem`, but unknown fields are ignored by default and
+        // the optional field falls back to None).
+        let raw = json!({
+            "missionId": 10,
+            "body": { "description": "missing row" }
+        });
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct Wrapper {
+            mission_id: i64,
+            body: mission::CreateIssueRequest,
+        }
+        let w: Wrapper = serde_json::from_value(raw).unwrap();
+        assert_eq!(w.mission_id, 10);
+        assert!(w.body.target_item.is_none());
+        assert_eq!(w.body.description, "missing row");
     }
 }
