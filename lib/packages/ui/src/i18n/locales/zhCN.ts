@@ -393,6 +393,7 @@ export const zhCN = {
   "crf.missionIssue.state.opened": "打开",
   "crf.missionIssue.state.closed": "已关闭",
   "crf.missionIssue.create.field.description": "问题描述",
+  "crf.missionIssue.create.newIssue": "新建问题",
   "crf.missionIssue.create.submit": "创建",
   "crf.missionIssue.detail.comments": "评论",
   "crf.missionIssue.detail.editDescription": "编辑描述",

@@ -19,7 +19,10 @@ import {
   Tooltip,
   Typography,
 } from "@aegis/ui/mui";
-import { ExpandMore as ExpandMoreIcon } from "@aegis/ui/icons";
+import {
+  Add as AddIcon,
+  ExpandMore as ExpandMoreIcon,
+} from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
 
 import type {
@@ -101,6 +104,7 @@ export function MissionIssueDialog({
 
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [newDescription, setNewDescription] = useState("");
+  const [composing, setComposing] = useState(false);
   const [editing, setEditing] = useState<{
     id: number;
     value: string;
@@ -116,10 +120,22 @@ export function MissionIssueDialog({
     if (!open) {
       setExpandedId(null);
       setNewDescription("");
+      setComposing(false);
       setEditing(null);
       setCommentDraft(null);
     }
   }, [open]);
+
+  const handleSubmitNew = () => {
+    onCreate(newDescription.trim());
+    setNewDescription("");
+    setComposing(false);
+  };
+
+  const handleCancelNew = () => {
+    setNewDescription("");
+    setComposing(false);
+  };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
@@ -128,35 +144,57 @@ export function MissionIssueDialog({
       </DialogTitle>
       <DialogContent>
         {canCreate && (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 1,
-              mb: 2,
-            }}
-          >
-            <TextField
-              multiline
-              minRows={2}
-              label={t("crf.missionIssue.create.field.description")}
-              value={newDescription}
-              onChange={(e) => setNewDescription(e.target.value)}
-              disabled={createPending}
-              data-testid="mission-issue-new-description"
-            />
-            {createError && (
-              <Alert severity="error">{errorMessage(createError)}</Alert>
+          <Box sx={{ mb: 2 }}>
+            {composing ? (
+              <Stack spacing={1}>
+                <TextField
+                  multiline
+                  minRows={2}
+                  label={t("crf.missionIssue.create.field.description")}
+                  value={newDescription}
+                  onChange={(e) => setNewDescription(e.target.value)}
+                  disabled={createPending}
+                  data-testid="mission-issue-new-description"
+                />
+                {createError && (
+                  <Alert severity="error">{errorMessage(createError)}</Alert>
+                )}
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    gap: 1,
+                  }}
+                >
+                  <Button
+                    onClick={handleCancelNew}
+                    disabled={createPending}
+                  >
+                    {t("crf.missionIssue.detail.cancel")}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    onClick={handleSubmitNew}
+                    disabled={
+                      createPending || newDescription.trim() === ""
+                    }
+                  >
+                    {t("crf.missionIssue.create.submit")}
+                  </Button>
+                </Box>
+              </Stack>
+            ) : (
+              <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<AddIcon />}
+                  onClick={() => setComposing(true)}
+                  data-testid="mission-issue-new-issue"
+                >
+                  {t("crf.missionIssue.create.newIssue")}
+                </Button>
+              </Box>
             )}
-            <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-              <Button
-                variant="contained"
-                onClick={() => onCreate(newDescription.trim())}
-                disabled={createPending || newDescription.trim() === ""}
-              >
-                {t("crf.missionIssue.create.submit")}
-              </Button>
-            </Box>
           </Box>
         )}
         {issues.length === 0 ? (
@@ -352,7 +390,6 @@ function IssueDetails({
                 {t("crf.missionIssue.detail.cancel")}
               </Button>
               <Button
-                variant="contained"
                 onClick={() =>
                   onUpdateDescription(issue.id, editing!.value.trim())
                 }

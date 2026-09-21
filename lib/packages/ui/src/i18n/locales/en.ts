@@ -404,6 +404,7 @@ export const en = {
   "crf.missionIssue.state.opened": "Opened",
   "crf.missionIssue.state.closed": "Closed",
   "crf.missionIssue.create.field.description": "Issue description",
+  "crf.missionIssue.create.newIssue": "New Issue",
   "crf.missionIssue.create.submit": "Create",
   "crf.missionIssue.detail.comments": "Comments",
   "crf.missionIssue.detail.editDescription": "Edit description",
