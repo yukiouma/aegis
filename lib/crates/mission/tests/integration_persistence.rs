@@ -11,7 +11,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use sqlx::PgPool;
 
 use mission::domain::{AssigneeNew, MissionKind, MissionNew, MissionRole};
-use mission::{AssigneeRepo, AssigneeRepository, DomainError, MissionRepo, MissionRepository};
+use mission::{
+    AssigneeRepo, AssigneeRepository, DomainError, IssueRepo, MissionIssueRepository, MissionRepo,
+    MissionRepository,
+};
 
 async fn with_pool<F, Fut, T>(f: F) -> T
 where
@@ -31,6 +34,10 @@ where
 
     // Destructive cleanup. The integration tests own the schema; if
     // you point them at production by mistake you will lose data.
+    sqlx::query("DROP TABLE IF EXISTS mission_issues CASCADE")
+        .execute(&pool)
+        .await
+        .expect("drop mission_issues");
     sqlx::query("DROP TABLE IF EXISTS assignees CASCADE")
         .execute(&pool)
         .await
@@ -195,6 +202,224 @@ async fn assignee_per_mission_user_role_uniqueness_holds() {
         assert!(
             matches!(err, DomainError::DuplicateAssignee { .. }),
             "expected DuplicateAssignee, got {err:?}"
+        );
+    })
+    .await
+}
+
+// ===========================================================================
+// Mission-issue live-DB tests
+// ===========================================================================
+
+#[tokio::test]
+#[ignore = "requires AEGIS_MISSION_DATABASE_URL pointing at a live PostgreSQL"]
+async fn issue_create_find_list_close_open_round_trip() {
+    use mission::domain::{IssueState, MissionIssueNew};
+
+    with_pool(|pool| async move {
+        let missions = MissionRepo::new(pool.clone());
+        let issues = IssueRepo::new(pool.clone());
+        let mission = missions
+            .create(MissionNew {
+                project_code: "prj1".into(),
+                mission_kind: MissionKind::Sdtm,
+                mission_code: unique_code("issue-rt"),
+                assignees: vec![],
+            })
+            .await
+            .expect("create mission");
+
+        let created = issues
+            .create(MissionIssueNew {
+                mission_id: mission.id,
+                target_item: Some("dm.x".into()),
+                issuer: "u1".into(),
+                description: "first issue".into(),
+            })
+            .await
+            .expect("create issue");
+        assert_eq!(created.state, IssueState::Opened);
+        assert!(created.comments.is_empty());
+
+        let fetched = issues
+            .find_by_id(created.id)
+            .await
+            .expect("find_by_id issue");
+        assert_eq!(fetched.id, created.id);
+        assert_eq!(fetched.issuer, "u1");
+        assert_eq!(fetched.target_item.as_deref(), Some("dm.x"));
+
+        let opened = issues
+            .list_by_mission(mission.id, Some(IssueState::Opened))
+            .await
+            .expect("list opened");
+        assert_eq!(opened.len(), 1);
+        assert_eq!(opened[0].id, created.id);
+
+        let closed = issues
+            .close(created.id)
+            .await
+            .expect("close issue");
+        assert_eq!(closed.state, IssueState::Closed);
+
+        let listed_closed = issues
+            .list_by_mission(mission.id, Some(IssueState::Closed))
+            .await
+            .expect("list closed");
+        assert_eq!(listed_closed.len(), 1);
+
+        let reopened = issues
+            .open(created.id)
+            .await
+            .expect("reopen issue");
+        assert_eq!(reopened.state, IssueState::Opened);
+    })
+    .await
+}
+
+#[tokio::test]
+#[ignore = "requires AEGIS_MISSION_DATABASE_URL pointing at a live PostgreSQL"]
+async fn issue_update_description_persists() {
+    use mission::domain::MissionIssueNew;
+
+    with_pool(|pool| async move {
+        let missions = MissionRepo::new(pool.clone());
+        let issues = IssueRepo::new(pool);
+        let mission = missions
+            .create(MissionNew {
+                project_code: "prj1".into(),
+                mission_kind: MissionKind::Crf,
+                mission_code: unique_code("issue-desc"),
+                assignees: vec![],
+            })
+            .await
+            .expect("create mission");
+
+        let created = issues
+            .create(MissionIssueNew {
+                mission_id: mission.id,
+                target_item: None,
+                issuer: "u1".into(),
+                description: "v1".into(),
+            })
+            .await
+            .expect("create issue");
+
+        let updated = issues
+            .update_description(created.id, "v2".into())
+            .await
+            .expect("update description");
+        assert_eq!(updated.description, "v2");
+
+        let err = issues
+            .update_description(created.id, "   ".into())
+            .await
+            .expect_err("whitespace rejected");
+        assert!(
+            matches!(err, DomainError::EmptyIssueDescription),
+            "expected EmptyIssueDescription, got {err:?}"
+        );
+    })
+    .await
+}
+
+#[tokio::test]
+#[ignore = "requires AEGIS_MISSION_DATABASE_URL pointing at a live PostgreSQL"]
+async fn issue_append_comment_round_trips_jsonb() {
+    use chrono::Utc;
+    use mission::domain::{IssueComment, MissionIssueNew};
+
+    with_pool(|pool| async move {
+        let missions = MissionRepo::new(pool.clone());
+        let issues = IssueRepo::new(pool);
+        let mission = missions
+            .create(MissionNew {
+                project_code: "prj1".into(),
+                mission_kind: MissionKind::Tfl,
+                mission_code: unique_code("issue-comments"),
+                assignees: vec![],
+            })
+            .await
+            .expect("create mission");
+
+        let created = issues
+            .create(MissionIssueNew {
+                mission_id: mission.id,
+                target_item: None,
+                issuer: "u1".into(),
+                description: "d".into(),
+            })
+            .await
+            .expect("create issue");
+
+        let with_one = issues
+            .append_comment(
+                created.id,
+                IssueComment {
+                    user: "u2".into(),
+                    content: "first".into(),
+                    created_at: Utc::now(),
+                },
+            )
+            .await
+            .expect("append first comment");
+        assert_eq!(with_one.comments.len(), 1);
+        assert_eq!(with_one.comments[0].content, "first");
+
+        let with_two = issues
+            .append_comment(
+                created.id,
+                IssueComment {
+                    user: "u3".into(),
+                    content: "second".into(),
+                    created_at: Utc::now(),
+                },
+            )
+            .await
+            .expect("append second comment");
+        assert_eq!(with_two.comments.len(), 2);
+        assert_eq!(with_two.comments[1].user, "u3");
+    })
+    .await
+}
+
+#[tokio::test]
+#[ignore = "requires AEGIS_MISSION_DATABASE_URL pointing at a live PostgreSQL"]
+async fn mission_delete_cascades_to_issues() {
+    use mission::domain::MissionIssueNew;
+
+    with_pool(|pool| async move {
+        let missions = MissionRepo::new(pool.clone());
+        let issues = IssueRepo::new(pool);
+        let mission = missions
+            .create(MissionNew {
+                project_code: "prj1".into(),
+                mission_kind: MissionKind::Adam,
+                mission_code: unique_code("issue-cascade"),
+                assignees: vec![],
+            })
+            .await
+            .expect("create mission");
+
+        let issue = issues
+            .create(MissionIssueNew {
+                mission_id: mission.id,
+                target_item: None,
+                issuer: "u1".into(),
+                description: "d".into(),
+            })
+            .await
+            .expect("create issue");
+
+        missions.delete(mission.id).await.expect("delete mission");
+
+        let after = issues
+            .find_by_id(issue.id)
+            .await
+            .expect_err("issue gone after parent delete");
+        assert!(
+            matches!(after, DomainError::MissionIssueNotFound),
+            "expected MissionIssueNotFound, got {after:?}"
         );
     })
     .await
