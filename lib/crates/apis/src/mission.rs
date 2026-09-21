@@ -94,8 +94,83 @@ pub enum MissionApiError {
         role: MissionRole,
     },
 
+    #[error("issue not found")]
+    IssueNotFound,
+
+    #[error("mission not found for issue {0}")]
+    MissionNotFoundForIssue(i64),
+
     #[error("repository error: {0}")]
     Repository(String),
+}
+
+/// Open / closed state of a `MissionIssue`. Mirrors
+/// `mission::domain::IssueState`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IssueState {
+    Opened,
+    Closed,
+}
+
+/// One entry in a `MissionIssue`'s append-only comment thread.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IssueCommentView {
+    pub user: String,
+    pub content: String,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Safe projection of a `MissionIssue` aggregate — comments are
+/// hydrated to `Vec<IssueCommentView>` on read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IssueView {
+    pub id: i64,
+    pub mission_id: i64,
+    pub target_item: Option<String>,
+    pub issuer: String,
+    pub description: String,
+    pub state: IssueState,
+    pub comments: Vec<IssueCommentView>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Input to [`MissionService::create_issue`].
+#[derive(Debug, Clone)]
+pub struct CreateIssueRequest {
+    pub mission_id: i64,
+    pub target_item: Option<String>,
+    pub description: String,
+}
+
+/// Empty marker request for [`MissionService::close_issue`].
+/// The PATCH `/api/mission/issues/{issue_id}/state` handler
+/// dispatches on `body.state`; this empty struct is what the
+/// apis trait accepts when the body says `"state": "closed"`.
+#[derive(Debug, Clone, Default)]
+pub struct CloseIssueRequest {}
+
+/// Empty marker request for [`MissionService::reopen_issue`].
+#[derive(Debug, Clone, Default)]
+pub struct ReopenIssueRequest {}
+
+/// Input to [`MissionService::update_issue_description`].
+#[derive(Debug, Clone)]
+pub struct UpdateIssueDescriptionRequest {
+    pub description: String,
+}
+
+/// Input to [`MissionService::append_comment`].
+#[derive(Debug, Clone)]
+pub struct AppendCommentRequest {
+    pub content: String,
+}
+
+/// Query for [`MissionService::list_issues_by_mission`].
+#[derive(Debug, Clone)]
+pub struct ListIssuesByMissionRequest {
+    pub mission_id: i64,
+    pub state: Option<IssueState>,
 }
 
 /// Safe projection of an `Assignee` aggregate.
@@ -204,4 +279,43 @@ pub trait MissionService: Send + Sync {
         mission_id: i64,
         assignee_id: i64,
     ) -> Result<(), MissionApiError>;
+
+    async fn list_issues_by_mission(
+        &self,
+        req: ListIssuesByMissionRequest,
+    ) -> Result<Vec<IssueView>, MissionApiError>;
+
+    async fn create_issue(
+        &self,
+        actor: &Actor,
+        req: CreateIssueRequest,
+    ) -> Result<IssueView, MissionApiError>;
+
+    async fn close_issue(
+        &self,
+        actor: &Actor,
+        req: CloseIssueRequest,
+        issue_id: i64,
+    ) -> Result<IssueView, MissionApiError>;
+
+    async fn reopen_issue(
+        &self,
+        actor: &Actor,
+        req: ReopenIssueRequest,
+        issue_id: i64,
+    ) -> Result<IssueView, MissionApiError>;
+
+    async fn update_issue_description(
+        &self,
+        actor: &Actor,
+        issue_id: i64,
+        req: UpdateIssueDescriptionRequest,
+    ) -> Result<IssueView, MissionApiError>;
+
+    async fn append_comment(
+        &self,
+        actor: &Actor,
+        issue_id: i64,
+        req: AppendCommentRequest,
+    ) -> Result<IssueView, MissionApiError>;
 }
