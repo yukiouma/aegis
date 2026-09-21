@@ -3,13 +3,14 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   IconButton,
   Stack,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -59,12 +60,7 @@ interface Props {
   onCreate: (description: string) => void;
 
   patchPending: boolean;
-  patchError: ApiError | null;
   onPatchState: (issueId: number, next: "opened" | "closed") => void;
-
-  updateDescPending: boolean;
-  updateDescError: ApiError | null;
-  onUpdateDescription: (issueId: number, description: string) => void;
 
   commentPending: boolean;
   commentError: ApiError | null;
@@ -90,11 +86,7 @@ export function MissionIssueDialog({
   createError,
   onCreate,
   patchPending,
-  patchError,
   onPatchState,
-  updateDescPending,
-  updateDescError,
-  onUpdateDescription,
   commentPending,
   commentError,
   onAppendComment,
@@ -105,10 +97,6 @@ export function MissionIssueDialog({
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [newDescription, setNewDescription] = useState("");
   const [composing, setComposing] = useState(false);
-  const [editing, setEditing] = useState<{
-    id: number;
-    value: string;
-  } | null>(null);
   const [commentDraft, setCommentDraft] = useState<{
     id: number;
     value: string;
@@ -121,7 +109,6 @@ export function MissionIssueDialog({
       setExpandedId(null);
       setNewDescription("");
       setComposing(false);
-      setEditing(null);
       setCommentDraft(null);
     }
   }, [open]);
@@ -234,21 +221,37 @@ export function MissionIssueDialog({
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        size="small"
-                        variant="outlined"
-                        label={t(
-                          issue.state === "opened"
-                            ? "crf.missionIssue.state.opened"
-                            : "crf.missionIssue.state.closed",
-                        )}
-                        color={
-                          issue.state === "opened" ? "warning" : "default"
+                      <FormControlLabel
+                        sx={{ m: 0, gap: 1 }}
+                        data-testid={`mission-issue-switch-${issue.id}`}
+                        control={
+                          <Switch
+                            size="small"
+                            checked={issue.state === "opened"}
+                            disabled={!canActOnIssue || patchPending}
+                            onChange={(_, checked) =>
+                              onPatchState(
+                                issue.id,
+                                checked ? "opened" : "closed",
+                              )
+                            }
+                          />
                         }
-                        sx={
-                          issue.state === "closed"
-                            ? { borderStyle: "dashed" }
-                            : undefined
+                        label={
+                          <Typography
+                            variant="body2"
+                            color={
+                              issue.state === "opened"
+                                ? "warning.main"
+                                : "text.secondary"
+                            }
+                          >
+                            {t(
+                              issue.state === "opened"
+                                ? "crf.missionIssue.state.opened"
+                                : "crf.missionIssue.state.closed",
+                            )}
+                          </Typography>
                         }
                       />
                     </TableCell>
@@ -279,21 +282,12 @@ export function MissionIssueDialog({
                       <TableCell colSpan={4} sx={{ bgcolor: "action.hover" }}>
                         <IssueDetails
                           issue={issue}
-                          editing={editing}
-                          setEditing={setEditing}
                           commentDraft={commentDraft}
                           setCommentDraft={setCommentDraft}
-                          canActOnIssue={canActOnIssue}
                           canComment={canComment}
-                          patchPending={patchPending}
-                          patchError={patchError}
-                          updateDescPending={updateDescPending}
-                          updateDescError={updateDescError}
                           commentPending={commentPending}
                           commentError={commentError}
                           resolveName={resolveName}
-                          onPatchState={onPatchState}
-                          onUpdateDescription={onUpdateDescription}
                           onAppendComment={onAppendComment}
                         />
                       </TableCell>
@@ -314,151 +308,41 @@ export function MissionIssueDialog({
 
 interface IssueDetailsProps {
   issue: IssueViewResponse;
-  editing: { id: number; value: string } | null;
-  setEditing: (v: { id: number; value: string } | null) => void;
   commentDraft: { id: number; value: string } | null;
   setCommentDraft: (v: { id: number; value: string } | null) => void;
-  canActOnIssue: boolean;
   canComment: boolean;
-  patchPending: boolean;
-  patchError: ApiError | null;
-  updateDescPending: boolean;
-  updateDescError: ApiError | null;
   commentPending: boolean;
   commentError: ApiError | null;
   resolveName: (userCode: string) => string;
-  onPatchState: (id: number, next: "opened" | "closed") => void;
-  onUpdateDescription: (id: number, description: string) => void;
   onAppendComment: (id: number, content: string) => void;
 }
 
 function IssueDetails({
   issue,
-  editing,
-  setEditing,
   commentDraft,
   setCommentDraft,
-  canActOnIssue,
   canComment,
-  patchPending,
-  patchError,
-  updateDescPending,
-  updateDescError,
   commentPending,
   commentError,
   resolveName,
-  onPatchState,
-  onUpdateDescription,
   onAppendComment,
 }: IssueDetailsProps) {
   const { t } = useI18n();
-  const isEditing = editing?.id === issue.id;
-  const draft =
-    commentDraft?.id === issue.id ? commentDraft.value : "";
+  const composingComment = commentDraft?.id === issue.id;
+  const draft = composingComment ? commentDraft!.value : "";
+
+  const handleStartComment = () =>
+    setCommentDraft({ id: issue.id, value: "" });
+  const handleSubmitComment = () => {
+    onAppendComment(issue.id, draft.trim());
+    setCommentDraft(null);
+  };
+  const handleCancelComment = () => setCommentDraft(null);
 
   return (
     <Stack spacing={2} sx={{ py: 1 }}>
-      {/* Description block */}
-      <Box>
-        {isEditing ? (
-          <Stack spacing={1}>
-            <TextField
-              multiline
-              minRows={2}
-              value={editing!.value}
-              onChange={(e) =>
-                setEditing({ id: issue.id, value: e.target.value })
-              }
-              disabled={updateDescPending}
-              fullWidth
-            />
-            {updateDescError && (
-              <Alert severity="error">{errorMessage(updateDescError)}</Alert>
-            )}
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "row",
-                justifyContent: "flex-end",
-                gap: 1,
-              }}
-            >
-              <Button
-                onClick={() => setEditing(null)}
-                disabled={updateDescPending}
-              >
-                {t("crf.missionIssue.detail.cancel")}
-              </Button>
-              <Button
-                onClick={() =>
-                  onUpdateDescription(issue.id, editing!.value.trim())
-                }
-                disabled={
-                  updateDescPending ||
-                  editing!.value.trim() === "" ||
-                  editing!.value.trim() === issue.description
-                }
-              >
-                {t("crf.missionIssue.detail.save")}
-              </Button>
-            </Box>
-          </Stack>
-        ) : (
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "flex-start",
-              justifyContent: "space-between",
-              gap: 1,
-            }}
-          >
-            <Typography variant="body2" sx={{ flexGrow: 1 }}>
-              {issue.description}
-            </Typography>
-            {canActOnIssue && (
-              <Button
-                size="small"
-                onClick={() =>
-                  setEditing({ id: issue.id, value: issue.description })
-                }
-              >
-                {t("crf.missionIssue.detail.editDescription")}
-              </Button>
-            )}
-          </Box>
-        )}
-      </Box>
-
-      {/* State-flip button */}
-      {canActOnIssue && (
-        <Box>
-          {patchError && (
-            <Alert severity="error" sx={{ mb: 1 }}>
-              {errorMessage(patchError)}
-            </Alert>
-          )}
-          <Button
-            size="small"
-            variant="outlined"
-            color={issue.state === "opened" ? "warning" : "primary"}
-            disabled={patchPending}
-            onClick={() =>
-              onPatchState(
-                issue.id,
-                issue.state === "opened" ? "closed" : "opened",
-              )
-            }
-            data-testid={`mission-issue-${issue.state === "opened" ? "close" : "reopen"}-${issue.id}`}
-          >
-            {t(
-              issue.state === "opened"
-                ? "crf.missionIssue.detail.close"
-                : "crf.missionIssue.detail.reopen",
-            )}
-          </Button>
-        </Box>
-      )}
+      {/* Description block (read-only) */}
+      <Typography variant="body2">{issue.description}</Typography>
 
       {/* Comments */}
       <Box>
@@ -493,31 +377,58 @@ function IssueDetails({
 
       {/* Comment form */}
       {canComment && (
-        <Stack spacing={1}>
-          <TextField
-            multiline
-            minRows={1}
-            placeholder={t("crf.missionIssue.detail.commentPlaceholder")}
-            value={draft}
-            onChange={(e) =>
-              setCommentDraft({ id: issue.id, value: e.target.value })
-            }
-            disabled={commentPending}
-            fullWidth
-          />
-          {commentError && (
-            <Alert severity="error">{errorMessage(commentError)}</Alert>
+        <Box>
+          {composingComment ? (
+            <Stack spacing={1}>
+              <TextField
+                multiline
+                minRows={1}
+                placeholder={t("crf.missionIssue.detail.commentPlaceholder")}
+                value={draft}
+                onChange={(e) =>
+                  setCommentDraft({ id: issue.id, value: e.target.value })
+                }
+                disabled={commentPending}
+                fullWidth
+              />
+              {commentError && (
+                <Alert severity="error">{errorMessage(commentError)}</Alert>
+              )}
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: 1,
+                }}
+              >
+                <Button
+                  onClick={handleCancelComment}
+                  disabled={commentPending}
+                >
+                  {t("crf.missionIssue.detail.cancel")}
+                </Button>
+                <Button
+                  variant="contained"
+                  disabled={commentPending || draft.trim() === ""}
+                  onClick={handleSubmitComment}
+                >
+                  {t("crf.missionIssue.detail.submitComment")}
+                </Button>
+              </Box>
+            </Stack>
+          ) : (
+            <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={handleStartComment}
+                data-testid="mission-issue-comment-add"
+              >
+                {t("crf.missionIssue.detail.addComment")}
+              </Button>
+            </Box>
           )}
-          <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-            <Button
-              variant="contained"
-              disabled={commentPending || draft.trim() === ""}
-              onClick={() => onAppendComment(issue.id, draft.trim())}
-            >
-              {t("crf.missionIssue.detail.addComment")}
-            </Button>
-          </Box>
-        </Stack>
+        </Box>
       )}
     </Stack>
   );

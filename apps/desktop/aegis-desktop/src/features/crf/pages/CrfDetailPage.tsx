@@ -35,7 +35,6 @@ import {
   useListIssuesByMission,
   useListMissionsByProject,
   usePatchIssueState,
-  useUpdateIssueDescription,
   type IssueScope,
 } from "../../mission";
 import { useCurrentUser } from "../../auth";
@@ -272,7 +271,6 @@ export function CrfDetailPage() {
 
   const createIssue = useCreateIssue();
   const patchIssueState = usePatchIssueState();
-  const updateIssueDescription = useUpdateIssueDescription();
   const appendComment = useAppendComment();
 
   const [issueDialog, setIssueDialog] = useState<
@@ -768,21 +766,11 @@ export function CrfDetailPage() {
             )
           }
           patchPending={patchIssueState.isPending}
-          patchError={patchIssueState.error}
           onPatchState={(issueId, next) =>
             patchIssueState.mutate({
               missionId: issueDialog.missionId,
               issueId,
               next,
-            })
-          }
-          updateDescPending={updateIssueDescription.isPending}
-          updateDescError={updateIssueDescription.error}
-          onUpdateDescription={(issueId, description) =>
-            updateIssueDescription.mutate({
-              missionId: issueDialog.missionId,
-              issueId,
-              body: { description },
             })
           }
           commentPending={appendComment.isPending}

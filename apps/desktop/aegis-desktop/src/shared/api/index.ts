@@ -64,7 +64,6 @@ import type {
   UpdateCrfOptionInput,
   UpdateCrfUnitInput,
   UpdateDomainAnnotationInput,
-  UpdateIssueDescriptionInput,
   UpdateProjectBody,
   UpdateSdtmDomainInput,
   UpdateSdtmVariableInput,
@@ -487,14 +486,6 @@ export const api = {
     state: IssueState,
   ): Promise<IssueViewResponse> =>
     call<IssueViewResponse>("patch_issue_state", { issueId, state }),
-  updateIssueDescription: (
-    issueId: number,
-    body: UpdateIssueDescriptionInput,
-  ): Promise<IssueViewResponse> =>
-    call<IssueViewResponse>("update_issue_description", {
-      issueId,
-      body: { ...body },
-    }),
   appendComment: (
     issueId: number,
     body: AppendCommentInput,
@@ -587,7 +578,6 @@ export type {
   UpdateCrfOptionInput,
   UpdateCrfUnitInput,
   UpdateDomainAnnotationInput,
-  UpdateIssueDescriptionInput,
   UpdateProjectBody,
   UpdateSdtmDomainInput,
   UpdateSdtmVariableInput,

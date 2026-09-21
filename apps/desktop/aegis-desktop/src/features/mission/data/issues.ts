@@ -7,7 +7,6 @@ import {
   type CreateIssueInput,
   type IssueState,
   type IssueViewResponse,
-  type UpdateIssueDescriptionInput,
 } from "../../../shared/api";
 import { queryKeys } from "../../../shared/query";
 
@@ -64,32 +63,6 @@ export function usePatchIssueState() {
     { missionId: number; issueId: number; next: IssueState }
   >({
     mutationFn: ({ issueId, next }) => api.patchIssueState(issueId, next),
-    onSuccess: (_data, vars) => {
-      void qc.invalidateQueries({
-        queryKey: queryKeys.mission.issuesByMission(vars.missionId),
-      });
-    },
-  });
-}
-
-/**
- * Replace an issue's description. `targetItem`, `issuer`, `state`,
- * and `comments` are immutable through this path — backend refuses
- * to mutate them. Same invalidation pattern.
- */
-export function useUpdateIssueDescription() {
-  const qc = useQueryClient();
-  return useMutation<
-    IssueViewResponse,
-    ApiError,
-    {
-      missionId: number;
-      issueId: number;
-      body: UpdateIssueDescriptionInput;
-    }
-  >({
-    mutationFn: ({ issueId, body }) =>
-      api.updateIssueDescription(issueId, body),
     onSuccess: (_data, vars) => {
       void qc.invalidateQueries({
         queryKey: queryKeys.mission.issuesByMission(vars.missionId),

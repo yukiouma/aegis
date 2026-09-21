@@ -10,7 +10,6 @@ export {
   useCreateIssue,
   useListIssuesByMission,
   usePatchIssueState,
-  useUpdateIssueDescription,
 } from "./data/issues";
 export { MissionIssueDialog } from "./components/MissionIssueDialog";
 export type { IssueScope } from "./components/MissionIssueDialog";
