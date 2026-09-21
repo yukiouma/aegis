@@ -1006,3 +1006,88 @@ describe("CrfDetailPage", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+// Mission-issue wiring. The form → mission → token lookup mirrors the
+// CrfMissionAssignDrawer pattern (`missions.find((m) => m.missionCode
+// === form.code)`); the chip clicks open the dialog with the
+// correct scope.
+const fakeMission = {
+  id: 10,
+  projectCode: "abc",
+  missionKind: "crf" as const,
+  missionCode: "AE",
+  assignees: [
+    {
+      id: 100,
+      userCode: "u",
+      role: "qc" as const,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
+  ],
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+};
+
+const openedMissionIssue = {
+  id: 1,
+  missionId: 10,
+  issuer: "u",
+  description: "missing row",
+  state: "opened" as const,
+  comments: [],
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+};
+
+describe("CrfDetailPage — mission-issue entry points", () => {
+  it("form code chip is enabled when a mission exists for the form", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => fakeForm,
+      get_crf_form_details: () => fakeDetail,
+      list_missions_by_project: () => [fakeMission],
+      list_issues_by_mission: () => [],
+    });
+    renderPage(["/project/abc/crf/11"]);
+    const chip = await screen.findByTestId("crf-form-11");
+    expect(chip).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("clicking the form chip opens the dialog showing the dialog title", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => fakeForm,
+      get_crf_form_details: () => fakeDetail,
+      list_missions_by_project: () => [fakeMission],
+      list_issues_by_mission: () => [openedMissionIssue],
+    });
+    renderPage(["/project/abc/crf/11"]);
+    const chip = await screen.findByTestId("crf-form-11");
+    fireEvent.click(chip);
+    // MissionIssueDialog renders the title with i18n key
+    // "crf.missionIssue.dialog.title" and the scope label.
+    expect(
+      await screen.findByText(/Mission issues/i),
+    ).toBeInTheDocument();
+  });
+
+  it("clicking an item code chip opens the dialog filtered to that item's code", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => fakeForm,
+      get_crf_form_details: () => fakeDetail,
+      list_missions_by_project: () => [fakeMission],
+      list_issues_by_mission: () => [],
+    });
+    renderPage(["/project/abc/crf/11"]);
+    const chip = await screen.findByTestId("crf-item-code-21");
+    fireEvent.click(chip);
+    expect(
+      await screen.findByText(/Mission issues/i),
+    ).toBeInTheDocument();
+  });
+});
