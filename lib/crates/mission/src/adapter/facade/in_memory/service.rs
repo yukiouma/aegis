@@ -1,62 +1,98 @@
 use async_trait::async_trait;
 
 use apis::mission::{
-    Actor, AssigneeData, AssigneeView as ApiAssigneeView, CreateMissionRequest,
+    Actor, AppendCommentRequest, AssigneeData, AssigneeView as ApiAssigneeView,
+    CloseIssueRequest, CreateIssueRequest, CreateMissionRequest,
+    IssueCommentView as ApiIssueCommentView, IssueState as ApiIssueState,
+    IssueView as ApiIssueView, ListIssuesByMissionRequest,
     ListMissionsByProjectRequest, ListMissionsByUserRequest, MissionApiError,
-    MissionKind as ApiKind, MissionRole as ApiRole, MissionService, MissionView as ApiMissionView,
+    MissionKind as ApiKind, MissionRole as ApiRole, MissionService,
+    MissionView as ApiMissionView, ReopenIssueRequest,
+    UpdateIssueDescriptionRequest,
 };
 
-use crate::domain::{DomainError, MissionRepository, ProjectLookup, UserLookup};
+use crate::domain::{
+    AssigneeRepository, DomainError, MissionIssueRepository, MissionRepository, ProjectLookup,
+    UserLookup,
+};
 use crate::usecase::{
-    AssigneeData as UcAssigneeData, CreateMission as UcCreateMission, MissionUsecase,
-    MissionUsecaseConfig, UsecaseError,
+    AssigneeData as UcAssigneeData, CreateIssue as UcCreateIssue,
+    CreateMission as UcCreateMission, MissionIssueUsecase, MissionUsecase, UsecaseError,
 };
 
 use crate::usecase::AssigneeView as UcAssigneeView;
+use crate::usecase::IssueCommentView as UcIssueCommentView;
+use crate::usecase::IssueView as UcIssueView;
 use crate::usecase::MissionView as UcMissionView;
+use crate::usecase::{MissionIssueUsecaseConfig, MissionUsecaseConfig};
 
-pub struct MissionServiceImpl<M, A, P, U> {
+pub struct MissionServiceImpl<M, A, P, U, I> {
     usecase: MissionUsecase<M, A, P, U>,
+    issue_usecase: MissionIssueUsecase<M, A, P, I>,
 }
 
-impl<M, A, P, U> MissionServiceImpl<M, A, P, U>
+impl<M, A, P, U, I> MissionServiceImpl<M, A, P, U, I>
 where
     M: MissionRepository,
-    A: crate::domain::AssigneeRepository,
+    A: AssigneeRepository,
     P: ProjectLookup,
     U: UserLookup,
+    I: MissionIssueRepository,
 {
-    pub fn from_usecase(usecase: MissionUsecase<M, A, P, U>) -> Self {
-        Self { usecase }
+    pub fn from_usecase(
+        usecase: MissionUsecase<M, A, P, U>,
+        issue_usecase: MissionIssueUsecase<M, A, P, I>,
+    ) -> Self {
+        Self {
+            usecase,
+            issue_usecase,
+        }
     }
 
+    /// Convenience constructor: builds both usecases from the
+    /// five backing pieces and returns a single facade. Mirrors
+    /// the legacy `from_repos(mission_repo, assignee_repo,
+    /// projects, users)` so the server wiring stays a one-liner.
     pub fn from_repos(
         mission_repo: M,
         assignee_repo: A,
         projects: std::sync::Arc<P>,
         users: std::sync::Arc<U>,
+        issue_repo: I,
     ) -> Self
     where
+        M: Clone,
         A: Clone,
         P: Clone,
         U: Clone,
     {
-        Self::from_usecase(MissionUsecase::new(MissionUsecaseConfig {
+        let mission_repo_issue = mission_repo.clone();
+        let assignee_repo_issue = assignee_repo.clone();
+        let projects_issue = (*projects).clone();
+        let mission_usecase = MissionUsecase::new(MissionUsecaseConfig {
             mission_repo,
             assignee_repo,
             project_lookup: (*projects).clone(),
             user_lookup: (*users).clone(),
-        }))
+        });
+        let issue_usecase = MissionIssueUsecase::new(MissionIssueUsecaseConfig {
+            mission_repo: mission_repo_issue,
+            assignee_repo: assignee_repo_issue,
+            project_lookup: projects_issue,
+            issue_repo,
+        });
+        Self::from_usecase(mission_usecase, issue_usecase)
     }
 }
 
 #[async_trait]
-impl<M, A, P, U> MissionService for MissionServiceImpl<M, A, P, U>
+impl<M, A, P, U, I> MissionService for MissionServiceImpl<M, A, P, U, I>
 where
     M: MissionRepository + 'static,
-    A: crate::domain::AssigneeRepository + 'static,
+    A: AssigneeRepository + 'static,
     P: ProjectLookup + 'static,
     U: UserLookup + 'static,
+    I: MissionIssueRepository + 'static,
 {
     async fn create_mission(
         &self,
@@ -153,6 +189,88 @@ where
             .await
             .map_err(map_error)
     }
+
+    async fn list_issues_by_mission(
+        &self,
+        req: ListIssuesByMissionRequest,
+    ) -> Result<Vec<ApiIssueView>, MissionApiError> {
+        self.issue_usecase
+            .list_issues_by_mission(req.mission_id, req.state.map(Into::into))
+            .await
+            .map(|v| v.into_iter().map(into_api_issue).collect())
+            .map_err(map_error)
+    }
+
+    async fn create_issue(
+        &self,
+        actor: &Actor,
+        req: CreateIssueRequest,
+    ) -> Result<ApiIssueView, MissionApiError> {
+        self.issue_usecase
+            .create_issue(
+                actor,
+                UcCreateIssue {
+                    mission_id: req.mission_id,
+                    target_item: req.target_item,
+                    description: req.description,
+                },
+            )
+            .await
+            .map(into_api_issue)
+            .map_err(map_error)
+    }
+
+    async fn close_issue(
+        &self,
+        actor: &Actor,
+        _req: CloseIssueRequest,
+        issue_id: i64,
+    ) -> Result<ApiIssueView, MissionApiError> {
+        self.issue_usecase
+            .close_issue(actor, issue_id)
+            .await
+            .map(into_api_issue)
+            .map_err(map_error)
+    }
+
+    async fn reopen_issue(
+        &self,
+        actor: &Actor,
+        _req: ReopenIssueRequest,
+        issue_id: i64,
+    ) -> Result<ApiIssueView, MissionApiError> {
+        self.issue_usecase
+            .reopen_issue(actor, issue_id)
+            .await
+            .map(into_api_issue)
+            .map_err(map_error)
+    }
+
+    async fn update_issue_description(
+        &self,
+        actor: &Actor,
+        issue_id: i64,
+        req: UpdateIssueDescriptionRequest,
+    ) -> Result<ApiIssueView, MissionApiError> {
+        self.issue_usecase
+            .update_issue_description(actor, issue_id, req.description)
+            .await
+            .map(into_api_issue)
+            .map_err(map_error)
+    }
+
+    async fn append_comment(
+        &self,
+        actor: &Actor,
+        issue_id: i64,
+        req: AppendCommentRequest,
+    ) -> Result<ApiIssueView, MissionApiError> {
+        self.issue_usecase
+            .append_comment(actor, issue_id, req.content)
+            .await
+            .map(into_api_issue)
+            .map_err(map_error)
+    }
 }
 
 // ---- apis <-> domain enum bridges ----
@@ -197,6 +315,24 @@ impl From<crate::domain::MissionRole> for ApiRole {
     }
 }
 
+impl From<ApiIssueState> for crate::domain::IssueState {
+    fn from(s: ApiIssueState) -> Self {
+        match s {
+            ApiIssueState::Opened => crate::domain::IssueState::Opened,
+            ApiIssueState::Closed => crate::domain::IssueState::Closed,
+        }
+    }
+}
+
+impl From<crate::domain::IssueState> for ApiIssueState {
+    fn from(s: crate::domain::IssueState) -> Self {
+        match s {
+            crate::domain::IssueState::Opened => ApiIssueState::Opened,
+            crate::domain::IssueState::Closed => ApiIssueState::Closed,
+        }
+    }
+}
+
 // ---- view bridges ----
 
 fn into_api_mission(m: UcMissionView) -> ApiMissionView {
@@ -221,6 +357,28 @@ fn into_api_assignee(a: UcAssigneeView) -> ApiAssigneeView {
     }
 }
 
+fn into_api_issue(i: UcIssueView) -> ApiIssueView {
+    ApiIssueView {
+        id: i.id,
+        mission_id: i.mission_id,
+        target_item: i.target_item,
+        issuer: i.issuer,
+        description: i.description,
+        state: i.state.into(),
+        comments: i.comments.into_iter().map(into_api_issue_comment).collect(),
+        created_at: i.created_at,
+        updated_at: i.updated_at,
+    }
+}
+
+fn into_api_issue_comment(c: UcIssueCommentView) -> ApiIssueCommentView {
+    ApiIssueCommentView {
+        user: c.user,
+        content: c.content,
+        created_at: c.created_at,
+    }
+}
+
 fn map_error(e: UsecaseError) -> MissionApiError {
     match e {
         UsecaseError::Forbidden {
@@ -237,7 +395,7 @@ fn map_error(e: UsecaseError) -> MissionApiError {
             | DomainError::UnknownMissionRole(_) => MissionApiError::Validation(d.to_string()),
             DomainError::NotFound => MissionApiError::NotFound,
             DomainError::AssigneeNotFound => MissionApiError::AssigneeNotFound,
-            DomainError::MissionIssueNotFound => MissionApiError::NotFound,
+            DomainError::MissionIssueNotFound => MissionApiError::IssueNotFound,
             DomainError::ProjectNotFound(c) => MissionApiError::ProjectNotFound(c),
             DomainError::UserNotFound(c) => MissionApiError::UserNotFound(c),
             DomainError::DuplicateMission {

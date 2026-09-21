@@ -1,11 +1,6 @@
-//! In-memory facade.
-//!
-//! Holds a `MissionUsecase<M, A, P, U>` and projects its results
-//! into the apis `MissionView` / `AssigneeView` types. The only
-//! facade today.
+//! In-memory facade adapters. `MissionServiceImpl` implements
+//! `apis::mission::MissionService` on top of
+//! `MissionUsecase` + `MissionIssueUsecase`.
 
-mod service;
-#[cfg(test)]
-mod tests;
-
-pub use service::MissionServiceImpl;
+pub mod issue_service;
+pub mod service;
