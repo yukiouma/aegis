@@ -113,6 +113,7 @@ function renderDialog(
         scope={{ kind: "form" }}
         mission={sampleMission}
         issues={[]}
+        resolveName={(code) => code}
         canCreate={true}
         canActOnIssue={true}
         canComment={true}
@@ -164,6 +165,24 @@ describe("MissionIssueDialog (shell)", () => {
     expect(
       screen.getAllByText(/missing CRF row in AE/i).length,
     ).toBeGreaterThanOrEqual(1);
+  });
+
+  it("renders the resolved name in the reviewer cell when resolveName maps the issuer", () => {
+    renderDialog({
+      issues: [openedIssue],
+      // Override the default identity resolver with a name table.
+      resolveName: (code) =>
+        code === "carol" ? "Carol Q. Reviewer" : code,
+    });
+    expect(screen.getByText("Carol Q. Reviewer")).toBeInTheDocument();
+  });
+
+  it("falls back to the user_code when resolveName returns it (e.g. user not in cache)", () => {
+    renderDialog({
+      issues: [openedIssue],
+      // Default identity resolver.
+    });
+    expect(screen.getByText("carol")).toBeInTheDocument();
   });
 
   it("calls onClose when the Cancel button is clicked", () => {
@@ -363,6 +382,7 @@ describe("MissionIssueDialog — per-row actions", () => {
           scope={{ kind: "form" }}
           mission={sampleMission}
           issues={[openedIssue]}
+          resolveName={(c) => c}
           canCreate={true}
           canActOnIssue={true}
           canComment={true}
@@ -390,6 +410,7 @@ describe("MissionIssueDialog — per-row actions", () => {
           scope={{ kind: "form" }}
           mission={sampleMission}
           issues={[openedIssue]}
+          resolveName={(c) => c}
           canCreate={true}
           canActOnIssue={true}
           canComment={true}

@@ -40,6 +40,13 @@ interface Props {
   mission: MissionViewResponse;
   issues: IssueViewResponse[];
   currentUser?: UserView;
+  /**
+   * Resolve a `user_code` to its display `name`. Falls back to the
+   * code itself when the user isn't in the cache (list not loaded
+   * yet, or the user was deactivated after the comment was
+   * written). Wired from `useUserNameMap()` on the page.
+   */
+  resolveName: (userCode: string) => string;
   canCreate: boolean;
   canActOnIssue: boolean;
   canComment: boolean;
@@ -72,6 +79,7 @@ export function MissionIssueDialog({
   scope,
   mission: _mission,
   issues,
+  resolveName,
   canCreate,
   canActOnIssue,
   canComment,
@@ -171,7 +179,7 @@ export function MissionIssueDialog({
                   <TableRow>
                     <TableCell>
                       <Tooltip title={issue.issuer}>
-                        <span>{issue.issuer}</span>
+                        <span>{resolveName(issue.issuer)}</span>
                       </Tooltip>
                     </TableCell>
                     <TableCell>
@@ -245,6 +253,7 @@ export function MissionIssueDialog({
                           updateDescError={updateDescError}
                           commentPending={commentPending}
                           commentError={commentError}
+                          resolveName={resolveName}
                           onPatchState={onPatchState}
                           onUpdateDescription={onUpdateDescription}
                           onAppendComment={onAppendComment}
@@ -279,6 +288,7 @@ interface IssueDetailsProps {
   updateDescError: ApiError | null;
   commentPending: boolean;
   commentError: ApiError | null;
+  resolveName: (userCode: string) => string;
   onPatchState: (id: number, next: "opened" | "closed") => void;
   onUpdateDescription: (id: number, description: string) => void;
   onAppendComment: (id: number, content: string) => void;
@@ -298,6 +308,7 @@ function IssueDetails({
   updateDescError,
   commentPending,
   commentError,
+  resolveName,
   onPatchState,
   onUpdateDescription,
   onAppendComment,
@@ -429,7 +440,10 @@ function IssueDetails({
                 sx={{ borderLeft: 2, pl: 1, borderColor: "divider" }}
               >
                 <Typography variant="body2">
-                  <strong>{c.user}</strong>: {c.content}
+                  <Tooltip title={c.user}>
+                    <strong>{resolveName(c.user)}</strong>
+                  </Tooltip>
+                  : {c.content}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {c.createdAt}

@@ -39,6 +39,7 @@ import {
   type IssueScope,
 } from "../../mission";
 import { useCurrentUser } from "../../auth";
+import { useUserNameMap } from "../../user";
 import { annotationColor } from "../components/AnnotationChip";
 import { useGetCrfForm } from "../data/list";
 import {
@@ -238,6 +239,7 @@ export function CrfDetailPage() {
   // while project data is resolving — controls flip on once the
   // check resolves to `true`.
   const isProjectLeader = useIsProjectLeader(projectCode);
+  const resolveName = useUserNameMap();
   const missionList =
     useListMissionsByProject(projectCode, "crf").data ?? [];
   const formMission = useMemo(
@@ -739,6 +741,7 @@ export function CrfDetailPage() {
           open
           scope={issueDialog.scope}
           mission={formMission}
+          resolveName={resolveName}
           issues={(issuesQuery.data ?? []).filter((i) => {
             if (issueDialog.scope.kind === "form") return i.targetItem == null;
             return i.targetItem === issueDialog.scope.itemCode;

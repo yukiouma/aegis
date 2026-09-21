@@ -1,3 +1,3 @@
 // Public API of the user (management) feature.
 
-export { useListUsers, useUpdateUser } from "./data/list";
+export { useListUsers, useUpdateUser, useUserNameMap } from "./data/list";
