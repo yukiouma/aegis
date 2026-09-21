@@ -377,33 +377,22 @@ pub async fn patch_issue_state(
     Path(issue_id): Path<i64>,
     axum::extract::Query(q): axum::extract::Query<std::collections::HashMap<String, String>>,
 ) -> Result<Json<dto::IssueViewResponse>, ApiError> {
-    let target = q
-        .get("state")
-        .map(|s| s.as_str())
-        .ok_or_else(|| {
-            ApiError::Mission(apis::mission::MissionApiError::Validation(
-                "missing `state` query parameter".into(),
-            ))
-        })?;
+    let target = q.get("state").map(|s| s.as_str()).ok_or_else(|| {
+        ApiError::Mission(apis::mission::MissionApiError::Validation(
+            "missing `state` query parameter".into(),
+        ))
+    })?;
     let view = match target {
         "closed" => {
             state
                 .mission
-                .close_issue(
-                    &to_actor(&claims),
-                    CloseIssueRequest::default(),
-                    issue_id,
-                )
+                .close_issue(&to_actor(&claims), CloseIssueRequest::default(), issue_id)
                 .await?
         }
         "opened" => {
             state
                 .mission
-                .reopen_issue(
-                    &to_actor(&claims),
-                    ReopenIssueRequest::default(),
-                    issue_id,
-                )
+                .reopen_issue(&to_actor(&claims), ReopenIssueRequest::default(), issue_id)
                 .await?
         }
         other => {

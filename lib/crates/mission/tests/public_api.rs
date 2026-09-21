@@ -5,17 +5,16 @@
 //! `cargo test -p mission` time.
 
 use apis::mission::{
-    Actor, AppendCommentRequest, AssigneeData, AssigneeView as ApiAssigneeView,
-    CloseIssueRequest, CreateIssueRequest, CreateMissionRequest,
-    IssueCommentView as ApiIssueCommentView, IssueState as ApiIssueState,
-    IssueView as ApiIssueView, ListIssuesByMissionRequest, MissionApiError,
-    MissionKind as ApiMissionKind, MissionRole as ApiMissionRole, MissionService,
+    Actor, AppendCommentRequest, AssigneeData, AssigneeView as ApiAssigneeView, CloseIssueRequest,
+    CreateIssueRequest, CreateMissionRequest, IssueCommentView as ApiIssueCommentView,
+    IssueState as ApiIssueState, IssueView as ApiIssueView, ListIssuesByMissionRequest,
+    MissionApiError, MissionKind as ApiMissionKind, MissionRole as ApiMissionRole, MissionService,
     MissionView as ApiMissionView, ReopenIssueRequest, UpdateIssueDescriptionRequest,
 };
 use chrono::{TimeZone, Utc};
 use mission::{
-    Assignee, AssigneeRepo, AssigneeRepository, CreateIssue, DomainError, IssueComment,
-    IssueRepo, IssueState, Mission, MissionIssue, MissionIssueRepository, MissionIssueUsecase,
+    Assignee, AssigneeRepo, AssigneeRepository, CreateIssue, DomainError, IssueComment, IssueRepo,
+    IssueState, Mission, MissionIssue, MissionIssueRepository, MissionIssueUsecase,
     MissionIssueUsecaseConfig, MissionKind, MissionRepo, MissionRepository, MissionRole,
     MissionServiceImpl, MissionUsecase, MissionUsecaseConfig, ProjectLookup, ProjectLookupImpl,
     UsecaseError, UserLookup, UserLookupImpl,
@@ -92,12 +91,7 @@ fn usecase_config_has_expected_field_shape() {
 #[test]
 fn issue_usecase_config_has_expected_field_shape() {
     let _assert_config_shape: fn(
-        MissionIssueUsecaseConfig<
-            MissionRepo,
-            AssigneeRepo,
-            ProjectLookupImpl,
-            IssueRepo,
-        >,
+        MissionIssueUsecaseConfig<MissionRepo, AssigneeRepo, ProjectLookupImpl, IssueRepo>,
     ) = |cfg| {
         let _: &MissionRepo = &cfg.mission_repo;
         let _: &AssigneeRepo = &cfg.assignee_repo;
@@ -265,12 +259,7 @@ fn mission_usecase_can_be_built_from_config() {
 #[allow(clippy::type_complexity)]
 fn issue_usecase_can_be_built_from_config() {
     let _: fn(
-        MissionIssueUsecaseConfig<
-            MissionRepo,
-            AssigneeRepo,
-            ProjectLookupImpl,
-            IssueRepo,
-        >,
+        MissionIssueUsecaseConfig<MissionRepo, AssigneeRepo, ProjectLookupImpl, IssueRepo>,
     ) -> MissionIssueUsecase<MissionRepo, AssigneeRepo, ProjectLookupImpl, IssueRepo> =
         |cfg| MissionIssueUsecase::new(cfg);
 }

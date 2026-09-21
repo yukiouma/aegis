@@ -1,14 +1,12 @@
 use async_trait::async_trait;
 
 use apis::mission::{
-    Actor, AppendCommentRequest, AssigneeData, AssigneeView as ApiAssigneeView,
-    CloseIssueRequest, CreateIssueRequest, CreateMissionRequest,
-    IssueCommentView as ApiIssueCommentView, IssueState as ApiIssueState,
-    IssueView as ApiIssueView, ListIssuesByMissionRequest,
+    Actor, AppendCommentRequest, AssigneeData, AssigneeView as ApiAssigneeView, CloseIssueRequest,
+    CreateIssueRequest, CreateMissionRequest, IssueCommentView as ApiIssueCommentView,
+    IssueState as ApiIssueState, IssueView as ApiIssueView, ListIssuesByMissionRequest,
     ListMissionsByProjectRequest, ListMissionsByUserRequest, MissionApiError,
-    MissionKind as ApiKind, MissionRole as ApiRole, MissionService,
-    MissionView as ApiMissionView, ReopenIssueRequest,
-    UpdateIssueDescriptionRequest,
+    MissionKind as ApiKind, MissionRole as ApiRole, MissionService, MissionView as ApiMissionView,
+    ReopenIssueRequest, UpdateIssueDescriptionRequest,
 };
 
 use crate::domain::{
@@ -16,8 +14,8 @@ use crate::domain::{
     UserLookup,
 };
 use crate::usecase::{
-    AssigneeData as UcAssigneeData, CreateIssue as UcCreateIssue,
-    CreateMission as UcCreateMission, MissionIssueUsecase, MissionUsecase, UsecaseError,
+    AssigneeData as UcAssigneeData, CreateIssue as UcCreateIssue, CreateMission as UcCreateMission,
+    MissionIssueUsecase, MissionUsecase, UsecaseError,
 };
 
 use crate::usecase::AssigneeView as UcAssigneeView;

@@ -12,8 +12,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 
 use crate::domain::{
-    DomainError, IssueComment, IssueState, MissionIssue, MissionIssueNew,
-    MissionIssueRepository,
+    DomainError, IssueComment, IssueState, MissionIssue, MissionIssueNew, MissionIssueRepository,
 };
 
 type IssueStore = Mutex<Vec<MissionIssue>>;

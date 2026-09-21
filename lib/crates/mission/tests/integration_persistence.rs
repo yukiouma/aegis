@@ -256,10 +256,7 @@ async fn issue_create_find_list_close_open_round_trip() {
         assert_eq!(opened.len(), 1);
         assert_eq!(opened[0].id, created.id);
 
-        let closed = issues
-            .close(created.id)
-            .await
-            .expect("close issue");
+        let closed = issues.close(created.id).await.expect("close issue");
         assert_eq!(closed.state, IssueState::Closed);
 
         let listed_closed = issues
@@ -268,10 +265,7 @@ async fn issue_create_find_list_close_open_round_trip() {
             .expect("list closed");
         assert_eq!(listed_closed.len(), 1);
 
-        let reopened = issues
-            .open(created.id)
-            .await
-            .expect("reopen issue");
+        let reopened = issues.open(created.id).await.expect("reopen issue");
         assert_eq!(reopened.state, IssueState::Opened);
     })
     .await
