@@ -340,12 +340,9 @@ export function CrfDetailPage() {
           >
             <span>
               <Badge
-                variant="dot"
                 color="error"
-                invisible={
-                  !formMission ||
-                  (openIssueCountByTarget.get(null) ?? 0) === 0
-                }
+                badgeContent={openIssueCountByTarget.get(null) ?? 0}
+                invisible={!formMission}
                 overlap="circular"
               >
                 <Chip
@@ -577,8 +574,8 @@ export function CrfDetailPage() {
                 formNotSubmitted={Boolean(form?.notSubmitted)}
                 itemNotSubmitted={Boolean(itemDetail.item.notSubmitted)}
                 noDomainAnnotations={noDomainAnnotations}
-                hasOpenIssue={
-                  (openIssueCountByTarget.get(itemDetail.item.code) ?? 0) > 0
+                openIssueCount={
+                  openIssueCountByTarget.get(itemDetail.item.code) ?? 0
                 }
                 onOpenIssues={() =>
                   formMission &&

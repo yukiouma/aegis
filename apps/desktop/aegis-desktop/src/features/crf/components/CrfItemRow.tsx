@@ -54,12 +54,13 @@ interface Props {
    */
   noDomainAnnotations: boolean;
   /**
-   * Whether at least one mission issue with `state: opened` exists
-   * for this item's code (the same scope as `targetItem`). The
-   * page derives this from the cached issues list. Drives the
-   * red-dot Badge on the item code chip.
+   * Number of mission issues with `state: opened` for this item's
+   * code (the same scope as `targetItem`). The page derives this
+   * from the cached issues list. Drives the count Badge on the
+   * item code chip — `0` hides the badge (MUI's default `showZero:
+   * false` behavior).
    */
-  hasOpenIssue: boolean;
+  openIssueCount: number;
   /**
    * Open the mission-issue dialog scoped to this item. Wired by
    * the page to `setIssueDialog({ scope: { kind: "item", ... } })`.
@@ -84,7 +85,7 @@ export function CrfItemRow({
   formNotSubmitted,
   itemNotSubmitted,
   noDomainAnnotations,
-  hasOpenIssue,
+  openIssueCount,
   onOpenIssues,
   missionExists,
 }: Props) {
@@ -156,9 +157,9 @@ export function CrfItemRow({
           >
             <span>
               <Badge
-                variant="dot"
                 color="error"
-                invisible={!hasOpenIssue}
+                badgeContent={openIssueCount}
+                invisible={!missionExists}
                 overlap="circular"
               >
                 <Chip

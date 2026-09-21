@@ -67,7 +67,7 @@ function renderRow(overrides: Partial<React.ComponentProps<typeof CrfItemRow>> =
         formNotSubmitted={false}
         itemNotSubmitted={false}
         noDomainAnnotations={false}
-        hasOpenIssue={false}
+        openIssueCount={0}
         onOpenIssues={onOpenIssues}
         missionExists={true}
         {...overrides}

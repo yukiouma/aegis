@@ -1091,11 +1091,12 @@ describe("CrfDetailPage — mission-issue entry points", () => {
     ).toBeInTheDocument();
   });
 
-  // Spec §Testing cases 1-5: chip + badge behavior. The Badge's
-  // `invisible` prop flips based on whether the open-issue count
-  // for the chip's scope is > 0; this test exercises the four
-  // counts (open, closed, none, item-target mismatch).
-  it("form chip dot badge is visible when an opened mission-level issue exists", async () => {
+  // Spec §Testing cases 1-5: chip + badge behavior. The Badge
+  // shows the open-issue count for the chip's scope; when no
+  // issues are open the Badge hides via MUI's default `showZero:
+  // false`. This test exercises the four counts (open, closed,
+  // none, item-target mismatch).
+  it("form chip count badge is visible when an opened mission-level issue exists", async () => {
     mockCommands({
       is_logged_in: () => true,
       current_user: () => fakeUser,
@@ -1107,17 +1108,17 @@ describe("CrfDetailPage — mission-issue entry points", () => {
     renderPage(["/project/abc/crf/11"]);
     await screen.findByTestId("crf-form-11");
     await waitFor(() => {
-      // The Badge invisible=false → renders the dot. The form code
-      // chip stays clickable. The Badge's data-testid is not part of
-      // the public surface; assert by structure: a `.MuiBadge-badge`
-      // child of the chip's parent <span>.
+      // With badgeContent > 0 the `.MuiBadge-badge` element renders
+      // and carries the count. The form code chip stays clickable.
       const chip = screen.getByTestId("crf-form-11");
       const wrapper = chip.closest(".MuiChip-root")?.parentElement;
-      expect(wrapper?.querySelector(".MuiBadge-badge")).not.toBeNull();
+      const badge = wrapper?.querySelector(".MuiBadge-badge");
+      expect(badge).not.toBeNull();
+      expect(badge?.textContent).toBe("1");
     });
   });
 
-  it("form chip dot badge is hidden when only closed issues exist", async () => {
+  it("form chip count badge is hidden when only closed issues exist", async () => {
     mockCommands({
       is_logged_in: () => true,
       current_user: () => fakeUser,
@@ -1130,9 +1131,9 @@ describe("CrfDetailPage — mission-issue entry points", () => {
     });
     renderPage(["/project/abc/crf/11"]);
     await screen.findByTestId("crf-form-11");
-    // The Badge `invisible` prop translates to `MuiBadge-invisible`
-    // on the inner `.MuiBadge-badge` element. We don't need to wait
-    // — the chip is synchronous once data is present.
+    // With badgeContent = 0 MUI applies the `MuiBadge-invisible` class
+    // (via its default `showZero: false`). We don't need to wait —
+    // the chip is synchronous once data is present.
     await waitFor(() => {
       const chip = screen.getByTestId("crf-form-11");
       const wrapper = chip.closest(".MuiChip-root")?.parentElement;
