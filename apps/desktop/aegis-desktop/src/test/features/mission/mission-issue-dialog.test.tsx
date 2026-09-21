@@ -221,3 +221,196 @@ describe("MissionIssueDialog — create form", () => {
     expect(screen.getByText(/boom/)).toBeInTheDocument();
   });
 });
+
+describe("MissionIssueDialog — per-row actions", () => {
+  const issueWithComment: IssueViewResponse = {
+    ...openedIssue,
+    id: 5,
+    comments: [
+      {
+        user: "bob",
+        content: "will fix by EOD",
+        createdAt: "2026-01-01T00:00:00Z",
+      },
+    ],
+  };
+
+  it("expands a row to show comments + edit + close/reopen + comment form", () => {
+    renderDialog({ issues: [issueWithComment] });
+    expect(screen.queryByText(/will fix by EOD/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /expand/i }));
+    expect(screen.getByText(/will fix by EOD/i)).toBeInTheDocument();
+  });
+
+  it("clicking Close on an opened issue calls onPatchState(id, closed)", () => {
+    const { onPatchState } = renderDialog({ issues: [openedIssue] });
+    fireEvent.click(screen.getByRole("button", { name: /expand/i }));
+    fireEvent.click(
+      screen.getByTestId(`mission-issue-close-${openedIssue.id}`),
+    );
+    expect(onPatchState).toHaveBeenCalledWith(openedIssue.id, "closed");
+  });
+
+  it("clicking Reopen on a closed issue calls onPatchState(id, opened)", () => {
+    const { onPatchState } = renderDialog({ issues: [closedIssue] });
+    fireEvent.click(screen.getByRole("button", { name: /expand/i }));
+    fireEvent.click(
+      screen.getByTestId(`mission-issue-reopen-${closedIssue.id}`),
+    );
+    expect(onPatchState).toHaveBeenCalledWith(closedIssue.id, "opened");
+  });
+
+  it("edit description: click Edit → TextField pre-filled → Save invokes onUpdateDescription", () => {
+    const { onUpdateDescription } = renderDialog({ issues: [openedIssue] });
+    fireEvent.click(screen.getByRole("button", { name: /expand/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Edit description/i }));
+    const ta = screen.getByDisplayValue(openedIssue.description);
+    fireEvent.change(ta, { target: { value: "new description" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Save$/i }));
+    expect(onUpdateDescription).toHaveBeenCalledWith(
+      openedIssue.id,
+      "new description",
+    );
+  });
+
+  it("append comment: typing then Send invokes onAppendComment with trimmed content", () => {
+    const { onAppendComment } = renderDialog({ issues: [openedIssue] });
+    fireEvent.click(screen.getByRole("button", { name: /expand/i }));
+    fireEvent.change(screen.getByPlaceholderText(/Type a comment/i), {
+      target: { value: "  hello  " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Add comment/i }));
+    expect(onAppendComment).toHaveBeenCalledWith(openedIssue.id, "hello");
+  });
+
+  it("Send is disabled when comment is empty or whitespace", () => {
+    renderDialog({ issues: [openedIssue] });
+    fireEvent.click(screen.getByRole("button", { name: /expand/i }));
+    expect(
+      screen.getByRole("button", { name: /Add comment/i }),
+    ).toBeDisabled();
+    fireEvent.change(screen.getByPlaceholderText(/Type a comment/i), {
+      target: { value: "   " },
+    });
+    expect(
+      screen.getByRole("button", { name: /Add comment/i }),
+    ).toBeDisabled();
+  });
+
+  it("hides Close/Reopen + Edit description when canActOnIssue is false", () => {
+    renderDialog({ canActOnIssue: false, issues: [openedIssue] });
+    fireEvent.click(screen.getByRole("button", { name: /expand/i }));
+    // The data-testid pin distinguishes the per-row state-flip button
+    // from the dialog's footer Close button.
+    expect(
+      screen.queryByTestId(`mission-issue-close-${openedIssue.id}`),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Edit description/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides the comment form when canComment is false", () => {
+    renderDialog({
+      canActOnIssue: false,
+      canComment: false,
+      issues: [openedIssue],
+    });
+    fireEvent.click(screen.getByRole("button", { name: /expand/i }));
+    expect(
+      screen.queryByPlaceholderText(/Type a comment/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the patchError inline above the Close/Reopen button when present", () => {
+    renderDialog({
+      patchError: {
+        kind: "http",
+        status: 403,
+        code: "forbidden",
+        message: "nope",
+      } as never,
+      issues: [openedIssue],
+    });
+    fireEvent.click(screen.getByRole("button", { name: /expand/i }));
+    expect(screen.getByText(/forbidden: nope/i)).toBeInTheDocument();
+  });
+
+  it("editing description on row A does not affect row B", () => {
+    const rowA: IssueViewResponse = openedIssue;
+    const rowB: IssueViewResponse = { ...openedIssue, id: 99 };
+    renderDialog({ issues: [rowA, rowB] });
+    fireEvent.click(screen.getAllByRole("button", { name: /expand/i })[0]);
+    fireEvent.click(screen.getByRole("button", { name: /Edit description/i }));
+    fireEvent.change(screen.getByDisplayValue(rowA.description), {
+      target: { value: "row A edit" },
+    });
+    // collapse row A; expand row B
+    fireEvent.click(screen.getAllByRole("button", { name: /expand/i })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: /expand/i })[1]);
+    expect(screen.queryByDisplayValue("row A edit")).not.toBeInTheDocument();
+  });
+
+  it("closing and reopening the dialog resets all internal state", () => {
+    const { rerender } = renderDialog({ issues: [openedIssue] });
+    fireEvent.click(screen.getByRole("button", { name: /expand/i }));
+    fireEvent.click(screen.getByRole("button", { name: /Edit description/i }));
+    // close
+    rerender(
+      <AegisI18nProvider>
+        <MissionIssueDialog
+          open={false}
+          scope={{ kind: "form" }}
+          mission={sampleMission}
+          issues={[openedIssue]}
+          canCreate={true}
+          canActOnIssue={true}
+          canComment={true}
+          createPending={false}
+          createError={null}
+          onCreate={() => undefined}
+          patchPending={false}
+          patchError={null}
+          onPatchState={() => undefined}
+          updateDescPending={false}
+          updateDescError={null}
+          onUpdateDescription={() => undefined}
+          commentPending={false}
+          commentError={null}
+          onAppendComment={() => undefined}
+          onClose={() => undefined}
+        />
+      </AegisI18nProvider>,
+    );
+    // reopen
+    rerender(
+      <AegisI18nProvider>
+        <MissionIssueDialog
+          open={true}
+          scope={{ kind: "form" }}
+          mission={sampleMission}
+          issues={[openedIssue]}
+          canCreate={true}
+          canActOnIssue={true}
+          canComment={true}
+          createPending={false}
+          createError={null}
+          onCreate={() => undefined}
+          patchPending={false}
+          patchError={null}
+          onPatchState={() => undefined}
+          updateDescPending={false}
+          updateDescError={null}
+          onUpdateDescription={() => undefined}
+          commentPending={false}
+          commentError={null}
+          onAppendComment={() => undefined}
+          onClose={() => undefined}
+        />
+      </AegisI18nProvider>,
+    );
+    expect(
+      screen.queryByRole("button", { name: /Edit description/i }),
+    ).not.toBeInTheDocument();
+  });
+});
