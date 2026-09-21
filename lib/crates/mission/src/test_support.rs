@@ -4,6 +4,7 @@
 
 #![allow(dead_code)]
 
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicI32, Ordering};
 
@@ -16,10 +17,32 @@ use crate::domain::{
     MissionRole, ProjectLookup, UserLookup,
 };
 
+/// Shared `(mission_id, assignee)` store used by both
+/// `FakeMissionRepo` (initial-assignees at create time) and
+/// `FakeAssigneeRepo` (everything else). Mirrors what the live
+/// Postgres `MissionRepo::create` transaction does in one
+/// statement.
+type AssigneeStore = Arc<Mutex<Vec<(i64, Assignee)>>>;
+
 #[derive(Default)]
 pub struct FakeMissionRepo {
     pub next_id: AtomicI32,
-    pub missions: Mutex<Vec<Mission>>,
+    pub missions: Arc<Mutex<Vec<Mission>>>,
+    /// Optional side-channel used by the fake to populate the
+    /// shared assignee store whenever a mission is created with
+    /// initial assignees — mirrors what the live Postgres repo
+    /// does inside its create transaction.
+    pub assignee_repo: Option<AssigneeStore>,
+}
+
+impl Clone for FakeMissionRepo {
+    fn clone(&self) -> Self {
+        Self {
+            next_id: AtomicI32::new(self.next_id.load(Ordering::SeqCst)),
+            missions: self.missions.clone(),
+            assignee_repo: self.assignee_repo.clone(),
+        }
+    }
 }
 
 #[async_trait]
@@ -41,6 +64,18 @@ impl MissionRepository for FakeMissionRepo {
                 )
             })
             .collect();
+        if let Some(store) = &self.assignee_repo {
+            for (idx, a) in input.assignees.iter().enumerate() {
+                let assignee = Assignee::for_repository(
+                    id * 1000 + idx as i64,
+                    a.user_code.clone(),
+                    a.role,
+                    now,
+                    now,
+                );
+                store.lock().unwrap().push((id, assignee));
+            }
+        }
         let m = Mission::for_repository(
             id,
             input.project_code,
@@ -101,7 +136,20 @@ impl MissionRepository for FakeMissionRepo {
 #[derive(Default)]
 pub struct FakeAssigneeRepo {
     pub next_id: AtomicI32,
-    pub assignees: Mutex<Vec<(i64, Assignee)>>, // (mission_id, assignee)
+    /// `(mission_id, assignee)` rows. The Arc is shared with the
+    /// companion `FakeMissionRepo` so initial-assignees added at
+    /// mission creation land in the same store the issue usecase
+    /// reads via `is_assignee`.
+    pub assignees: AssigneeStore,
+}
+
+impl Clone for FakeAssigneeRepo {
+    fn clone(&self) -> Self {
+        Self {
+            next_id: AtomicI32::new(self.next_id.load(Ordering::SeqCst)),
+            assignees: self.assignees.clone(),
+        }
+    }
 }
 
 #[async_trait]
@@ -156,7 +204,16 @@ impl AssigneeRepository for FakeAssigneeRepo {
 #[derive(Default)]
 pub struct FakeIssueRepo {
     pub next_id: AtomicI32,
-    pub issues: Mutex<Vec<MissionIssue>>,
+    pub issues: Arc<Mutex<Vec<MissionIssue>>>,
+}
+
+impl Clone for FakeIssueRepo {
+    fn clone(&self) -> Self {
+        Self {
+            next_id: AtomicI32::new(self.next_id.load(Ordering::SeqCst)),
+            issues: self.issues.clone(),
+        }
+    }
 }
 
 #[async_trait]
