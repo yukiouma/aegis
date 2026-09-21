@@ -237,6 +237,7 @@ fn map_error(e: UsecaseError) -> MissionApiError {
             | DomainError::UnknownMissionRole(_) => MissionApiError::Validation(d.to_string()),
             DomainError::NotFound => MissionApiError::NotFound,
             DomainError::AssigneeNotFound => MissionApiError::AssigneeNotFound,
+            DomainError::MissionIssueNotFound => MissionApiError::NotFound,
             DomainError::ProjectNotFound(c) => MissionApiError::ProjectNotFound(c),
             DomainError::UserNotFound(c) => MissionApiError::UserNotFound(c),
             DomainError::DuplicateMission {
@@ -257,6 +258,9 @@ fn map_error(e: UsecaseError) -> MissionApiError {
                 user_code,
                 role: role.into(),
             },
+            DomainError::EmptyIssueDescription
+            | DomainError::EmptyIssueIssuer
+            | DomainError::EmptyCommentContent => MissionApiError::Validation(d.to_string()),
             DomainError::Repository(s) => MissionApiError::Repository(s),
         },
     }

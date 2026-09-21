@@ -23,6 +23,9 @@ pub enum DomainError {
     #[error("assignee not found")]
     AssigneeNotFound,
 
+    #[error("mission issue not found")]
+    MissionIssueNotFound,
+
     #[error("project not found: {0}")]
     ProjectNotFound(String),
 
@@ -42,6 +45,15 @@ pub enum DomainError {
         user_code: String,
         role: MissionRole,
     },
+
+    #[error("issue description must not be empty")]
+    EmptyIssueDescription,
+
+    #[error("issue issuer must not be empty")]
+    EmptyIssueIssuer,
+
+    #[error("comment content must not be empty")]
+    EmptyCommentContent,
 
     #[error("repository error: {0}")]
     Repository(String),

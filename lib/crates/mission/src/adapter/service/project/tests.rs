@@ -3,7 +3,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use apis::project::{
-    ProjectApiError, ProjectMemberView, ProjectService, ProjectView, UserSummaryView,
+    ProjectApiError, ProjectConfigurationView, ProjectMemberView, ProjectService, ProjectView,
+    UserSummaryView,
 };
 
 use crate::domain::{DomainError, ProjectLookup};
@@ -56,7 +57,7 @@ fn view(code: &str, leaders: &[String]) -> ProjectView {
             workers: vec![],
         },
         unblind_members: ProjectMemberView::default(),
-        tags: vec![],
+        configurations: ProjectConfigurationView::default(),
         active: true,
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
