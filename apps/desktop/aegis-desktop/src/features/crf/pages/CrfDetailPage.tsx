@@ -338,60 +338,40 @@ export function CrfDetailPage() {
         <IconButton aria-label={t("crf.detail.back")} onClick={back}>
           <ArrowBackIcon />
         </IconButton>
-        {form?.code && (() => {
-          // Three gate reasons, ranked by informativeness:
-          //   1. no mission at all -> "no mission exists" tooltip wins
-          //   2. mission exists but zero opened issues AND the viewer
-          //      can't open the empty-issue dialog -> "no issues to view"
-          //   3. otherwise, the chip is enabled
-          const noMission = !formMission;
-          const noIssuesToView =
-            formMission != null &&
-            (openIssueCountByTarget.get(null) ?? 0) === 0 &&
-            !canOpenEmptyIssueDialog;
-          const formChipDisabled = noMission || noIssuesToView;
-          const formChipTitle = noMission
-            ? t("crf.missionIssue.tooltip.noMission")
-            : noIssuesToView
-              ? t("crf.detail.tooltip.noIssueToView")
-              : "";
-          return (
-            <Tooltip
-              title={formChipTitle}
-              disableHoverListener={!formChipDisabled}
-              disableFocusListener={!formChipDisabled}
-              disableTouchListener={!formChipDisabled}
-            >
-              <span>
-                <Badge
-                  color="error"
-                  badgeContent={openIssueCountByTarget.get(null) ?? 0}
-                  invisible={!formMission}
-                  overlap="circular"
-                >
-                  <Chip
-                    sx={{ minWidth: 70 }}
-                    size="small"
-                    label={form.code}
-                    variant="outlined"
-                    disabled={formChipDisabled}
-                    onClick={() =>
-                      formMission &&
+        {form?.code && (
+          <Badge
+            color="error"
+            badgeContent={openIssueCountByTarget.get(null) ?? 0}
+            invisible={!formMission}
+            overlap="circular"
+          >
+            <Chip
+              sx={{ minWidth: 70 }}
+              size="small"
+              label={form.code}
+              variant="outlined"
+              // No `onClick` when the chip should not open the
+              // issue dialog (no mission / zero opened issues for a
+              // viewer without permission) — silently drops the
+              // click so the chip keeps the same outlined style as
+              // the always-enabled path.
+              onClick={
+                formMission && canOpenEmptyIssueDialog
+                  || (formMission && (openIssueCountByTarget.get(null) ?? 0) > 0)
+                  ? () =>
                       setIssueDialog({
                         scope: { kind: "form" },
-                        missionId: formMission.id,
+                        missionId: formMission!.id,
                       })
-                    }
-                    // Stable anchor for `?focus=form-<id>` from the global
-                    // search page. Sits next to the form-name Typography so
-                    // scrolling here lands the user on the form header.
-                    data-testid={`crf-form-${id}`}
-                  />
-                </Badge>
-              </span>
-            </Tooltip>
-          );
-        })()}
+                  : undefined
+              }
+              // Stable anchor for `?focus=form-<id>` from the global
+              // search page. Sits next to the form-name Typography so
+              // scrolling here lands the user on the form header.
+              data-testid={`crf-form-${id}`}
+            />
+          </Badge>
+        )}
         <Typography
           variant="h5"
           onClick={(e) =>
@@ -515,47 +495,29 @@ export function CrfDetailPage() {
             applied to the per-domain annotation chips below. */}
         {detail && detail.domainAnnotations.length > 0 && (
           <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-            {detail.domainAnnotations.map((d, i) => {
-              // When the viewer can't edit annotations (QC,
-              // task-unrelated), MUI's disabled chip blocks both
-              // `onClick` and `onDelete` — so unset the handlers
-              // too and wrap it in a Tooltip host that explains the
-              // permission state. The Tooltip host is required
-              // because MUI's disabled chips drop hover events.
-              const chip = (
-                <Chip
-                  key={d.id}
-                  label={t("crf.detail.domainChip.label", {
-                    name: d.name,
-                    description: d.description,
-                  })}
-                  color={annotationColor(i)}
-                  onClick={
-                    canEditAnnotations
-                      ? () => setDomainDialog({ mode: "edit", row: d })
-                      : undefined
-                  }
-                  onDelete={
-                    canEditAnnotations
-                      ? () => setConfirmDeleteDomain(d)
-                      : undefined
-                  }
-                  size="small"
-                  data-testid={`domain-annotation-chip-${d.id}`}
-                  variant="outlined"
-                  disabled={!canEditAnnotations}
-                />
-              );
-              if (canEditAnnotations) return chip;
-              return (
-                <Tooltip
-                  key={d.id}
-                  title={t("crf.detail.tooltip.noPermissionEdit")}
-                >
-                  <span>{chip}</span>
-                </Tooltip>
-              );
-            })}
+            {detail.domainAnnotations.map((d, i) => (
+              <Chip
+                key={d.id}
+                label={t("crf.detail.domainChip.label", {
+                  name: d.name,
+                  description: d.description,
+                })}
+                color={annotationColor(i)}
+                onClick={
+                  canEditAnnotations
+                    ? () => setDomainDialog({ mode: "edit", row: d })
+                    : undefined
+                }
+                onDelete={
+                  canEditAnnotations
+                    ? () => setConfirmDeleteDomain(d)
+                    : undefined
+                }
+                size="small"
+                data-testid={`domain-annotation-chip-${d.id}`}
+                variant="outlined"
+              />
+            ))}
           </Stack>
         )}
         <Box sx={{ flexGrow: 1 }} />

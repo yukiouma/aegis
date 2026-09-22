@@ -1,7 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AegisI18nProvider } from "@aegis/ui/i18n";
 
 import {
   AnnotationChip,
@@ -9,11 +8,11 @@ import {
 } from "../../../features/crf/components/AnnotationChip";
 import { CrfAnnotationArea } from "../../../features/crf/components/CrfAnnotationArea";
 
-// When `disabled={true}` is passed, AnnotationChip calls useI18n to
-// render the disabled-state tooltip title. Tests in the
-// `AnnotationChip — disabled prop` block wrap their render with
-// AegisI18nProvider so the hook has a context. The default (enabled)
-// path doesn't touch i18n, so existing tests don't need a provider.
+// The disabled path renders the same Chip as the enabled path —
+// no tooltip wrapper, no `disabled` attribute — so neither path
+// needs an AegisI18nProvider here. Click handlers are simply unset
+// when the chip is disabled, which keeps the visual style identical
+// across roles.
 
 afterEach(() => cleanup());
 
@@ -152,11 +151,10 @@ describe("AnnotationChip — disabled prop", () => {
     updatedAt: "2026-01-02T00:00:00Z",
   };
 
-  // Disabled path uses useI18n for the tooltip title; wrap with the
-  // provider so the hook has a context.
-  function renderDisabled(ui: React.ReactElement) {
-    return render(<AegisI18nProvider>{ui}</AegisI18nProvider>);
-  }
+  // The disabled path renders the same Chip as the enabled path —
+  // no tooltip wrapper, no `disabled` attribute — but the chip's
+  // `onClick` and `onDelete` are unset so MUI drops the clickable
+  // affordance. The visual style stays identical across roles.
 
   it("renders the chip unchanged when disabled is omitted or false", () => {
     render(
@@ -171,8 +169,9 @@ describe("AnnotationChip — disabled prop", () => {
     expect(chip).not.toHaveClass("Mui-disabled");
   });
 
-  it("renders with Mui-disabled when disabled is true", () => {
-    renderDisabled(
+  it("does not apply Mui-disabled when disabled is true", () => {
+    // Same chip view style — no greyed-out disabled treatment.
+    render(
       <AnnotationChip
         annotation={baseAnnotation}
         colorIndex={0}
@@ -182,15 +181,14 @@ describe("AnnotationChip — disabled prop", () => {
       />,
     );
     const chip = screen.getByText("annotation text").closest(".MuiChip-root")!;
-    expect(chip).toHaveClass("Mui-disabled");
+    expect(chip).not.toHaveClass("Mui-disabled");
   });
 
   it("does not render the delete icon when disabled is true", () => {
     // When `disabled` is true the implementation unsets onDelete so the
-    // delete affordance disappears entirely (rather than rendering a
-    // permanently-disabled delete icon). This is the same behaviour
-    // as MUI's own disabled chip with no onDelete supplied.
-    const { container } = renderDisabled(
+    // delete affordance disappears entirely — no chip clickability, no
+    // delete button.
+    const { container } = render(
       <AnnotationChip
         annotation={baseAnnotation}
         colorIndex={0}
@@ -204,7 +202,7 @@ describe("AnnotationChip — disabled prop", () => {
 
   it("does not call onEdit when the disabled chip is clicked", () => {
     const onEdit = vi.fn();
-    renderDisabled(
+    render(
       <AnnotationChip
         annotation={baseAnnotation}
         colorIndex={0}
@@ -243,34 +241,31 @@ describe("CrfAnnotationArea — canEditAnnotations", () => {
     expect(chip).not.toHaveClass("Mui-disabled");
   });
 
-  it("renders chips disabled when canEditAnnotations is false", () => {
+  it("renders chips with the same visual style when canEditAnnotations is false", () => {
     render(
-      <AegisI18nProvider>
-        <CrfAnnotationArea
-          annotations={[baseAnnotation]}
-          colorByDomainAnnotationId={new Map([[50, 0]])}
-          canEditAnnotations={false}
-          onEdit={() => undefined}
-          onDelete={() => undefined}
-        />
-      </AegisI18nProvider>,
+      <CrfAnnotationArea
+        annotations={[baseAnnotation]}
+        colorByDomainAnnotationId={new Map([[50, 0]])}
+        canEditAnnotations={false}
+        onEdit={() => undefined}
+        onDelete={() => undefined}
+      />,
     );
     const chip = screen.getByText("annotation text").closest(".MuiChip-root")!;
-    expect(chip).toHaveClass("Mui-disabled");
+    // Same chip view style — no greyed-out disabled treatment.
+    expect(chip).not.toHaveClass("Mui-disabled");
   });
 
   it("does not call onEdit when a disabled chip is clicked", () => {
     const onEdit = vi.fn();
     render(
-      <AegisI18nProvider>
-        <CrfAnnotationArea
-          annotations={[baseAnnotation]}
-          colorByDomainAnnotationId={new Map([[50, 0]])}
-          canEditAnnotations={false}
-          onEdit={onEdit}
-          onDelete={() => undefined}
-        />
-      </AegisI18nProvider>,
+      <CrfAnnotationArea
+        annotations={[baseAnnotation]}
+        colorByDomainAnnotationId={new Map([[50, 0]])}
+        canEditAnnotations={false}
+        onEdit={onEdit}
+        onDelete={() => undefined}
+      />,
     );
     fireEvent.click(screen.getByText("annotation text"));
     expect(onEdit).not.toHaveBeenCalled();

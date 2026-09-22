@@ -1,4 +1,4 @@
-import { Badge, Box, Chip, Stack, Tooltip, Typography } from "@aegis/ui/mui";
+import { Badge, Box, Chip, Stack, Typography } from "@aegis/ui/mui";
 import { RadioButtonUnchecked as RadioButtonUncheckedIcon } from "@aegis/ui/icons";
 
 import type { Annotation, AnnotationOwner, CrfItemDetail } from "../../../shared/api";
@@ -165,51 +165,33 @@ export function CrfItemRow({
         {/* Label items have no captured variable — hide the code
             chip so the row reads as static text rather than as a
             field that can be annotated. */}
-        {!isLabel && (() => {
-          // Three gate reasons, ranked by informativeness:
-          //   1. no mission at all -> "no mission exists" tooltip wins
-          //   2. mission exists but zero opened issues AND the viewer
-          //      can't open the empty-issue dialog -> "no issues to view"
-          //   3. otherwise, the chip is enabled
-          const noMission = !missionExists;
-          const noIssuesToView =
-            missionExists &&
-            openIssueCount === 0 &&
-            !canOpenEmptyIssueDialog;
-          const chipDisabled = noMission || noIssuesToView;
-          const chipTitle = noMission
-            ? t("crf.missionIssue.tooltip.noMission")
-            : noIssuesToView
-              ? t("crf.detail.tooltip.noIssueToView")
-              : "";
-          return (
-            <Tooltip
-              title={chipTitle}
-              disableHoverListener={!chipDisabled}
-              disableFocusListener={!chipDisabled}
-              disableTouchListener={!chipDisabled}
-            >
-              <span>
-                <Badge
-                  color="error"
-                  badgeContent={openIssueCount}
-                  invisible={!missionExists}
-                  overlap="circular"
-                >
-                  <Chip
-                    sx={{ width: 92 }}
-                    label={item.code}
-                    variant="outlined"
-                    size="small"
-                    onClick={onOpenIssues}
-                    disabled={chipDisabled}
-                    data-testid={`crf-item-code-${item.id}`}
-                  />
-                </Badge>
-              </span>
-            </Tooltip>
-          );
-        })()}
+        {!isLabel && (
+          <Badge
+            color="error"
+            badgeContent={openIssueCount}
+            invisible={!missionExists}
+            overlap="circular"
+          >
+            <Chip
+              sx={{ width: 92 }}
+              label={item.code}
+              variant="outlined"
+              size="small"
+              // Drop `onClick` when the chip shouldn't open the
+              // issue dialog (no mission / zero opened issues for a
+              // viewer without permission). The chip keeps its
+              // outlined style — only the click is silently
+              // dropped.
+              onClick={
+                missionExists &&
+                (openIssueCount > 0 || canOpenEmptyIssueDialog)
+                  ? onOpenIssues
+                  : undefined
+              }
+              data-testid={`crf-item-code-${item.id}`}
+            />
+          </Badge>
+        )}
         <Typography
           variant="subtitle1"
           sx={clickableSx}

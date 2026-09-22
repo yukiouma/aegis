@@ -1,6 +1,5 @@
-import { Chip, Tooltip } from "@aegis/ui/mui";
+import { Chip } from "@aegis/ui/mui";
 import type { ChipProps } from "@aegis/ui/mui";
-import { useI18n } from "@aegis/ui/i18n";
 import type { Annotation } from "../../../shared/api";
 
 /**
@@ -26,41 +25,38 @@ interface Props {
   onEdit: () => void;
   onDelete: () => void;
   /**
-   * Render the chip as MUI-disabled (blocks both `onClick` and
-   * `onDelete`) and wrap it in a Tooltip that explains the user
-   * lacks permission. Used by `CrfAnnotationArea` when the current
-   * viewer is not allowed to edit annotations on this form. The
-   * Tooltip host is required because MUI's disabled chips drop
-   * hover events; the same `<Tooltip><span><Chip /></span></Tooltip>`
-   * pattern is used elsewhere on the page (cf. `CrfDetailPage.tsx`
-   * lines 330-369 and 409-466).
+   * Block `onClick` and `onDelete` from firing — used by
+   * `CrfAnnotationArea` and `CrfItemRow` when the current viewer
+   * is not allowed to edit annotations on this form. We keep the
+   * chip's visual style identical to the enabled path (no
+   * `disabled` attribute, no tooltip wrapper) so QC / task-unrelated
+   * users see the same chip as leader / DEV — only their clicks
+   * are silently dropped.
    */
   disabled?: boolean;
 }
 
 /**
- * The chip body. Doesn't touch `useI18n` so callers don't need an
- * `AegisI18nProvider` for the enabled (default) path. When
- * `disabled` is true, the public `AnnotationChip` routes through
- * `DisabledAnnotationChip` which owns the i18n tooltip title.
+ * Annotation chip used both at the form level (via
+ * `CrfAnnotationArea`) and inside each `CrfItemRow`. When
+ * `disabled` is true the chip looks identical to the enabled
+ * version — same outline, same colour, same border style — but
+ * MUI's Chip won't render the clickable affordance or delete icon
+ * because we omit `onClick` and `onDelete`.
  */
-export function AnnotationChip(props: Props) {
-  if (props.disabled) return <DisabledAnnotationChip {...props} />;
-  return <EnabledAnnotationChip {...props} />;
-}
-
-function EnabledAnnotationChip({
+export function AnnotationChip({
   annotation,
   colorIndex,
   onEdit,
   onDelete,
+  disabled = false,
 }: Props) {
   return (
     <Chip
       label={annotation.content}
       color={annotationColor(colorIndex)}
-      onClick={onEdit}
-      onDelete={onDelete}
+      onClick={disabled ? undefined : onEdit}
+      onDelete={disabled ? undefined : onDelete}
       size="small"
       variant="outlined"
       // `assign: true` flips the chip border to a dotted line so the
@@ -73,37 +69,5 @@ function EnabledAnnotationChip({
       // scrollIntoView when navigating in with ?focus=annotation-<id>.
       data-testid={`crf-annotation-${annotation.id}`}
     />
-  );
-}
-
-function DisabledAnnotationChip({
-  annotation,
-  colorIndex,
-  onEdit: _onEdit,
-  onDelete: _onDelete,
-}: Props) {
-  const { t } = useI18n();
-  // OnDelete is unset so the delete affordance disappears — consistent
-  // with `Mui-disabled` blocking the click anyway, and avoids
-  // presenting a permanently-disabled delete icon that the user can't
-  // use. onEdit is unset for the same reason.
-  return (
-    <Tooltip
-      title={t("crf.detail.tooltip.noPermissionEdit")}
-    >
-      <span>
-        <Chip
-          label={annotation.content}
-          color={annotationColor(colorIndex)}
-          onClick={undefined}
-          onDelete={undefined}
-          size="small"
-          variant="outlined"
-          disabled
-          sx={annotation.assign ? { borderStyle: "dashed" } : undefined}
-          data-testid={`crf-annotation-${annotation.id}`}
-        />
-      </span>
-    </Tooltip>
   );
 }

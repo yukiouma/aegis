@@ -289,12 +289,12 @@ describe("CrfItemRow", () => {
       expect(onOpenIssues).toHaveBeenCalled();
     });
 
-    it("disables the chip when missionExists is false", () => {
-      renderRow({ missionExists: false });
-      expect(screen.getByTestId("crf-item-code-21")).toHaveAttribute(
-        "aria-disabled",
-        "true",
-      );
+    it("does not call onOpenIssues when no mission exists", () => {
+      // The chip keeps its outlined style (no `aria-disabled`,
+      // no `Mui-disabled`) — only the click is silently dropped.
+      const { onOpenIssues } = renderRow({ missionExists: false });
+      fireEvent.click(screen.getByTestId("crf-item-code-21"));
+      expect(onOpenIssues).not.toHaveBeenCalled();
     });
   });
 

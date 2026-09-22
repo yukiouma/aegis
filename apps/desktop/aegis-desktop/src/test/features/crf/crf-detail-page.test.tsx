@@ -1291,12 +1291,15 @@ describe("CrfDetailPage — role-based restrictions", () => {
     const item = await screen.findByTestId("crf-item-name-21");
     expect(item).not.toHaveStyle({ cursor: "pointer" });
 
-    // Annotation chip is disabled.
+    // Annotation chip stays in the same outlined style (no
+    // `Mui-disabled`, no tooltip wrapper) but the click is
+    // silently dropped — the chip's `onClick` is unset.
     const ann = await screen.findByText("item-level note");
-    expect(ann.closest(".MuiChip-root")).toHaveClass("Mui-disabled");
+    expect(ann.closest(".MuiChip-root")).not.toHaveClass("Mui-disabled");
+    expect(ann.closest(".MuiChip-root")).not.toHaveClass("MuiChip-clickable");
   });
 
-  it("mission DEV: form chip disabled when zero issues; menu stays enabled", async () => {
+  it("mission DEV: form chip does not open the issue dialog when zero issues; menu stays enabled", async () => {
     mockCommands({
       is_logged_in: () => true,
       current_user: () => fakeUser,
@@ -1307,9 +1310,16 @@ describe("CrfDetailPage — role-based restrictions", () => {
       list_issues_by_mission: () => [],
     });
     renderPage(["/project/abc/crf/11"]);
-    // DEV can't open the empty-issue dialog → form chip disabled.
+    // DEV can't open the empty-issue dialog — the chip keeps its
+    // outlined style but clicking it does not open the dialog.
     const chip = await screen.findByTestId("crf-form-11");
-    expect(chip).toHaveAttribute("aria-disabled", "true");
+    expect(chip).not.toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(chip);
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Mission issues/i),
+      ).not.toBeInTheDocument();
+    });
 
     // Menu still enabled (DEV can edit annotations).
     const formName = await screen.findByTestId("crf-form-name");
@@ -1362,9 +1372,16 @@ describe("CrfDetailPage — role-based restrictions", () => {
       list_issues_by_mission: () => [],
     });
     renderPage(["/project/abc/crf/11"]);
-    // Form chip disabled (no role + no issues).
+    // Form chip keeps its outlined style but does not open the
+    // issue dialog when there's no role + no issues.
     const chip = await screen.findByTestId("crf-form-11");
-    expect(chip).toHaveAttribute("aria-disabled", "true");
+    expect(chip).not.toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(chip);
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Mission issues/i),
+      ).not.toBeInTheDocument();
+    });
 
     // Menu items disabled.
     const formName = await screen.findByTestId("crf-form-name");
@@ -1391,8 +1408,10 @@ describe("CrfDetailPage — role-based restrictions", () => {
     const item = await screen.findByTestId("crf-item-name-21");
     expect(item).not.toHaveStyle({ cursor: "pointer" });
 
-    // Annotation chip is disabled.
+    // Annotation chip keeps the outlined style (no `Mui-disabled`,
+    // no tooltip) but the click is silently dropped.
     const ann = await screen.findByText("item-level note");
-    expect(ann.closest(".MuiChip-root")).toHaveClass("Mui-disabled");
+    expect(ann.closest(".MuiChip-root")).not.toHaveClass("Mui-disabled");
+    expect(ann.closest(".MuiChip-root")).not.toHaveClass("MuiChip-clickable");
   });
 });
