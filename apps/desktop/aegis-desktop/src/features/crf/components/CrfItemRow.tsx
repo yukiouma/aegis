@@ -82,6 +82,14 @@ interface Props {
    * so the chip doesn't reflow when the mission shows up.
    */
   missionExists: boolean;
+  /**
+   * Whether the current viewer is allowed to open the mission-issue
+   * dialog when its scope has zero opened issues. When `false` AND
+   * `openIssueCount === 0`, the item code chip is disabled with the
+   * no-issues-to-view tooltip. The page derives this from the same
+   * RBAC flags used by the form-name hover menu.
+   */
+  canOpenEmptyIssueDialog: boolean;
 }
 
 export function CrfItemRow({
@@ -98,6 +106,7 @@ export function CrfItemRow({
   openIssueCount,
   onOpenIssues,
   missionExists,
+  canOpenEmptyIssueDialog,
 }: Props) {
   const { t } = useI18n();
   const { item, options, units, annotations } = itemDetail;
@@ -156,37 +165,51 @@ export function CrfItemRow({
         {/* Label items have no captured variable — hide the code
             chip so the row reads as static text rather than as a
             field that can be annotated. */}
-        {!isLabel && (
-          <Tooltip
-            title={
-              missionExists
-                ? ""
-                : t("crf.missionIssue.tooltip.noMission")
-            }
-            disableHoverListener={missionExists}
-            disableFocusListener={missionExists}
-            disableTouchListener={missionExists}
-          >
-            <span>
-              <Badge
-                color="error"
-                badgeContent={openIssueCount}
-                invisible={!missionExists}
-                overlap="circular"
-              >
-                <Chip
-                  sx={{ width: 92 }}
-                  label={item.code}
-                  variant="outlined"
-                  size="small"
-                  onClick={onOpenIssues}
-                  disabled={!missionExists}
-                  data-testid={`crf-item-code-${item.id}`}
-                />
-              </Badge>
-            </span>
-          </Tooltip>
-        )}
+        {!isLabel && (() => {
+          // Three gate reasons, ranked by informativeness:
+          //   1. no mission at all -> "no mission exists" tooltip wins
+          //   2. mission exists but zero opened issues AND the viewer
+          //      can't open the empty-issue dialog -> "no issues to view"
+          //   3. otherwise, the chip is enabled
+          const noMission = !missionExists;
+          const noIssuesToView =
+            missionExists &&
+            openIssueCount === 0 &&
+            !canOpenEmptyIssueDialog;
+          const chipDisabled = noMission || noIssuesToView;
+          const chipTitle = noMission
+            ? t("crf.missionIssue.tooltip.noMission")
+            : noIssuesToView
+              ? t("crf.detail.tooltip.noIssueToView")
+              : "";
+          return (
+            <Tooltip
+              title={chipTitle}
+              disableHoverListener={!chipDisabled}
+              disableFocusListener={!chipDisabled}
+              disableTouchListener={!chipDisabled}
+            >
+              <span>
+                <Badge
+                  color="error"
+                  badgeContent={openIssueCount}
+                  invisible={!missionExists}
+                  overlap="circular"
+                >
+                  <Chip
+                    sx={{ width: 92 }}
+                    label={item.code}
+                    variant="outlined"
+                    size="small"
+                    onClick={onOpenIssues}
+                    disabled={chipDisabled}
+                    data-testid={`crf-item-code-${item.id}`}
+                  />
+                </Badge>
+              </span>
+            </Tooltip>
+          );
+        })()}
         <Typography
           variant="subtitle1"
           sx={clickableSx}
