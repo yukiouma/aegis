@@ -69,12 +69,34 @@ pub struct TagView {
     pub value: String,
 }
 
-/// Request-side configuration: optional locale plus the tag list.
-/// Carries `TagData` because it travels into the backend.
+/// Wire-shaped pointer to a `SdtmVersion` (SDTM Implementation
+/// Guide version). The pair `(version_id, version_name)` is what
+/// the client picked from `DomainModelService::list_versions`; the
+/// project crate does not verify the row still exists at write
+/// time.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelVersionData {
+    pub version_id: i64,
+    pub version_name: String,
+}
+
+/// Server-side projection of [`ModelVersionData`]. Kept as a
+/// distinct type so the request DTO can diverge later without
+/// breaking the projection contract.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelVersionView {
+    pub version_id: i64,
+    pub version_name: String,
+}
+
+/// Request-side configuration: optional locale plus the tag list
+/// plus an optional SDTM-IG version pointer. Carries `TagData`
+/// because it travels into the backend.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProjectConfigurationData {
     pub language: Option<ProjectLanguage>,
     pub tags: Vec<TagData>,
+    pub sdtmig: Option<ModelVersionData>,
 }
 
 /// Server-side projection of the configuration. Carries `TagView`
@@ -83,6 +105,7 @@ pub struct ProjectConfigurationData {
 pub struct ProjectConfigurationView {
     pub language: Option<ProjectLanguage>,
     pub tags: Vec<TagView>,
+    pub sdtmig: Option<ModelVersionView>,
 }
 
 /// Safe projection of a project: membership lists are hydrated to

@@ -11,8 +11,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 
 use crate::domain::{
-    DomainError, Project, ProjectConfiguration, ProjectMember, ProjectNew, ProjectRepository,
-    ProjectTag, ProjectUpdate, UserService, UserSummary,
+    DomainError, ModelVersion, Project, ProjectConfiguration, ProjectMember, ProjectNew,
+    ProjectRepository, ProjectTag, ProjectUpdate, UserService, UserSummary,
 };
 use crate::usecase::commands::{CreateProject, UpdateProject};
 use crate::usecase::error::UsecaseError;
@@ -282,6 +282,7 @@ async fn create_project_with_configuration_succeeds() {
                     ProjectTag::for_repository("Product".into(), "DEMO-001".into()),
                     ProjectTag::for_repository("Region".into(), "EU".into()),
                 ],
+                None,
             )),
         })
         .await
@@ -308,6 +309,7 @@ async fn create_project_with_duplicate_tag_keys_succeeds() {
                     ProjectTag::for_repository("Product".into(), "DEMO-001".into()),
                     ProjectTag::for_repository("Product".into(), "DEMO-002".into()),
                 ],
+                None,
             )),
         })
         .await
@@ -329,6 +331,7 @@ async fn create_project_with_empty_tag_key_returns_validation_error() {
             configuration: Some(ProjectConfiguration::for_repository(
                 None,
                 vec![ProjectTag::for_repository("".into(), "v".into())],
+                None,
             )),
         })
         .await
@@ -351,6 +354,7 @@ async fn create_project_with_empty_tag_value_returns_validation_error() {
             configuration: Some(ProjectConfiguration::for_repository(
                 None,
                 vec![ProjectTag::for_repository("k".into(), "   ".into())],
+                None,
             )),
         })
         .await
@@ -358,6 +362,51 @@ async fn create_project_with_empty_tag_value_returns_validation_error() {
     assert!(matches!(
         err,
         UsecaseError::Validation(DomainError::EmptyTagValue)
+    ));
+}
+
+#[tokio::test]
+async fn create_project_with_sdtmig_succeeds() {
+    let (_projects, _users, usecase) = make_usecase();
+    let view = usecase
+        .create_project(CreateProject {
+            code: "proj1".into(),
+            description: "".into(),
+            members: None,
+            unblind_members: None,
+            configuration: Some(ProjectConfiguration::for_repository(
+                None,
+                vec![],
+                Some(ModelVersion::for_repository(7, "2024-03-29".into())),
+            )),
+        })
+        .await
+        .expect("create");
+    let sdtmig = view.configurations.sdtmig.expect("sdtmig present");
+    assert_eq!(sdtmig.version_id, 7);
+    assert_eq!(sdtmig.version_name, "2024-03-29");
+}
+
+#[tokio::test]
+async fn create_project_with_empty_sdtmig_name_returns_validation_error() {
+    let (_projects, _users, usecase) = make_usecase();
+    let err = usecase
+        .create_project(CreateProject {
+            code: "proj1".into(),
+            description: "".into(),
+            members: None,
+            unblind_members: None,
+            configuration: Some(ProjectConfiguration::for_repository(
+                None,
+                vec![],
+                Some(ModelVersion::for_repository(7, "   ".into())),
+            )),
+        })
+        .await
+        .expect_err("empty sdtmig name rejected");
+    assert!(matches!(
+        err,
+        UsecaseError::Validation(DomainError::EmptySdtmigName)
     ));
 }
 
@@ -405,6 +454,7 @@ async fn update_project_replaces_configuration_whole_list() {
             configuration: Some(ProjectConfiguration::for_repository(
                 None,
                 vec![ProjectTag::for_repository("k1".into(), "v1".into())],
+                None,
             )),
         })
         .await
@@ -420,6 +470,7 @@ async fn update_project_replaces_configuration_whole_list() {
                     ProjectTag::for_repository("k2".into(), "v2".into()),
                     ProjectTag::for_repository("k3".into(), "v3".into()),
                 ],
+                None,
             )),
             ..Default::default()
         })
@@ -442,6 +493,7 @@ async fn update_project_leaves_configuration_unchanged_when_none() {
             configuration: Some(ProjectConfiguration::for_repository(
                 None,
                 vec![ProjectTag::for_repository("k1".into(), "v1".into())],
+                None,
             )),
         })
         .await

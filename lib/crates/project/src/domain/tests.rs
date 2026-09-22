@@ -171,10 +171,30 @@ fn project_configuration_for_repository_carries_language_and_tags() {
     let c = ProjectConfiguration::for_repository(
         Some(ProjectLanguage::SimplifiedChinese),
         vec![ProjectTag::for_repository("k".into(), "v".into())],
+        None,
     );
     assert_eq!(c.language, Some(ProjectLanguage::SimplifiedChinese));
     assert_eq!(c.tags.len(), 1);
     assert_eq!(c.tags[0].key, "k");
+}
+
+#[test]
+fn project_configuration_default_has_no_sdtmig() {
+    let c = ProjectConfiguration::default();
+    assert!(c.sdtmig.is_none());
+}
+
+#[test]
+fn project_configuration_for_repository_carries_sdtmig() {
+    let c = ProjectConfiguration::for_repository(
+        None,
+        vec![],
+        Some(ModelVersion::for_repository(3, "2024-03-29".into())),
+    );
+    assert_eq!(
+        c.sdtmig,
+        Some(ModelVersion::for_repository(3, "2024-03-29".into()))
+    );
 }
 
 #[test]

@@ -186,6 +186,7 @@ mod row_tests {
                     ProjectTag::for_repository("Product".into(), "DEMO-001".into()),
                     ProjectTag::for_repository("Region".into(), "EU".into()),
                 ],
+                None,
             )),
             created_at: ts(),
             updated_at: ts(),

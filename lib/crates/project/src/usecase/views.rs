@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-use crate::domain::{Project, ProjectConfiguration, ProjectTag, UserSummary};
+use crate::domain::{ModelVersion, Project, ProjectConfiguration, ProjectTag, UserSummary};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserSummaryView {
@@ -38,14 +38,31 @@ impl From<ProjectTag> for TagView {
     }
 }
 
+/// Server-side projection of a single `ModelVersion` pointer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ModelVersionView {
+    pub version_id: i64,
+    pub version_name: String,
+}
+
+impl From<ModelVersion> for ModelVersionView {
+    fn from(v: ModelVersion) -> Self {
+        Self {
+            version_id: v.version_id,
+            version_name: v.version_name,
+        }
+    }
+}
+
 /// Server-side projection of the project's configuration: an
-/// optional locale plus the tag list. Mirrors the apis
-/// `ProjectConfigurationView` so the facade `From` impl is a
-/// straight rename.
+/// optional locale, the tag list, and the optional SDTM-IG version
+/// pointer. Mirrors the apis `ProjectConfigurationView` so the
+/// facade `From` impl is a straight rename.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ProjectConfigurationView {
     pub language: Option<crate::domain::ProjectLanguage>,
     pub tags: Vec<TagView>,
+    pub sdtmig: Option<ModelVersionView>,
 }
 
 impl From<ProjectConfiguration> for ProjectConfigurationView {
@@ -53,6 +70,7 @@ impl From<ProjectConfiguration> for ProjectConfigurationView {
         Self {
             language: c.language,
             tags: c.tags.into_iter().map(Into::into).collect(),
+            sdtmig: c.sdtmig.map(Into::into),
         }
     }
 }

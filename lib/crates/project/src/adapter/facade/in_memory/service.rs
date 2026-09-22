@@ -1,17 +1,18 @@
 use async_trait::async_trait;
 
 use apis::project::{
-    CreateProjectRequest, ProjectApiError, ProjectConfigurationData, ProjectLanguage as ApiProjectLanguage,
+    CreateProjectRequest, ModelVersionData, ModelVersionView as ApiModelVersionView,
+    ProjectApiError, ProjectConfigurationData, ProjectLanguage as ApiProjectLanguage,
     ProjectMemberData, ProjectMemberView as ApiProjectMemberView, ProjectService, ProjectView,
     TagData, UpdateProjectRequest, UserSummaryView as ApiUserSummaryView,
 };
 
 use crate::domain::{
-    ProjectConfiguration, ProjectLanguage, ProjectMember, ProjectRepository, ProjectTag,
+    ModelVersion, ProjectConfiguration, ProjectLanguage, ProjectMember, ProjectRepository, ProjectTag,
     UserService,
 };
 use crate::usecase::{
-    CreateProject, ProjectConfigurationView, ProjectUsecase, UpdateProject,
+    CreateProject, ModelVersionView, ProjectConfigurationView, ProjectUsecase, UpdateProject,
     UserSummaryView as DomainUserSummaryView,
 };
 
@@ -110,12 +111,17 @@ fn member_data_to_domain(d: ProjectMemberData) -> ProjectMember {
 /// usecase / domain layer re-validates the inner tags via
 /// `ProjectTag::new`; if the wire payload violated the non-empty
 /// contract, that re-validation surfaces as
-/// `UsecaseError::Validation(EmptyTagKey | EmptyTagValue)`.
+/// `UsecaseError::Validation(EmptyTagKey | EmptyTagValue | EmptySdtmigName)`.
 fn configuration_data_to_domain(d: ProjectConfigurationData) -> ProjectConfiguration {
     ProjectConfiguration::for_repository(
         d.language.map(api_language_to_domain),
         tag_data_vec_to_domain(d.tags),
+        d.sdtmig.map(model_version_data_to_domain),
     )
+}
+
+fn model_version_data_to_domain(d: ModelVersionData) -> ModelVersion {
+    ModelVersion::for_repository(d.version_id, d.version_name)
 }
 
 fn api_language_to_domain(l: ApiProjectLanguage) -> ProjectLanguage {
@@ -168,7 +174,15 @@ impl From<ProjectConfigurationView> for apis::project::ProjectConfigurationView 
         Self {
             language: v.language.map(domain_language_to_api),
             tags: v.tags.into_iter().map(Into::into).collect(),
+            sdtmig: v.sdtmig.map(model_version_view_to_api),
         }
+    }
+}
+
+fn model_version_view_to_api(v: ModelVersionView) -> ApiModelVersionView {
+    ApiModelVersionView {
+        version_id: v.version_id,
+        version_name: v.version_name,
     }
 }
 
