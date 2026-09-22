@@ -14,10 +14,12 @@ import { useI18n } from "@aegis/ui/i18n";
 import {
   type ApiError,
   type ProjectConfiguration,
+  type ProjectConfigurationSdtmig,
   type ProjectLanguage,
   type Tag,
 } from "../../../shared/api";
 import { errorMessage } from "../../../shared/api/error";
+import { useListSdtmVersions } from "../../domain-model/data/list";
 import { useUpdateProject } from "../../project-list";
 import { TagEditor } from "../../project-list/components/TagEditor";
 
@@ -51,8 +53,14 @@ export function ConfigurationGeneralSection({
     initial.language,
   );
   const [tags, setTags] = useState<Tag[]>(initial.tags);
+  const [sdtmig, setSdtmig] = useState<ProjectConfigurationSdtmig | null>(
+    initial.sdtmig ?? null,
+  );
   const languageTouchedRef = useRef(false);
   const tagsTouchedRef = useRef(false);
+  const sdtmTouchedRef = useRef(false);
+
+  const versions = useListSdtmVersions();
 
   // Reseed the local state whenever a fresh `initial` arrives
   // (e.g. after `useUpdateProject` invalidates the project cache
@@ -63,15 +71,20 @@ export function ConfigurationGeneralSection({
     lastInitialRef.current = initial;
     setLanguage(initial.language);
     setTags(initial.tags);
+    setSdtmig(initial.sdtmig ?? null);
     languageTouchedRef.current = false;
     tagsTouchedRef.current = false;
+    sdtmTouchedRef.current = false;
   }, [initial]);
 
-  const dirty = languageTouchedRef.current || tagsTouchedRef.current;
+  const dirty =
+    languageTouchedRef.current ||
+    tagsTouchedRef.current ||
+    sdtmTouchedRef.current;
   const submitDisabled = readonly || !dirty || update.isPending;
 
   async function onSave() {
-    const configurations: ProjectConfiguration = { language, tags };
+    const configurations: ProjectConfiguration = { language, tags, sdtmig };
     await update.mutateAsync({
       code: projectCode,
       body: { configurations },
@@ -105,6 +118,47 @@ export function ConfigurationGeneralSection({
           <MenuItem value="zh-CN">
             {t("language.simplifiedChinese")}
           </MenuItem>
+        </Select>
+      </FormControl>
+
+      <FormControl size="small" disabled={readonly}>
+        <InputLabel id="config-sdtmig-label">
+          {t("project.configuration.general.sdtmig")}
+        </InputLabel>
+        <Select<string>
+          labelId="config-sdtmig-label"
+          label={t("project.configuration.general.sdtmig")}
+          value={sdtmig ? String(sdtmig.versionId) : ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "") {
+              setSdtmig(null);
+            } else {
+              const id = Number(v);
+              const found = versions.data?.find((x) => x.id === id);
+              setSdtmig({ versionId: id, versionName: found?.name ?? "" });
+            }
+            sdtmTouchedRef.current = true;
+          }}
+          inputProps={{ "data-testid": "config-sdtmig-input" }}
+        >
+          <MenuItem value="">
+            {t("project.configuration.general.sdtmig.none")}
+          </MenuItem>
+          {/* Synthetic MenuItem for the seeded selection when the
+              version list hasn't resolved yet — MUI Select otherwise
+              warns about an out-of-range value. */}
+          {sdtmig &&
+            !versions.data?.some((v) => v.id === sdtmig.versionId) && (
+              <MenuItem value={String(sdtmig.versionId)}>
+                {sdtmig.versionName}
+              </MenuItem>
+            )}
+          {(versions.data ?? []).map((v) => (
+            <MenuItem key={v.id} value={String(v.id)}>
+              {v.name}
+            </MenuItem>
+          ))}
         </Select>
       </FormControl>
 

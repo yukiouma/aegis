@@ -47,6 +47,43 @@ const projectFixture: ProjectView = makeProject({
   },
 });
 
+const sdtmVersionsResponse = {
+  versions: [
+    {
+      id: 1,
+      name: "SDTMIG v3.1.2",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
+    {
+      id: 2,
+      name: "SDTMIG v3.2",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
+    {
+      id: 3,
+      name: "SDTMIG v3.3",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+    },
+  ],
+};
+
+const projectWithSdtmig: ProjectView = makeProject({
+  code: "alpha",
+  members: {
+    leaders: [{ code: "alice", name: "Alice" }],
+    workers: [{ code: "bob", name: "Bob" }],
+  },
+  unblindMembers: { leaders: [], workers: [] },
+  configurations: {
+    language: "en",
+    tags: [{ key: "Product", value: "DEMO-001" }],
+    sdtmig: { versionId: 2, versionName: "SDTMIG v3.2" },
+  },
+});
+
 beforeEach(() => {
   (invoke as unknown as ReturnType<typeof vi.fn>).mockReset();
   vi.stubGlobal("localStorage", {
@@ -81,6 +118,7 @@ describe("ProjectConfigurationPage — leader view", () => {
       is_logged_in: () => true,
       current_user: () => leader,
       get_project_by_code: () => projectFixture,
+      list_sdtm_versions: () => sdtmVersionsResponse,
     });
   });
 
@@ -123,11 +161,12 @@ describe("ProjectConfigurationPage — leader view", () => {
     await waitFor(() => expect(save).not.toBeDisabled());
   });
 
-  it("clicking Save fires update_project with configurations { language, tags }", async () => {
+  it("clicking Save fires update_project with configurations { language, tags, sdtmig }", async () => {
     mockCommands({
       is_logged_in: () => true,
       current_user: () => leader,
       get_project_by_code: () => projectFixture,
+      list_sdtm_versions: () => sdtmVersionsResponse,
       update_project: () => projectFixture,
     });
     await renderPage();
@@ -153,6 +192,90 @@ describe("ProjectConfigurationPage — leader view", () => {
               tags: expect.arrayContaining([
                 { key: "Product", value: "DEMO-002" },
               ]),
+              sdtmig: null,
+            }),
+          }),
+        }),
+      ),
+    );
+  });
+
+  it("renders the SDTMIG Select with the seeded version preselected", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => leader,
+      get_project_by_code: () => projectWithSdtmig,
+      list_sdtm_versions: () => sdtmVersionsResponse,
+    });
+    await renderPage();
+    // The Select's rendered value reflects the saved version's name.
+    // MUI Select shows the selected text inside the trigger div;
+    // findByText works because the MenuItem children are not in the
+    // DOM until the dropdown is opened.
+    expect(await screen.findByText("SDTMIG v3.2")).toBeInTheDocument();
+  });
+
+  it("renders an '(unspecified)' item as the first option", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => leader,
+      get_project_by_code: () => projectFixture,
+      list_sdtm_versions: () => sdtmVersionsResponse,
+    });
+    await renderPage();
+    // Open the Select to render the MenuItem children into the DOM.
+    await userEvent.click(await screen.findByLabelText(/sdtmig version/i));
+    expect(
+      await screen.findByRole("option", { name: /\(unspecified\)/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("picking a SDTMIG version enables Save", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => leader,
+      get_project_by_code: () => projectFixture,
+      list_sdtm_versions: () => sdtmVersionsResponse,
+    });
+    await renderPage();
+    const save = await screen.findByTestId("config-general-save");
+    expect(save).toBeDisabled();
+
+    await userEvent.click(await screen.findByLabelText(/sdtmig version/i));
+    await userEvent.click(
+      await screen.findByRole("option", { name: /sdtmig v3\.2/i }),
+    );
+
+    await waitFor(() => expect(save).not.toBeDisabled());
+  });
+
+  it("picking '(unspecified)' → Save → body.configurations.sdtmig === null", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => leader,
+      get_project_by_code: () => projectWithSdtmig,
+      list_sdtm_versions: () => sdtmVersionsResponse,
+      update_project: () => projectFixture,
+    });
+    await renderPage();
+
+    await userEvent.click(await screen.findByLabelText(/sdtmig version/i));
+    await userEvent.click(
+      await screen.findByRole("option", { name: /\(unspecified\)/i }),
+    );
+
+    const save = await screen.findByTestId("config-general-save");
+    await waitFor(() => expect(save).not.toBeDisabled());
+    await userEvent.click(save);
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        "update_project",
+        expect.objectContaining({
+          code: "alpha",
+          body: expect.objectContaining({
+            configurations: expect.objectContaining({
+              sdtmig: null,
             }),
           }),
         }),
@@ -174,6 +297,7 @@ describe("ProjectConfigurationPage — non-leader view", () => {
       is_logged_in: () => true,
       current_user: () => other,
       get_project_by_code: () => projectFixture,
+      list_sdtm_versions: () => sdtmVersionsResponse,
     });
   });
 
@@ -205,6 +329,19 @@ describe("ProjectConfigurationPage — non-leader view", () => {
       ).toBe(true);
     });
   });
+
+  it("SDTMIG Select is disabled for non-leaders", async () => {
+    await renderPage();
+    const select = await screen.findByLabelText(/sdtmig version/i);
+    await waitFor(() => {
+      const fc = select.closest(".MuiFormControl-root");
+      const root = select.closest(".MuiInputBase-root");
+      expect(
+        fc!.classList.contains("Mui-disabled") ||
+          root!.classList.contains("Mui-disabled"),
+      ).toBe(true);
+    });
+  });
 });
 
 describe("ProjectConfigurationPage — filepath placeholder", () => {
@@ -213,6 +350,7 @@ describe("ProjectConfigurationPage — filepath placeholder", () => {
       is_logged_in: () => true,
       current_user: () => leader,
       get_project_by_code: () => projectFixture,
+      list_sdtm_versions: () => sdtmVersionsResponse,
     });
   });
 
