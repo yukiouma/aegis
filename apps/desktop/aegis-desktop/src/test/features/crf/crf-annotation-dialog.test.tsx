@@ -310,4 +310,92 @@ describe("AnnotationDialog", () => {
       ).toBeInTheDocument();
     });
   });
+
+  // --- Keyboard navigation ---
+
+  it("ArrowDown moves the highlight to the next variable (wrapping)", async () => {
+    mountWithSeed();
+    const content = screen.getByLabelText(/Content/i);
+    fireEvent.change(content, { target: { value: "@", selectionStart: 1 } });
+    await waitFor(() => screen.getByTestId("crf-variable-1"));
+    // First item highlighted by default
+    expect(screen.getByTestId("crf-variable-1")).toHaveAttribute(
+      "data-highlighted",
+      "true",
+    );
+    // ArrowDown → second item
+    fireEvent.keyDown(content, { key: "ArrowDown" });
+    expect(screen.getByTestId("crf-variable-2")).toHaveAttribute(
+      "data-highlighted",
+      "true",
+    );
+    expect(screen.getByTestId("crf-variable-1")).not.toHaveAttribute(
+      "data-highlighted",
+    );
+    // Two more → wrap to first
+    fireEvent.keyDown(content, { key: "ArrowDown" });
+    fireEvent.keyDown(content, { key: "ArrowDown" });
+    fireEvent.keyDown(content, { key: "ArrowDown" });
+    expect(screen.getByTestId("crf-variable-1")).toHaveAttribute(
+      "data-highlighted",
+      "true",
+    );
+  });
+
+  it("ArrowUp moves the highlight to the previous variable (wrapping)", async () => {
+    mountWithSeed();
+    const content = screen.getByLabelText(/Content/i);
+    fireEvent.change(content, { target: { value: "@", selectionStart: 1 } });
+    await waitFor(() => screen.getByTestId("crf-variable-1"));
+    // ArrowUp from first → last (wrap)
+    fireEvent.keyDown(content, { key: "ArrowUp" });
+    expect(screen.getByTestId("crf-variable-4")).toHaveAttribute(
+      "data-highlighted",
+      "true",
+    );
+  });
+
+  it("Enter inserts the highlighted variable", async () => {
+    mountWithSeed();
+    const content = screen.getByLabelText(/Content/i);
+    fireEvent.change(content, { target: { value: "@", selectionStart: 1 } });
+    await waitFor(() => screen.getByTestId("crf-variable-1"));
+    // Move to AESEV (second)
+    fireEvent.keyDown(content, { key: "ArrowDown" });
+    fireEvent.keyDown(content, { key: "Enter" });
+    await waitFor(() => {
+      expect(screen.getByLabelText(/Content/i)).toHaveValue("AESEV");
+    });
+  });
+
+  it("Escape closes the dropdown but keeps the @ symbol in the text field", async () => {
+    mountWithSeed();
+    const content = screen.getByLabelText(/Content/i);
+    fireEvent.change(content, { target: { value: "@a", selectionStart: 2 } });
+    await waitFor(() => screen.getByTestId("crf-variable-1"));
+    fireEvent.keyDown(content, { key: "Escape" });
+    // Dropdown closes — the variable items are gone.
+    await waitFor(() =>
+      expect(screen.queryByTestId("crf-variable-1")).not.toBeInTheDocument(),
+    );
+    // The @-fragment remains in the field; the user kept what they typed.
+    expect(screen.getByLabelText(/Content/i)).toHaveValue("@a");
+  });
+
+  it("typing more letters after Escape re-opens the dropdown", async () => {
+    mountWithSeed();
+    const content = screen.getByLabelText(/Content/i);
+    fireEvent.change(content, { target: { value: "@a", selectionStart: 2 } });
+    await waitFor(() => screen.getByTestId("crf-variable-1"));
+    fireEvent.keyDown(content, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByTestId("crf-variable-1")).not.toBeInTheDocument(),
+    );
+    // User keeps typing — mention reopens.
+    fireEvent.change(content, { target: { value: "@ag", selectionStart: 3 } });
+    await waitFor(() => screen.getByTestId("crf-variable-3"));
+    // AGE (id=3) is the only variable starting with "AG".
+    expect(screen.getByTestId("crf-variable-3")).toBeInTheDocument();
+    expect(screen.queryByTestId("crf-variable-1")).not.toBeInTheDocument();
+  });
 });

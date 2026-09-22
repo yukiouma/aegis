@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ChangeEvent } from "react";
+import type { ChangeEvent, KeyboardEvent } from "react";
 import {
   Alert,
   Box,
@@ -106,6 +106,10 @@ export function AnnotationDialog({
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [mentionRange, setMentionRange] =
     useState<{ start: number; end: number } | null>(null);
+  // Index of the keyboard-highlighted variable inside `filteredVariables`.
+  // Resets to 0 whenever the filtered list changes (new fragment, new
+  // fetch result, dropdown re-opens).
+  const [highlightIndex, setHighlightIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -168,6 +172,14 @@ export function AnnotationDialog({
     return all.filter((v) => v.name.toUpperCase().startsWith(q));
   }, [variablesQuery.data, fragment]);
 
+  // Reset the keyboard highlight whenever the filtered list changes
+  // (user typed more letters, the variables query resolved, the
+  // dropdown re-opened after Escape). Without this the highlight would
+  // drift past the end of the new list.
+  useEffect(() => {
+    setHighlightIndex(0);
+  }, [filteredVariables]);
+
   function handleSubmit() {
     if (submitDisabled) return;
     onSubmit({
@@ -221,6 +233,42 @@ export function AnnotationDialog({
     });
   }
 
+  // --- @-mention keyboard navigation ---
+  // The content field keeps focus while the Popover is open; intercept
+  // Arrow / Enter / Escape here so the caret does not move out from
+  // under the user.
+  function handleContentKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (!mentionRange) return;
+    if (filteredVariables.length === 0) {
+      // Only Escape is meaningful when the list is empty.
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setMentionRange(null);
+        setAnchorEl(null);
+      }
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlightIndex((i) => (i + 1) % filteredVariables.length);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlightIndex(
+        (i) => (i - 1 + filteredVariables.length) % filteredVariables.length,
+      );
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const picked = filteredVariables[highlightIndex];
+      if (picked) insertVariable(picked.name);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      // Close the dropdown but leave the `@fragment` text in the field
+      // — the user explicitly cancelled the menu, not the typing.
+      setMentionRange(null);
+      setAnchorEl(null);
+    }
+  }
+
   return (
     <Dialog
       open={open}
@@ -272,6 +320,7 @@ export function AnnotationDialog({
             label={t("crf.annotationDialog.field.content")}
             value={body.content}
             onChange={handleContentChange}
+            onKeyDown={handleContentKeyDown}
             inputRef={inputRef}
             slotProps={{
               htmlInput: {
@@ -293,11 +342,13 @@ export function AnnotationDialog({
                   {t("crf.annotationDialog.variable.noMatch")}
                 </MenuItem>
               ) : (
-                filteredVariables.map((v) => (
+                filteredVariables.map((v, idx) => (
                   <MenuItem
                     key={v.id}
+                    selected={idx === highlightIndex}
                     onClick={() => insertVariable(v.name)}
                     data-testid={`crf-variable-${v.id}`}
+                    data-highlighted={idx === highlightIndex ? "true" : null}
                   >
                     {v.name}
                   </MenuItem>
