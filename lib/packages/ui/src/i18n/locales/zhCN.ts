@@ -421,6 +421,8 @@ export const zhCN = {
   "crf.annotationDialog.submit.save": "保存",
   "crf.annotationDialog.notSubmit": "未提交",
   "crf.annotationDialog.domainAnnotation.none": "该表单暂无域注释",
+  "crf.annotationDialog.field.content.placeholder": "Type content — use @ to insert a variable",
+  "crf.annotationDialog.variable.noMatch": "No variables match",
   "crf.deleteDomain.title": "删除域注释",
   "crf.deleteDomain.message": "删除域注释 \"{name}\" 及其所有关联注释？此操作不可撤销。",
   "crf.deleteDomain.submit": "删除",
