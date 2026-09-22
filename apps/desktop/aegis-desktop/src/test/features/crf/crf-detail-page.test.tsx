@@ -770,6 +770,11 @@ describe("CrfDetailPage", () => {
     mockCommands({
       is_logged_in: () => true,
       current_user: () => fakeUser,
+      // useSdtmContext (now threaded into the page) reads project
+      // configurations; mock it so the SDTM hooks don't error and
+      // re-render the page while this test is interacting with the
+      // form-name menu.
+      get_project_by_code: () => leaderProject,
       get_crf_form_by_id: () => ({ ...fakeForm, notSubmitted: true }),
       get_crf_form_details: () => ({
         ...fakeDetail,
@@ -791,16 +796,13 @@ describe("CrfDetailPage", () => {
     const formName = await screen.findByTestId("crf-form-name");
     await screen.findByTestId("not-submitted-chip");
 
-    // Open the menu. Note: the first click after the chip's
-    // mount is occasionally swallowed by a microtask race in
-    // React 18; a second click reliably opens the popover. Match
-    // menuitems through `.MuiMenuItem-root` (the disabled
-    // MenuItems are wrapped in a Tooltip-host `<span>` whose
-    // aria-label shadows the inner text in the accessibility
-    // tree, so accessibility-tree queries are unreliable here).
-    fireEvent.click(formName);
-    fireEvent.click(formName);
+    // Open the menu. The first click after the chip's mount is
+    // occasionally swallowed by a microtask race in React 18
+    // (made worse by the SDTM-context queries that the page now
+    // runs); retry the click up to a few times until the popover
+    // actually mounts.
     await waitFor(() => {
+      fireEvent.click(formName);
       expect(
         document.querySelectorAll(".MuiMenuItem-root").length,
       ).toBeGreaterThanOrEqual(2);

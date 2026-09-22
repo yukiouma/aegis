@@ -4,8 +4,57 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 
 import { DomainAnnotationDialog } from "../../../features/crf/components/DomainAnnotationDialog";
+import type { SdtmDomainView } from "../../../shared/api";
 
 afterEach(() => cleanup());
+
+const sdtmDomains: SdtmDomainView[] = [
+  {
+    id: 100,
+    versionId: 5,
+    name: "AE",
+    category: "Events",
+    descriptions: [
+      { lang: "en", details: { description: "Adverse Events", structure: "" } },
+    ],
+    createdAt: "",
+    updatedAt: "",
+  },
+  {
+    id: 101,
+    versionId: 5,
+    name: "AESI",
+    category: "Events",
+    descriptions: [
+      { lang: "en", details: { description: "AESIs", structure: "" } },
+    ],
+    createdAt: "",
+    updatedAt: "",
+  },
+  {
+    id: 102,
+    versionId: 5,
+    name: "AG",
+    category: "Events",
+    descriptions: [
+      { lang: "en", details: { description: "Agent", structure: "" } },
+    ],
+    createdAt: "",
+    updatedAt: "",
+  },
+  {
+    id: 103,
+    versionId: 5,
+    name: "VS",
+    category: "Findings",
+    descriptions: [
+      // Note: only EN — the test asserts zh-CN fallback empties the description.
+      { lang: "en", details: { description: "Vital Signs", structure: "" } },
+    ],
+    createdAt: "",
+    updatedAt: "",
+  },
+];
 
 function renderDialog(
   props: Partial<React.ComponentProps<typeof DomainAnnotationDialog>> = {},
@@ -25,6 +74,8 @@ function renderDialog(
         markNotSubmittedError={null}
         mutationError={null}
         mutationPending={false}
+        sdtmDomains={sdtmDomains}
+        sdtmLanguage="en"
         {...props}
       />
     </AegisI18nProvider>,
@@ -37,7 +88,7 @@ describe("DomainAnnotationDialog", () => {
     const { onSubmit } = renderDialog();
     const submit = screen.getByRole("button", { name: /Create/i });
     expect(submit).toBeDisabled();
-    fireEvent.change(screen.getByLabelText(/Name/i), {
+    fireEvent.change(screen.getAllByLabelText(/Name/i)[0]!, {
       target: { value: "AE" },
     });
     expect(submit).not.toBeDisabled();
@@ -62,12 +113,13 @@ describe("DomainAnnotationDialog", () => {
       },
       onSubmit,
     });
-    fireEvent.change(screen.getByLabelText(/Name/i), {
-      target: { value: "Renamed" },
+    // The Autocomplete uppercases typed input, so "renamed" → "RENAMED".
+    fireEvent.change(screen.getAllByLabelText(/Name/i)[0]!, {
+      target: { value: "renamed" },
     });
     fireEvent.click(screen.getByRole("button", { name: /Save/i }));
     expect(onSubmit).toHaveBeenCalledWith({
-      name: "Renamed",
+      name: "RENAMED",
       description: "Adverse Events",
     });
   });
@@ -88,11 +140,6 @@ describe("DomainAnnotationDialog", () => {
   });
 
   it("hides the Not submit button in edit mode", () => {
-    // The Not submit action is a "decide whether the form needs
-    // the flag" affordance. In edit mode the user is changing an
-    // existing domain annotation's name / description, not making
-    // that decision — so the button must be hidden even when the
-    // form is currently submitted.
     renderDialog({
       mode: "edit",
       row: {
@@ -107,5 +154,63 @@ describe("DomainAnnotationDialog", () => {
     expect(
       screen.queryByTestId("crf-domain-dialog-not-submit"),
     ).not.toBeInTheDocument();
+  });
+
+  // --- New: Autocomplete + description auto-fill ---
+
+  it("auto-uppercases typed name input", () => {
+    renderDialog();
+    const nameInput = screen.getAllByLabelText(/Name/i)[0]!;
+    fireEvent.change(nameInput, { target: { value: "ae" } });
+    expect(nameInput).toHaveValue("AE");
+  });
+
+  it("free-form typing leaves the description unchanged when no domain matches", () => {
+    renderDialog();
+    fireEvent.change(screen.getAllByLabelText(/Name/i)[0]!, {
+      target: { value: "ZZ" },
+    });
+    fireEvent.change(screen.getAllByLabelText(/Description/i)[0]!, {
+      target: { value: "custom" },
+    });
+    expect(screen.getAllByLabelText(/Description/i)[0]!).toHaveValue("custom");
+  });
+
+  it("picking a matching domain auto-fills the description in the project's language", () => {
+    renderDialog();
+    const nameInput = screen.getAllByLabelText(/Name/i)[0]!;
+    fireEvent.change(nameInput, { target: { value: "AE" } });
+    // Open the Autocomplete dropdown and pick the AE option.
+    fireEvent.keyDown(nameInput, { key: "ArrowDown" });
+    fireEvent.click(screen.getByRole("option", { name: "AE" }));
+    expect(screen.getAllByLabelText(/Description/i)[0]!).toHaveValue("Adverse Events");
+  });
+
+  it("picking a domain with no description in the project language leaves the description empty", () => {
+    renderDialog({ sdtmLanguage: "zh-CN" });
+    const nameInput = screen.getAllByLabelText(/Name/i)[0]!;
+    fireEvent.change(nameInput, { target: { value: "VS" } });
+    fireEvent.keyDown(nameInput, { key: "ArrowDown" });
+    fireEvent.click(screen.getByRole("option", { name: "VS" }));
+    expect(screen.getAllByLabelText(/Description/i)[0]!).toHaveValue("");
+  });
+
+  it("in edit mode, picking a different domain re-fills the description", () => {
+    renderDialog({
+      mode: "edit",
+      row: {
+        id: 50,
+        formId: 11,
+        name: "old",
+        description: "old description",
+        createdAt: "",
+        updatedAt: "",
+      },
+    });
+    const nameInput = screen.getAllByLabelText(/Name/i)[0]!;
+    fireEvent.change(nameInput, { target: { value: "AESI" } });
+    fireEvent.keyDown(nameInput, { key: "ArrowDown" });
+    fireEvent.click(screen.getByRole("option", { name: "AESI" }));
+    expect(screen.getAllByLabelText(/Description/i)[0]!).toHaveValue("AESIs");
   });
 });

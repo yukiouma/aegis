@@ -434,6 +434,8 @@ export const en = {
   "crf.annotationDialog.submit.save": "Save",
   "crf.annotationDialog.notSubmit": "Not submit",
   "crf.annotationDialog.domainAnnotation.none": "No domain annotations on this form",
+  "crf.annotationDialog.field.content.placeholder": "Type content — use @ to insert a variable",
+  "crf.annotationDialog.variable.noMatch": "No variables match",
   "crf.deleteDomain.title": "Delete domain annotation",
   "crf.deleteDomain.message":
     "Delete domain annotation \"{name}\" and all annotations using it? This cannot be undone.",
