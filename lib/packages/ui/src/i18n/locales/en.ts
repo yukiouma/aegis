@@ -451,6 +451,10 @@ export const en = {
     "Create a domain annotation first; annotations must belong to a domain annotation.",
   "crf.detail.itemRow.disabledWhenNotSubmitted":
     "The form is marked not submitted; clear the flag to add annotations.",
+  "crf.detail.tooltip.noPermissionEdit":
+    "You don't have permission to edit annotations on this form.",
+  "crf.detail.tooltip.noIssueToView":
+    "There are no issues for this scope yet.",
   "crf.detail.domainChip.label": "{name} ({description})",
   "crf.detail.empty": "No items yet",
   "crf.detail.loadFailed": "Failed to load form detail: {message}",
