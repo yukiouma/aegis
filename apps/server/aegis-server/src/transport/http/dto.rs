@@ -303,6 +303,42 @@ impl From<apis::project::TagView> for TagViewResponse {
     }
 }
 
+/// Wire-level request body for the SDTM-IG version pointer a
+/// project targets. Mirrors `apis::project::ModelVersionData`.
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelVersionRequest {
+    pub version_id: i64,
+    pub version_name: String,
+}
+
+impl From<ModelVersionRequest> for apis::project::ModelVersionData {
+    fn from(v: ModelVersionRequest) -> Self {
+        Self {
+            version_id: v.version_id,
+            version_name: v.version_name,
+        }
+    }
+}
+
+/// Wire-level projection of the SDTM-IG version pointer. Mirrors
+/// `apis::project::ModelVersionView`.
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelVersionResponse {
+    pub version_id: i64,
+    pub version_name: String,
+}
+
+impl From<apis::project::ModelVersionView> for ModelVersionResponse {
+    fn from(v: apis::project::ModelVersionView) -> Self {
+        Self {
+            version_id: v.version_id,
+            version_name: v.version_name,
+        }
+    }
+}
+
 // -- project configuration DTOs ---------------------------------------------
 
 /// Wire-level mirror of [`apis::project::ProjectLanguage`]. The two
@@ -348,6 +384,8 @@ pub struct ProjectConfigurationDataRequest {
     pub language: Option<ProjectLanguage>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<TagDataRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sdtmig: Option<ModelVersionRequest>,
 }
 
 impl From<ProjectConfigurationDataRequest> for apis::project::ProjectConfigurationData {
@@ -362,6 +400,7 @@ impl From<ProjectConfigurationDataRequest> for apis::project::ProjectConfigurati
                     value: t.value,
                 })
                 .collect(),
+            sdtmig: c.sdtmig.map(Into::into),
         }
     }
 }
@@ -374,6 +413,8 @@ pub struct ProjectConfigurationViewResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub language: Option<ProjectLanguage>,
     pub tags: Vec<TagViewResponse>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sdtmig: Option<ModelVersionResponse>,
 }
 
 impl From<apis::project::ProjectConfigurationView> for ProjectConfigurationViewResponse {
@@ -381,6 +422,7 @@ impl From<apis::project::ProjectConfigurationView> for ProjectConfigurationViewR
         Self {
             language: c.language.map(Into::into),
             tags: c.tags.into_iter().map(Into::into).collect(),
+            sdtmig: c.sdtmig.map(Into::into),
         }
     }
 }
@@ -2531,6 +2573,7 @@ mod tests {
                         value: "EU".into(),
                     },
                 ],
+                sdtmig: None,
             },
             active: true,
             created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
