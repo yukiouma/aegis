@@ -111,11 +111,22 @@ export interface Tag {
  *  `src-tauri/src/http/project.rs::ProjectLanguage`. */
 export type ProjectLanguage = "en" | "zh-CN";
 
-/** Project configuration payload: optional locale plus the tag list.
- *  Server treats `Some(config)` on update as whole-replace. */
+/** Wire-shaped pointer to a project's SDTM-IG version selection.
+ *  `versionId` / `versionName` are camelCase to mirror the server's
+ *  `#[serde(rename_all = "camelCase")]` on
+ *  `apps/server/aegis-server/src/transport/http/dto.rs::ModelVersionRequest`. */
+export interface ProjectConfigurationSdtmig {
+  versionId: number;
+  versionName: string;
+}
+
+/** Project configuration payload: optional locale, the tag list, and
+ *  an optional SDTM-IG version pointer. Server treats `Some(config)`
+ *  on update as whole-replace. */
 export interface ProjectConfiguration {
   language: ProjectLanguage | null;
   tags: Tag[];
+  sdtmig?: ProjectConfigurationSdtmig | null;
 }
 export interface ProjectView {
   id: number;
