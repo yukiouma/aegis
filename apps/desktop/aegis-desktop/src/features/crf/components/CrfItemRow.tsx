@@ -11,6 +11,15 @@ interface Props {
   itemDetail: CrfItemDetail;
   colorByDomainAnnotationId: Map<number, number>;
   /**
+   * Whether the current viewer is allowed to create / update
+   * annotations on this form. When `false`, every row-level
+   * create-annotation entry point (item name, option value, unit
+   * value) is gated: the pointer cursor / hover underline fall
+   * away and the click is a no-op. Derived by the page from the
+   * same RBAC flags used by the form-name hover menu.
+   */
+  canEditAnnotations: boolean;
+  /**
    * Open the new-annotation dialog for the given owner. The page
    * holds the dialog state so the caller's owner kind/id stays in
    * one place.
@@ -78,6 +87,7 @@ interface Props {
 export function CrfItemRow({
   itemDetail,
   colorByDomainAnnotationId,
+  canEditAnnotations,
   onCreateAnnotation,
   onEditAnnotation,
   onDeleteAnnotation,
@@ -96,14 +106,16 @@ export function CrfItemRow({
   // point are no-ops for them. Treat `kind === "label"` as a
   // row-wide block alongside the existing guards.
   const isLabel = item.kind === "label";
-  // Collapse the three "no new annotations" guards into one. When
-  // any of these is true every create-annotation entry point on
-  // this row must short-circuit — the form cascade has wiped
-  // every annotation, the item cascade has wiped this row's
-  // annotations, there is no domain annotation to assign a
-  // new annotation to, or the item is a static label.
+  // Collapse the row-level "no new annotations" guards into one.
+  // When any of these is true every create-annotation entry point on
+  // this row must short-circuit — the form cascade has wiped every
+  // annotation, the item cascade has wiped this row's annotations,
+  // there is no domain annotation to assign a new annotation to,
+  // the item is a static label, or the current viewer doesn't have
+  // permission to edit annotations on this form (QC / task-unrelated).
   const rowBlocked =
-    formNotSubmitted || itemNotSubmitted || noDomainAnnotations || isLabel;
+    formNotSubmitted || itemNotSubmitted || noDomainAnnotations ||
+    isLabel || !canEditAnnotations;
   // Build the create-annotation handler once per row so the click
   // short-circuits under a single readable guard instead of
   // repeating the conditions at every call site.

@@ -60,6 +60,7 @@ function renderRow(overrides: Partial<React.ComponentProps<typeof CrfItemRow>> =
       <CrfItemRow
         itemDetail={baseItemDetail}
         colorByDomainAnnotationId={new Map()}
+        canEditAnnotations={true}
         onCreateAnnotation={onCreateAnnotation}
         onEditAnnotation={onEditAnnotation}
         onDeleteAnnotation={onDeleteAnnotation}
@@ -293,6 +294,48 @@ describe("CrfItemRow", () => {
         "aria-disabled",
         "true",
       );
+    });
+  });
+
+  // Role-based gating: when the current viewer is not allowed to
+  // edit annotations on this form (QC, task-unrelated), every
+  // create-annotation entry point on the row must short-circuit.
+  describe("when canEditAnnotations=false", () => {
+    it("ignores clicks on the item name", () => {
+      const { onCreateAnnotation } = renderRow({
+        canEditAnnotations: false,
+      });
+      fireEvent.click(screen.getByTestId("crf-item-name-21"));
+      expect(onCreateAnnotation).not.toHaveBeenCalled();
+    });
+
+    it("ignores clicks on the option value", () => {
+      const { onCreateAnnotation } = renderRow({
+        canEditAnnotations: false,
+      });
+      fireEvent.click(screen.getByTestId("crf-option-31"));
+      expect(onCreateAnnotation).not.toHaveBeenCalled();
+    });
+
+    it("ignores clicks on the unit value", () => {
+      const { onCreateAnnotation } = renderRow({
+        canEditAnnotations: false,
+      });
+      fireEvent.click(screen.getByTestId("crf-unit-41"));
+      expect(onCreateAnnotation).not.toHaveBeenCalled();
+    });
+
+    it("drops the pointer cursor on the clickable labels", () => {
+      renderRow({ canEditAnnotations: false });
+      expect(screen.getByTestId("crf-item-name-21")).not.toHaveStyle({
+        cursor: "pointer",
+      });
+      expect(screen.getByTestId("crf-option-31")).not.toHaveStyle({
+        cursor: "pointer",
+      });
+      expect(screen.getByTestId("crf-unit-41")).not.toHaveStyle({
+        cursor: "pointer",
+      });
     });
   });
 });

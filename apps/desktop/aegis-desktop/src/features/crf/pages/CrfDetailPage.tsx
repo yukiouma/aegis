@@ -559,6 +559,7 @@ export function CrfDetailPage() {
                   })),
                 }}
                 colorByDomainAnnotationId={colorByDomainAnnotationId}
+                canEditAnnotations={true}
                 onCreateAnnotation={openCreateAnnotation}
                 onEditAnnotation={(a) => {
                   const owner: AnnotationOwner = a.owner;
