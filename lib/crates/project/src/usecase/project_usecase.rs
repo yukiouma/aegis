@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::domain::{
-    DomainError, Project, ProjectConfiguration, ProjectMember, ProjectNew, ProjectRepository,
-    ProjectTag, ProjectUpdate, UserService, UserSummary,
+    DomainError, ModelVersion, Project, ProjectConfiguration, ProjectMember, ProjectNew,
+    ProjectRepository, ProjectTag, ProjectUpdate, UserService, UserSummary,
 };
 
 use super::commands::{CreateProject, UpdateProject};
@@ -152,7 +152,7 @@ fn validate_create_project(cmd: &CreateProject) -> Result<(), UsecaseError> {
         ProjectMember::new(m.leaders.clone(), m.workers.clone())?;
     }
     if let Some(ref c) = cmd.configuration {
-        validate_configuration_tags(c)?;
+        validate_configuration(c)?;
     }
     Ok(())
 }
@@ -170,15 +170,15 @@ fn validate_update_project(cmd: &UpdateProject) -> Result<(), UsecaseError> {
         ProjectMember::new(m.leaders.clone(), m.workers.clone())?;
     }
     if let Some(ref c) = cmd.configuration {
-        validate_configuration_tags(c)?;
+        validate_configuration(c)?;
     }
     Ok(())
 }
 
-/// Tag validation surfaces as `Validation`, not `Repository`. The
-/// domain `From<DomainError>` impl maps straight to `Repository`,
-/// so map the two tag variants explicitly.
-fn validate_configuration_tags(c: &ProjectConfiguration) -> Result<(), UsecaseError> {
+/// Configuration validation surfaces as `Validation`, not
+/// `Repository`. The domain `From<DomainError>` impl maps straight
+/// to `Repository`, so map the tag and sdtmig variants explicitly.
+fn validate_configuration(c: &ProjectConfiguration) -> Result<(), UsecaseError> {
     for tag in &c.tags {
         match ProjectTag::new(tag.key.clone(), tag.value.clone()) {
             Ok(_) => {}
@@ -187,6 +187,15 @@ fn validate_configuration_tags(c: &ProjectConfiguration) -> Result<(), UsecaseEr
             }
             Err(DomainError::EmptyTagValue) => {
                 return Err(UsecaseError::Validation(DomainError::EmptyTagValue));
+            }
+            Err(other) => return Err(UsecaseError::Repository(other)),
+        }
+    }
+    if let Some(ref m) = c.sdtmig {
+        match ModelVersion::new(m.version_id, m.version_name.clone()) {
+            Ok(_) => {}
+            Err(DomainError::EmptySdtmigName) => {
+                return Err(UsecaseError::Validation(DomainError::EmptySdtmigName));
             }
             Err(other) => return Err(UsecaseError::Repository(other)),
         }

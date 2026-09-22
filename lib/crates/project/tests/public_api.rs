@@ -10,8 +10,8 @@ use apis::project::{
     TagView, UpdateProjectRequest, UserSummaryView as ApiUserSummaryView,
 };
 use project::{
-    CreateProject, DomainError, ProjectConfiguration, ProjectLanguage, ProjectMember, ProjectNew,
-    ProjectRepo, ProjectRepository, ProjectServiceImpl, ProjectTag, ProjectUpdate,
+    CreateProject, DomainError, ModelVersion, ProjectConfiguration, ProjectLanguage, ProjectMember,
+    ProjectNew, ProjectRepo, ProjectRepository, ProjectServiceImpl, ProjectTag, ProjectUpdate,
     ProjectUsecaseConfig, ProjectView, RoleType, TeamType, UpdateProject, UsecaseError, UserService,
     UserServiceImpl, UserSummary, UserSummaryView,
 };
@@ -53,7 +53,11 @@ fn usecase_commands_have_expected_field_shape() {
         description: "".into(),
         members: None,
         unblind_members: None,
-        configuration: None,
+        configuration: Some(ProjectConfiguration::for_repository(
+            None,
+            vec![],
+            Some(ModelVersion::for_repository(7, "2024-03-29".into())),
+        )),
     };
 
     let _update_project = UpdateProject {
@@ -63,7 +67,11 @@ fn usecase_commands_have_expected_field_shape() {
         active: None,
         members: None,
         unblind_members: None,
-        configuration: None,
+        configuration: Some(ProjectConfiguration::for_repository(
+            None,
+            vec![],
+            Some(ModelVersion::for_repository(7, "2024-03-29".into())),
+        )),
     };
 }
 
@@ -74,7 +82,14 @@ fn api_requests_have_expected_field_shape() {
         description: "".into(),
         members: None,
         unblind_members: None,
-        configurations: None,
+        configurations: Some(ProjectConfigurationData {
+            language: None,
+            tags: vec![],
+            sdtmig: Some(apis::project::ModelVersionData {
+                version_id: 7,
+                version_name: "2024-03-29".into(),
+            }),
+        }),
     };
 
     let _update_project = UpdateProjectRequest {
@@ -84,7 +99,14 @@ fn api_requests_have_expected_field_shape() {
         active: None,
         members: None,
         unblind_members: None,
-        configurations: None,
+        configurations: Some(ProjectConfigurationData {
+            language: None,
+            tags: vec![],
+            sdtmig: Some(apis::project::ModelVersionData {
+                version_id: 7,
+                version_name: "2024-03-29".into(),
+            }),
+        }),
     };
 }
 
@@ -170,6 +192,7 @@ fn apis_view_dtos_are_nameable() {
     assert_configuration_view(ProjectConfigurationView {
         language: Some(apis::project::ProjectLanguage::English),
         tags: vec![],
+        sdtmig: None,
     });
     assert_configuration_data(ProjectConfigurationData::default());
 }

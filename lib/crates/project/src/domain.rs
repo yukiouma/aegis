@@ -1,4 +1,5 @@
 mod error;
+mod model_version;
 mod project;
 mod project_configuration;
 mod project_language;
@@ -10,6 +11,7 @@ mod tests;
 mod user;
 
 pub use error::DomainError;
+pub use model_version::ModelVersion;
 pub use project::{Project, ProjectNew, ProjectRepository, ProjectUpdate};
 pub use project_configuration::ProjectConfiguration;
 pub use project_language::ProjectLanguage;

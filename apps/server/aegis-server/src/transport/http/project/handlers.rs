@@ -23,8 +23,9 @@ fn member_data(value: dto::ProjectMemberDataRequest) -> apis::project::ProjectMe
 }
 
 /// Translate a wire configuration DTO into the apis DTO. The
-/// configuration carries an optional language and a list of tags;
-/// validation (non-empty key/value for each tag, known language
+/// configuration carries an optional language, a list of tags, and
+/// an optional SDTM-IG version pointer; validation (non-empty
+/// key/value for each tag, non-empty sdtmig name, known language
 /// value) is delegated to the domain layer — the handler just
 /// passes through whatever the client supplied.
 fn configuration_data(
@@ -40,6 +41,7 @@ fn configuration_data(
                 value: t.value,
             })
             .collect(),
+        sdtmig: value.sdtmig.map(Into::into),
     }
 }
 

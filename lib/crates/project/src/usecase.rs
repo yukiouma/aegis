@@ -10,5 +10,6 @@ pub use commands::{CreateProject, UpdateProject};
 pub use error::UsecaseError;
 pub use project_usecase::{ProjectUsecase, ProjectUsecaseConfig};
 pub use views::{
-    ProjectConfigurationView, ProjectMemberView, ProjectView, TagView, UserSummaryView,
+    ModelVersionView, ProjectConfigurationView, ProjectMemberView, ProjectView, TagView,
+    UserSummaryView,
 };

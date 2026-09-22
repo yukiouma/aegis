@@ -195,7 +195,11 @@ fn tag(key: &str, value: &str) -> TagData {
 }
 
 fn configuration_with_tags(tags: Vec<TagData>) -> ProjectConfigurationData {
-    ProjectConfigurationData { language: None, tags }
+    ProjectConfigurationData {
+        language: None,
+        tags,
+        sdtmig: None,
+    }
 }
 
 #[tokio::test]
@@ -370,6 +374,31 @@ async fn project_service_is_send_sync() {
 async fn project_service_box_dyn_compiles() {
     let service = make_service();
     let _boxed: Box<dyn ProjectService> = Box::new(service);
+}
+
+#[tokio::test]
+async fn create_project_with_sdtmig_round_trips_through_ap_view() {
+    let service = make_service();
+    let view = service
+        .create_project(CreateProjectRequest {
+            code: "proj1".into(),
+            description: "".into(),
+            members: None,
+            unblind_members: None,
+            configurations: Some(apis::project::ProjectConfigurationData {
+                language: None,
+                tags: vec![],
+                sdtmig: Some(apis::project::ModelVersionData {
+                    version_id: 7,
+                    version_name: "2024-03-29".into(),
+                }),
+            }),
+        })
+        .await
+        .expect("create");
+    let sdtmig = view.configurations.sdtmig.expect("sdtmig present");
+    assert_eq!(sdtmig.version_id, 7);
+    assert_eq!(sdtmig.version_name, "2024-03-29");
 }
 
 // silence unused import warnings for enums the tests exercise via
