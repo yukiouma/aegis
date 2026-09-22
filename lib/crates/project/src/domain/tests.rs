@@ -176,3 +176,29 @@ fn project_configuration_for_repository_carries_language_and_tags() {
     assert_eq!(c.tags.len(), 1);
     assert_eq!(c.tags[0].key, "k");
 }
+
+#[test]
+fn model_version_new_rejects_empty_name() {
+    let err = ModelVersion::new(1, "".into()).unwrap_err();
+    assert!(matches!(err, DomainError::EmptySdtmigName));
+}
+
+#[test]
+fn model_version_new_rejects_whitespace_name() {
+    let err = ModelVersion::new(1, "   ".into()).unwrap_err();
+    assert!(matches!(err, DomainError::EmptySdtmigName));
+}
+
+#[test]
+fn model_version_new_accepts_valid_input() {
+    let v = ModelVersion::new(7, "2024-03-29".into()).unwrap();
+    assert_eq!(v.version_id, 7);
+    assert_eq!(v.version_name, "2024-03-29");
+}
+
+#[test]
+fn model_version_for_repository_carries_fields() {
+    let v = ModelVersion::for_repository(7, "2024-03-29".into());
+    assert_eq!(v.version_id, 7);
+    assert_eq!(v.version_name, "2024-03-29");
+}
