@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import {
   Alert,
   Box,
@@ -12,6 +13,8 @@ import {
   FormControlLabel,
   InputLabel,
   MenuItem,
+  MenuList,
+  Popover,
   Select,
   TextField,
 } from "@aegis/ui/mui";
@@ -23,7 +26,9 @@ import type {
   AnnotationOwner,
   ApiError,
   DomainAnnotation,
+  SdtmDomainView,
 } from "../../../shared/api";
+import { useListSdtmVariables } from "../../domain-model/data";
 
 export interface AnnotationDialogBody {
   domainAnnotationId: number;
@@ -62,6 +67,14 @@ interface Props {
   markNotSubmittedError: ApiError | null;
   mutationError: ApiError | null;
   mutationPending: boolean;
+  /**
+   * SDTM domains for the project's resolved SDTMIG version. The
+   * dialog matches the currently-selected domain annotation's
+   * `name` against this list (case-insensitive) to decide which
+   * SDTM domain's variables to offer in the `@`-mention
+   * dropdown. Empty array disables the dropdown entirely.
+   */
+  sdtmDomains: SdtmDomainView[];
 }
 
 const EMPTY: AnnotationDialogBody = {
@@ -84,9 +97,16 @@ export function AnnotationDialog({
   markNotSubmittedError,
   mutationError,
   mutationPending,
+  sdtmDomains,
 }: Props) {
   const { t } = useI18n();
   const [body, setBody] = useState<AnnotationDialogBody>(EMPTY);
+
+  // --- @-mention state ---
+  const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  const [mentionRange, setMentionRange] =
+    useState<{ start: number; end: number } | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -103,6 +123,9 @@ export function AnnotationDialog({
         assign: false,
       });
     }
+    // Reseeding also wipes the active mention.
+    setAnchorEl(null);
+    setMentionRange(null);
   }, [open, mode, row, availableDomainAnnotations]);
 
   const submitDisabled =
@@ -110,13 +133,40 @@ export function AnnotationDialog({
     body.content.trim() === "" ||
     body.domainAnnotationId === 0;
   // The Not submit action is one-way and only meaningful when
-  // creating a fresh annotation. Hide it in edit mode — the user
-  // is editing an existing row, not deciding whether the owner
-  // needs a flag — and hide it once the owner is already
-  // not-submitted.
+  // creating a fresh annotation. Hide it in edit mode — the user is
+  // editing an existing row, not deciding whether the owner needs a
+  // flag — and hide it once the owner is already not-submitted.
   const markVisible = mode === "create" && !ownerNotSubmitted;
   const markDisabled =
     markNotSubmittedPending || mutationPending;
+
+  // --- SDTM domain lookup for the current domain annotation ---
+  const selectedDomainName = useMemo(() => {
+    const da = availableDomainAnnotations.find(
+      (d) => d.id === body.domainAnnotationId,
+    );
+    return da?.name?.toUpperCase() ?? null;
+  }, [availableDomainAnnotations, body.domainAnnotationId]);
+  const selectedDomain = useMemo(
+    () =>
+      sdtmDomains.find(
+        (d) => d.name.toUpperCase() === selectedDomainName,
+      ) ?? null,
+    [sdtmDomains, selectedDomainName],
+  );
+  const variablesQuery = useListSdtmVariables(
+    open && selectedDomain ? selectedDomain.id : null,
+  );
+
+  const fragment = mentionRange
+    ? body.content.slice(mentionRange.start + 1, mentionRange.end)
+    : "";
+  const filteredVariables = useMemo(() => {
+    const all = variablesQuery.data ?? [];
+    const q = fragment.toUpperCase();
+    if (!q) return all;
+    return all.filter((v) => v.name.toUpperCase().startsWith(q));
+  }, [variablesQuery.data, fragment]);
 
   function handleSubmit() {
     if (submitDisabled) return;
@@ -124,6 +174,50 @@ export function AnnotationDialog({
       domainAnnotationId: body.domainAnnotationId,
       content: body.content.trim(),
       assign: body.assign,
+    });
+  }
+
+  // --- @-mention detection ---
+  function handleContentChange(e: ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value;
+    const caret = e.target.selectionStart ?? value.length;
+    setBody((b) => ({ ...b, content: value }));
+
+    // Walk backwards from caret to the previous whitespace.
+    const before = value.slice(0, caret);
+    const lastWs = Math.max(
+      before.lastIndexOf(" "),
+      before.lastIndexOf("\n"),
+      before.lastIndexOf("\t"),
+    );
+    const head = before.slice(lastWs + 1);
+    const atIdx = head.lastIndexOf("@");
+    if (atIdx >= 0) {
+      const start = lastWs + 1 + atIdx;
+      // Reject @ that is mid-word (e.g. "foo@bar").
+      if (atIdx === 0 || /\s/.test(head[atIdx - 1] ?? "")) {
+        setMentionRange({ start, end: caret });
+        setAnchorEl(e.currentTarget);
+        return;
+      }
+    }
+    setMentionRange(null);
+    setAnchorEl(null);
+  }
+
+  function insertVariable(name: string) {
+    if (!mentionRange) return;
+    const before = body.content.slice(0, mentionRange.start);
+    const after = body.content.slice(mentionRange.end);
+    // Inserted text is always the variable name — language-independent.
+    const inserted = name;
+    const next = before + inserted + after;
+    setBody((b) => ({ ...b, content: next }));
+    setMentionRange(null);
+    setAnchorEl(null);
+    const caret = (before + inserted).length;
+    queueMicrotask(() => {
+      inputRef.current?.setSelectionRange(caret, caret);
     });
   }
 
@@ -177,10 +271,40 @@ export function AnnotationDialog({
             size="small"
             label={t("crf.annotationDialog.field.content")}
             value={body.content}
-            onChange={(e) =>
-              setBody((b) => ({ ...b, content: e.target.value }))
-            }
+            onChange={handleContentChange}
+            inputRef={inputRef}
+            slotProps={{
+              htmlInput: {
+                "data-testid": "crf-annotation-dialog-content",
+              },
+            }}
           />
+          {/* @-mention Popover. Anchored to the content TextField. */}
+          <Popover
+            open={Boolean(anchorEl) && mentionRange !== null}
+            anchorEl={anchorEl}
+            anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+            slotProps={{ paper: { sx: { minWidth: 240, maxHeight: 240 } } }}
+            data-testid="crf-variable-popover"
+          >
+            <MenuList>
+              {filteredVariables.length === 0 ? (
+                <MenuItem disabled>
+                  {t("crf.annotationDialog.variable.noMatch")}
+                </MenuItem>
+              ) : (
+                filteredVariables.map((v) => (
+                  <MenuItem
+                    key={v.id}
+                    onClick={() => insertVariable(v.name)}
+                    data-testid={`crf-variable-${v.id}`}
+                  >
+                    {v.name}
+                  </MenuItem>
+                ))
+              )}
+            </MenuList>
+          </Popover>
           <FormControlLabel
             control={
               <Checkbox
