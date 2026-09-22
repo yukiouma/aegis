@@ -334,6 +334,13 @@ export function AnnotationDialog({
             anchorEl={anchorEl}
             anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
             slotProps={{ paper: { sx: { minWidth: 240, maxHeight: 240 } } }}
+            // The TextField keeps focus while the Popover is open — the
+            // user types more letters to filter and uses Arrow / Enter /
+            // Escape to drive the menu. Without these flags MUI's Popover
+            // would steal focus to the first MenuItem on open, swallow
+            // further keystrokes, and capture Escape.
+            disableAutoFocus
+            disableEnforceFocus
             data-testid="crf-variable-popover"
           >
             <MenuList>

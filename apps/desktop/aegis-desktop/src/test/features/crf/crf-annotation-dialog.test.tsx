@@ -398,4 +398,22 @@ describe("AnnotationDialog", () => {
     expect(screen.getByTestId("crf-variable-3")).toBeInTheDocument();
     expect(screen.queryByTestId("crf-variable-1")).not.toBeInTheDocument();
   });
+
+  // --- Focus retention while the Popover is open ---
+  // MUI's Popover steals focus on open by default. With focus stolen,
+  // typing and ESC never reach the content TextField's handlers — the
+  // user is typing into a MenuItem instead. The Popover must therefore
+  // be told to leave focus on the TextField.
+
+  it("focus stays on the content TextField after the dropdown opens", async () => {
+    mountWithSeed();
+    const content = screen.getByLabelText(/Content/i) as HTMLInputElement;
+    content.focus();
+    expect(document.activeElement).toBe(content);
+    fireEvent.change(content, { target: { value: "@", selectionStart: 1 } });
+    await waitFor(() => screen.getByTestId("crf-variable-1"));
+    // Popover is open, but the TextField must still be the active
+    // element — otherwise typing goes nowhere useful.
+    expect(document.activeElement).toBe(content);
+  });
 });
