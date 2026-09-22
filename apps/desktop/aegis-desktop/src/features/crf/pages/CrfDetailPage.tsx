@@ -51,6 +51,7 @@ import {
   useUpdateDomainAnnotation,
   useUpdateOwnerNotSubmitted,
 } from "../data/detail";
+import { useSdtmContext } from "../data/sdtm";
 import type {
   Annotation,
   AnnotationOwner,
@@ -143,6 +144,7 @@ export function CrfDetailPage() {
 
   const query = useGetCrfForm(id);
   const detailQuery = useCrfFormDetail(id);
+  const sdtmContext = useSdtmContext(projectCode);
 
   // `focus` carries `kind-id` from the global-search row click
   // (e.g. "item-21"). When the detail query resolves we scroll the
@@ -649,6 +651,8 @@ export function CrfDetailPage() {
         mode={domainDialog?.mode ?? "create"}
         row={domainDialog?.mode === "edit" ? domainDialog.row : undefined}
         formNotSubmitted={form?.notSubmitted ?? false}
+        sdtmDomains={sdtmContext.domains}
+        sdtmLanguage={sdtmContext.language}
         onClose={() => setDomainDialog(null)}
         onSubmit={(body) => {
           if (domainDialog?.mode === "edit") {
@@ -700,6 +704,7 @@ export function CrfDetailPage() {
         }
         row={annotationDialog?.mode === "edit" ? annotationDialog.row : undefined}
         availableDomainAnnotations={detail?.domainAnnotations ?? []}
+        sdtmDomains={sdtmContext.domains}
         onClose={() => setAnnotationDialog(null)}
         onSubmit={(body) => {
           if (annotationDialog?.mode === "edit") {
