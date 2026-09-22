@@ -524,6 +524,7 @@ export function CrfDetailPage() {
               // because MUI's disabled chips drop hover events.
               const chip = (
                 <Chip
+                  key={d.id}
                   label={t("crf.detail.domainChip.label", {
                     name: d.name,
                     description: d.description,

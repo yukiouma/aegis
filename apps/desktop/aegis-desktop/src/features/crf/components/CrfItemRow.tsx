@@ -241,6 +241,7 @@ export function CrfItemRow({
               colorIndex={
                 colorByDomainAnnotationId.get(a.domainAnnotationId) ?? -1
               }
+              disabled={!canEditAnnotations}
               onEdit={() => onEditAnnotation(a)}
               onDelete={() => onDeleteAnnotation(a)}
             />
@@ -260,6 +261,7 @@ export function CrfItemRow({
                   colorIndex={
                     colorByDomainAnnotationId.get(a.domainAnnotationId) ?? -1
                   }
+                  disabled={!canEditAnnotations}
                   onEdit={() => onEditAnnotation(a)}
                   onDelete={() => onDeleteAnnotation(a)}
                 />
@@ -314,6 +316,7 @@ export function CrfItemRow({
                     colorIndex={
                       colorByDomainAnnotationId.get(a.domainAnnotationId) ?? -1
                     }
+                    disabled={!canEditAnnotations}
                     onEdit={() => onEditAnnotation(a)}
                     onDelete={() => onDeleteAnnotation(a)}
                   />
