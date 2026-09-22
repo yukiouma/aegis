@@ -1,11 +1,18 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { AegisI18nProvider } from "@aegis/ui/i18n";
 
 import {
   AnnotationChip,
   annotationColor,
 } from "../../../features/crf/components/AnnotationChip";
+
+// When `disabled={true}` is passed, AnnotationChip calls useI18n to
+// render the disabled-state tooltip title. Tests in the
+// `AnnotationChip — disabled prop` block wrap their render with
+// AegisI18nProvider so the hook has a context. The default (enabled)
+// path doesn't touch i18n, so existing tests don't need a provider.
 
 afterEach(() => cleanup());
 
@@ -130,5 +137,82 @@ describe("AnnotationChip", () => {
         .borderStyle,
     ).toBe("dashed");
     unmount();
+  });
+});
+
+describe("AnnotationChip — disabled prop", () => {
+  const baseAnnotation = {
+    id: 1,
+    domainAnnotationId: 50,
+    content: "annotation text",
+    assign: false,
+    owner: { kind: "form" as const, id: 11 },
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-02T00:00:00Z",
+  };
+
+  // Disabled path uses useI18n for the tooltip title; wrap with the
+  // provider so the hook has a context.
+  function renderDisabled(ui: React.ReactElement) {
+    return render(<AegisI18nProvider>{ui}</AegisI18nProvider>);
+  }
+
+  it("renders the chip unchanged when disabled is omitted or false", () => {
+    render(
+      <AnnotationChip
+        annotation={baseAnnotation}
+        colorIndex={0}
+        onEdit={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+    const chip = screen.getByText("annotation text").closest(".MuiChip-root")!;
+    expect(chip).not.toHaveClass("Mui-disabled");
+  });
+
+  it("renders with Mui-disabled when disabled is true", () => {
+    renderDisabled(
+      <AnnotationChip
+        annotation={baseAnnotation}
+        colorIndex={0}
+        onEdit={() => undefined}
+        onDelete={() => undefined}
+        disabled={true}
+      />,
+    );
+    const chip = screen.getByText("annotation text").closest(".MuiChip-root")!;
+    expect(chip).toHaveClass("Mui-disabled");
+  });
+
+  it("does not render the delete icon when disabled is true", () => {
+    // When `disabled` is true the implementation unsets onDelete so the
+    // delete affordance disappears entirely (rather than rendering a
+    // permanently-disabled delete icon). This is the same behaviour
+    // as MUI's own disabled chip with no onDelete supplied.
+    const { container } = renderDisabled(
+      <AnnotationChip
+        annotation={baseAnnotation}
+        colorIndex={0}
+        onEdit={() => undefined}
+        onDelete={() => undefined}
+        disabled={true}
+      />,
+    );
+    expect(container.querySelector(".MuiChip-deleteIcon")).toBeNull();
+  });
+
+  it("does not call onEdit when the disabled chip is clicked", () => {
+    const onEdit = vi.fn();
+    renderDisabled(
+      <AnnotationChip
+        annotation={baseAnnotation}
+        colorIndex={0}
+        onEdit={onEdit}
+        onDelete={() => undefined}
+        disabled={true}
+      />,
+    );
+    fireEvent.click(screen.getByText("annotation text"));
+    expect(onEdit).not.toHaveBeenCalled();
   });
 });
