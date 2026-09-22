@@ -54,8 +54,28 @@ pub enum ProjectLanguage {
     SimplifiedChinese,
 }
 
-/// Wire-level request body for a project's configuration. `language`
-/// and `tags` are individually optional / empty-skippable so a
+/// Wire-level request body for the SDTM-IG version pointer a
+/// project targets. Mirrors the server's
+/// `apps/server/aegis-server/src/transport/http/dto.rs::ModelVersionRequest`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelVersionRequest {
+    pub version_id: i64,
+    pub version_name: String,
+}
+
+/// Wire-level projection of the SDTM-IG version pointer. Mirrors the
+/// server's `apps/server/aegis-server/src/transport/http/dto.rs::ModelVersionResponse`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModelVersionResponse {
+    pub version_id: i64,
+    pub version_name: String,
+}
+
+/// Wire-level request body for a project's configuration.
+/// `language` and `tags` are individually optional / empty-skippable;
+/// `sdtmig` is skipped on serialize when absent so a
 /// present-but-empty config round-trips as `{}`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -64,6 +84,8 @@ pub struct ProjectConfigurationDataRequest {
     pub language: Option<ProjectLanguage>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<TagDataRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sdtmig: Option<ModelVersionRequest>,
 }
 
 /// Wire-level projection of a project's configuration.
@@ -73,6 +95,7 @@ pub struct ProjectConfigurationViewResponse {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub language: Option<ProjectLanguage>,
     pub tags: Vec<TagViewResponse>,
+    pub sdtmig: Option<ModelVersionResponse>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -190,7 +213,8 @@ mod tests {
                                 "id": 1, "code": "p", "description": "",
                                 "configurations": {
                                     "language": "en",
-                                    "tags": [{ "key": "Product", "value": "DEMO-001" }]
+                                    "tags": [{ "key": "Product", "value": "DEMO-001" }],
+                                    "sdtmig": { "versionId": 2, "versionName": "SDTMIG v3.2" }
                                 },
                                 "members": { "leaders": [], "workers": [] },
                                 "unblindMembers": { "leaders": [], "workers": [] },
@@ -212,6 +236,16 @@ mod tests {
         );
         assert_eq!(projects[0].configurations.tags.len(), 1);
         assert_eq!(projects[0].configurations.tags[0].key, "Product");
+        // sdtmig round-trips: the wire JSON carries `versionId` /
+        // `versionName` (camelCase) which deserialize back into the
+        // snake_case Rust fields.
+        let sdtmig = projects[0]
+            .configurations
+            .sdtmig
+            .as_ref()
+            .expect("sdtmig present");
+        assert_eq!(sdtmig.version_id, 2);
+        assert_eq!(sdtmig.version_name, "SDTMIG v3.2");
     }
 
     #[test]
@@ -249,12 +283,38 @@ mod tests {
                 key: "Product".into(),
                 value: "DEMO-001".into(),
             }],
+            sdtmig: None,
         };
         let j = serde_json::to_string(&body).unwrap();
         assert_eq!(
             j,
             r#"{"language":"zh-CN","tags":[{"key":"Product","value":"DEMO-001"}]}"#
         );
+
+        // sdtmig is camelCase on the wire and skipped on serialize
+        // when None.
+        let body = ProjectConfigurationDataRequest {
+            language: None,
+            tags: vec![],
+            sdtmig: Some(ModelVersionRequest {
+                version_id: 3,
+                version_name: "SDTMIG v3.3".into(),
+            }),
+        };
+        let j = serde_json::to_string(&body).unwrap();
+        assert_eq!(j, r#"{"sdtmig":{"versionId":3,"versionName":"SDTMIG v3.3"}}"#);
+    }
+
+    #[test]
+    fn model_version_request_round_trips() {
+        let body = ModelVersionRequest {
+            version_id: 7,
+            version_name: "SDTMIG v3.4".into(),
+        };
+        let j = serde_json::to_string(&body).unwrap();
+        assert_eq!(j, r#"{"versionId":7,"versionName":"SDTMIG v3.4"}"#);
+        let parsed: ModelVersionRequest = serde_json::from_str(&j).unwrap();
+        assert_eq!(parsed, body);
     }
 
     #[test]
