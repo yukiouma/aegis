@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Alert,
+  Autocomplete,
   Box,
   Button,
   Dialog,
@@ -12,7 +13,11 @@ import {
 import { useI18n } from "@aegis/ui/i18n";
 
 import { errorMessage } from "../../../shared/api/error";
-import type { ApiError, DomainAnnotation } from "../../../shared/api";
+import type {
+  ApiError,
+  DomainAnnotation,
+  SdtmDomainView,
+} from "../../../shared/api";
 
 export interface DomainAnnotationDialogBody {
   name: string;
@@ -43,12 +48,43 @@ interface Props {
   markNotSubmittedError: ApiError | null;
   mutationError: ApiError | null;
   mutationPending: boolean;
+  /**
+   * SDTM domains for the project's resolved SDTMIG version. Empty
+   * array disables the autocomplete's option list (the user can
+   * still type free-form names via `freeSolo`).
+   */
+  sdtmDomains: SdtmDomainView[];
+  /**
+   * Language code used to look up the matching description when
+   * the user picks a domain from the autocomplete. `""` / `"en"`
+   * / `"zh-CN"` etc. — matches the lang field on
+   * `SdtmDomainDescription`.
+   */
+  sdtmLanguage: string;
 }
 
 const EMPTY: DomainAnnotationDialogBody = {
   name: "",
   description: "",
 };
+
+/**
+ * Look up the description for the given domain name in the project
+ * language. Returns `null` when the domain is not in `sdtmDomains`
+ * or no description matches the language (per the brainstorming
+ * Q3 decision: leave the field empty, not an em-dash, no warning).
+ */
+function findDescription(
+  domains: SdtmDomainView[],
+  name: string,
+  language: string,
+): string | null {
+  const upper = name.toUpperCase();
+  const match = domains.find((d) => d.name.toUpperCase() === upper);
+  if (!match) return null;
+  const desc = match.descriptions.find((d) => d.lang === language);
+  return desc?.details.description ?? null;
+}
 
 export function DomainAnnotationDialog({
   open,
@@ -62,6 +98,8 @@ export function DomainAnnotationDialog({
   markNotSubmittedError,
   mutationError,
   mutationPending,
+  sdtmDomains,
+  sdtmLanguage,
 }: Props) {
   const { t } = useI18n();
   const [body, setBody] = useState<DomainAnnotationDialogBody>(EMPTY);
@@ -99,6 +137,8 @@ export function DomainAnnotationDialog({
     });
   }
 
+  const domainOptions = sdtmDomains.map((d) => d.name);
+
   return (
     <Dialog
       open={open}
@@ -117,13 +157,47 @@ export function DomainAnnotationDialog({
         <Box
           sx={{ display: "flex", flexDirection: "column", gap: 2, pt: 2 }}
         >
-          <TextField
-            size="small"
-            label={t("crf.domainDialog.field.name")}
-            value={body.name}
-            onChange={(e) =>
-              setBody((b) => ({ ...b, name: e.target.value }))
+          <Autocomplete
+            freeSolo
+            options={domainOptions}
+            // Case-insensitive startsWith — matches "auto upcase what
+            // they enter, filter the domains with the current value".
+            filterOptions={(opts, state) =>
+              opts.filter((o) =>
+                o.toUpperCase().startsWith(state.inputValue.toUpperCase()),
+              )
             }
+            inputValue={body.name}
+            // Typing path: uppercase as the user types.
+            onInputChange={(_e, value, reason) => {
+              if (reason === "input") {
+                setBody((b) => ({ ...b, name: value.toUpperCase() }));
+              } else {
+                setBody((b) => ({ ...b, name: value }));
+              }
+            }}
+            // Selection path: uppercase the picked name and auto-fill
+            // the description in the project's language.
+            onChange={(_e, value) => {
+              const next = (
+                typeof value === "string" ? value : value ?? ""
+              ).toUpperCase();
+              const desc = next
+                ? findDescription(sdtmDomains, next, sdtmLanguage)
+                : null;
+              setBody((b) => ({
+                ...b,
+                name: next,
+                description: desc ?? (next ? "" : b.description),
+              }));
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                size="small"
+                label={t("crf.domainDialog.field.name")}
+              />
+            )}
           />
           <TextField
             size="small"
