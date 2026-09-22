@@ -178,6 +178,10 @@ describe("CrfDetailPage", () => {
       current_user: () => fakeUser,
       get_crf_form_by_id: () => fakeForm,
       get_crf_form_details: () => fakeDetail,
+      // Project-leader mock so the create-menu items stay enabled —
+      // the menu items are now gated on `canEditAnnotations` which
+      // requires the leader query to resolve to true.
+      get_project_by_code: () => leaderProject,
     });
 
     renderPage(["/project/abc/crf/11"]);
@@ -370,6 +374,9 @@ describe("CrfDetailPage", () => {
       current_user: () => fakeUser,
       get_crf_form_by_id: () => fakeForm,
       get_crf_form_details: () => fakeDetail,
+      // Leader mock so the domain-annotation chip stays clickable —
+      // the chip's `onDelete` is gated on `canEditAnnotations`.
+      get_project_by_code: () => leaderProject,
       // The cascade delete runs `delete_crf_annotation` once per
       // linked annotation, then `delete_crf_domain_annotation` last.
       // Both succeed silently.
@@ -490,6 +497,9 @@ describe("CrfDetailPage", () => {
       current_user: () => fakeUser,
       get_crf_form_by_id: () => ({ ...fakeForm, notSubmitted: true }),
       get_crf_form_details: () => detailNotSubmitted,
+      // Leader mock so the [NOT SUBMITTED] chip's delete affordance
+      // is rendered — `canClearNotSubmitted` requires leader / DEV.
+      get_project_by_code: () => leaderProject,
       update_crf_form: () => fakeForm,
       update_crf_item: () => detailNotSubmitted.items[0]!.item,
       update_crf_option: () => detailNotSubmitted.items[0]!.options[0]!.option,
@@ -576,6 +586,9 @@ describe("CrfDetailPage", () => {
       current_user: () => fakeUser,
       get_crf_form_by_id: () => fakeForm,
       get_crf_form_details: () => fakeDetail,
+      // Leader mock so the menu's `New annotation` entry stays
+      // enabled — the test opens it to reach the create dialog.
+      get_project_by_code: () => leaderProject,
       update_crf_form: () => fakeForm,
       delete_crf_annotation: () => undefined,
       delete_crf_domain_annotation: () => undefined,
@@ -682,6 +695,9 @@ describe("CrfDetailPage", () => {
         ...fakeDetail,
         form: { ...fakeDetail.form, notSubmitted },
       }),
+      // Leader mock so the menu's `New annotation` entry stays
+      // enabled — the test opens it to reach the create dialog.
+      get_project_by_code: () => leaderProject,
       update_crf_form: (args) => {
         notSubmitted = (args?.body as { notSubmitted: boolean })
           ?.notSubmitted === true;
@@ -964,6 +980,10 @@ describe("CrfDetailPage", () => {
         ...fakeDetail,
         domainAnnotations: [],
       }),
+      // Leader mock so `canEditAnnotations` resolves true —
+      // otherwise the test would conflate the no-domain-annotations
+      // disable with the no-permission disable.
+      get_project_by_code: () => leaderProject,
     });
 
     renderPage(["/project/abc/crf/11"]);
@@ -1140,5 +1160,353 @@ describe("CrfDetailPage — mission-issue entry points", () => {
       const badge = wrapper?.querySelector(".MuiBadge-badge");
       expect(badge?.className ?? "").toMatch(/MuiBadge-invisible/);
     });
+  });
+});
+
+// =========================================================================
+// Role-based restriction coverage. Each case drives the leader / QC / DEV
+// booleans by mocking `get_project_by_code` (so useIsProjectLeader
+// resolves) AND the project's leaders list, then mocks
+// `list_missions_by_project` / `list_issues_by_mission` for the chip
+// state. The shape mirrors `ProjectView` from
+// `apps/desktop/aegis-desktop/src/shared/api/types.ts`.
+// =========================================================================
+
+const baseProject = {
+  id: 1,
+  code: "abc",
+  description: "Test project",
+  configurations: { language: "en" as const, tags: [] },
+  active: true,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+};
+
+const leaderProject = {
+  ...baseProject,
+  members: {
+    leaders: [{ code: "u", name: "U" }],
+    workers: [],
+  },
+  unblindMembers: {
+    leaders: [{ code: "u", name: "U" }],
+    workers: [],
+  },
+};
+
+const nonLeaderProject = {
+  ...baseProject,
+  members: {
+    leaders: [{ code: "other", name: "Other" }],
+    workers: [],
+  },
+  unblindMembers: {
+    leaders: [{ code: "other", name: "Other" }],
+    workers: [],
+  },
+};
+
+function missionForUser(role: "qc" | "dev" | "other") {
+  return {
+    ...fakeMission,
+    assignees:
+      role === "other"
+        ? []
+        : [{ ...fakeMission.assignees[0], role }],
+  };
+}
+
+describe("CrfDetailPage — role-based restrictions", () => {
+  it("project leader: form chip enabled with zero issues; menu and chips enabled", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => fakeForm,
+      get_crf_form_details: () => fakeDetail,
+      get_project_by_code: () => leaderProject,
+      list_missions_by_project: () => [missionForUser("qc")],
+      list_issues_by_mission: () => [],
+    });
+    renderPage(["/project/abc/crf/11"]);
+    // Leader exempt: form chip stays enabled even though zero issues.
+    const chip = await screen.findByTestId("crf-form-11");
+    expect(chip).not.toHaveAttribute("aria-disabled", "true");
+
+    // Menu: both MenuItems enabled.
+    const formName = await screen.findByTestId("crf-form-name");
+    fireEvent.click(formName);
+    fireEvent.click(formName);
+    await waitFor(() => {
+      expect(
+        document.querySelectorAll(".MuiMenuItem-root").length,
+      ).toBeGreaterThanOrEqual(2);
+    });
+    const items = Array.from(
+      document.querySelectorAll<HTMLElement>(".MuiMenuItem-root"),
+    );
+    const newDomain = items.find(
+      (el) => el.textContent?.trim() === "New domain",
+    );
+    const newAnnotation = items.find(
+      (el) => el.textContent?.trim() === "New annotation",
+    );
+    expect(newDomain).not.toHaveAttribute("aria-disabled", "true");
+    expect(newAnnotation).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("mission QC: annotation menu disabled but form chip is enabled (empty-issue dialog allowed)", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => fakeForm,
+      get_crf_form_details: () => fakeDetail,
+      get_project_by_code: () => nonLeaderProject,
+      list_missions_by_project: () => [missionForUser("qc")],
+      list_issues_by_mission: () => [],
+    });
+    renderPage(["/project/abc/crf/11"]);
+    const chip = await screen.findByTestId("crf-form-11");
+    // QC can open the empty-issue dialog — chip stays enabled.
+    expect(chip).not.toHaveAttribute("aria-disabled", "true");
+
+    const formName = await screen.findByTestId("crf-form-name");
+    fireEvent.click(formName);
+    fireEvent.click(formName);
+    await waitFor(() => {
+      expect(
+        document.querySelectorAll(".MuiMenuItem-root").length,
+      ).toBeGreaterThanOrEqual(2);
+    });
+    const items = Array.from(
+      document.querySelectorAll<HTMLElement>(".MuiMenuItem-root"),
+    );
+    const newDomain = items.find(
+      (el) => el.textContent?.trim() === "New domain",
+    );
+    const newAnnotation = items.find(
+      (el) => el.textContent?.trim() === "New annotation",
+    );
+    // QC can't edit annotations → both menu items are disabled.
+    expect(newDomain).toHaveAttribute("aria-disabled", "true");
+    expect(newAnnotation).toHaveAttribute("aria-disabled", "true");
+
+    // Item / option / unit Typography drop pointer cursor.
+    const item = await screen.findByTestId("crf-item-name-21");
+    expect(item).not.toHaveStyle({ cursor: "pointer" });
+
+    // Annotation chip stays in the same outlined style (no
+    // `Mui-disabled`, no tooltip wrapper) but the click is
+    // silently dropped — the chip's `onClick` is unset.
+    const ann = await screen.findByText("item-level note");
+    expect(ann.closest(".MuiChip-root")).not.toHaveClass("Mui-disabled");
+    expect(ann.closest(".MuiChip-root")).not.toHaveClass("MuiChip-clickable");
+  });
+
+  it("mission DEV: form chip does not open the issue dialog when zero issues; menu stays enabled", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => fakeForm,
+      get_crf_form_details: () => fakeDetail,
+      get_project_by_code: () => nonLeaderProject,
+      list_missions_by_project: () => [missionForUser("dev")],
+      list_issues_by_mission: () => [],
+    });
+    renderPage(["/project/abc/crf/11"]);
+    // DEV can't open the empty-issue dialog — the chip keeps its
+    // outlined style but clicking it does not open the dialog.
+    const chip = await screen.findByTestId("crf-form-11");
+    expect(chip).not.toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(chip);
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Mission issues/i),
+      ).not.toBeInTheDocument();
+    });
+
+    // Menu still enabled (DEV can edit annotations).
+    const formName = await screen.findByTestId("crf-form-name");
+    fireEvent.click(formName);
+    fireEvent.click(formName);
+    await waitFor(() => {
+      expect(
+        document.querySelectorAll(".MuiMenuItem-root").length,
+      ).toBeGreaterThanOrEqual(2);
+    });
+    const items = Array.from(
+      document.querySelectorAll<HTMLElement>(".MuiMenuItem-root"),
+    );
+    const newDomain = items.find(
+      (el) => el.textContent?.trim() === "New domain",
+    );
+    expect(newDomain).not.toHaveAttribute("aria-disabled", "true");
+  });
+
+  it("mission DEV: form chip becomes enabled once an issue exists", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => fakeForm,
+      get_crf_form_details: () => fakeDetail,
+      get_project_by_code: () => nonLeaderProject,
+      list_missions_by_project: () => [missionForUser("dev")],
+      list_issues_by_mission: () => [openedMissionIssue],
+    });
+    renderPage(["/project/abc/crf/11"]);
+    // With at least one issue, the chip un-disables. Wait for the
+    // mission / issues / leader queries to resolve — initially
+    // `formMission` is undefined so the chip renders as
+    // `aria-disabled="true"` regardless of role, then flips once
+    // the queries settle.
+    const chip = await screen.findByTestId("crf-form-11");
+    await waitFor(() => {
+      expect(chip).not.toHaveAttribute("aria-disabled", "true");
+    });
+  });
+
+  it("task unrelated (no role): strictest — chips and menu all disabled", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => fakeForm,
+      get_crf_form_details: () => fakeDetail,
+      get_project_by_code: () => nonLeaderProject,
+      list_missions_by_project: () => [missionForUser("other")],
+      list_issues_by_mission: () => [],
+    });
+    renderPage(["/project/abc/crf/11"]);
+    // Form chip keeps its outlined style but does not open the
+    // issue dialog when there's no role + no issues.
+    const chip = await screen.findByTestId("crf-form-11");
+    expect(chip).not.toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(chip);
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Mission issues/i),
+      ).not.toBeInTheDocument();
+    });
+
+    // Menu items disabled.
+    const formName = await screen.findByTestId("crf-form-name");
+    fireEvent.click(formName);
+    fireEvent.click(formName);
+    await waitFor(() => {
+      expect(
+        document.querySelectorAll(".MuiMenuItem-root").length,
+      ).toBeGreaterThanOrEqual(2);
+    });
+    const items = Array.from(
+      document.querySelectorAll<HTMLElement>(".MuiMenuItem-root"),
+    );
+    const newDomain = items.find(
+      (el) => el.textContent?.trim() === "New domain",
+    );
+    const newAnnotation = items.find(
+      (el) => el.textContent?.trim() === "New annotation",
+    );
+    expect(newDomain).toHaveAttribute("aria-disabled", "true");
+    expect(newAnnotation).toHaveAttribute("aria-disabled", "true");
+
+    // Item Typography drops pointer cursor.
+    const item = await screen.findByTestId("crf-item-name-21");
+    expect(item).not.toHaveStyle({ cursor: "pointer" });
+
+    // Annotation chip keeps the outlined style (no `Mui-disabled`,
+    // no tooltip) but the click is silently dropped.
+    const ann = await screen.findByText("item-level note");
+    expect(ann.closest(".MuiChip-root")).not.toHaveClass("Mui-disabled");
+    expect(ann.closest(".MuiChip-root")).not.toHaveClass("MuiChip-clickable");
+  });
+
+  // [NOT SUBMITTED] chip's delete affordance is gated on
+  // `canClearNotSubmitted = isLeader || isMissionDev`. Mission QC
+  // (the reviewer) and task-unrelated users see the chip but can't
+  // click it to clear the flag — leader and DEV are the only two
+  // roles allowed to clear.
+  it("mission QC: [NOT SUBMITTED] chip renders without delete affordance", async () => {
+    const detailNotSubmitted = {
+      ...fakeDetail,
+      form: { ...fakeDetail.form, notSubmitted: true },
+      items: [
+        {
+          ...fakeDetail.items[0]!,
+          item: { ...fakeDetail.items[0]!.item, notSubmitted: true },
+        },
+      ],
+    };
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => ({ ...fakeForm, notSubmitted: true }),
+      get_crf_form_details: () => detailNotSubmitted,
+      get_project_by_code: () => nonLeaderProject,
+      list_missions_by_project: () => [missionForUser("qc")],
+      list_issues_by_mission: () => [],
+    });
+    renderPage(["/project/abc/crf/11"]);
+
+    // Both the form-level chip and the per-item chip render, but
+    // without a delete icon — MUI's Chip only renders the delete
+    // affordance when `onDelete` is provided.
+    const chips = await screen.findAllByTestId("not-submitted-chip");
+    expect(chips.length).toBeGreaterThanOrEqual(2);
+    for (const c of chips) {
+      const root = c.closest(".MuiChip-root")!;
+      expect(root.querySelector(".MuiChip-deleteIcon")).toBeNull();
+    }
+  });
+
+  it("mission DEV: [NOT SUBMITTED] chip retains its delete affordance", async () => {
+    const detailNotSubmitted = {
+      ...fakeDetail,
+      form: { ...fakeDetail.form, notSubmitted: true },
+      items: [
+        {
+          ...fakeDetail.items[0]!,
+          item: { ...fakeDetail.items[0]!.item, notSubmitted: true },
+        },
+      ],
+    };
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => ({ ...fakeForm, notSubmitted: true }),
+      get_crf_form_details: () => detailNotSubmitted,
+      get_project_by_code: () => nonLeaderProject,
+      list_missions_by_project: () => [missionForUser("dev")],
+      list_issues_by_mission: () => [],
+    });
+    renderPage(["/project/abc/crf/11"]);
+
+    // DEV authors annotations — they're allowed to clear the flag
+    // (e.g. after re-fixing the item they marked not-submitted).
+    const chips = await screen.findAllByTestId("not-submitted-chip");
+    expect(chips.length).toBeGreaterThanOrEqual(2);
+    for (const c of chips) {
+      const root = c.closest(".MuiChip-root")!;
+      expect(root.querySelector(".MuiChip-deleteIcon")).not.toBeNull();
+    }
+  });
+
+  it("project leader: [NOT SUBMITTED] chip retains its delete affordance", async () => {
+    const detailNotSubmitted = {
+      ...fakeDetail,
+      form: { ...fakeDetail.form, notSubmitted: true },
+    };
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => ({ ...fakeForm, notSubmitted: true }),
+      get_crf_form_details: () => detailNotSubmitted,
+      get_project_by_code: () => leaderProject,
+      list_missions_by_project: () => [missionForUser("qc")],
+      list_issues_by_mission: () => [],
+    });
+    renderPage(["/project/abc/crf/11"]);
+
+    // The form-level chip has a delete icon.
+    const chip = await screen.findByTestId("not-submitted-chip");
+    const root = chip.closest(".MuiChip-root")!;
+    expect(root.querySelector(".MuiChip-deleteIcon")).not.toBeNull();
   });
 });

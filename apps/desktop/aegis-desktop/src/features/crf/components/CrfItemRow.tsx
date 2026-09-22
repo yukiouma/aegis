@@ -1,4 +1,4 @@
-import { Badge, Box, Chip, Stack, Tooltip, Typography } from "@aegis/ui/mui";
+import { Badge, Box, Chip, Stack, Typography } from "@aegis/ui/mui";
 import { RadioButtonUnchecked as RadioButtonUncheckedIcon } from "@aegis/ui/icons";
 
 import type { Annotation, AnnotationOwner, CrfItemDetail } from "../../../shared/api";
@@ -10,6 +10,15 @@ import { NotSubmittedChip } from "./NotSubmittedChip";
 interface Props {
   itemDetail: CrfItemDetail;
   colorByDomainAnnotationId: Map<number, number>;
+  /**
+   * Whether the current viewer is allowed to create / update
+   * annotations on this form. When `false`, every row-level
+   * create-annotation entry point (item name, option value, unit
+   * value) is gated: the pointer cursor / hover underline fall
+   * away and the click is a no-op. Derived by the page from the
+   * same RBAC flags used by the form-name hover menu.
+   */
+  canEditAnnotations: boolean;
   /**
    * Open the new-annotation dialog for the given owner. The page
    * holds the dialog state so the caller's owner kind/id stays in
@@ -73,11 +82,28 @@ interface Props {
    * so the chip doesn't reflow when the mission shows up.
    */
   missionExists: boolean;
+  /**
+   * Whether the current viewer is allowed to open the mission-issue
+   * dialog when its scope has zero opened issues. When `false` AND
+   * `openIssueCount === 0`, the item code chip is disabled with the
+   * no-issues-to-view tooltip. The page derives this from the same
+   * RBAC flags used by the form-name hover menu.
+   */
+  canOpenEmptyIssueDialog: boolean;
+  /**
+   * Whether the current viewer is allowed to clear the
+   * [NOT SUBMITTED] flag on this item / option / unit. When
+   * `false`, the row's `<NotSubmittedChip>` renders without the
+   * delete affordance — same chip view style, no click surface.
+   * Only project leader and mission DEV can clear the flag.
+   */
+  canClearNotSubmitted: boolean;
 }
 
 export function CrfItemRow({
   itemDetail,
   colorByDomainAnnotationId,
+  canEditAnnotations,
   onCreateAnnotation,
   onEditAnnotation,
   onDeleteAnnotation,
@@ -88,6 +114,8 @@ export function CrfItemRow({
   openIssueCount,
   onOpenIssues,
   missionExists,
+  canOpenEmptyIssueDialog,
+  canClearNotSubmitted,
 }: Props) {
   const { t } = useI18n();
   const { item, options, units, annotations } = itemDetail;
@@ -96,14 +124,16 @@ export function CrfItemRow({
   // point are no-ops for them. Treat `kind === "label"` as a
   // row-wide block alongside the existing guards.
   const isLabel = item.kind === "label";
-  // Collapse the three "no new annotations" guards into one. When
-  // any of these is true every create-annotation entry point on
-  // this row must short-circuit — the form cascade has wiped
-  // every annotation, the item cascade has wiped this row's
-  // annotations, there is no domain annotation to assign a
-  // new annotation to, or the item is a static label.
+  // Collapse the row-level "no new annotations" guards into one.
+  // When any of these is true every create-annotation entry point on
+  // this row must short-circuit — the form cascade has wiped every
+  // annotation, the item cascade has wiped this row's annotations,
+  // there is no domain annotation to assign a new annotation to,
+  // the item is a static label, or the current viewer doesn't have
+  // permission to edit annotations on this form (QC / task-unrelated).
   const rowBlocked =
-    formNotSubmitted || itemNotSubmitted || noDomainAnnotations || isLabel;
+    formNotSubmitted || itemNotSubmitted || noDomainAnnotations ||
+    isLabel || !canEditAnnotations;
   // Build the create-annotation handler once per row so the click
   // short-circuits under a single readable guard instead of
   // repeating the conditions at every call site.
@@ -145,35 +175,31 @@ export function CrfItemRow({
             chip so the row reads as static text rather than as a
             field that can be annotated. */}
         {!isLabel && (
-          <Tooltip
-            title={
-              missionExists
-                ? ""
-                : t("crf.missionIssue.tooltip.noMission")
-            }
-            disableHoverListener={missionExists}
-            disableFocusListener={missionExists}
-            disableTouchListener={missionExists}
+          <Badge
+            color="error"
+            badgeContent={openIssueCount}
+            invisible={!missionExists}
+            overlap="circular"
           >
-            <span>
-              <Badge
-                color="error"
-                badgeContent={openIssueCount}
-                invisible={!missionExists}
-                overlap="circular"
-              >
-                <Chip
-                  sx={{ width: 92 }}
-                  label={item.code}
-                  variant="outlined"
-                  size="small"
-                  onClick={onOpenIssues}
-                  disabled={!missionExists}
-                  data-testid={`crf-item-code-${item.id}`}
-                />
-              </Badge>
-            </span>
-          </Tooltip>
+            <Chip
+              sx={{ width: 92 }}
+              label={item.code}
+              variant="outlined"
+              size="small"
+              // Drop `onClick` when the chip shouldn't open the
+              // issue dialog (no mission / zero opened issues for a
+              // viewer without permission). The chip keeps its
+              // outlined style — only the click is silently
+              // dropped.
+              onClick={
+                missionExists &&
+                (openIssueCount > 0 || canOpenEmptyIssueDialog)
+                  ? onOpenIssues
+                  : undefined
+              }
+              data-testid={`crf-item-code-${item.id}`}
+            />
+          </Badge>
         )}
         <Typography
           variant="subtitle1"
@@ -189,8 +215,10 @@ export function CrfItemRow({
         />
         {item.notSubmitted && (
           <NotSubmittedChip
-            onDelete={() =>
-              onClearNotSubmitted({ kind: "item", id: item.id })
+            onDelete={
+              canClearNotSubmitted
+                ? () => onClearNotSubmitted({ kind: "item", id: item.id })
+                : undefined
             }
           />
         )}
@@ -206,6 +234,7 @@ export function CrfItemRow({
               colorIndex={
                 colorByDomainAnnotationId.get(a.domainAnnotationId) ?? -1
               }
+              disabled={!canEditAnnotations}
               onEdit={() => onEditAnnotation(a)}
               onDelete={() => onDeleteAnnotation(a)}
             />
@@ -225,6 +254,7 @@ export function CrfItemRow({
                   colorIndex={
                     colorByDomainAnnotationId.get(a.domainAnnotationId) ?? -1
                   }
+                  disabled={!canEditAnnotations}
                   onEdit={() => onEditAnnotation(a)}
                   onDelete={() => onDeleteAnnotation(a)}
                 />
@@ -240,8 +270,10 @@ export function CrfItemRow({
             </Typography>
             {u.unit.notSubmitted && (
               <NotSubmittedChip
-                onDelete={() =>
-                  onClearNotSubmitted({ kind: "unit", id: u.unit.id })
+                onDelete={
+                  canClearNotSubmitted
+                    ? () => onClearNotSubmitted({ kind: "unit", id: u.unit.id })
+                    : undefined
                 }
               />
             )}
@@ -266,8 +298,14 @@ export function CrfItemRow({
               </Typography>
               {o.option.notSubmitted && (
                 <NotSubmittedChip
-                  onDelete={() =>
-                    onClearNotSubmitted({ kind: "option", id: o.option.id })
+                  onDelete={
+                    canClearNotSubmitted
+                      ? () =>
+                          onClearNotSubmitted({
+                            kind: "option",
+                            id: o.option.id,
+                          })
+                      : undefined
                   }
                 />
               )}
@@ -279,6 +317,7 @@ export function CrfItemRow({
                     colorIndex={
                       colorByDomainAnnotationId.get(a.domainAnnotationId) ?? -1
                     }
+                    disabled={!canEditAnnotations}
                     onEdit={() => onEditAnnotation(a)}
                     onDelete={() => onDeleteAnnotation(a)}
                   />

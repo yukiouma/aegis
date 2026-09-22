@@ -437,6 +437,8 @@ export const zhCN = {
     "请先创建域注释，再新建注释（注释必须归属于某个域注释）。",
   "crf.detail.itemRow.disabledWhenNotSubmitted":
     "表单已标记为未提交，请清除该标记后再添加注释。",
+  "crf.detail.tooltip.noPermissionEdit": "您没有权限编辑此表单上的注释。",
+  "crf.detail.tooltip.noIssueToView": "此范围内暂无问题。",
   "crf.detail.domainChip.label": "{name}（{description}）",
   "crf.detail.empty": "暂无项目",
   "crf.detail.loadFailed": "加载表单详情失败：{message}",

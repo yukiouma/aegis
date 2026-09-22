@@ -24,20 +24,39 @@ interface Props {
   colorIndex: number;
   onEdit: () => void;
   onDelete: () => void;
+  /**
+   * Block `onClick` and `onDelete` from firing — used by
+   * `CrfAnnotationArea` and `CrfItemRow` when the current viewer
+   * is not allowed to edit annotations on this form. We keep the
+   * chip's visual style identical to the enabled path (no
+   * `disabled` attribute, no tooltip wrapper) so QC / task-unrelated
+   * users see the same chip as leader / DEV — only their clicks
+   * are silently dropped.
+   */
+  disabled?: boolean;
 }
 
+/**
+ * Annotation chip used both at the form level (via
+ * `CrfAnnotationArea`) and inside each `CrfItemRow`. When
+ * `disabled` is true the chip looks identical to the enabled
+ * version — same outline, same colour, same border style — but
+ * MUI's Chip won't render the clickable affordance or delete icon
+ * because we omit `onClick` and `onDelete`.
+ */
 export function AnnotationChip({
   annotation,
   colorIndex,
   onEdit,
   onDelete,
+  disabled = false,
 }: Props) {
   return (
     <Chip
       label={annotation.content}
       color={annotationColor(colorIndex)}
-      onClick={onEdit}
-      onDelete={onDelete}
+      onClick={disabled ? undefined : onEdit}
+      onDelete={disabled ? undefined : onDelete}
       size="small"
       variant="outlined"
       // `assign: true` flips the chip border to a dotted line so the

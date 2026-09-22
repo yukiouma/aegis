@@ -6,6 +6,13 @@ import {
   AnnotationChip,
   annotationColor,
 } from "../../../features/crf/components/AnnotationChip";
+import { CrfAnnotationArea } from "../../../features/crf/components/CrfAnnotationArea";
+
+// The disabled path renders the same Chip as the enabled path —
+// no tooltip wrapper, no `disabled` attribute — so neither path
+// needs an AegisI18nProvider here. Click handlers are simply unset
+// when the chip is disabled, which keeps the visual style identical
+// across roles.
 
 afterEach(() => cleanup());
 
@@ -130,5 +137,137 @@ describe("AnnotationChip", () => {
         .borderStyle,
     ).toBe("dashed");
     unmount();
+  });
+});
+
+describe("AnnotationChip — disabled prop", () => {
+  const baseAnnotation = {
+    id: 1,
+    domainAnnotationId: 50,
+    content: "annotation text",
+    assign: false,
+    owner: { kind: "form" as const, id: 11 },
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-02T00:00:00Z",
+  };
+
+  // The disabled path renders the same Chip as the enabled path —
+  // no tooltip wrapper, no `disabled` attribute — but the chip's
+  // `onClick` and `onDelete` are unset so MUI drops the clickable
+  // affordance. The visual style stays identical across roles.
+
+  it("renders the chip unchanged when disabled is omitted or false", () => {
+    render(
+      <AnnotationChip
+        annotation={baseAnnotation}
+        colorIndex={0}
+        onEdit={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+    const chip = screen.getByText("annotation text").closest(".MuiChip-root")!;
+    expect(chip).not.toHaveClass("Mui-disabled");
+  });
+
+  it("does not apply Mui-disabled when disabled is true", () => {
+    // Same chip view style — no greyed-out disabled treatment.
+    render(
+      <AnnotationChip
+        annotation={baseAnnotation}
+        colorIndex={0}
+        onEdit={() => undefined}
+        onDelete={() => undefined}
+        disabled={true}
+      />,
+    );
+    const chip = screen.getByText("annotation text").closest(".MuiChip-root")!;
+    expect(chip).not.toHaveClass("Mui-disabled");
+  });
+
+  it("does not render the delete icon when disabled is true", () => {
+    // When `disabled` is true the implementation unsets onDelete so the
+    // delete affordance disappears entirely — no chip clickability, no
+    // delete button.
+    const { container } = render(
+      <AnnotationChip
+        annotation={baseAnnotation}
+        colorIndex={0}
+        onEdit={() => undefined}
+        onDelete={() => undefined}
+        disabled={true}
+      />,
+    );
+    expect(container.querySelector(".MuiChip-deleteIcon")).toBeNull();
+  });
+
+  it("does not call onEdit when the disabled chip is clicked", () => {
+    const onEdit = vi.fn();
+    render(
+      <AnnotationChip
+        annotation={baseAnnotation}
+        colorIndex={0}
+        onEdit={onEdit}
+        onDelete={() => undefined}
+        disabled={true}
+      />,
+    );
+    fireEvent.click(screen.getByText("annotation text"));
+    expect(onEdit).not.toHaveBeenCalled();
+  });
+});
+
+describe("CrfAnnotationArea — canEditAnnotations", () => {
+  const baseAnnotation = {
+    id: 1,
+    domainAnnotationId: 50,
+    content: "annotation text",
+    assign: false,
+    owner: { kind: "form" as const, id: 11 },
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-02T00:00:00Z",
+  };
+
+  it("renders chips enabled when canEditAnnotations is true", () => {
+    render(
+      <CrfAnnotationArea
+        annotations={[baseAnnotation]}
+        colorByDomainAnnotationId={new Map([[50, 0]])}
+        canEditAnnotations={true}
+        onEdit={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+    const chip = screen.getByText("annotation text").closest(".MuiChip-root")!;
+    expect(chip).not.toHaveClass("Mui-disabled");
+  });
+
+  it("renders chips with the same visual style when canEditAnnotations is false", () => {
+    render(
+      <CrfAnnotationArea
+        annotations={[baseAnnotation]}
+        colorByDomainAnnotationId={new Map([[50, 0]])}
+        canEditAnnotations={false}
+        onEdit={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+    const chip = screen.getByText("annotation text").closest(".MuiChip-root")!;
+    // Same chip view style — no greyed-out disabled treatment.
+    expect(chip).not.toHaveClass("Mui-disabled");
+  });
+
+  it("does not call onEdit when a disabled chip is clicked", () => {
+    const onEdit = vi.fn();
+    render(
+      <CrfAnnotationArea
+        annotations={[baseAnnotation]}
+        colorByDomainAnnotationId={new Map([[50, 0]])}
+        canEditAnnotations={false}
+        onEdit={onEdit}
+        onDelete={() => undefined}
+      />,
+    );
+    fireEvent.click(screen.getByText("annotation text"));
+    expect(onEdit).not.toHaveBeenCalled();
   });
 });

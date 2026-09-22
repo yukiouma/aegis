@@ -268,6 +268,24 @@ export function CrfDetailPage() {
   const canCreate = isProjectLeader === true || isMissionQc;
   const canActOnIssue = isProjectLeader === true || isMissionQc;
   const canComment = canActOnIssue || isMissionDev;
+  // Two flat RBAC flags that drive the page-level gates. `canEditAnnotations`
+  // controls the form-name hover menu's create entries, the header
+  // domain-annotation chips, the form-level annotation chips (via
+  // CrfAnnotationArea), and the CrfItemRow click affordances.
+  // `canOpenEmptyIssueDialog` controls the form / item code chip's
+  // `disabled` when its scope has zero opened issues — the spec lets
+  // leader and QC through, blocks DEV and task-unrelated. Both default
+  // to `false` when `isProjectLeader === null` (initial fetch) —
+  // matches today's `canCreate` behavior.
+  const canEditAnnotations = isProjectLeader === true || isMissionDev;
+  const canOpenEmptyIssueDialog = isProjectLeader === true || isMissionQc;
+  // Only project leader and mission DEV can clear the
+  // [NOT SUBMITTED] flag on a form / item / option / unit. Mission
+  // QC (the reviewer) and unrelated users see the chip as a
+  // read-only status indicator — the delete affordance is dropped
+  // entirely so they can't accidentally re-mark the owner as
+  // submitted.
+  const canClearNotSubmitted = isProjectLeader === true || isMissionDev;
 
   const createIssue = useCreateIssue();
   const patchIssueState = usePatchIssueState();
@@ -328,44 +346,38 @@ export function CrfDetailPage() {
           <ArrowBackIcon />
         </IconButton>
         {form?.code && (
-          <Tooltip
-            title={
-              formMission
-                ? ""
-                : t("crf.missionIssue.tooltip.noMission")
-            }
-            disableHoverListener={Boolean(formMission)}
-            disableFocusListener={Boolean(formMission)}
-            disableTouchListener={Boolean(formMission)}
+          <Badge
+            color="error"
+            badgeContent={openIssueCountByTarget.get(null) ?? 0}
+            invisible={!formMission}
+            overlap="circular"
           >
-            <span>
-              <Badge
-                color="error"
-                badgeContent={openIssueCountByTarget.get(null) ?? 0}
-                invisible={!formMission}
-                overlap="circular"
-              >
-                <Chip
-                  sx={{ minWidth: 70 }}
-                  size="small"
-                  label={form.code}
-                  variant="outlined"
-                  disabled={!formMission}
-                  onClick={() =>
-                    formMission &&
-                    setIssueDialog({
-                      scope: { kind: "form" },
-                      missionId: formMission.id,
-                    })
-                  }
-                  // Stable anchor for `?focus=form-<id>` from the global
-                  // search page. Sits next to the form-name Typography so
-                  // scrolling here lands the user on the form header.
-                  data-testid={`crf-form-${id}`}
-                />
-              </Badge>
-            </span>
-          </Tooltip>
+            <Chip
+              sx={{ minWidth: 70 }}
+              size="small"
+              label={form.code}
+              variant="outlined"
+              // No `onClick` when the chip should not open the
+              // issue dialog (no mission / zero opened issues for a
+              // viewer without permission) — silently drops the
+              // click so the chip keeps the same outlined style as
+              // the always-enabled path.
+              onClick={
+                formMission && canOpenEmptyIssueDialog
+                  || (formMission && (openIssueCountByTarget.get(null) ?? 0) > 0)
+                  ? () =>
+                      setIssueDialog({
+                        scope: { kind: "form" },
+                        missionId: formMission!.id,
+                      })
+                  : undefined
+              }
+              // Stable anchor for `?focus=form-<id>` from the global
+              // search page. Sits next to the form-name Typography so
+              // scrolling here lands the user on the form header.
+              data-testid={`crf-form-${id}`}
+            />
+          </Badge>
         )}
         <Typography
           variant="h5"
@@ -381,12 +393,18 @@ export function CrfDetailPage() {
         </Typography>
         {form?.notSubmitted && (
           <NotSubmittedChip
-            onDelete={() =>
-              updateOwnerNotSubmitted.mutate({
-                formId: id,
-                owner: { kind: "form", id },
-                notSubmitted: false,
-              })
+            // QC / task-unrelated users see the chip but can't
+            // clear the flag — `onDelete` is omitted so MUI drops
+            // the delete icon entirely.
+            onDelete={
+              canClearNotSubmitted
+                ? () =>
+                    updateOwnerNotSubmitted.mutate({
+                      formId: id,
+                      owner: { kind: "form", id },
+                      notSubmitted: false,
+                    })
+                : undefined
             }
           />
         )}
@@ -410,11 +428,19 @@ export function CrfDetailPage() {
               title={
                 form?.notSubmitted
                   ? t("crf.detail.menu.disabledWhenNotSubmitted")
-                  : ""
+                  : !canEditAnnotations
+                    ? t("crf.detail.tooltip.noPermissionEdit")
+                    : ""
               }
-              disableHoverListener={!form?.notSubmitted}
-              disableFocusListener={!form?.notSubmitted}
-              disableTouchListener={!form?.notSubmitted}
+              disableHoverListener={
+                !!form?.notSubmitted || !canEditAnnotations
+              }
+              disableFocusListener={
+                !!form?.notSubmitted || !canEditAnnotations
+              }
+              disableTouchListener={
+                !!form?.notSubmitted || !canEditAnnotations
+              }
             >
               {/* `span` wrapper is required because MUI's disabled
                   MenuItem doesn't forward refs / props to a Tooltip
@@ -422,7 +448,7 @@ export function CrfDetailPage() {
                   when the menu item itself is aria-disabled. */}
               <span>
                 <MenuItem
-                  disabled={Boolean(form?.notSubmitted)}
+                  disabled={Boolean(form?.notSubmitted) || !canEditAnnotations}
                   onClick={() => {
                     setFormNameMenuAnchor(null);
                     setDomainDialog({ mode: "create" });
@@ -438,22 +464,32 @@ export function CrfDetailPage() {
                   ? t("crf.detail.menu.disabledWhenNotSubmitted")
                   : noDomainAnnotations
                     ? t("crf.detail.menu.disabledWhenNoDomainAnnotations")
-                    : ""
+                    : !canEditAnnotations
+                      ? t("crf.detail.tooltip.noPermissionEdit")
+                      : ""
               }
               disableHoverListener={
-                !form?.notSubmitted && !noDomainAnnotations
+                !!form?.notSubmitted ||
+                noDomainAnnotations ||
+                !canEditAnnotations
               }
               disableFocusListener={
-                !form?.notSubmitted && !noDomainAnnotations
+                !!form?.notSubmitted ||
+                noDomainAnnotations ||
+                !canEditAnnotations
               }
               disableTouchListener={
-                !form?.notSubmitted && !noDomainAnnotations
+                !!form?.notSubmitted ||
+                noDomainAnnotations ||
+                !canEditAnnotations
               }
             >
               <span>
                 <MenuItem
                   disabled={
-                    Boolean(form?.notSubmitted) || noDomainAnnotations
+                    Boolean(form?.notSubmitted) ||
+                    noDomainAnnotations ||
+                    !canEditAnnotations
                   }
                   onClick={() => {
                     setFormNameMenuAnchor(null);
@@ -480,8 +516,16 @@ export function CrfDetailPage() {
                   description: d.description,
                 })}
                 color={annotationColor(i)}
-                onClick={() => setDomainDialog({ mode: "edit", row: d })}
-                onDelete={() => setConfirmDeleteDomain(d)}
+                onClick={
+                  canEditAnnotations
+                    ? () => setDomainDialog({ mode: "edit", row: d })
+                    : undefined
+                }
+                onDelete={
+                  canEditAnnotations
+                    ? () => setConfirmDeleteDomain(d)
+                    : undefined
+                }
                 size="small"
                 data-testid={`domain-annotation-chip-${d.id}`}
                 variant="outlined"
@@ -522,6 +566,7 @@ export function CrfDetailPage() {
             colorByDomainAnnotationId,
           )}
           colorByDomainAnnotationId={colorByDomainAnnotationId}
+          canEditAnnotations={canEditAnnotations}
           onEdit={(a) => openEditAnnotation(a, { kind: "form", id })}
           onDelete={(a) => setConfirmDeleteAnnotation(a)}
         />
@@ -558,6 +603,7 @@ export function CrfDetailPage() {
                   })),
                 }}
                 colorByDomainAnnotationId={colorByDomainAnnotationId}
+                canEditAnnotations={canEditAnnotations}
                 onCreateAnnotation={openCreateAnnotation}
                 onEditAnnotation={(a) => {
                   const owner: AnnotationOwner = a.owner;
@@ -589,6 +635,8 @@ export function CrfDetailPage() {
                   })
                 }
                 missionExists={Boolean(formMission)}
+                canOpenEmptyIssueDialog={canOpenEmptyIssueDialog}
+                canClearNotSubmitted={canClearNotSubmitted}
               />
             ))
           )}
