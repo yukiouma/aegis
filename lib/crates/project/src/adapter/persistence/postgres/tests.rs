@@ -143,6 +143,34 @@ fn project_members_migration_cascades_on_delete() {
     );
 }
 
+#[test]
+fn sdtmig_migration_adds_sdtmig_key_to_configuration() {
+    let sql = load_migration("0003_add_project_configuration_sdtmig.sql");
+    let upper = sql.to_uppercase();
+    assert!(
+        upper.contains("SDTMIG"),
+        "the 0003 migration must add the sdtmig key to the configuration JSONB; got:\n{sql}"
+    );
+    assert!(
+        upper.contains("CONFIGURATION = CONFIGURATION ||"),
+        "the 0003 migration must merge the sdtmig key into existing rows; got:\n{sql}"
+    );
+}
+
+#[test]
+fn sdtmig_migration_updates_default_to_include_sdtmig_null() {
+    let sql = load_migration("0003_add_project_configuration_sdtmig.sql");
+    let upper = sql.to_uppercase();
+    assert!(
+        upper.contains("DEFAULT"),
+        "the 0003 migration must update the column default; got:\n{sql}"
+    );
+    assert!(
+        upper.contains("SDTMIG"),
+        "the column default must include sdtmig; got:\n{sql}"
+    );
+}
+
 #[cfg(test)]
 mod row_tests {
     use chrono::{TimeZone, Utc};
