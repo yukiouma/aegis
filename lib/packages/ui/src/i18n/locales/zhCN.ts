@@ -124,6 +124,8 @@ export const zhCN = {
   'project.configuration.general.language': '首选语言',
   'project.configuration.general.language.none': '（未指定）',
   'project.configuration.general.tags': '标签',
+  'project.configuration.general.sdtmig': 'SDTM-IG 版本',
+  'project.configuration.general.sdtmig.none': '（未指定）',
   'project.configuration.members.leadersHeading': '负责人（只读）',
   'project.configuration.members.workersHeading': '项目成员',
   'project.configuration.members.add': '新增成员',

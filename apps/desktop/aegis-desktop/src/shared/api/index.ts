@@ -548,6 +548,7 @@ export type {
   ProjectMembers,
   ProjectMembersView,
   ProjectConfiguration,
+  ProjectConfigurationSdtmig,
   ProjectLanguage,
   ProjectView,
   Role,

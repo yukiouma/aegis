@@ -126,6 +126,8 @@ export const en = {
   'project.configuration.general.language': 'Preferred language',
   'project.configuration.general.language.none': '(no preference)',
   'project.configuration.general.tags': 'Tags',
+  'project.configuration.general.sdtmig': 'SDTMIG Version',
+  'project.configuration.general.sdtmig.none': '(unspecified)',
   'project.configuration.members.leadersHeading': 'Leaders (read-only)',
   'project.configuration.members.workersHeading': 'Workers',
   'project.configuration.members.add': 'Add worker',
