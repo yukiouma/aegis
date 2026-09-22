@@ -72,6 +72,7 @@ function renderRow(overrides: Partial<React.ComponentProps<typeof CrfItemRow>> =
         onOpenIssues={onOpenIssues}
         missionExists={true}
         canOpenEmptyIssueDialog={true}
+        canClearNotSubmitted={true}
         {...overrides}
       />
     </AegisI18nProvider>,

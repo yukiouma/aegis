@@ -497,6 +497,9 @@ describe("CrfDetailPage", () => {
       current_user: () => fakeUser,
       get_crf_form_by_id: () => ({ ...fakeForm, notSubmitted: true }),
       get_crf_form_details: () => detailNotSubmitted,
+      // Leader mock so the [NOT SUBMITTED] chip's delete affordance
+      // is rendered — `canClearNotSubmitted` requires leader / DEV.
+      get_project_by_code: () => leaderProject,
       update_crf_form: () => fakeForm,
       update_crf_item: () => detailNotSubmitted.items[0]!.item,
       update_crf_option: () => detailNotSubmitted.items[0]!.options[0]!.option,
@@ -1413,5 +1416,97 @@ describe("CrfDetailPage — role-based restrictions", () => {
     const ann = await screen.findByText("item-level note");
     expect(ann.closest(".MuiChip-root")).not.toHaveClass("Mui-disabled");
     expect(ann.closest(".MuiChip-root")).not.toHaveClass("MuiChip-clickable");
+  });
+
+  // [NOT SUBMITTED] chip's delete affordance is gated on
+  // `canClearNotSubmitted = isLeader || isMissionDev`. Mission QC
+  // (the reviewer) and task-unrelated users see the chip but can't
+  // click it to clear the flag — leader and DEV are the only two
+  // roles allowed to clear.
+  it("mission QC: [NOT SUBMITTED] chip renders without delete affordance", async () => {
+    const detailNotSubmitted = {
+      ...fakeDetail,
+      form: { ...fakeDetail.form, notSubmitted: true },
+      items: [
+        {
+          ...fakeDetail.items[0]!,
+          item: { ...fakeDetail.items[0]!.item, notSubmitted: true },
+        },
+      ],
+    };
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => ({ ...fakeForm, notSubmitted: true }),
+      get_crf_form_details: () => detailNotSubmitted,
+      get_project_by_code: () => nonLeaderProject,
+      list_missions_by_project: () => [missionForUser("qc")],
+      list_issues_by_mission: () => [],
+    });
+    renderPage(["/project/abc/crf/11"]);
+
+    // Both the form-level chip and the per-item chip render, but
+    // without a delete icon — MUI's Chip only renders the delete
+    // affordance when `onDelete` is provided.
+    const chips = await screen.findAllByTestId("not-submitted-chip");
+    expect(chips.length).toBeGreaterThanOrEqual(2);
+    for (const c of chips) {
+      const root = c.closest(".MuiChip-root")!;
+      expect(root.querySelector(".MuiChip-deleteIcon")).toBeNull();
+    }
+  });
+
+  it("mission DEV: [NOT SUBMITTED] chip retains its delete affordance", async () => {
+    const detailNotSubmitted = {
+      ...fakeDetail,
+      form: { ...fakeDetail.form, notSubmitted: true },
+      items: [
+        {
+          ...fakeDetail.items[0]!,
+          item: { ...fakeDetail.items[0]!.item, notSubmitted: true },
+        },
+      ],
+    };
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => ({ ...fakeForm, notSubmitted: true }),
+      get_crf_form_details: () => detailNotSubmitted,
+      get_project_by_code: () => nonLeaderProject,
+      list_missions_by_project: () => [missionForUser("dev")],
+      list_issues_by_mission: () => [],
+    });
+    renderPage(["/project/abc/crf/11"]);
+
+    // DEV authors annotations — they're allowed to clear the flag
+    // (e.g. after re-fixing the item they marked not-submitted).
+    const chips = await screen.findAllByTestId("not-submitted-chip");
+    expect(chips.length).toBeGreaterThanOrEqual(2);
+    for (const c of chips) {
+      const root = c.closest(".MuiChip-root")!;
+      expect(root.querySelector(".MuiChip-deleteIcon")).not.toBeNull();
+    }
+  });
+
+  it("project leader: [NOT SUBMITTED] chip retains its delete affordance", async () => {
+    const detailNotSubmitted = {
+      ...fakeDetail,
+      form: { ...fakeDetail.form, notSubmitted: true },
+    };
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => fakeUser,
+      get_crf_form_by_id: () => ({ ...fakeForm, notSubmitted: true }),
+      get_crf_form_details: () => detailNotSubmitted,
+      get_project_by_code: () => leaderProject,
+      list_missions_by_project: () => [missionForUser("qc")],
+      list_issues_by_mission: () => [],
+    });
+    renderPage(["/project/abc/crf/11"]);
+
+    // The form-level chip has a delete icon.
+    const chip = await screen.findByTestId("not-submitted-chip");
+    const root = chip.closest(".MuiChip-root")!;
+    expect(root.querySelector(".MuiChip-deleteIcon")).not.toBeNull();
   });
 });

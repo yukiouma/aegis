@@ -279,6 +279,13 @@ export function CrfDetailPage() {
   // matches today's `canCreate` behavior.
   const canEditAnnotations = isProjectLeader === true || isMissionDev;
   const canOpenEmptyIssueDialog = isProjectLeader === true || isMissionQc;
+  // Only project leader and mission DEV can clear the
+  // [NOT SUBMITTED] flag on a form / item / option / unit. Mission
+  // QC (the reviewer) and unrelated users see the chip as a
+  // read-only status indicator — the delete affordance is dropped
+  // entirely so they can't accidentally re-mark the owner as
+  // submitted.
+  const canClearNotSubmitted = isProjectLeader === true || isMissionDev;
 
   const createIssue = useCreateIssue();
   const patchIssueState = usePatchIssueState();
@@ -386,12 +393,18 @@ export function CrfDetailPage() {
         </Typography>
         {form?.notSubmitted && (
           <NotSubmittedChip
-            onDelete={() =>
-              updateOwnerNotSubmitted.mutate({
-                formId: id,
-                owner: { kind: "form", id },
-                notSubmitted: false,
-              })
+            // QC / task-unrelated users see the chip but can't
+            // clear the flag — `onDelete` is omitted so MUI drops
+            // the delete icon entirely.
+            onDelete={
+              canClearNotSubmitted
+                ? () =>
+                    updateOwnerNotSubmitted.mutate({
+                      formId: id,
+                      owner: { kind: "form", id },
+                      notSubmitted: false,
+                    })
+                : undefined
             }
           />
         )}
@@ -623,6 +636,7 @@ export function CrfDetailPage() {
                 }
                 missionExists={Boolean(formMission)}
                 canOpenEmptyIssueDialog={canOpenEmptyIssueDialog}
+                canClearNotSubmitted={canClearNotSubmitted}
               />
             ))
           )}

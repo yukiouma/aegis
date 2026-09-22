@@ -90,6 +90,14 @@ interface Props {
    * RBAC flags used by the form-name hover menu.
    */
   canOpenEmptyIssueDialog: boolean;
+  /**
+   * Whether the current viewer is allowed to clear the
+   * [NOT SUBMITTED] flag on this item / option / unit. When
+   * `false`, the row's `<NotSubmittedChip>` renders without the
+   * delete affordance — same chip view style, no click surface.
+   * Only project leader and mission DEV can clear the flag.
+   */
+  canClearNotSubmitted: boolean;
 }
 
 export function CrfItemRow({
@@ -107,6 +115,7 @@ export function CrfItemRow({
   onOpenIssues,
   missionExists,
   canOpenEmptyIssueDialog,
+  canClearNotSubmitted,
 }: Props) {
   const { t } = useI18n();
   const { item, options, units, annotations } = itemDetail;
@@ -206,8 +215,10 @@ export function CrfItemRow({
         />
         {item.notSubmitted && (
           <NotSubmittedChip
-            onDelete={() =>
-              onClearNotSubmitted({ kind: "item", id: item.id })
+            onDelete={
+              canClearNotSubmitted
+                ? () => onClearNotSubmitted({ kind: "item", id: item.id })
+                : undefined
             }
           />
         )}
@@ -259,8 +270,10 @@ export function CrfItemRow({
             </Typography>
             {u.unit.notSubmitted && (
               <NotSubmittedChip
-                onDelete={() =>
-                  onClearNotSubmitted({ kind: "unit", id: u.unit.id })
+                onDelete={
+                  canClearNotSubmitted
+                    ? () => onClearNotSubmitted({ kind: "unit", id: u.unit.id })
+                    : undefined
                 }
               />
             )}
@@ -285,8 +298,14 @@ export function CrfItemRow({
               </Typography>
               {o.option.notSubmitted && (
                 <NotSubmittedChip
-                  onDelete={() =>
-                    onClearNotSubmitted({ kind: "option", id: o.option.id })
+                  onDelete={
+                    canClearNotSubmitted
+                      ? () =>
+                          onClearNotSubmitted({
+                            kind: "option",
+                            id: o.option.id,
+                          })
+                      : undefined
                   }
                 />
               )}
