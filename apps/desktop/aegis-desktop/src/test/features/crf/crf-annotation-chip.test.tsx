@@ -7,6 +7,7 @@ import {
   AnnotationChip,
   annotationColor,
 } from "../../../features/crf/components/AnnotationChip";
+import { CrfAnnotationArea } from "../../../features/crf/components/CrfAnnotationArea";
 
 // When `disabled={true}` is passed, AnnotationChip calls useI18n to
 // render the disabled-state tooltip title. Tests in the
@@ -211,6 +212,65 @@ describe("AnnotationChip — disabled prop", () => {
         onDelete={() => undefined}
         disabled={true}
       />,
+    );
+    fireEvent.click(screen.getByText("annotation text"));
+    expect(onEdit).not.toHaveBeenCalled();
+  });
+});
+
+describe("CrfAnnotationArea — canEditAnnotations", () => {
+  const baseAnnotation = {
+    id: 1,
+    domainAnnotationId: 50,
+    content: "annotation text",
+    assign: false,
+    owner: { kind: "form" as const, id: 11 },
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-02T00:00:00Z",
+  };
+
+  it("renders chips enabled when canEditAnnotations is true", () => {
+    render(
+      <CrfAnnotationArea
+        annotations={[baseAnnotation]}
+        colorByDomainAnnotationId={new Map([[50, 0]])}
+        canEditAnnotations={true}
+        onEdit={() => undefined}
+        onDelete={() => undefined}
+      />,
+    );
+    const chip = screen.getByText("annotation text").closest(".MuiChip-root")!;
+    expect(chip).not.toHaveClass("Mui-disabled");
+  });
+
+  it("renders chips disabled when canEditAnnotations is false", () => {
+    render(
+      <AegisI18nProvider>
+        <CrfAnnotationArea
+          annotations={[baseAnnotation]}
+          colorByDomainAnnotationId={new Map([[50, 0]])}
+          canEditAnnotations={false}
+          onEdit={() => undefined}
+          onDelete={() => undefined}
+        />
+      </AegisI18nProvider>,
+    );
+    const chip = screen.getByText("annotation text").closest(".MuiChip-root")!;
+    expect(chip).toHaveClass("Mui-disabled");
+  });
+
+  it("does not call onEdit when a disabled chip is clicked", () => {
+    const onEdit = vi.fn();
+    render(
+      <AegisI18nProvider>
+        <CrfAnnotationArea
+          annotations={[baseAnnotation]}
+          colorByDomainAnnotationId={new Map([[50, 0]])}
+          canEditAnnotations={false}
+          onEdit={onEdit}
+          onDelete={() => undefined}
+        />
+      </AegisI18nProvider>,
     );
     fireEvent.click(screen.getByText("annotation text"));
     expect(onEdit).not.toHaveBeenCalled();

@@ -522,6 +522,7 @@ export function CrfDetailPage() {
             colorByDomainAnnotationId,
           )}
           colorByDomainAnnotationId={colorByDomainAnnotationId}
+          canEditAnnotations={true}
           onEdit={(a) => openEditAnnotation(a, { kind: "form", id })}
           onDelete={(a) => setConfirmDeleteAnnotation(a)}
         />
