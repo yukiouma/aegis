@@ -13,7 +13,11 @@ import {
   Tooltip,
   Typography,
 } from "@aegis/ui/mui";
-import { ArrowBack as ArrowBackIcon } from "@aegis/ui/icons";
+import {
+  ArrowBack as ArrowBackIcon,
+  PendingActions as PendingActionsIcon,
+  Verified as VerifiedIcon,
+} from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
 
@@ -40,7 +44,7 @@ import {
 import { useCurrentUser } from "../../auth";
 import { useUserNameMap } from "../../user";
 import { annotationColor } from "../components/AnnotationChip";
-import { useGetCrfForm } from "../data/list";
+import { useGetCrfForm, useSetCrfFormApproved } from "../data/list";
 import {
   useCrfFormDetail,
   useCreateAnnotation,
@@ -309,6 +313,30 @@ export function CrfDetailPage() {
   const createIssue = useCreateIssue();
   const patchIssueState = usePatchIssueState();
   const appendComment = useAppendComment();
+  const setApproved = useSetCrfFormApproved();
+
+  // Approval chip — QC-only, blocked while open issues exist on
+  // the form (cached count used for visual feedback only; the
+  // authoritative gate lives in the Tauri command and
+  // re-fetches the live count before calling the server).
+  const openIssueCount = openIssueCountByTarget.get(null) ?? 0;
+  const approvedDisabled =
+    setApproved.isPending ||
+    !isMissionQc ||
+    (form !== undefined && form.approved === false && openIssueCount > 0);
+  const approvedTooltipReason = !isMissionQc
+    ? t("crf.toolbar.approveDisabled.notQc")
+    : form !== undefined && form.approved === false && openIssueCount > 0
+      ? t("crf.toolbar.approveDisabled.openIssues", { count: openIssueCount })
+      : "";
+  const handleToggleApproved = () => {
+    if (!form || !formMission) return;
+    setApproved.mutate({
+      id: form.id,
+      approved: !form.approved,
+      missionId: formMission.id,
+    });
+  };
 
   const [issueDialog, setIssueDialog] = useState<
     | { scope: IssueScope; missionId: number }
@@ -553,6 +581,35 @@ export function CrfDetailPage() {
           </Stack>
         )}
         <Box sx={{ flexGrow: 1 }} />
+        {form && (
+          <Tooltip
+            title={approvedTooltipReason}
+            disableHoverListener={!approvedDisabled || !approvedTooltipReason}
+          >
+            <span>
+              <Chip
+                icon={
+                  form.approved ? <VerifiedIcon /> : <PendingActionsIcon />
+                }
+                label={
+                  form.approved
+                    ? t("crf.toolbar.statusApproved")
+                    : t("crf.toolbar.statusPending")
+                }
+                color={form.approved ? "success" : "warning"}
+                variant="outlined"
+                size="small"
+                onClick={approvedDisabled ? undefined : handleToggleApproved}
+                sx={
+                  approvedDisabled
+                    ? { opacity: 0.5, cursor: "not-allowed" }
+                    : undefined
+                }
+                data-testid="crf-approval-toggle"
+              />
+            </span>
+          </Tooltip>
+        )}
         <CrfToolsMenu projectCode={projectCode} versionId={routeSearch.versionId ?? null} />
       </Box>
 
