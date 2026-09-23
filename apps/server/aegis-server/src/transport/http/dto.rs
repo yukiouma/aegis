@@ -339,6 +339,43 @@ impl From<apis::project::ModelVersionView> for ModelVersionResponse {
     }
 }
 
+/// Wire-level request body for the SDTM controlled-terminology
+/// version pointer a project pins. Mirrors
+/// `apis::project::TerminologyVersionData`.
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminologyVersionRequest {
+    pub version_id: i64,
+    pub version_name: String,
+}
+
+impl From<TerminologyVersionRequest> for apis::project::TerminologyVersionData {
+    fn from(v: TerminologyVersionRequest) -> Self {
+        Self {
+            version_id: v.version_id,
+            version_name: v.version_name,
+        }
+    }
+}
+
+/// Wire-level projection of the SDTM controlled-terminology version
+/// pointer. Mirrors `apis::project::TerminologyVersionView`.
+#[derive(Serialize, Deserialize, ToSchema, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminologyVersionResponse {
+    pub version_id: i64,
+    pub version_name: String,
+}
+
+impl From<apis::project::TerminologyVersionView> for TerminologyVersionResponse {
+    fn from(v: apis::project::TerminologyVersionView) -> Self {
+        Self {
+            version_id: v.version_id,
+            version_name: v.version_name,
+        }
+    }
+}
+
 // -- project configuration DTOs ---------------------------------------------
 
 /// Wire-level mirror of [`apis::project::ProjectLanguage`]. The two
@@ -386,6 +423,8 @@ pub struct ProjectConfigurationDataRequest {
     pub tags: Vec<TagDataRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sdtmig: Option<ModelVersionRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sdtm_terminology: Option<TerminologyVersionRequest>,
 }
 
 impl From<ProjectConfigurationDataRequest> for apis::project::ProjectConfigurationData {
@@ -401,6 +440,7 @@ impl From<ProjectConfigurationDataRequest> for apis::project::ProjectConfigurati
                 })
                 .collect(),
             sdtmig: c.sdtmig.map(Into::into),
+            sdtm_terminology: c.sdtm_terminology.map(Into::into),
         }
     }
 }
@@ -415,6 +455,8 @@ pub struct ProjectConfigurationViewResponse {
     pub tags: Vec<TagViewResponse>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sdtmig: Option<ModelVersionResponse>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sdtm_terminology: Option<TerminologyVersionResponse>,
 }
 
 impl From<apis::project::ProjectConfigurationView> for ProjectConfigurationViewResponse {
@@ -423,6 +465,7 @@ impl From<apis::project::ProjectConfigurationView> for ProjectConfigurationViewR
             language: c.language.map(Into::into),
             tags: c.tags.into_iter().map(Into::into).collect(),
             sdtmig: c.sdtmig.map(Into::into),
+            sdtm_terminology: c.sdtm_terminology.map(Into::into),
         }
     }
 }
@@ -2574,6 +2617,7 @@ mod tests {
                     },
                 ],
                 sdtmig: None,
+                sdtm_terminology: None,
             },
             active: true,
             created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
