@@ -57,6 +57,7 @@ fn usecase_commands_have_expected_field_shape() {
             None,
             vec![],
             Some(ModelVersion::for_repository(7, "2024-03-29".into())),
+            None,
         )),
     };
 
@@ -71,6 +72,7 @@ fn usecase_commands_have_expected_field_shape() {
             None,
             vec![],
             Some(ModelVersion::for_repository(7, "2024-03-29".into())),
+            None,
         )),
     };
 }
@@ -89,6 +91,7 @@ fn api_requests_have_expected_field_shape() {
                 version_id: 7,
                 version_name: "2024-03-29".into(),
             }),
+            sdtm_terminology: None,
         }),
     };
 
@@ -106,6 +109,7 @@ fn api_requests_have_expected_field_shape() {
                 version_id: 7,
                 version_name: "2024-03-29".into(),
             }),
+            sdtm_terminology: None,
         }),
     };
 }
@@ -193,6 +197,7 @@ fn apis_view_dtos_are_nameable() {
         language: Some(apis::project::ProjectLanguage::English),
         tags: vec![],
         sdtmig: None,
+        sdtm_terminology: None,
     });
     assert_configuration_data(ProjectConfigurationData::default());
 }
