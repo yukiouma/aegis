@@ -165,7 +165,7 @@ empty-config serialises-as-`{}` invariant.
 `apps/desktop/aegis-desktop/src/shared/api/types.ts`:
 
 ```ts
-export interface ProjectConfigurationSdtmTerminology {
+export interface ProjectConfigurationTerminology {
   versionId: number;
   versionName: string;
 }
@@ -174,7 +174,7 @@ export interface ProjectConfiguration {
   language: ProjectLanguage | null;
   tags: Tag[];
   sdtmig?: ProjectConfigurationSdtmig | null;
-  sdtmTerminology?: ProjectConfigurationSdtmTerminology | null;
+  sdtmTerminology?: ProjectConfigurationTerminology | null;
 }
 ```
 
@@ -204,7 +204,7 @@ parallel:
 
 ```tsx
 const [sdtmTerminology, setSdtmTerminology] =
-  useState<ProjectConfigurationSdtmTerminology | null>(
+  useState<ProjectConfigurationTerminology | null>(
     initial.sdtmTerminology ?? null,
   );
 const sdtmTerminologyTouchedRef = useRef(false);
