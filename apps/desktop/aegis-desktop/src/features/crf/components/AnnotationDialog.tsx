@@ -355,7 +355,7 @@ export function AnnotationDialog({
               ))}
             </Select>
           </FormControl>
-          <Stack direction="row" spacing={1} alignItems="center">
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
             <TextField
               size="small"
               label={t("crf.annotationDialog.field.content")}
