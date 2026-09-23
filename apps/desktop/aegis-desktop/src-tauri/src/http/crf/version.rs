@@ -390,6 +390,7 @@ pub async fn import_als(
                     name: f.description.clone(),
                     order: f.order,
                     not_submitted: false,
+                    approved: false,
                 },
                 items,
             },

@@ -16,6 +16,7 @@ pub struct CrfFormViewResponse {
     pub name: String,
     pub order: i32,
     pub not_submitted: bool,
+    pub approved: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -33,6 +34,7 @@ pub struct CreateCrfFormRequest {
     pub name: String,
     pub order: i32,
     pub not_submitted: bool,
+    pub approved: bool,
 }
 
 /// Wire mirror of `apis::crf::CrfItemKind`. Used by the bulk-create
@@ -172,6 +174,27 @@ pub async fn delete(c: &HttpClient, id: i64) -> Result<(), ApiError> {
         )
         .await?;
     Ok(())
+}
+
+/// Body for `POST /api/crf/forms/{id}/approval`. The id is in
+/// the path; the body carries only the desired flag value.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetCrfApprovedRequest {
+    pub approved: bool,
+}
+
+pub async fn set_approved(
+    c: &HttpClient,
+    id: i64,
+    body: SetCrfApprovedRequest,
+) -> Result<CrfFormViewResponse, ApiError> {
+    c.request(
+        reqwest::Method::POST,
+        &format!("/api/crf/forms/{id}/approval"),
+        Some(&body),
+    )
+    .await
 }
 
 pub async fn get_by_id(c: &HttpClient, id: i64) -> Result<CrfFormViewResponse, ApiError> {
@@ -358,6 +381,7 @@ mod tests {
             "name": name,
             "order": 0,
             "notSubmitted": false,
+            "approved": false,
             "createdAt": "2026-01-01T00:00:00Z",
             "updatedAt": "2026-01-02T00:00:00Z"
         })
@@ -402,6 +426,7 @@ mod tests {
                 name: "Adverse Events".into(),
                 order: 0,
                 not_submitted: false,
+                approved: false,
             },
         )
         .await
@@ -541,5 +566,26 @@ mod tests {
             .unwrap();
         assert_eq!(resp.forms.len(), 1);
         assert_eq!(resp.forms[0].id, 11);
+    }
+
+    #[tokio::test]
+    async fn set_approved_hits_correct_path() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/crf/forms/11/approval"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(form_view_json(11, 7, "AE", "Renamed")),
+            )
+            .mount(&server)
+            .await;
+        let f = set_approved(
+            &client(&server),
+            11,
+            SetCrfApprovedRequest { approved: true },
+        )
+        .await
+        .unwrap();
+        assert_eq!(f.id, 11);
+        assert!(!f.approved, "fixture helper defaults to false; mock body matches");
     }
 }
