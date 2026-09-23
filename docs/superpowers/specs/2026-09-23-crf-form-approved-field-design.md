@@ -35,9 +35,11 @@ A new migration `0008_add_crf_forms_approved.sql` adds `approved BOOLEAN NOT NUL
 - New command `SetCrfApproved { id: i64, approved: bool }`.
 - New method `CrfUsecase::set_approved(cmd) -> Result<CrfFormView, UsecaseError>`:
   1. Load the form (`DomainError::CrfFormNotFound(id)` if missing → 404).
-  2. If `cmd.approved == true`: look up the form's mission via the existing project lookup (`forms.code == missions.mission_code`) and count open issues (`state == Opened`) for that mission. If `count > 0`, return `UsecaseError::Validation(DomainError::OpenIssuesBlockingApproval { open_issue_count })`.
-  3. If the form has no mission, return `UsecaseError::Validation(DomainError::NoMissionForApproval)`.
-  4. Call the new `form_repo.set_approved(id, approved)` and project to view.
+  2. If `cmd.approved == true`:
+     a. Load the form's version to get `project_code` (`DomainError::CrfVersionNotFound(version_id)` if missing).
+     b. Call `mission_repo.find_by_project_code_and_mission_code(project_code, MissionKind::Crf, form.code)` — a new port method added to `MissionRepository` (see "New mission-port method" below). If `Result::Err(DomainError::MissionNotFound)` (or no row), return `UsecaseError::Validation(DomainError::NoMissionForApproval)`.
+     c. Count open issues (`state == Opened`) on that mission via `issue_repo.count_open_by_mission(mission.id)` — a new port method (see "New issue-port method" below). If `count > 0`, return `UsecaseError::Validation(DomainError::OpenIssuesBlockingApproval { open_issue_count })`.
+  3. Call `form_repo.set_approved(id, approved)` and project to view.
 
 ### Persistence (`lib/crates/crf/src/adapter/persistence/postgres`)
 
@@ -57,9 +59,21 @@ A new migration `0008_add_crf_forms_approved.sql` adds `approved BOOLEAN NOT NUL
 - New error variants:
   - `CrfApiError::SetCrfApprovedFailed { reason: String }` — payload is a stable string code that the handler maps to an HTTP 409 with `code: <reason>`. Reasons used: `"open_issues_blocking_approval"`, `"no_mission"`.
 
-### New domain error
+### New domain error (in `lib/crates/crf/src/domain/error.rs`)
 
-`DomainError::OpenIssuesBlockingApproval { open_issue_count: usize }` and `DomainError::NoMissionForApproval`.
+Two new variants on `crf::DomainError`:
+- `DomainError::OpenIssuesBlockingApproval { open_issue_count: usize }` — the gate tripped.
+- `DomainError::NoMissionForApproval` — the form has no matching mission, so it can't be approved.
+
+Both flow through `UsecaseError::Validation(...)` → `CrfApiError::SetCrfApprovedFailed { reason }` → HTTP 409 with stable `code`.
+
+### New mission-port method (`lib/crates/mission/src/domain/mission_lookup.rs`)
+
+`MissionRepository::find_by_project_code_and_mission_code(project_code: &str, kind: MissionKind, mission_code: &str) -> Result<Mission, DomainError>` — returns the single mission matching the triple, or `DomainError::MissionNotFound`. Adds a SQL `WHERE project_code = $1 AND kind = $2 AND mission_code = $3` to `MissionRepo`. Mirrored on `FakeMissionRepo` in `test_support.rs`. Avoids the form-usecase having to load the full project mission list and filter in memory.
+
+### New issue-port method (`lib/crates/mission/src/domain/mission_lookup.rs`)
+
+`MissionIssueRepository::count_open_by_mission(mission_id: i64) -> Result<usize, DomainError>` — `SELECT COUNT(*) FROM mission_issues WHERE mission_id = $1 AND state = 'opened'`. Mirrored on `FakeIssueRepo` in `test_support.rs`.
 
 ### Facade (`lib/crates/crf/src/adapter/facade/in_memory/service.rs`)
 
