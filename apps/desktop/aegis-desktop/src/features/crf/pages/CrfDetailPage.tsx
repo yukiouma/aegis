@@ -20,6 +20,7 @@ import {
 } from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   AnnotationDialog,
@@ -63,6 +64,7 @@ import type {
   DomainAnnotation,
 } from "../../../shared/api";
 import { errorMessage } from "../../../shared/api/error";
+import { queryKeys } from "../../../shared/query/keys";
 
 type DomainDialogState =
   | { mode: "create" }
@@ -314,6 +316,7 @@ export function CrfDetailPage() {
   const patchIssueState = usePatchIssueState();
   const appendComment = useAppendComment();
   const setApproved = useSetCrfFormApproved();
+  const qc = useQueryClient();
 
   // Approval chip — QC-only, blocked while open issues exist on
   // the form (cached count used for visual feedback only; the
@@ -336,6 +339,26 @@ export function CrfDetailPage() {
       approved: !form.approved,
       missionId: formMission.id,
     });
+  };
+
+  // Surface a closable Alert when the Tauri command rejects
+  // set_approved (e.g. open issues blocking approval). Closing
+  // re-fetches the mission's issues so the chip's disabled state
+  // stays in sync with the fresh count.
+  const [approvalError, setApprovalError] = useState<string | null>(null);
+  useEffect(() => {
+    if (setApproved.isError && setApproved.error) {
+      setApprovalError(errorMessage(setApproved.error));
+    }
+  }, [setApproved.isError, setApproved.error]);
+  const dismissApprovalError = () => {
+    setApprovalError(null);
+    setApproved.reset();
+    if (formMission) {
+      void qc.invalidateQueries({
+        queryKey: queryKeys.mission.issuesByMission(formMission.id),
+      });
+    }
   };
 
   const [issueDialog, setIssueDialog] = useState<
@@ -612,6 +635,16 @@ export function CrfDetailPage() {
         )}
         <CrfToolsMenu projectCode={projectCode} versionId={routeSearch.versionId ?? null} />
       </Box>
+
+      {approvalError && (
+        <Alert
+          severity="warning"
+          onClose={dismissApprovalError}
+          data-testid="crf-approval-error"
+        >
+          {approvalError}
+        </Alert>
+      )}
 
       {query.isFetching && !form && (
         <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
