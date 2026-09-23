@@ -30,6 +30,7 @@ const row: CrfForm = {
   name: "Adverse Events",
   order: 1,
   notSubmitted: false,
+  approved: false,
   createdAt: "",
   updatedAt: "",
 };
