@@ -215,6 +215,7 @@ mod row_tests {
                     ProjectTag::for_repository("Region".into(), "EU".into()),
                 ],
                 None,
+                None,
             )),
             created_at: ts(),
             updated_at: ts(),

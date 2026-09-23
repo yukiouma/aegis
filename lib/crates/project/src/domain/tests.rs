@@ -172,7 +172,7 @@ fn project_configuration_for_repository_carries_language_and_tags() {
         Some(ProjectLanguage::SimplifiedChinese),
         vec![ProjectTag::for_repository("k".into(), "v".into())],
         None,
-    );
+        None,);
     assert_eq!(c.language, Some(ProjectLanguage::SimplifiedChinese));
     assert_eq!(c.tags.len(), 1);
     assert_eq!(c.tags[0].key, "k");
@@ -190,7 +190,7 @@ fn project_configuration_for_repository_carries_sdtmig() {
         None,
         vec![],
         Some(ModelVersion::for_repository(3, "2024-03-29".into())),
-    );
+        None,);
     assert_eq!(
         c.sdtmig,
         Some(ModelVersion::for_repository(3, "2024-03-29".into()))
@@ -221,4 +221,50 @@ fn model_version_for_repository_carries_fields() {
     let v = ModelVersion::for_repository(7, "2024-03-29".into());
     assert_eq!(v.version_id, 7);
     assert_eq!(v.version_name, "2024-03-29");
+}
+
+#[test]
+fn terminology_version_data_new_rejects_empty_name() {
+    let err = TerminologyVersionData::new(1, "".into()).unwrap_err();
+    assert!(matches!(err, DomainError::EmptySdtmTerminologyName));
+}
+
+#[test]
+fn terminology_version_data_new_rejects_whitespace_name() {
+    let err = TerminologyVersionData::new(1, "   ".into()).unwrap_err();
+    assert!(matches!(err, DomainError::EmptySdtmTerminologyName));
+}
+
+#[test]
+fn terminology_version_data_new_accepts_valid_input() {
+    let v = TerminologyVersionData::new(7, "2024-03-29".into()).unwrap();
+    assert_eq!(v.version_id, 7);
+    assert_eq!(v.version_name, "2024-03-29");
+}
+
+#[test]
+fn terminology_version_data_for_repository_carries_fields() {
+    let v = TerminologyVersionData::for_repository(7, "2024-03-29".into());
+    assert_eq!(v.version_id, 7);
+    assert_eq!(v.version_name, "2024-03-29");
+}
+
+#[test]
+fn project_configuration_default_has_no_sdtm_terminology() {
+    let c = ProjectConfiguration::default();
+    assert!(c.sdtm_terminology.is_none());
+}
+
+#[test]
+fn project_configuration_for_repository_carries_sdtm_terminology() {
+    let c = ProjectConfiguration::for_repository(
+        None,
+        vec![],
+        None,
+        Some(TerminologyVersionData::for_repository(7, "2024-03-29".into())),
+    );
+    assert_eq!(
+        c.sdtm_terminology,
+        Some(TerminologyVersionData::for_repository(7, "2024-03-29".into()))
+    );
 }
