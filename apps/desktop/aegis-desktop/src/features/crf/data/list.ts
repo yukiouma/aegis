@@ -80,3 +80,23 @@ export function useDeleteCrfForm() {
     },
   });
 }
+
+export function useSetCrfFormApproved() {
+  const qc = useQueryClient();
+  return useMutation<
+    CrfForm,
+    ApiError,
+    { id: number; approved: boolean; missionId: number }
+  >({
+    mutationFn: ({ id, approved, missionId }) =>
+      api.setCrfFormApproved(id, approved, missionId),
+    onSuccess: (updated) => {
+      void qc.invalidateQueries({
+        queryKey: queryKeys.crf.formsByVersion(updated.versionId),
+      });
+      void qc.invalidateQueries({
+        queryKey: queryKeys.crf.form(updated.id),
+      });
+    },
+  });
+}
