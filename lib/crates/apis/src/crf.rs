@@ -62,6 +62,7 @@ pub struct CrfFormView {
     pub name: String,
     pub order: i32,
     pub not_submitted: bool,
+    pub approved: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -149,6 +150,7 @@ pub struct CreateCrfFormRequest {
     pub name: String,
     pub order: i32,
     pub not_submitted: bool,
+    pub approved: bool,
 }
 
 /// Input DTO for [`CrfService::bulk_create_form`].
@@ -228,6 +230,16 @@ pub struct UpdateCrfFormRequest {
     pub name: Option<String>,
     pub order: Option<i32>,
     pub not_submitted: Option<bool>,
+}
+
+/// Input DTO for [`CrfService::set_approved`]. The gate (zero
+/// open issues) is enforced by the Tauri command, not by this
+/// port — `set_approved` is a thin server-side toggle on the
+/// `approved` flag.
+#[derive(Debug, Clone)]
+pub struct SetCrfApprovedRequest {
+    pub id: i64,
+    pub approved: bool,
 }
 
 /// Input DTO for [`CrfService::create_item`].
@@ -589,6 +601,18 @@ pub trait CrfService: Send + Sync {
     async fn update_form(&self, req: UpdateCrfFormRequest) -> Result<CrfFormView, CrfApiError>;
 
     async fn delete_form(&self, id: i64) -> Result<(), CrfApiError>;
+
+    /// Toggle the `approved` flag on the form identified by
+    /// `req.id`. Thin server-side toggle — no gate logic. Returns
+    /// `CrfApiError::CrfFormNotFound(req.id)` if the form does
+    /// not exist. The Tauri command re-fetches the open-issue
+    /// count and rejects before calling this endpoint, so an
+    /// "approve with open issues" call should never reach the
+    /// server.
+    async fn set_approved(
+        &self,
+        req: SetCrfApprovedRequest,
+    ) -> Result<CrfFormView, CrfApiError>;
 
     /// Atomically create a form, every item, and each item's
     /// options + units. All-or-nothing: any error rolls back the

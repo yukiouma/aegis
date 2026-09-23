@@ -29,6 +29,7 @@ pub struct CreateCrfForm {
     pub name: String,
     pub order: i32,
     pub not_submitted: bool,
+    pub approved: bool,
 }
 
 #[derive(Default)]
@@ -38,6 +39,15 @@ pub struct UpdateCrfForm {
     pub name: Option<String>,
     pub order: Option<i32>,
     pub not_submitted: Option<bool>,
+}
+
+/// Toggle the `approved` flag on a CRF form. The gate (zero open
+/// issues) is enforced by the Tauri command, not here — this
+/// usecase is intentionally simple and does not compose
+/// mission / issue services.
+pub struct SetCrfApproved {
+    pub id: i64,
+    pub approved: bool,
 }
 
 // ---- CrfItem ----
@@ -191,6 +201,7 @@ impl From<CreateCrfBulkForm> for DomainCrfBulkCreateForm {
                 name: cmd.form.name,
                 order: cmd.form.order,
                 not_submitted: cmd.form.not_submitted,
+                approved: cmd.form.approved,
             },
             items: cmd
                 .items

@@ -166,6 +166,7 @@ where
                 name: req.name,
                 order: req.order,
                 not_submitted: req.not_submitted,
+                approved: req.approved,
             })
             .await
             .map(Into::into)
@@ -184,6 +185,7 @@ where
                     name: req.form.name,
                     order: req.form.order,
                     not_submitted: req.form.not_submitted,
+                    approved: req.form.approved,
                 },
                 items: req
                     .items
@@ -275,6 +277,20 @@ where
 
     async fn delete_form(&self, id: i64) -> Result<(), CrfApiError> {
         self.usecase.delete_form(id).await.map_err(map_error)
+    }
+
+    async fn set_approved(
+        &self,
+        req: apis::crf::SetCrfApprovedRequest,
+    ) -> Result<ApiCrfFormView, CrfApiError> {
+        self.usecase
+            .set_approved(crate::usecase::SetCrfApproved {
+                id: req.id,
+                approved: req.approved,
+            })
+            .await
+            .map(Into::into)
+            .map_err(map_error)
     }
 
     // ---- CrfItem ----
@@ -710,6 +726,7 @@ impl From<crate::usecase::CrfFormView> for ApiCrfFormView {
             name: f.name,
             order: f.order,
             not_submitted: f.not_submitted,
+            approved: f.approved,
             created_at: f.created_at,
             updated_at: f.updated_at,
         }
