@@ -74,6 +74,7 @@ export function CrfFormDrawer({
         name: name.trim(),
         order: 0,
         notSubmitted: false,
+        approved: false, // new forms are not pre-approved
       });
     }
   }
