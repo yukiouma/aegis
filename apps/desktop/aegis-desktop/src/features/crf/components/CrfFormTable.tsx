@@ -21,6 +21,7 @@ import {
   FilterList as FilterListIcon,
   Launch as LaunchIcon,
   PendingActions as PendingActionsIcon,
+  Verified as VerifiedIcon,
 } from "@aegis/ui/icons";
 import {
   DragDropProvider,
@@ -186,10 +187,16 @@ function DraggableRow({
       </TableCell>
       <TableCell>
         <Chip
-          icon={<PendingActionsIcon />}
-          label={t("crf.toolbar.statusPending")}
+          icon={
+            row.approved ? <VerifiedIcon /> : <PendingActionsIcon />
+          }
+          label={
+            row.approved
+              ? t("crf.toolbar.statusApproved")
+              : t("crf.toolbar.statusPending")
+          }
           size="small"
-          color="warning"
+          color={row.approved ? "success" : "warning"}
           variant="outlined"
         />
       </TableCell>
