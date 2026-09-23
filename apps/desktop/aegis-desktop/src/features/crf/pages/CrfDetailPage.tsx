@@ -9,6 +9,7 @@ import {
   MenuItem,
   MenuList,
   Popover,
+  Snackbar,
   Stack,
   Tooltip,
   Typography,
@@ -341,18 +342,21 @@ export function CrfDetailPage() {
     });
   };
 
-  // Surface a closable Alert when the Tauri command rejects
-  // set_approved (e.g. open issues blocking approval). Closing
-  // re-fetches the mission's issues so the chip's disabled state
-  // stays in sync with the fresh count.
-  const [approvalError, setApprovalError] = useState<string | null>(null);
+  // Surface a closable top Snackbar when the Tauri command
+  // rejects set_approved (e.g. open issues blocking approval).
+  // Closing re-fetches the mission's issues so the chip's
+  // disabled state stays in sync with the fresh count.
+  const [approvalError, setApprovalError] = useState<{
+    open: boolean;
+    message: string;
+  }>({ open: false, message: "" });
   useEffect(() => {
     if (setApproved.isError && setApproved.error) {
-      setApprovalError(errorMessage(setApproved.error));
+      setApprovalError({ open: true, message: errorMessage(setApproved.error) });
     }
   }, [setApproved.isError, setApproved.error]);
   const dismissApprovalError = () => {
-    setApprovalError(null);
+    setApprovalError({ open: false, message: "" });
     setApproved.reset();
     if (formMission) {
       void qc.invalidateQueries({
@@ -636,15 +640,17 @@ export function CrfDetailPage() {
         <CrfToolsMenu projectCode={projectCode} versionId={routeSearch.versionId ?? null} />
       </Box>
 
-      {approvalError && (
-        <Alert
-          severity="error"
-          onClose={dismissApprovalError}
-          data-testid="crf-approval-error"
-        >
-          {approvalError}
+      <Snackbar
+        open={approvalError.open}
+        autoHideDuration={6000}
+        onClose={dismissApprovalError}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        data-testid="crf-approval-error"
+      >
+        <Alert severity="error" onClose={dismissApprovalError}>
+          {approvalError.message}
         </Alert>
-      )}
+      </Snackbar>
 
       {query.isFetching && !form && (
         <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
