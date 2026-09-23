@@ -120,13 +120,26 @@ export interface ProjectConfigurationSdtmig {
   versionName: string;
 }
 
+/** Wire-shaped pointer to a project's SDTM controlled-terminology
+ *  version selection. `versionId` / `versionName` are camelCase to
+ *  mirror the server's `#[serde(rename_all = "camelCase")]` on
+ *  `apps/server/aegis-server/src/transport/http/dto.rs::TerminologyVersionRequest`.
+ *  Distinct from `ProjectConfigurationSdtmig` — the SDTM-IG version
+ *  targets the implementation guide; this targets the controlled
+ *  terminology release. */
+export interface ProjectConfigurationTerminology {
+  versionId: number;
+  versionName: string;
+}
+
 /** Project configuration payload: optional locale, the tag list, and
- *  an optional SDTM-IG version pointer. Server treats `Some(config)`
- *  on update as whole-replace. */
+ *  optional SDTM-IG / SDTM controlled-terminology version pointers.
+ *  Server treats `Some(config)` on update as whole-replace. */
 export interface ProjectConfiguration {
   language: ProjectLanguage | null;
   tags: Tag[];
   sdtmig?: ProjectConfigurationSdtmig | null;
+  sdtmTerminology?: ProjectConfigurationTerminology | null;
 }
 export interface ProjectView {
   id: number;
