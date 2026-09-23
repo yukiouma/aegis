@@ -16,6 +16,7 @@ import {
   MenuList,
   Popover,
   Select,
+  Stack,
   TextField,
 } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
@@ -75,6 +76,14 @@ interface Props {
    * dropdown. Empty array disables the dropdown entirely.
    */
   sdtmDomains: SdtmDomainView[];
+  /**
+   * Resolved `CrfItem.code` for the annotation's owner. `null` for
+   * non-item owners (form/option/unit) and for item owners whose
+   * item is not in the cached form detail. Drives the SUPP button's
+   * `<itemCode> in SUPP<domainCode>` draft; `null`/`undefined`
+   * disables the button when nothing useful can be drafted.
+   */
+  ownerItemCode?: string | null;
 }
 
 const EMPTY: AnnotationDialogBody = {
@@ -86,7 +95,7 @@ const EMPTY: AnnotationDialogBody = {
 export function AnnotationDialog({
   open,
   mode,
-  owner: _owner,
+  owner,
   ownerNotSubmitted,
   row,
   availableDomainAnnotations,
@@ -98,6 +107,7 @@ export function AnnotationDialog({
   mutationError,
   mutationPending,
   sdtmDomains,
+  ownerItemCode = null,
 }: Props) {
   const { t } = useI18n();
   const [body, setBody] = useState<AnnotationDialogBody>(EMPTY);
@@ -151,6 +161,13 @@ export function AnnotationDialog({
     );
     return da?.name?.toUpperCase() ?? null;
   }, [availableDomainAnnotations, body.domainAnnotationId]);
+  // SUPP gate. `null` selectedDomainName means no domain annotation
+  // is selected — nothing meaningful to draft. For item owners we
+  // additionally need the resolved item code: without it there's no
+  // "ITEMCODE in SUPPXX" left half to write.
+  const suppDisabled =
+    !selectedDomainName ||
+    (owner.kind === "item" && !ownerItemCode);
   const selectedDomain = useMemo(
     () =>
       sdtmDomains.find(
@@ -186,6 +203,29 @@ export function AnnotationDialog({
       domainAnnotationId: body.domainAnnotationId,
       content: body.content.trim(),
       assign: body.assign,
+    });
+  }
+
+  // SUPP quick-draft. Replaces the entire content with the common
+  // " in SUPP<domainCode>" / "<itemCode> in SUPP<domainCode>" pattern.
+  // `suppDisabled` gates the button in the JSX, but the handler
+  // re-checks so a programmatic click (test, future keyboard
+  // shortcut) can't slip through.
+  function handleSuppClick() {
+    if (suppDisabled) return;
+    const domainCode = selectedDomainName!;
+    const next =
+      owner.kind === "item" && ownerItemCode
+        ? `${ownerItemCode} in SUPP${domainCode}`
+        : ` in SUPP${domainCode}`;
+    setBody((b) => ({ ...b, content: next }));
+    // Close any open @-mention dropdown — clicking SUPP replaces
+    // the field wholesale, so a stale `@fragment` mention would be
+    // orphaned.
+    setMentionRange(null);
+    setAnchorEl(null);
+    queueMicrotask(() => {
+      inputRef.current?.setSelectionRange(next.length, next.length);
     });
   }
 
@@ -315,19 +355,36 @@ export function AnnotationDialog({
               ))}
             </Select>
           </FormControl>
-          <TextField
-            size="small"
-            label={t("crf.annotationDialog.field.content")}
-            value={body.content}
-            onChange={handleContentChange}
-            onKeyDown={handleContentKeyDown}
-            inputRef={inputRef}
-            slotProps={{
-              htmlInput: {
-                "data-testid": "crf-annotation-dialog-content",
-              },
-            }}
-          />
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <TextField
+              size="small"
+              label={t("crf.annotationDialog.field.content")}
+              value={body.content}
+              onChange={handleContentChange}
+              onKeyDown={handleContentKeyDown}
+              inputRef={inputRef}
+              sx={{ flexGrow: 1 }}
+              slotProps={{
+                htmlInput: {
+                  "data-testid": "crf-annotation-dialog-content",
+                },
+              }}
+            />
+            {/* SUPP quick-draft. Replaces `body.content` with the
+                common " in SUPP<domainCode>" / "<itemCode> in
+                SUPP<domainCode>" pattern. `data-testid` is the only
+                identifier — no label, no tooltip — see spec
+                2026-09-23-crf-annotation-supp-draft-design.md. */}
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={handleSuppClick}
+              disabled={suppDisabled}
+              data-testid="crf-annotation-dialog-supp"
+            >
+              SUPP
+            </Button>
+          </Stack>
           {/* @-mention Popover. Anchored to the content TextField. */}
           <Popover
             open={Boolean(anchorEl) && mentionRange !== null}

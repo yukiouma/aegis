@@ -416,4 +416,85 @@ describe("AnnotationDialog", () => {
     // element — otherwise typing goes nowhere useful.
     expect(document.activeElement).toBe(content);
   });
+
+  // --- SUPP quick-draft button ---
+
+  it("renders the SUPP button when the dialog is open and a domain annotation is selected", () => {
+    mountWithSeed();
+    expect(
+      screen.getByTestId("crf-annotation-dialog-supp"),
+    ).toBeInTheDocument();
+  });
+
+  it("disables the SUPP button when no domain annotation is selected", () => {
+    // availableDomainAnnotations has three entries, but in create
+    // mode the dialog defaults `body.domainAnnotationId` to
+    // `availableDomainAnnotations[0].id`, so simulate "no selection"
+    // by passing an empty list.
+    mountWithSeed({ availableDomainAnnotations: [] });
+    expect(
+      screen.getByTestId("crf-annotation-dialog-supp"),
+    ).toBeDisabled();
+  });
+
+  it("disables the SUPP button for an item owner with no resolved item code", () => {
+    mountWithSeed({ owner: { kind: "item", id: 99 }, ownerItemCode: null });
+    expect(
+      screen.getByTestId("crf-annotation-dialog-supp"),
+    ).toBeDisabled();
+  });
+
+  it("enables the SUPP button for an item owner with a resolved item code", () => {
+    mountWithSeed({ owner: { kind: "item", id: 99 }, ownerItemCode: "LBCLSIG" });
+    expect(
+      screen.getByTestId("crf-annotation-dialog-supp"),
+    ).not.toBeDisabled();
+  });
+
+  it("drafts ' in SUPPXX' for a form-level owner (AE)", () => {
+    const { onSubmit } = mountWithSeed({ owner: { kind: "form", id: 11 } });
+    fireEvent.click(screen.getByTestId("crf-annotation-dialog-supp"));
+    expect(screen.getByLabelText(/Content/i)).toHaveValue(" in SUPPAE");
+    // onSubmit must NOT have been triggered — the click only sets body.
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("drafts '<itemCode> in SUPPXX' for an item-level owner (LBCLSIG/VS)", () => {
+    const { onSubmit } = mountWithSeed({
+      owner: { kind: "item", id: 99 },
+      ownerItemCode: "LBCLSIG",
+    });
+    // The dialog defaults the picked domain annotation to
+    // availableDomainAnnotations[0] (AE, id=50) in create mode.
+    // Switch it to VS (id=51) so the SUPP draft lands on "VS".
+    fireEvent.mouseDown(screen.getByRole("combobox"));
+    fireEvent.click(screen.getByRole("option", { name: "VS" }));
+    fireEvent.click(screen.getByTestId("crf-annotation-dialog-supp"));
+    expect(screen.getByLabelText(/Content/i)).toHaveValue(
+      "LBCLSIG in SUPPVS",
+    );
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("SUPP replaces existing content in the field (does not append)", () => {
+    mountWithSeed({ owner: { kind: "form", id: 11 } });
+    const content = screen.getByLabelText(/Content/i);
+    fireEvent.change(content, { target: { value: "pre-existing note" } });
+    expect(content).toHaveValue("pre-existing note");
+    fireEvent.click(screen.getByTestId("crf-annotation-dialog-supp"));
+    expect(content).toHaveValue(" in SUPPAE");
+  });
+
+  it("re-evaluates the SUPP draft when the domain annotation changes", () => {
+    mountWithSeed({ owner: { kind: "form", id: 11 } });
+    // Default picked domain annotation is AE — click SUPP first.
+    fireEvent.click(screen.getByTestId("crf-annotation-dialog-supp"));
+    expect(screen.getByLabelText(/Content/i)).toHaveValue(" in SUPPAE");
+    // Switch the picked domain annotation to VS.
+    fireEvent.mouseDown(screen.getByRole("combobox"));
+    fireEvent.click(screen.getByRole("option", { name: "VS" }));
+    // Click SUPP again — domain code now reads VS.
+    fireEvent.click(screen.getByTestId("crf-annotation-dialog-supp"));
+    expect(screen.getByLabelText(/Content/i)).toHaveValue(" in SUPPVS");
+  });
 });
