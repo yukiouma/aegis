@@ -89,6 +89,7 @@ async fn cascade_delete_form_with_version() {
             name: "Form 1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -157,6 +158,7 @@ async fn polymorphic_owner_check_rejects_two_owners() {
             name: "F".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -236,6 +238,7 @@ async fn options_cascade_delete_with_item() {
             name: "F".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -297,6 +300,7 @@ async fn units_cascade_delete_with_item() {
             name: "F".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -362,6 +366,7 @@ async fn polymorphic_owner_round_trip() {
             name: "F".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -507,6 +512,7 @@ async fn get_form_detail_batch_ports_round_trip() {
             name: "F".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
