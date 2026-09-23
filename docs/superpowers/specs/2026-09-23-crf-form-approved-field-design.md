@@ -1,7 +1,7 @@
 # CRF Form `approved` Field — Design
 
 **Date:** 2026-09-23
-**Scope:** Add a `approved: bool` (default `false`) flag to `CrfForm`, persisted end-to-end and exposed on the wire. Add a server-enforced endpoint that lets only the QC assignee toggle the flag, gated on zero open issues.
+**Scope:** Add a `approved: bool` (default `false`) flag to `CrfForm`, persisted end-to-end and exposed on the wire. A dedicated server endpoint toggles the flag; the **Tauri command** enforces the open-issues gate client-side (the crf usecase stays simple and does not compose mission service).
 
 ## Motivation
 
@@ -9,7 +9,14 @@ Today the CRF workflow has no concept of "this form has been reviewed and is app
 
 ## Shape of the change
 
-The field is **not** exposed on `UpdateCrfFormRequest` / `UpdateCrfFormInput`. Toggling `approved` is the only operation gated on QC + open-issues, so it gets a dedicated server endpoint (`POST /api/crf/forms/{id}/approval`) and a dedicated Tauri command. The existing `PATCH /forms/{id}` keeps its current scope (code, name, order, `not_submitted`).
+The field is **not** exposed on `UpdateCrfFormRequest` / `UpdateCrfFormInput`. Toggling `approved` is the only operation gated on open-issues, so it gets:
+
+1. A dedicated server endpoint `POST /api/crf/forms/{id}/approval` whose only job is to flip the flag (no gate logic on the server).
+2. A dedicated Tauri command `set_crf_form_approved(id, approved, open_issue_count)` which holds the gate — it rejects `approved=true` when `open_issue_count > 0` before calling the server.
+
+The crf usecase (`set_approved`) is intentionally simple: it loads the form and persists the new value. It does **not** compose mission / issue services, and it does **not** carry the open-issues count. That keeps the crf crate's port surface stable (no new cross-crate dependencies) and confines the gate to one Rust file in the desktop shell.
+
+The existing `PATCH /forms/{id}` keeps its current scope (code, name, order, `not_submitted`).
 
 ## Data model & wire shape
 
@@ -17,7 +24,7 @@ The field is **not** exposed on `UpdateCrfFormRequest` / `UpdateCrfFormInput`. T
 
 ### DB
 
-A new migration `0008_add_crf_forms_approved.sql` adds `approved BOOLEAN NOT NULL DEFAULT FALSE` to `crf_forms`. The existing `0002_create_crf_forms.sql` is **not** edited; the new migration keeps history linear. Filename ordering puts it after `0007_create_crf_annotations.sql`. Idempotent (`ADD COLUMN IF NOT EXISTS`).
+A new migration `0008_add_crf_forms_approved.sql` adds `approved BOOLEAN NOT NULL DEFAULT FALSE` to `crf_forms`. The existing `0002_create_crf_forms.sql` is **not** edited; the new migration keeps history linear. Idempotent (`ADD COLUMN IF NOT EXISTS`).
 
 ### Domain (`lib/crates/crf`)
 
@@ -35,17 +42,15 @@ A new migration `0008_add_crf_forms_approved.sql` adds `approved BOOLEAN NOT NUL
 - New command `SetCrfApproved { id: i64, approved: bool }`.
 - New method `CrfUsecase::set_approved(cmd) -> Result<CrfFormView, UsecaseError>`:
   1. Load the form (`DomainError::CrfFormNotFound(id)` if missing → 404).
-  2. If `cmd.approved == true`:
-     a. Load the form's version to get `project_code` (`DomainError::CrfVersionNotFound(version_id)` if missing).
-     b. Call `mission_repo.find_by_project_code_and_mission_code(project_code, MissionKind::Crf, form.code)` — a new port method added to `MissionRepository` (see "New mission-port method" below). If `Result::Err(DomainError::MissionNotFound)` (or no row), return `UsecaseError::Validation(DomainError::NoMissionForApproval)`.
-     c. Count open issues (`state == Opened`) on that mission via `issue_repo.count_open_by_mission(mission.id)` — a new port method (see "New issue-port method" below). If `count > 0`, return `UsecaseError::Validation(DomainError::OpenIssuesBlockingApproval { open_issue_count })`.
-  3. Call `form_repo.set_approved(id, approved)` and project to view.
+  2. Call `form_repo.set_approved(id, approved)` and project to view.
+
+No mission lookup, no issue count, no extra port methods.
 
 ### Persistence (`lib/crates/crf/src/adapter/persistence/postgres`)
 
 - `CrfFormRow` gains `approved: bool`; the `From<CrfFormRow> for CrfForm` impl threads it.
 - `CrfFormRepoPg::create` returns `approved` in its `RETURNING`; `find_by_id`, `list_by_version`, `search_by_version` `SELECT` it.
-- `CrfFormRepoPg::update` (which still maps to `CrfFormUpdate`) is **unchanged** — does not touch `approved`.
+- `CrfFormRepoPg::update` (which still maps to `CrfFormUpdate`) is **unchanged** — does not touch `approved`. The `RETURNING *` clause naturally returns the new column too.
 - New method `CrfFormRepoPg::set_approved(id, approved)` → `UPDATE crf_forms SET approved = $2 WHERE id = $1 RETURNING ...`; throws `DomainError::CrfFormNotFound(id)` if no row.
 - `CrfBulkFormRepoPg::bulk_create` INSERT/RETURNING thread `approved`.
 
@@ -56,31 +61,14 @@ A new migration `0008_add_crf_forms_approved.sql` adds `approved BOOLEAN NOT NUL
 - `UpdateCrfFormRequest` **does not** gain a field.
 - New `SetCrfApprovedRequest { id: i64, approved: bool }`.
 - New `CrfService::set_approved(req: SetCrfApprovedRequest) -> Result<CrfFormView, CrfApiError>` trait method.
-- New error variants:
-  - `CrfApiError::SetCrfApprovedFailed { reason: String }` — payload is a stable string code that the handler maps to an HTTP 409 with `code: <reason>`. Reasons used: `"open_issues_blocking_approval"`, `"no_mission"`.
-
-### New domain error (in `lib/crates/crf/src/domain/error.rs`)
-
-Two new variants on `crf::DomainError`:
-- `DomainError::OpenIssuesBlockingApproval { open_issue_count: usize }` — the gate tripped.
-- `DomainError::NoMissionForApproval` — the form has no matching mission, so it can't be approved.
-
-Both flow through `UsecaseError::Validation(...)` → `CrfApiError::SetCrfApprovedFailed { reason }` → HTTP 409 with stable `code`.
-
-### New mission-port method (`lib/crates/mission/src/domain/mission_lookup.rs`)
-
-`MissionRepository::find_by_project_code_and_mission_code(project_code: &str, kind: MissionKind, mission_code: &str) -> Result<Mission, DomainError>` — returns the single mission matching the triple, or `DomainError::MissionNotFound`. Adds a SQL `WHERE project_code = $1 AND kind = $2 AND mission_code = $3` to `MissionRepo`. Mirrored on `FakeMissionRepo` in `test_support.rs`. Avoids the form-usecase having to load the full project mission list and filter in memory.
-
-### New issue-port method (`lib/crates/mission/src/domain/mission_lookup.rs`)
-
-`MissionIssueRepository::count_open_by_mission(mission_id: i64) -> Result<usize, DomainError>` — `SELECT COUNT(*) FROM mission_issues WHERE mission_id = $1 AND state = 'opened'`. Mirrored on `FakeIssueRepo` in `test_support.rs`.
+- **No new `CrfApiError` variants.** The handler maps the existing `DomainError::CrfFormNotFound` to 404 — that's the only error the endpoint can produce.
 
 ### Facade (`lib/crates/crf/src/adapter/facade/in_memory/service.rs`)
 
 - `From<usecase::CrfFormView> for ApiCrfFormView` includes `approved: f.approved`.
 - `CrfServiceImpl::create_form` and `bulk_create_form` pass `approved` through.
 - `CrfServiceImpl::update_form` is **unchanged** in shape — no `approved` plumbing.
-- New `CrfServiceImpl::set_approved(req)` method.
+- New `CrfServiceImpl::set_approved(req)` method — calls `usecase::set_approved`.
 
 ### Server wire (`apps/server/aegis-server/src/transport/http/dto.rs`)
 
@@ -89,7 +77,6 @@ Both flow through `UsecaseError::Validation(...)` → `CrfApiError::SetCrfApprov
 - `UpdateCrfFormRequest` **does not** gain a field.
 - `BulkCreateCrfFormRequest` propagates `approved` (it re-uses `CreateCrfFormRequest`).
 - New `SetCrfApprovedRequest { approved: bool }`.
-- New `BulkCreateCrfFormResponse` etc. unchanged.
 
 ### Server transport (`apps/server/aegis-server/src/transport/http/crf/handlers.rs`)
 
@@ -99,13 +86,12 @@ Both flow through `UsecaseError::Validation(...)` → `CrfApiError::SetCrfApprov
   - Body: `SetCrfApprovedRequest { approved: bool }`.
   - Response: `CrfFormViewResponse` (200).
   - 404 if the form does not exist.
-  - 409 with `code: "crf.open_issues_blocking_approval"` if there are open issues on the form's mission and the request is `approved: true`.
-  - 409 with `code: "crf.no_mission"` if the form has no mission (cannot approve a form that is not a mission).
+  - No other error codes. The endpoint is a thin toggle.
 - `router()` gains `.routes(routes!(handlers::set_approved))` under the CrfForm section.
 
 ### Authorization note
 
-The existing CRF route handlers in this codebase do not yet enforce role-based authz at the handler layer (only `AuthClaims` is required). The `// TODO: reject or not base on the project role` comments throughout `crf/handlers.rs` mark this future work. For V1, `set_approved` accepts any authenticated caller; the QC gate happens client-side in `CrfDetailPage`. This matches the codebase's current convention.
+The existing CRF route handlers in this codebase do not yet enforce role-based authz at the handler layer (only `AuthClaims` is required). The `// TODO: reject or not base on the project role` comments throughout `crf/handlers.rs` mark this future work. For V1, `set_approved` accepts any authenticated caller; the QC + open-issues gate is enforced in the Tauri command. This matches the codebase's current convention.
 
 ### Tauri wire (`apps/desktop/aegis-desktop/src-tauri/src/http/crf/form.rs`)
 
@@ -113,14 +99,18 @@ The existing CRF route handlers in this codebase do not yet enforce role-based a
 - `CreateCrfFormRequest.approved: bool`.
 - `UpdateCrfFormRequest` **does not** gain a field.
 - New `SetCrfApprovedRequest { approved: bool }`.
-- New async fn `set_approved(c, id, body) -> Result<CrfFormViewResponse, ApiError>`.
+- New async fn `set_approved(c, id, body) -> Result<CrfFormViewResponse, ApiError>` — single server call, no gate logic. Returns the form unchanged-shape.
 - Update the four wiremock-based unit tests so `form_view_json` includes `"approved": false`. The `update_request_skips_none_fields` test stays valid (the field doesn't exist).
+- New wiremock test: `set_approved_hits_correct_path` mounts a `POST /api/crf/forms/{id}/approval` mock and asserts the response body is returned.
 
 ### Tauri commands (`apps/desktop/aegis-desktop/src-tauri/src/commands/crf/form.rs`)
 
 - `create_crf_form` body type unchanged but now receives `CreateCrfFormRequest` with `approved`.
 - `update_crf_form` body type unchanged.
-- New `#[tauri::command] set_crf_form_approved(client, id, approved: bool) -> Result<CrfFormViewResponse, ApiError>`.
+- New `#[tauri::command] set_crf_form_approved(client, id, approved: bool, open_issue_count: usize) -> Result<CrfFormViewResponse, ApiError>`:
+  - If `approved && open_issue_count > 0`, return `Err(ApiError::Http { status: 409, code: "crf.open_issues_blocking_approval".into(), message: format!("{open_issue_count} open issue(s) blocking approval") })` — using the existing `ApiError::Http` struct variant (mirrors `{ kind: "http"; status; code; message }` in the TS wire).
+  - Otherwise call `http::crf::form::set_approved(client, id, SetCrfApprovedRequest { approved }).await`.
+  - The `open_issue_count` argument is a plain `usize` — the frontend already has it cached from `useListIssuesByMission`, so no extra network calls.
 
 ### TS types (`apps/desktop/aegis-desktop/src/shared/api/types.ts`)
 
@@ -131,7 +121,8 @@ The existing CRF route handlers in this codebase do not yet enforce role-based a
 ### Tests — Rust
 
 - `lib/crates/crf/tests/public_api.rs` — the `CrfForm::new` and `CrfFormNew` literals gain `approved: false`. `CrfFormUpdate` fixtures unchanged.
-- `lib/crates/crf/tests/integration_persistence.rs` — every `not_submitted: false` site gains a paired `approved: false` on the same `CrfFormNew` / `CrfForm` literal. Update assertions that compare view structs to include the `approved` field.
+- `lib/crates/crf/tests/integration_persistence.rs` — every `not_submitted: false` site gains a paired `approved: false` on the same `CrfFormNew` / `CrfForm` literal. Update assertions that compare view structs to include the `approved` field. New case for `set_approved` (toggle `false → true`, then `true → false`; 404 for unknown id).
+- `apps/desktop/aegis-desktop/src-tauri/src/commands/crf/form.rs` — new unit test that wires a mock client: when `open_issue_count > 0 && approved == true`, the command returns the 409 `ApiError::Http` *without* calling the server (use a mock that asserts no call). When `open_issue_count == 0 || approved == false`, the mock receives exactly one `POST /api/crf/forms/{id}/approval` and the response is forwarded.
 
 ### Tests — TS
 
@@ -148,8 +139,8 @@ The existing CRF route handlers in this codebase do not yet enforce role-based a
 - Renders one of two states based on `form.approved`:
   - `approved === true` → `<Chip color="success" icon={<VerifiedIcon />} label={t("crf.toolbar.statusApproved")} onClick={handleToggle} />` — label `"Approved"`.
   - `approved === false` → `<Chip color="warning" icon={<PendingActionsIcon />} label={t("crf.toolbar.statusPending")} onClick={handleToggle} />` — label `"Pending"`.
-- `handleToggle` calls `setCrfFormApproved.mutate({ id, approved: !form.approved })`.
-- Gates:
+- `handleToggle` calls `setCrfFormApproved.mutate({ id, approved: !form.approved, openIssueCount })`, passing the cached `openIssueCount` from `useListIssuesByMission` so the Rust command can gate without an extra round trip.
+- Gates (UI-side, visual feedback only — the authoritative gate is in the Tauri command):
   - Always disabled when `!isMissionQc`.
   - Disabled when `form.approved === false && openIssueCount > 0` (cannot approve while issues are open).
   - Always enabled for `form.approved === true` (un-approve has no issue gate).
@@ -188,11 +179,11 @@ Becomes derived rather than static:
 
 ### New data hook — `apps/desktop/aegis-desktop/src/features/crf/data/list.ts`
 
-`useSetCrfFormApproved()` — TanStack mutation calling the new Tauri command. On success, invalidates `queryKeys.crf.formsByVersion(updated.versionId)` and `queryKeys.crf.form(updated.id)` — same pattern as `useUpdateCrfForm`.
+`useSetCrfFormApproved()` — TanStack mutation calling the new Tauri command. The hook signature accepts `openIssueCount: number` and passes it through. On success, invalidates `queryKeys.crf.formsByVersion(updated.versionId)` and `queryKeys.crf.form(updated.id)` — same pattern as `useUpdateCrfForm`.
 
 ### New shared API entry — `apps/desktop/aegis-desktop/src/shared/api/index.ts`
 
-`api.setCrfFormApproved(id, approved): Promise<CrfForm>` — wraps `invoke("set_crf_form_approved", { id, approved })`.
+`api.setCrfFormApproved(id, approved, openIssueCount): Promise<CrfForm>` — wraps `invoke("set_crf_form_approved", { id, approved, openIssueCount })`.
 
 ### i18n strings (added to `en.ts` and `zhCN.ts`)
 
@@ -206,8 +197,8 @@ Becomes derived rather than static:
 ### Rust
 
 - `cargo check --workspace` — catches every site where the field was added.
-- `cargo test -p crf` (no `--ignored`) — public-api compile fixture and in-memory facade tests.
-- `cargo test -p apis`, `cargo test -p aegis-server`, `cargo test -p aegis-desktop --lib` — wire DTO round-trips and Tauri wiremock tests.
+- `cargo test -p crf` (no `--ignored`) — public-api compile fixture, in-memory facade tests, new `set_approved` persistence tests.
+- `cargo test -p apis`, `cargo test -p aegis-server`, `cargo test -p aegis-desktop --lib` — wire DTO round-trips and Tauri wiremock tests (including the new `set_approved_hits_correct_path` and the gate-by-`open_issue_count` command test).
 - `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
 - `cargo fmt --all -- --check`.
 - Live-DB integration (deliberate, not part of normal verification):
@@ -234,6 +225,8 @@ Becomes derived rather than static:
 ## Out of scope
 
 - Handler-level role-based authz (matches the codebase's current "AuthClaims-only" convention; `// TODO: reject or not base on the project role` markers exist throughout the existing handlers).
+- Server-side enforcement of the open-issues gate (gate lives in the Tauri command by design — see "Shape of the change").
+- Composing mission service / issue service into the crf usecase.
 - Allowing project leaders to override the QC gate.
 - Allowing un-approve to also require zero open issues.
 - Auto-approving forms whose mission has been deleted.
