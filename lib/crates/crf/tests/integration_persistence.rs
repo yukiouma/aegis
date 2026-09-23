@@ -686,7 +686,10 @@ async fn set_approved_toggles_flag_and_404s_on_unknown_id() {
         })
         .await
         .unwrap();
-    assert!(!f.approved, "newly-created forms default to approved = false");
+    assert!(
+        !f.approved,
+        "newly-created forms default to approved = false"
+    );
 
     // Toggle on.
     let approved = forms.set_approved(f.id, true).await.unwrap();
@@ -703,5 +706,8 @@ async fn set_approved_toggles_flag_and_404s_on_unknown_id() {
 
     // Missing id surfaces as CrfFormNotFound.
     let missing = forms.set_approved(99_999_999, true).await;
-    assert!(matches!(missing, Err(DomainError::CrfFormNotFound(99_999_999))));
+    assert!(matches!(
+        missing,
+        Err(DomainError::CrfFormNotFound(99_999_999))
+    ));
 }

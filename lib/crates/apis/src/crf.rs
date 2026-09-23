@@ -609,10 +609,7 @@ pub trait CrfService: Send + Sync {
     /// count and rejects before calling this endpoint, so an
     /// "approve with open issues" call should never reach the
     /// server.
-    async fn set_approved(
-        &self,
-        req: SetCrfApprovedRequest,
-    ) -> Result<CrfFormView, CrfApiError>;
+    async fn set_approved(&self, req: SetCrfApprovedRequest) -> Result<CrfFormView, CrfApiError>;
 
     /// Atomically create a form, every item, and each item's
     /// options + units. All-or-nothing: any error rolls back the

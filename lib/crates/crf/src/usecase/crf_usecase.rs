@@ -244,10 +244,7 @@ impl<
     /// deliberately does NOT compose mission / issue services.
     /// Returns `UsecaseError::Repository(CrfFormNotFound(id))`
     /// when the form does not exist.
-    pub async fn set_approved(
-        &self,
-        cmd: SetCrfApproved,
-    ) -> Result<CrfFormView, UsecaseError> {
+    pub async fn set_approved(&self, cmd: SetCrfApproved) -> Result<CrfFormView, UsecaseError> {
         let f = self.form_repo.set_approved(cmd.id, cmd.approved).await?;
         Ok(f.into())
     }

@@ -147,9 +147,7 @@ impl CrfFormRepository for InMemoryForms {
     }
     async fn set_approved(&self, id: i64, approved: bool) -> Result<CrfForm, DomainError> {
         let mut rows = self.rows.lock().unwrap();
-        let f = rows
-            .get_mut(&id)
-            .ok_or(DomainError::CrfFormNotFound(id))?;
+        let f = rows.get_mut(&id).ok_or(DomainError::CrfFormNotFound(id))?;
         f.approved = approved;
         f.updated_at = chrono::Utc::now();
         Ok(f.clone())

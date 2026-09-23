@@ -112,11 +112,7 @@ impl CrfFormRepository for CrfFormRepoPg {
         Ok(row.into())
     }
 
-    async fn set_approved(
-        &self,
-        id: i64,
-        approved: bool,
-    ) -> Result<CrfForm, DomainError> {
+    async fn set_approved(&self, id: i64, approved: bool) -> Result<CrfForm, DomainError> {
         let row: CrfFormRow = sqlx::query_as::<_, CrfFormRow>(
             "UPDATE crf_forms SET approved = $2
              WHERE id = $1

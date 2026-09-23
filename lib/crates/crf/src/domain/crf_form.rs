@@ -132,9 +132,5 @@ pub trait CrfFormRepository: Send + Sync {
     ) -> Result<Vec<CrfForm>, DomainError>;
     /// Toggle the `approved` flag on a form. Returns
     /// `DomainError::CrfFormNotFound(id)` if the row is missing.
-    async fn set_approved(
-        &self,
-        id: i64,
-        approved: bool,
-    ) -> Result<CrfForm, DomainError>;
+    async fn set_approved(&self, id: i64, approved: bool) -> Result<CrfForm, DomainError>;
 }
