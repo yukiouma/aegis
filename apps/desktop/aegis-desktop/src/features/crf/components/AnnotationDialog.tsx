@@ -206,6 +206,29 @@ export function AnnotationDialog({
     });
   }
 
+  // SUPP quick-draft. Replaces the entire content with the common
+  // " in SUPP<domainCode>" / "<itemCode> in SUPP<domainCode>" pattern.
+  // `suppDisabled` gates the button in the JSX, but the handler
+  // re-checks so a programmatic click (test, future keyboard
+  // shortcut) can't slip through.
+  function handleSuppClick() {
+    if (suppDisabled) return;
+    const domainCode = selectedDomainName!;
+    const next =
+      owner.kind === "item" && ownerItemCode
+        ? `${ownerItemCode} in SUPP${domainCode}`
+        : ` in SUPP${domainCode}`;
+    setBody((b) => ({ ...b, content: next }));
+    // Close any open @-mention dropdown — clicking SUPP replaces
+    // the field wholesale, so a stale `@fragment` mention would be
+    // orphaned.
+    setMentionRange(null);
+    setAnchorEl(null);
+    queueMicrotask(() => {
+      inputRef.current?.setSelectionRange(next.length, next.length);
+    });
+  }
+
   // --- @-mention detection ---
   function handleContentChange(e: ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
@@ -355,7 +378,7 @@ export function AnnotationDialog({
             <Button
               size="small"
               variant="outlined"
-              onClick={() => undefined}
+              onClick={handleSuppClick}
               disabled={suppDisabled}
               data-testid="crf-annotation-dialog-supp"
             >
