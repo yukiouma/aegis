@@ -95,7 +95,7 @@ const EMPTY: AnnotationDialogBody = {
 export function AnnotationDialog({
   open,
   mode,
-  owner: _owner,
+  owner,
   ownerNotSubmitted,
   row,
   availableDomainAnnotations,
@@ -161,6 +161,13 @@ export function AnnotationDialog({
     );
     return da?.name?.toUpperCase() ?? null;
   }, [availableDomainAnnotations, body.domainAnnotationId]);
+  // SUPP gate. `null` selectedDomainName means no domain annotation
+  // is selected — nothing meaningful to draft. For item owners we
+  // additionally need the resolved item code: without it there's no
+  // "ITEMCODE in SUPPXX" left half to write.
+  const suppDisabled =
+    !selectedDomainName ||
+    (owner.kind === "item" && !ownerItemCode);
   const selectedDomain = useMemo(
     () =>
       sdtmDomains.find(
@@ -349,6 +356,7 @@ export function AnnotationDialog({
               size="small"
               variant="outlined"
               onClick={() => undefined}
+              disabled={suppDisabled}
               data-testid="crf-annotation-dialog-supp"
             >
               SUPP

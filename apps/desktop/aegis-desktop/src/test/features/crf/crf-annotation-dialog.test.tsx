@@ -425,4 +425,22 @@ describe("AnnotationDialog", () => {
       screen.getByTestId("crf-annotation-dialog-supp"),
     ).toBeInTheDocument();
   });
+
+  it("disables the SUPP button when no domain annotation is selected", () => {
+    // availableDomainAnnotations has three entries, but in create
+    // mode the dialog defaults `body.domainAnnotationId` to
+    // `availableDomainAnnotations[0].id`, so simulate "no selection"
+    // by passing an empty list.
+    mountWithSeed({ availableDomainAnnotations: [] });
+    expect(
+      screen.getByTestId("crf-annotation-dialog-supp"),
+    ).toBeDisabled();
+  });
+
+  it("disables the SUPP button for an item owner with no resolved item code", () => {
+    mountWithSeed({ owner: { kind: "item", id: 99 }, ownerItemCode: null });
+    expect(
+      screen.getByTestId("crf-annotation-dialog-supp"),
+    ).toBeDisabled();
+  });
 });
