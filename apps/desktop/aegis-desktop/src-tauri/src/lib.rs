@@ -95,6 +95,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::crf::form::get_crf_form_by_id,
             commands::crf::form::get_crf_form_details,
             commands::crf::form::search_crf_forms_by_version,
+            commands::crf::form::set_crf_form_approved,
             commands::crf::item::list_crf_items_by_form,
             commands::crf::item::get_crf_item_by_id,
             commands::crf::item::update_crf_item,
