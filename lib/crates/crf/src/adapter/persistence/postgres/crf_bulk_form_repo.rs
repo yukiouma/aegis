@@ -22,6 +22,7 @@ struct CrfFormRow {
     name: String,
     order: i32,
     not_submitted: bool,
+    approved: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -35,6 +36,7 @@ impl From<CrfFormRow> for CrfForm {
             r.name,
             r.order,
             r.not_submitted,
+            r.approved,
             r.created_at,
             r.updated_at,
         )
@@ -94,15 +96,16 @@ impl CrfBulkFormRepository for CrfBulkFormRepoPg {
         // 1. Insert the form. RETURNING gives us the freshly
         //    stamped surrogate id so child rows can bind to it.
         let form_row: CrfFormRow = sqlx::query_as::<_, CrfFormRow>(
-            "INSERT INTO crf_forms (version_id, code, name, \"order\", not_submitted)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING id, version_id, code, name, \"order\", not_submitted, created_at, updated_at",
+            "INSERT INTO crf_forms (version_id, code, name, \"order\", not_submitted, approved)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id, version_id, code, name, \"order\", not_submitted, approved, created_at, updated_at",
         )
         .bind(input.form.version_id)
         .bind(&input.form.code)
         .bind(&input.form.name)
         .bind(input.form.order)
         .bind(input.form.not_submitted)
+        .bind(input.form.approved)
         .fetch_one(&mut *tx)
         .await
         .map_err(map_db_err)?;
