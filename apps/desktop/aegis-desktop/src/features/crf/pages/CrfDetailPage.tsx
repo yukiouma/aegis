@@ -103,6 +103,23 @@ function readOwnerNotSubmitted(
 }
 
 /**
+ * Look up the `CrfItem.code` for an item-level annotation owner so
+ * the AnnotationDialog's SUPP button can draft `<code> in SUPP<xx>`
+ * content. Returns `null` for non-item owners and for item owners
+ * whose item isn't in the cached form detail — `null` is the same
+ * "nothing useful to draft" signal the dialog already treats as
+ * "disable the button".
+ */
+function readOwnerItemCode(
+  detail: CrfFormDetail | undefined,
+  owner: AnnotationOwner,
+): string | null {
+  if (!detail || owner.kind !== "item") return null;
+  const found = detail.items.find((i) => i.item.id === owner.id);
+  return found ? found.item.code : null;
+}
+
+/**
  * Order annotations the same way the form's `domainAnnotations` list
  * is ordered — within a single owner (form / item / option / unit),
  * chips for the first domain annotation appear first, then the
@@ -702,6 +719,12 @@ export function CrfDetailPage() {
               : { kind: "form", id },
           ) ?? false
         }
+        ownerItemCode={readOwnerItemCode(
+          detail,
+          annotationDialog
+            ? annotationDialog.owner
+            : { kind: "form", id },
+        )}
         row={annotationDialog?.mode === "edit" ? annotationDialog.row : undefined}
         availableDomainAnnotations={detail?.domainAnnotations ?? []}
         sdtmDomains={sdtmContext.domains}
