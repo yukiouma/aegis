@@ -73,10 +73,30 @@ pub struct ModelVersionResponse {
     pub version_name: String,
 }
 
+/// Wire-level request body for the SDTM controlled-terminology
+/// version pointer a project pins. Mirrors the server's
+/// `apps/server/aegis-server/src/transport/http/dto.rs::TerminologyVersionRequest`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminologyVersionRequest {
+    pub version_id: i64,
+    pub version_name: String,
+}
+
+/// Wire-level projection of the SDTM controlled-terminology version
+/// pointer. Mirrors the server's
+/// `apps/server/aegis-server/src/transport/http/dto.rs::TerminologyVersionResponse`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TerminologyVersionResponse {
+    pub version_id: i64,
+    pub version_name: String,
+}
+
 /// Wire-level request body for a project's configuration.
 /// `language` and `tags` are individually optional / empty-skippable;
-/// `sdtmig` is skipped on serialize when absent so a
-/// present-but-empty config round-trips as `{}`.
+/// `sdtmig` and `sdtm_terminology` are skipped on serialize when
+/// absent so a present-but-empty config round-trips as `{}`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectConfigurationDataRequest {
@@ -86,6 +106,8 @@ pub struct ProjectConfigurationDataRequest {
     pub tags: Vec<TagDataRequest>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sdtmig: Option<ModelVersionRequest>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sdtm_terminology: Option<TerminologyVersionRequest>,
 }
 
 /// Wire-level projection of a project's configuration.
@@ -96,6 +118,7 @@ pub struct ProjectConfigurationViewResponse {
     pub language: Option<ProjectLanguage>,
     pub tags: Vec<TagViewResponse>,
     pub sdtmig: Option<ModelVersionResponse>,
+    pub sdtm_terminology: Option<TerminologyVersionResponse>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -284,6 +307,7 @@ mod tests {
                 value: "DEMO-001".into(),
             }],
             sdtmig: None,
+            sdtm_terminology: None,
         };
         let j = serde_json::to_string(&body).unwrap();
         assert_eq!(
@@ -300,6 +324,7 @@ mod tests {
                 version_id: 3,
                 version_name: "SDTMIG v3.3".into(),
             }),
+            sdtm_terminology: None,
         };
         let j = serde_json::to_string(&body).unwrap();
         assert_eq!(j, r#"{"sdtmig":{"versionId":3,"versionName":"SDTMIG v3.3"}}"#);
@@ -315,6 +340,36 @@ mod tests {
         assert_eq!(j, r#"{"versionId":7,"versionName":"SDTMIG v3.4"}"#);
         let parsed: ModelVersionRequest = serde_json::from_str(&j).unwrap();
         assert_eq!(parsed, body);
+    }
+
+    #[test]
+    fn terminology_version_request_round_trips() {
+        let body = TerminologyVersionRequest {
+            version_id: 11,
+            version_name: "2024-03-29".into(),
+        };
+        let j = serde_json::to_string(&body).unwrap();
+        assert_eq!(j, r#"{"versionId":11,"versionName":"2024-03-29"}"#);
+        let parsed: TerminologyVersionRequest = serde_json::from_str(&j).unwrap();
+        assert_eq!(parsed, body);
+    }
+
+    #[test]
+    fn project_configuration_data_request_serialises_sdtm_terminology() {
+        let body = ProjectConfigurationDataRequest {
+            language: None,
+            tags: vec![],
+            sdtmig: None,
+            sdtm_terminology: Some(TerminologyVersionRequest {
+                version_id: 11,
+                version_name: "2024-03-29".into(),
+            }),
+        };
+        let j = serde_json::to_string(&body).unwrap();
+        assert_eq!(
+            j,
+            r#"{"sdtmTerminology":{"versionId":11,"versionName":"2024-03-29"}}"#
+        );
     }
 
     #[test]
