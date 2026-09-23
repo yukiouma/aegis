@@ -638,7 +638,7 @@ export function CrfDetailPage() {
 
       {approvalError && (
         <Alert
-          severity="warning"
+          severity="error"
           onClose={dismissApprovalError}
           data-testid="crf-approval-error"
         >
