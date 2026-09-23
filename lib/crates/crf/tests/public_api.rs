@@ -131,7 +131,7 @@ fn crf_item_kind_variants_compile() {
 #[test]
 fn aggregate_constructors_compile() {
     let _ = CrfVersion::new("P1".into(), "v1".into()).unwrap();
-    let _: CrfForm = CrfForm::new(1, "F1".into(), "Form 1".into(), 0, false).unwrap();
+    let _: CrfForm = CrfForm::new(1, "F1".into(), "Form 1".into(), 0, false, false).unwrap();
     let _: CrfItem =
         CrfItem::new(1, "I1".into(), "Item 1".into(), CrfItemKind::Text, 0, false).unwrap();
     let _: CrfOption = CrfOption::new(1, "yes".into(), false).unwrap();
@@ -152,6 +152,7 @@ fn new_and_update_dtos_compile() {
         name: "F1".into(),
         order: 0,
         not_submitted: false,
+        approved: false,
     };
     let _: CrfItemNew = CrfItemNew {
         form_id: 1,

@@ -38,6 +38,7 @@ pub struct CrfFormView {
     pub name: String,
     pub order: i32,
     pub not_submitted: bool,
+    pub approved: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -51,6 +52,7 @@ impl From<CrfForm> for CrfFormView {
             name: f.name,
             order: f.order,
             not_submitted: f.not_submitted,
+            approved: f.approved,
             created_at: f.created_at,
             updated_at: f.updated_at,
         }

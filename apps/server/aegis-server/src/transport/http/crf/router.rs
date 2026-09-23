@@ -23,6 +23,7 @@
 //! - `GET    /forms/{id}/details`                          get_form_details
 //! - `PATCH  /forms/{id}`                                  update_form
 //! - `DELETE /forms/{id}`                                  delete_form
+//! - `POST   /forms/{id}/approval`                         set_approved
 //! - `POST   /forms/{form_id}/items`                       create_item
 //! - `GET    /forms/{form_id}/items`                       list_items_by_form
 //! - `GET    /versions/{version_id}/items/search`          search_items_by_version
@@ -83,6 +84,7 @@ pub fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(handlers::get_form_details))
         .routes(routes!(handlers::update_form))
         .routes(routes!(handlers::delete_form))
+        .routes(routes!(handlers::set_approved))
         // ---- CrfItem ----
         .routes(routes!(handlers::create_item))
         .routes(routes!(handlers::list_items_by_form))

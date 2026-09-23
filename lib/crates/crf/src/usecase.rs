@@ -20,7 +20,7 @@ pub use commands::{
     CreateCrfOption, CreateCrfUnit, CreateCrfVersion, CreateDomainAnnotation,
     SearchAnnotationsByVersion, SearchCrfFormsByVersion, SearchCrfItemsByVersion,
     SearchCrfOptionsByVersion, SearchCrfUnitsByVersion, SearchDomainAnnotationsByVersion,
-    UpdateAnnotation, UpdateCrfForm, UpdateCrfItem, UpdateCrfOption, UpdateCrfUnit,
+    SetCrfApproved, UpdateAnnotation, UpdateCrfForm, UpdateCrfItem, UpdateCrfOption, UpdateCrfUnit,
     UpdateCrfVersion, UpdateDomainAnnotation,
 };
 pub use crf_usecase::{CrfUsecase, CrfUsecaseConfig};

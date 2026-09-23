@@ -439,6 +439,12 @@ pub(crate) mod test_support {
         async fn delete_form(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
             unimplemented!()
         }
+        async fn set_approved(
+            &self,
+            _req: apis::crf::SetCrfApprovedRequest,
+        ) -> Result<apis::crf::CrfFormView, apis::crf::CrfApiError> {
+            unimplemented!()
+        }
         async fn bulk_create_form(
             &self,
             _req: apis::crf::BulkCreateCrfFormRequest,

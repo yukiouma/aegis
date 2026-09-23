@@ -1576,6 +1576,7 @@ pub struct CrfFormViewResponse {
     pub name: String,
     pub order: i32,
     pub not_submitted: bool,
+    pub approved: bool,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -1589,6 +1590,7 @@ impl From<apis::crf::CrfFormView> for CrfFormViewResponse {
             name: v.name,
             order: v.order,
             not_submitted: v.not_submitted,
+            approved: v.approved,
             created_at: v.created_at,
             updated_at: v.updated_at,
         }
@@ -1794,6 +1796,7 @@ pub struct CreateCrfFormRequest {
     pub name: String,
     pub order: i32,
     pub not_submitted: bool,
+    pub approved: bool,
 }
 
 /// Body for `POST /api/crf/versions/{version_id}/forms/bulk`. The
@@ -1928,6 +1931,14 @@ pub struct UpdateCrfFormRequest {
     pub order: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub not_submitted: Option<bool>,
+}
+
+/// Body for `POST /api/crf/forms/{id}/approval`. The id is in
+/// the path; the body carries only the desired flag value.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SetCrfApprovedRequest {
+    pub approved: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]

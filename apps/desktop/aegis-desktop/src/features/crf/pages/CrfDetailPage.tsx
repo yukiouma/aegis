@@ -9,13 +9,19 @@ import {
   MenuItem,
   MenuList,
   Popover,
+  Snackbar,
   Stack,
   Tooltip,
   Typography,
 } from "@aegis/ui/mui";
-import { ArrowBack as ArrowBackIcon } from "@aegis/ui/icons";
+import {
+  ArrowBack as ArrowBackIcon,
+  PendingActions as PendingActionsIcon,
+  Verified as VerifiedIcon,
+} from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
 import { useNavigate, useParams, useSearch } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   AnnotationDialog,
@@ -40,7 +46,7 @@ import {
 import { useCurrentUser } from "../../auth";
 import { useUserNameMap } from "../../user";
 import { annotationColor } from "../components/AnnotationChip";
-import { useGetCrfForm } from "../data/list";
+import { useGetCrfForm, useSetCrfFormApproved } from "../data/list";
 import {
   useCrfFormDetail,
   useCreateAnnotation,
@@ -59,6 +65,7 @@ import type {
   DomainAnnotation,
 } from "../../../shared/api";
 import { errorMessage } from "../../../shared/api/error";
+import { queryKeys } from "../../../shared/query/keys";
 
 type DomainDialogState =
   | { mode: "create" }
@@ -309,6 +316,54 @@ export function CrfDetailPage() {
   const createIssue = useCreateIssue();
   const patchIssueState = usePatchIssueState();
   const appendComment = useAppendComment();
+  const setApproved = useSetCrfFormApproved();
+  const qc = useQueryClient();
+
+  // Approval chip — QC-only, blocked while open issues exist on
+  // the form (cached count used for visual feedback only; the
+  // authoritative gate lives in the Tauri command and
+  // re-fetches the live count before calling the server).
+  const openIssueCount = openIssueCountByTarget.get(null) ?? 0;
+  const approvedDisabled =
+    setApproved.isPending ||
+    !isMissionQc ||
+    (form !== undefined && form.approved === false && openIssueCount > 0);
+  const approvedTooltipReason = !isMissionQc
+    ? t("crf.toolbar.approveDisabled.notQc")
+    : form !== undefined && form.approved === false && openIssueCount > 0
+      ? t("crf.toolbar.approveDisabled.openIssues", { count: openIssueCount })
+      : "";
+  const handleToggleApproved = () => {
+    if (!form || !formMission) return;
+    setApproved.mutate({
+      id: form.id,
+      approved: !form.approved,
+      missionId: formMission.id,
+    });
+  };
+
+  // Surface a closable top Snackbar when the Tauri command
+  // rejects set_approved (e.g. open issues blocking approval).
+  // Closing re-fetches the mission's issues so the chip's
+  // disabled state stays in sync with the fresh count.
+  const [approvalError, setApprovalError] = useState<{
+    open: boolean;
+    message: string;
+  }>({ open: false, message: "" });
+  useEffect(() => {
+    if (setApproved.isError && setApproved.error) {
+      setApprovalError({ open: true, message: errorMessage(setApproved.error) });
+    }
+  }, [setApproved.isError, setApproved.error]);
+  const dismissApprovalError = () => {
+    setApprovalError({ open: false, message: "" });
+    setApproved.reset();
+    if (formMission) {
+      void qc.invalidateQueries({
+        queryKey: queryKeys.mission.issuesByMission(formMission.id),
+      });
+    }
+  };
 
   const [issueDialog, setIssueDialog] = useState<
     | { scope: IssueScope; missionId: number }
@@ -553,8 +608,49 @@ export function CrfDetailPage() {
           </Stack>
         )}
         <Box sx={{ flexGrow: 1 }} />
+        {form && (
+          <Tooltip
+            title={approvedTooltipReason}
+            disableHoverListener={!approvedDisabled || !approvedTooltipReason}
+          >
+            <span>
+              <Chip
+                icon={
+                  form.approved ? <VerifiedIcon /> : <PendingActionsIcon />
+                }
+                label={
+                  form.approved
+                    ? t("crf.toolbar.statusApproved")
+                    : t("crf.toolbar.statusPending")
+                }
+                color={form.approved ? "success" : "warning"}
+                variant="outlined"
+                size="small"
+                onClick={approvedDisabled ? undefined : handleToggleApproved}
+                sx={
+                  approvedDisabled
+                    ? { opacity: 0.5, cursor: "not-allowed" }
+                    : undefined
+                }
+                data-testid="crf-approval-toggle"
+              />
+            </span>
+          </Tooltip>
+        )}
         <CrfToolsMenu projectCode={projectCode} versionId={routeSearch.versionId ?? null} />
       </Box>
+
+      <Snackbar
+        open={approvalError.open}
+        autoHideDuration={6000}
+        onClose={dismissApprovalError}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+        data-testid="crf-approval-error"
+      >
+        <Alert severity="error" onClose={dismissApprovalError}>
+          {approvalError.message}
+        </Alert>
+      </Snackbar>
 
       {query.isFetching && !form && (
         <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>

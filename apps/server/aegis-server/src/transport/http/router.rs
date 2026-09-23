@@ -1383,6 +1383,7 @@ mod tests {
                 name: format!("Form {}", req.id),
                 order: 1,
                 not_submitted: false,
+                approved: false,
                 created_at: chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
                     .unwrap()
                     .with_timezone(&chrono::Utc),
@@ -1404,6 +1405,7 @@ mod tests {
                 name: format!("Form {}", req.form_id),
                 order: 0,
                 not_submitted: false,
+                approved: false,
                 created_at: now,
                 updated_at: now,
             };
@@ -1428,6 +1430,12 @@ mod tests {
         }
         async fn delete_form(&self, _id: i64) -> Result<(), apis::crf::CrfApiError> {
             Ok(())
+        }
+        async fn set_approved(
+            &self,
+            _req: apis::crf::SetCrfApprovedRequest,
+        ) -> Result<apis::crf::CrfFormView, apis::crf::CrfApiError> {
+            unimplemented!()
         }
         async fn create_item(
             &self,

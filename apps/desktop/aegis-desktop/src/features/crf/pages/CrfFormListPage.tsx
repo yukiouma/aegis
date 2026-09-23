@@ -243,7 +243,7 @@ export function CrfFormListPage() {
         }
         disabled={versions.length === 0}
       />
-      <CrfStatusChip />
+      <CrfStatusChip forms={allRows} />
       <Box sx={{ flexGrow: 1 }} />
       <CrfToolsMenu projectCode={projectCode} versionId={selectedVersionId} />
     </Box>

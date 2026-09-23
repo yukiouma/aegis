@@ -446,6 +446,7 @@ export interface CrfForm {
   name: string;
   order: number;
   notSubmitted: boolean;
+  approved: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -475,6 +476,7 @@ export interface CreateCrfFormInput {
   name: string;
   order: number;
   notSubmitted: boolean;
+  approved: boolean;
 }
 
 export interface UpdateCrfFormInput {

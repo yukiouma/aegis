@@ -324,6 +324,12 @@ export const api = {
     call<CrfForm>("update_crf_form", { id, body: { ...body } }),
   deleteCrfForm: (id: number): Promise<void> =>
     call<void>("delete_crf_form", { id }),
+  setCrfFormApproved: (
+    id: number,
+    approved: boolean,
+    missionId: number,
+  ): Promise<CrfForm> =>
+    call<CrfForm>("set_crf_form_approved", { id, approved, missionId }),
   getCrfFormDetails: (id: number): Promise<CrfFormDetail> =>
     call<CrfFormDetail>("get_crf_form_details", { id }),
   searchCrfFormsByVersion: async (

@@ -35,8 +35,9 @@ use super::commands::{
     CreateAnnotation, CreateCrfBulkForm, CreateCrfForm, CreateCrfItem, CreateCrfOption,
     CreateCrfUnit, CreateCrfVersion, CreateDomainAnnotation, SearchAnnotationsByVersion,
     SearchCrfFormsByVersion, SearchCrfItemsByVersion, SearchCrfOptionsByVersion,
-    SearchCrfUnitsByVersion, SearchDomainAnnotationsByVersion, UpdateAnnotation, UpdateCrfForm,
-    UpdateCrfItem, UpdateCrfOption, UpdateCrfUnit, UpdateCrfVersion, UpdateDomainAnnotation,
+    SearchCrfUnitsByVersion, SearchDomainAnnotationsByVersion, SetCrfApproved, UpdateAnnotation,
+    UpdateCrfForm, UpdateCrfItem, UpdateCrfOption, UpdateCrfUnit, UpdateCrfVersion,
+    UpdateDomainAnnotation,
 };
 use super::error::UsecaseError;
 use super::views::{
@@ -198,6 +199,7 @@ impl<
                 name: cmd.name,
                 order: cmd.order,
                 not_submitted: cmd.not_submitted,
+                approved: cmd.approved,
             })
             .await?;
         Ok(f.into())
@@ -234,6 +236,17 @@ impl<
     pub async fn delete_form(&self, id: i64) -> Result<(), UsecaseError> {
         self.form_repo.delete(id).await?;
         Ok(())
+    }
+
+    /// Toggle the `approved` flag on a form. Thin pass-through
+    /// to the persistence port — the gate (zero open issues)
+    /// lives in the Tauri command, not here, so this usecase
+    /// deliberately does NOT compose mission / issue services.
+    /// Returns `UsecaseError::Repository(CrfFormNotFound(id))`
+    /// when the form does not exist.
+    pub async fn set_approved(&self, cmd: SetCrfApproved) -> Result<CrfFormView, UsecaseError> {
+        let f = self.form_repo.set_approved(cmd.id, cmd.approved).await?;
+        Ok(f.into())
     }
 
     /// Return every piece of state owned by this form (items

@@ -26,6 +26,7 @@ const rows: CrfForm[] = [
     name: "Adverse Events",
     order: 1,
     notSubmitted: false,
+    approved: false,
     createdAt: "",
     updatedAt: "",
   },
@@ -36,6 +37,7 @@ const rows: CrfForm[] = [
     name: "Vital Signs",
     order: 2,
     notSubmitted: false,
+    approved: false,
     createdAt: "",
     updatedAt: "",
   },
@@ -357,6 +359,48 @@ describe("CrfFormTable", () => {
     // variant per design (dashed border).
     const qcChip = within(row1).getByText(/qc/i);
     expect(qcChip).toBeInTheDocument();
+  });
+
+  it("shows the Approved chip on a row whose approved flag is true", () => {
+    renderTable({
+      missions: [],
+      rows: [
+        {
+          id: 1,
+          versionId: 7,
+          code: "AE",
+          name: "Adverse Events",
+          order: 1,
+          notSubmitted: false,
+          approved: true,
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    });
+    const row1 = screen.getByText("Adverse Events").closest("tr")!;
+    expect(within(row1).getByText(/approved/i)).toBeInTheDocument();
+  });
+
+  it("shows the Pending chip on a row whose approved flag is false", () => {
+    renderTable({
+      missions: [],
+      rows: [
+        {
+          id: 1,
+          versionId: 7,
+          code: "AE",
+          name: "Adverse Events",
+          order: 1,
+          notSubmitted: false,
+          approved: false,
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    });
+    const row1 = screen.getByText("Adverse Events").closest("tr")!;
+    expect(within(row1).getByText(/pending/i)).toBeInTheDocument();
   });
 
   it("hides the assign-takers icon when the current user is not a project leader", async () => {

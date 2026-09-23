@@ -64,7 +64,7 @@ fn crf_version_new_rejects_empty_name() {
 
 #[test]
 fn crf_form_new_accepts_valid_inputs() {
-    let f = CrfForm::new(1, "F1".into(), "Form 1".into(), 0, false).unwrap();
+    let f = CrfForm::new(1, "F1".into(), "Form 1".into(), 0, false, false).unwrap();
     assert_eq!(f.code, "F1");
     assert_eq!(f.name, "Form 1");
     assert!(!f.not_submitted);
@@ -72,13 +72,13 @@ fn crf_form_new_accepts_valid_inputs() {
 
 #[test]
 fn crf_form_new_rejects_empty_code() {
-    let err = CrfForm::new(1, "  ".into(), "Form 1".into(), 0, false).unwrap_err();
+    let err = CrfForm::new(1, "  ".into(), "Form 1".into(), 0, false, false).unwrap_err();
     assert!(matches!(err, DomainError::EmptyCode));
 }
 
 #[test]
 fn crf_form_new_rejects_empty_name() {
-    let err = CrfForm::new(1, "F1".into(), "  ".into(), 0, false).unwrap_err();
+    let err = CrfForm::new(1, "F1".into(), "  ".into(), 0, false, false).unwrap_err();
     assert!(matches!(err, DomainError::EmptyName));
 }
 

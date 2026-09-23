@@ -14,6 +14,7 @@ pub struct CrfForm {
     pub name: String,
     pub order: i32,
     pub not_submitted: bool,
+    pub approved: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -27,6 +28,7 @@ impl std::fmt::Debug for CrfForm {
             .field("name", &self.name)
             .field("order", &self.order)
             .field("not_submitted", &self.not_submitted)
+            .field("approved", &self.approved)
             .field("created_at", &self.created_at)
             .field("updated_at", &self.updated_at)
             .finish()
@@ -42,6 +44,7 @@ impl CrfForm {
         name: String,
         order: i32,
         not_submitted: bool,
+        approved: bool,
     ) -> Result<Self, DomainError> {
         if code.trim().is_empty() {
             return Err(DomainError::EmptyCode);
@@ -56,6 +59,7 @@ impl CrfForm {
             name,
             order,
             not_submitted,
+            approved,
             created_at: DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
             updated_at: DateTime::<Utc>::from_timestamp(0, 0).unwrap(),
         })
@@ -71,6 +75,7 @@ impl CrfForm {
         name: String,
         order: i32,
         not_submitted: bool,
+        approved: bool,
         created_at: DateTime<Utc>,
         updated_at: DateTime<Utc>,
     ) -> Self {
@@ -81,6 +86,7 @@ impl CrfForm {
             name,
             order,
             not_submitted,
+            approved,
             created_at,
             updated_at,
         }
@@ -95,10 +101,13 @@ pub struct CrfFormNew {
     pub name: String,
     pub order: i32,
     pub not_submitted: bool,
+    pub approved: bool,
 }
 
 /// Input DTO for `CrfFormRepository::update`. Every field
-/// except `id` is optional.
+/// except `id` is optional. The `approved` flag is intentionally
+/// not exposed here — toggling approval has its own port method
+/// (`set_approved`) and its own dedicated endpoint.
 #[derive(Debug, Clone, Default)]
 pub struct CrfFormUpdate {
     pub id: i64,
@@ -121,4 +130,7 @@ pub trait CrfFormRepository: Send + Sync {
         version_id: i64,
         fragment: &str,
     ) -> Result<Vec<CrfForm>, DomainError>;
+    /// Toggle the `approved` flag on a form. Returns
+    /// `DomainError::CrfFormNotFound(id)` if the row is missing.
+    async fn set_approved(&self, id: i64, approved: bool) -> Result<CrfForm, DomainError>;
 }

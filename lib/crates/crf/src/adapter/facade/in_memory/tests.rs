@@ -104,6 +104,7 @@ async fn facade_form_crud() {
             name: "Form 1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -139,6 +140,7 @@ async fn facade_item_crud() {
             name: "Form 1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -178,6 +180,7 @@ async fn facade_option_unit_crud() {
             name: "Form 1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -229,6 +232,7 @@ async fn facade_selection_without_options_returns_kind_shape_violation() {
             name: "F1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -276,6 +280,7 @@ async fn facade_domain_annotation_crud() {
             name: "F1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -308,6 +313,7 @@ async fn facade_annotation_polymorphic() {
             name: "F1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -356,6 +362,7 @@ async fn facade_bulk_create_form_round_trip() {
                 name: "Form 1".into(),
                 order: 0,
                 not_submitted: false,
+                approved: false,
             },
             items: vec![
                 BulkCreateCrfItemInput {
@@ -434,6 +441,7 @@ async fn facade_bulk_create_form_rejects_text_with_options() {
                 name: "Form 1".into(),
                 order: 0,
                 not_submitted: false,
+                approved: false,
             },
             items: vec![apis::crf::BulkCreateCrfItemInput {
                 item: apis::crf::CreateCrfItemRequest {
@@ -476,6 +484,7 @@ async fn facade_get_form_detail_round_trip() {
             name: "Form 1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();

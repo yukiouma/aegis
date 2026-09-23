@@ -138,11 +138,19 @@ impl CrfFormRepository for InMemoryForms {
             input.name,
             input.order,
             input.not_submitted,
+            input.approved,
             chrono::Utc::now(),
             chrono::Utc::now(),
         );
         self.rows.lock().unwrap().insert(id, f.clone());
         Ok(f)
+    }
+    async fn set_approved(&self, id: i64, approved: bool) -> Result<CrfForm, DomainError> {
+        let mut rows = self.rows.lock().unwrap();
+        let f = rows.get_mut(&id).ok_or(DomainError::CrfFormNotFound(id))?;
+        f.approved = approved;
+        f.updated_at = chrono::Utc::now();
+        Ok(f.clone())
     }
     async fn find_by_id(&self, id: i64) -> Result<CrfForm, DomainError> {
         self.rows
@@ -680,6 +688,7 @@ impl CrfBulkFormRepository for InMemoryBulkForms {
             input.form.name,
             input.form.order,
             input.form.not_submitted,
+            input.form.approved,
             now,
             now,
         );
@@ -897,6 +906,7 @@ async fn make_form(uc: &TestUsecase) -> i64 {
             name: "Form 1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -920,6 +930,7 @@ async fn crud_form_round_trip() {
             name: "Form 1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -936,6 +947,7 @@ async fn create_form_rejects_empty_code() {
             name: "Form 1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap_err();
@@ -979,6 +991,7 @@ async fn list_forms_by_version_returns_only_that_version() {
         name: "F1".into(),
         order: 0,
         not_submitted: false,
+        approved: false,
     })
     .await
     .unwrap();
@@ -1029,6 +1042,7 @@ async fn create_item_selection_without_options_rolls_back() {
             name: "F1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -1182,6 +1196,7 @@ async fn crud_domain_annotation_round_trip() {
             name: "F1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -1229,6 +1244,7 @@ async fn crud_annotation_form_owner() {
             name: "F1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -1280,6 +1296,7 @@ async fn crud_annotation_item_owner() {
             name: "F1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -1326,6 +1343,7 @@ async fn create_annotation_rejects_empty_content() {
             name: "F1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -1384,6 +1402,7 @@ async fn search_items_by_version_filters_through_forms() {
             name: "F1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -1479,6 +1498,7 @@ async fn bulk_create_form_inserts_form_items_options_units() {
                 name: "Form 1".into(),
                 order: 0,
                 not_submitted: false,
+                approved: false,
             },
             items: vec![
                 CreateCrfBulkItem {
@@ -1551,6 +1571,7 @@ async fn bulk_create_form_returns_results_in_input_order() {
                 name: "Form 1".into(),
                 order: 0,
                 not_submitted: false,
+                approved: false,
             },
             items: (0..5)
                 .map(|i| CreateCrfBulkItem {
@@ -1595,6 +1616,7 @@ async fn bulk_create_form_rejects_empty_form_code() {
                 name: "Form".into(),
                 order: 0,
                 not_submitted: false,
+                approved: false,
             },
             items: vec![],
         })
@@ -1621,6 +1643,7 @@ async fn bulk_create_form_rejects_text_kind_with_options() {
                 name: "Form 1".into(),
                 order: 0,
                 not_submitted: false,
+                approved: false,
             },
             items: vec![CreateCrfBulkItem {
                 item: crate::usecase::CreateCrfItem {
@@ -1666,6 +1689,7 @@ async fn bulk_create_form_rejects_selection_without_options() {
                 name: "Form 1".into(),
                 order: 0,
                 not_submitted: false,
+                approved: false,
             },
             items: vec![CreateCrfBulkItem {
                 item: crate::usecase::CreateCrfItem {
@@ -1707,6 +1731,7 @@ async fn bulk_create_form_rejects_empty_item_code() {
                 name: "Form 1".into(),
                 order: 0,
                 not_submitted: false,
+                approved: false,
             },
             items: vec![CreateCrfBulkItem {
                 item: crate::usecase::CreateCrfItem {
@@ -1747,6 +1772,7 @@ async fn bulk_create_form_validation_rejects_empty_code_with_existing_version() 
                 name: "Form".into(),
                 order: 0,
                 not_submitted: false,
+                approved: false,
             },
             items: vec![],
         })
@@ -1770,6 +1796,7 @@ async fn bulk_create_form_rejects_missing_parent_version() {
                 name: "Form 1".into(),
                 order: 0,
                 not_submitted: false,
+                approved: false,
             },
             items: vec![],
         })
@@ -1801,6 +1828,7 @@ async fn get_form_detail_assembles_tree_in_id_order() {
             name: "F1".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();
@@ -1958,6 +1986,7 @@ async fn get_form_detail_empty_form_returns_empty_items() {
             name: "Empty".into(),
             order: 0,
             not_submitted: false,
+            approved: false,
         })
         .await
         .unwrap();

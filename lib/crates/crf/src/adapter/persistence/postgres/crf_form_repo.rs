@@ -12,6 +12,7 @@ struct CrfFormRow {
     name: String,
     order: i32,
     not_submitted: bool,
+    approved: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -25,6 +26,7 @@ impl From<CrfFormRow> for CrfForm {
             r.name,
             r.order,
             r.not_submitted,
+            r.approved,
             r.created_at,
             r.updated_at,
         )
@@ -46,15 +48,16 @@ impl CrfFormRepoPg {
 impl CrfFormRepository for CrfFormRepoPg {
     async fn create(&self, input: CrfFormNew) -> Result<CrfForm, DomainError> {
         let row: CrfFormRow = sqlx::query_as::<_, CrfFormRow>(
-            "INSERT INTO crf_forms (version_id, code, name, \"order\", not_submitted)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING id, version_id, code, name, \"order\", not_submitted, created_at, updated_at",
+            "INSERT INTO crf_forms (version_id, code, name, \"order\", not_submitted, approved)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id, version_id, code, name, \"order\", not_submitted, approved, created_at, updated_at",
         )
         .bind(input.version_id)
         .bind(&input.code)
         .bind(&input.name)
         .bind(input.order)
         .bind(input.not_submitted)
+        .bind(input.approved)
         .fetch_one(&self.pool)
         .await
         .map_err(map_db_err)?;
@@ -63,7 +66,7 @@ impl CrfFormRepository for CrfFormRepoPg {
 
     async fn find_by_id(&self, id: i64) -> Result<CrfForm, DomainError> {
         let row: CrfFormRow = sqlx::query_as::<_, CrfFormRow>(
-            "SELECT id, version_id, code, name, \"order\", not_submitted, created_at, updated_at
+            "SELECT id, version_id, code, name, \"order\", not_submitted, approved, created_at, updated_at
              FROM crf_forms WHERE id = $1",
         )
         .bind(id)
@@ -76,7 +79,7 @@ impl CrfFormRepository for CrfFormRepoPg {
 
     async fn list_by_version(&self, version_id: i64) -> Result<Vec<CrfForm>, DomainError> {
         let rows = sqlx::query_as::<_, CrfFormRow>(
-            "SELECT id, version_id, code, name, \"order\", not_submitted, created_at, updated_at
+            "SELECT id, version_id, code, name, \"order\", not_submitted, approved, created_at, updated_at
              FROM crf_forms WHERE version_id = $1
              ORDER BY \"order\" ASC, id ASC",
         )
@@ -95,7 +98,7 @@ impl CrfFormRepository for CrfFormRepoPg {
                 \"order\"       = COALESCE($4, \"order\"),
                 not_submitted = COALESCE($5, not_submitted)
              WHERE id = $1
-             RETURNING id, version_id, code, name, \"order\", not_submitted, created_at, updated_at",
+             RETURNING id, version_id, code, name, \"order\", not_submitted, approved, created_at, updated_at",
         )
         .bind(input.id)
         .bind(input.code.as_deref())
@@ -106,6 +109,21 @@ impl CrfFormRepository for CrfFormRepoPg {
         .await
         .map_err(map_db_err)?
         .ok_or(DomainError::CrfFormNotFound(input.id))?;
+        Ok(row.into())
+    }
+
+    async fn set_approved(&self, id: i64, approved: bool) -> Result<CrfForm, DomainError> {
+        let row: CrfFormRow = sqlx::query_as::<_, CrfFormRow>(
+            "UPDATE crf_forms SET approved = $2
+             WHERE id = $1
+             RETURNING id, version_id, code, name, \"order\", not_submitted, approved, created_at, updated_at",
+        )
+        .bind(id)
+        .bind(approved)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(map_db_err)?
+        .ok_or(DomainError::CrfFormNotFound(id))?;
         Ok(row.into())
     }
 
@@ -128,7 +146,7 @@ impl CrfFormRepository for CrfFormRepoPg {
     ) -> Result<Vec<CrfForm>, DomainError> {
         let pat = format!("%{fragment}%");
         let rows = sqlx::query_as::<_, CrfFormRow>(
-            "SELECT id, version_id, code, name, \"order\", not_submitted, created_at, updated_at
+            "SELECT id, version_id, code, name, \"order\", not_submitted, approved, created_at, updated_at
              FROM crf_forms
              WHERE version_id = $1 AND (code ILIKE $2 OR name ILIKE $2)
              ORDER BY \"order\" ASC, id ASC",

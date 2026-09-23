@@ -204,6 +204,7 @@ pub async fn create_form(
             name: req.name,
             order: req.order,
             not_submitted: req.not_submitted,
+            approved: req.approved,
         })
         .await?;
     Ok((StatusCode::CREATED, Json(view.into())))
@@ -248,6 +249,7 @@ pub async fn bulk_create_form(
                 name: req.form.name,
                 order: req.form.order,
                 not_submitted: req.form.not_submitted,
+                approved: req.form.approved,
             },
             items: req
                 .items
@@ -468,6 +470,43 @@ pub async fn delete_form(
     // TODO: reject or not base on the project role
     state.crf.delete_form(id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// `POST /api/crf/forms/{id}/approval` — toggle the `approved`
+/// flag on a CRF form. Thin endpoint: the only error is
+/// `CrfFormNotFound` → 404. The open-issues gate lives in the
+/// Tauri command (which re-fetches the live open-issue count
+/// and rejects before reaching this endpoint), so this handler
+/// is intentionally gate-free.
+#[utoipa::path(
+    post, path = "/forms/{id}/approval", tag = "crf",
+    operation_id = "crf_set_form_approved",
+    params(
+        ("id" = i64, Path, description = "Form id"),
+    ),
+    request_body = dto::SetCrfApprovedRequest,
+    responses(
+        (status = 200, description = "Form approval toggled", body = dto::CrfFormViewResponse),
+        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
+        (status = 404, description = "CRF form not found", body = crate::transport::http::error::ErrorBody),
+        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
+    ),
+    security(("BearerAuth" = [])),
+)]
+pub async fn set_approved(
+    State(state): State<AppState>,
+    Path(CrfPathId { id }): Path<CrfPathId>,
+    Json(req): Json<dto::SetCrfApprovedRequest>,
+) -> Result<Json<dto::CrfFormViewResponse>, ApiError> {
+    // TODO: reject or not base on the project role
+    let view = state
+        .crf
+        .set_approved(apis::crf::SetCrfApprovedRequest {
+            id,
+            approved: req.approved,
+        })
+        .await?;
+    Ok(Json(view.into()))
 }
 
 // ---- CrfItem ----
