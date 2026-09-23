@@ -653,3 +653,49 @@ async fn get_form_detail_missing_form_returns_not_found() {
         Err(DomainError::CrfFormNotFound(99_999_999))
     ));
 }
+
+#[tokio::test]
+#[ignore]
+async fn set_approved_toggles_flag_and_404s_on_unknown_id() {
+    let pool = connect().await;
+    let versions = CrfVersionRepoPg::new(pool.clone());
+    let forms = CrfFormRepoPg::new(pool);
+
+    let suffix = unique_suffix();
+    let v = versions
+        .create(CrfVersionNew {
+            project_code: format!("P_{suffix}"),
+            name: "v1".into(),
+        })
+        .await
+        .unwrap();
+    let f = forms
+        .create(CrfFormNew {
+            version_id: v.id,
+            code: format!("F_{suffix}"),
+            name: "Form 1".into(),
+            order: 0,
+            not_submitted: false,
+            approved: false,
+        })
+        .await
+        .unwrap();
+    assert!(!f.approved, "newly-created forms default to approved = false");
+
+    // Toggle on.
+    let approved = forms.set_approved(f.id, true).await.unwrap();
+    assert!(approved.approved, "set_approved(true) flips the flag");
+    assert_eq!(approved.id, f.id);
+
+    // Re-fetch — change is persisted.
+    let fetched = forms.find_by_id(f.id).await.unwrap();
+    assert!(fetched.approved, "re-fetched form reflects approved = true");
+
+    // Toggle off.
+    let unapproved = forms.set_approved(f.id, false).await.unwrap();
+    assert!(!unapproved.approved, "set_approved(false) flips it back");
+
+    // Missing id surfaces as CrfFormNotFound.
+    let missing = forms.set_approved(99_999_999, true).await;
+    assert!(matches!(missing, Err(DomainError::CrfFormNotFound(99_999_999))));
+}
