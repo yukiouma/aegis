@@ -416,4 +416,13 @@ describe("AnnotationDialog", () => {
     // element — otherwise typing goes nowhere useful.
     expect(document.activeElement).toBe(content);
   });
+
+  // --- SUPP quick-draft button ---
+
+  it("renders the SUPP button when the dialog is open and a domain annotation is selected", () => {
+    mountWithSeed();
+    expect(
+      screen.getByTestId("crf-annotation-dialog-supp"),
+    ).toBeInTheDocument();
+  });
 });
