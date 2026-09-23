@@ -12,9 +12,11 @@ Today the CRF workflow has no concept of "this form has been reviewed and is app
 The field is **not** exposed on `UpdateCrfFormRequest` / `UpdateCrfFormInput`. Toggling `approved` is the only operation gated on open-issues, so it gets:
 
 1. A dedicated server endpoint `POST /api/crf/forms/{id}/approval` whose only job is to flip the flag (no gate logic on the server).
-2. A dedicated Tauri command `set_crf_form_approved(id, approved, open_issue_count)` which holds the gate — it rejects `approved=true` when `open_issue_count > 0` before calling the server.
+2. A dedicated Tauri command `set_crf_form_approved(id, approved, mission_id)` which holds the gate — it **re-fetches the current open issues from the server** for the given mission, and rejects `approved=true` when the freshly-listed issues are non-empty before calling the server endpoint.
 
 The crf usecase (`set_approved`) is intentionally simple: it loads the form and persists the new value. It does **not** compose mission / issue services, and it does **not** carry the open-issues count. That keeps the crf crate's port surface stable (no new cross-crate dependencies) and confines the gate to one Rust file in the desktop shell.
+
+The `mission_id` argument to the Tauri command comes from the frontend's already-cached `useListMissionsByProject` query (loaded by `CrfDetailPage` for assignee lookups), so it does not introduce an extra round trip. The open-issues list, however, is fetched fresh inside the command — the cached TanStack-Query `openIssueCount` is not trusted, because it could be stale.
 
 The existing `PATCH /forms/{id}` keeps its current scope (code, name, order, `not_submitted`).
 
@@ -107,10 +109,11 @@ The existing CRF route handlers in this codebase do not yet enforce role-based a
 
 - `create_crf_form` body type unchanged but now receives `CreateCrfFormRequest` with `approved`.
 - `update_crf_form` body type unchanged.
-- New `#[tauri::command] set_crf_form_approved(client, id, approved: bool, open_issue_count: usize) -> Result<CrfFormViewResponse, ApiError>`:
-  - If `approved && open_issue_count > 0`, return `Err(ApiError::Http { status: 409, code: "crf.open_issues_blocking_approval".into(), message: format!("{open_issue_count} open issue(s) blocking approval") })` — using the existing `ApiError::Http` struct variant (mirrors `{ kind: "http"; status; code; message }` in the TS wire).
-  - Otherwise call `http::crf::form::set_approved(client, id, SetCrfApprovedRequest { approved }).await`.
-  - The `open_issue_count` argument is a plain `usize` — the frontend already has it cached from `useListIssuesByMission`, so no extra network calls.
+- New `#[tauri::command] set_crf_form_approved(client, id, approved: bool, mission_id: i64) -> Result<CrfFormViewResponse, ApiError>`:
+  1. Re-fetch the current open issues for the form's mission via `http::mission::list_issues_by_mission(client, mission_id, Some(IssueState::Opened))`. **This is a fresh server call** — the TanStack-Query-cached count is intentionally not trusted, since it could be stale.
+  2. If `approved && !issues.is_empty()`, return `Err(ApiError::Http { status: 409, code: "crf.open_issues_blocking_approval".into(), message: format!("{} open issue(s) blocking approval", issues.len()) })` — using the existing `ApiError::Http` struct variant (mirrors `{ kind: "http"; status; code; message }` in the TS wire). The server is **not** called in this branch.
+  3. Otherwise call `http::crf::form::set_approved(client, id, SetCrfApprovedRequest { approved }).await`.
+  4. The `mission_id` is taken from the frontend's cached `useListMissionsByProject`, so it does not introduce an extra round trip.
 
 ### TS types (`apps/desktop/aegis-desktop/src/shared/api/types.ts`)
 
@@ -122,7 +125,11 @@ The existing CRF route handlers in this codebase do not yet enforce role-based a
 
 - `lib/crates/crf/tests/public_api.rs` — the `CrfForm::new` and `CrfFormNew` literals gain `approved: false`. `CrfFormUpdate` fixtures unchanged.
 - `lib/crates/crf/tests/integration_persistence.rs` — every `not_submitted: false` site gains a paired `approved: false` on the same `CrfFormNew` / `CrfForm` literal. Update assertions that compare view structs to include the `approved` field. New case for `set_approved` (toggle `false → true`, then `true → false`; 404 for unknown id).
-- `apps/desktop/aegis-desktop/src-tauri/src/commands/crf/form.rs` — new unit test that wires a mock client: when `open_issue_count > 0 && approved == true`, the command returns the 409 `ApiError::Http` *without* calling the server (use a mock that asserts no call). When `open_issue_count == 0 || approved == false`, the mock receives exactly one `POST /api/crf/forms/{id}/approval` and the response is forwarded.
+- `apps/desktop/aegis-desktop/src-tauri/src/commands/crf/form.rs` — new unit tests:
+  - When `approved == true` and `list_issues_by_mission` returns ≥1 opened issue, the command returns the 409 `ApiError::Http` *without* calling the approve endpoint (mock that asserts no `POST /api/crf/forms/{id}/approval`).
+  - When `approved == true` and `list_issues_by_mission` returns 0 opened issues, the mock receives exactly one `POST /api/crf/forms/{id}/approval` and the response is forwarded.
+  - When `approved == false`, `list_issues_by_mission` is **not** called (un-approve bypasses the gate); the approve endpoint is called once with `{ approved: false }`.
+  - Verify `list_issues_by_mission` is called with `state = Some(IssueState::Opened)`, not all states.
 
 ### Tests — TS
 
@@ -139,10 +146,10 @@ The existing CRF route handlers in this codebase do not yet enforce role-based a
 - Renders one of two states based on `form.approved`:
   - `approved === true` → `<Chip color="success" icon={<VerifiedIcon />} label={t("crf.toolbar.statusApproved")} onClick={handleToggle} />` — label `"Approved"`.
   - `approved === false` → `<Chip color="warning" icon={<PendingActionsIcon />} label={t("crf.toolbar.statusPending")} onClick={handleToggle} />` — label `"Pending"`.
-- `handleToggle` calls `setCrfFormApproved.mutate({ id, approved: !form.approved, openIssueCount })`, passing the cached `openIssueCount` from `useListIssuesByMission` so the Rust command can gate without an extra round trip.
+- `handleToggle` calls `setCrfFormApproved.mutate({ id, approved: !form.approved, missionId })`. The mutation hook passes `missionId` (from cached `useListMissionsByProject` → find mission matching `form.code`) to the Tauri command. The Tauri command is responsible for fetching the live open-issue count and gating.
 - Gates (UI-side, visual feedback only — the authoritative gate is in the Tauri command):
   - Always disabled when `!isMissionQc`.
-  - Disabled when `form.approved === false && openIssueCount > 0` (cannot approve while issues are open).
+  - Disabled when `form.approved === false && openIssueCount > 0` (cannot approve while issues are open). The chip uses the *cached* `openIssueCount` from `useListIssuesByMission` purely for visual feedback; the authoritative check uses a fresh server fetch inside the command.
   - Always enabled for `form.approved === true` (un-approve has no issue gate).
   - Disabled while the mutation is in flight.
 - Disabled visual: `onClick={undefined}` + `<Tooltip>` with the disable reason + `sx={{ opacity: 0.5, cursor: "not-allowed" }}`.
@@ -179,11 +186,11 @@ Becomes derived rather than static:
 
 ### New data hook — `apps/desktop/aegis-desktop/src/features/crf/data/list.ts`
 
-`useSetCrfFormApproved()` — TanStack mutation calling the new Tauri command. The hook signature accepts `openIssueCount: number` and passes it through. On success, invalidates `queryKeys.crf.formsByVersion(updated.versionId)` and `queryKeys.crf.form(updated.id)` — same pattern as `useUpdateCrfForm`.
+`useSetCrfFormApproved()` — TanStack mutation calling the new Tauri command. The mutation `variables` are `{ id, approved, missionId }`. On success, invalidates `queryKeys.crf.formsByVersion(updated.versionId)` and `queryKeys.crf.form(updated.id)` — same pattern as `useUpdateCrfForm`.
 
 ### New shared API entry — `apps/desktop/aegis-desktop/src/shared/api/index.ts`
 
-`api.setCrfFormApproved(id, approved, openIssueCount): Promise<CrfForm>` — wraps `invoke("set_crf_form_approved", { id, approved, openIssueCount })`.
+`api.setCrfFormApproved(id, approved, missionId): Promise<CrfForm>` — wraps `invoke("set_crf_form_approved", { id, approved, missionId })`.
 
 ### i18n strings (added to `en.ts` and `zhCN.ts`)
 
@@ -198,7 +205,7 @@ Becomes derived rather than static:
 
 - `cargo check --workspace` — catches every site where the field was added.
 - `cargo test -p crf` (no `--ignored`) — public-api compile fixture, in-memory facade tests, new `set_approved` persistence tests.
-- `cargo test -p apis`, `cargo test -p aegis-server`, `cargo test -p aegis-desktop --lib` — wire DTO round-trips and Tauri wiremock tests (including the new `set_approved_hits_correct_path` and the gate-by-`open_issue_count` command test).
+- `cargo test -p apis`, `cargo test -p aegis-server`, `cargo test -p aegis-desktop --lib` — wire DTO round-trips and Tauri wiremock tests (including the new `set_approved_hits_correct_path` and the gate-by-fresh-issue-fetch command test).
 - `cargo clippy --workspace --all-targets --all-features -- -D warnings`.
 - `cargo fmt --all -- --check`.
 - Live-DB integration (deliberate, not part of normal verification):
