@@ -70,6 +70,31 @@ const sdtmVersionsResponse = {
   ],
 };
 
+const terminologyVersionsResponse = [
+  {
+    id: 10,
+    kind: "sdtm" as const,
+    name: "2024-03-29",
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: 11,
+    kind: "sdtm" as const,
+    name: "2023-09-29",
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+  },
+  // Adam release — must NOT appear as a MenuItem in the picker.
+  {
+    id: 12,
+    kind: "adam" as const,
+    name: "ADAM-2024",
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+  },
+];
+
 const projectWithSdtmig: ProjectView = makeProject({
   code: "alpha",
   members: {
@@ -119,6 +144,7 @@ describe("ProjectConfigurationPage — leader view", () => {
       current_user: () => leader,
       get_project_by_code: () => projectFixture,
       list_sdtm_versions: () => sdtmVersionsResponse,
+      list_terminology_versions: () => terminologyVersionsResponse,
     });
   });
 
@@ -193,6 +219,7 @@ describe("ProjectConfigurationPage — leader view", () => {
                 { key: "Product", value: "DEMO-002" },
               ]),
               sdtmig: null,
+              sdtmTerminology: null,
             }),
           }),
         }),
@@ -289,6 +316,111 @@ describe("ProjectConfigurationPage — leader view", () => {
     expect(await screen.findByTestId("config-leaders")).toBeInTheDocument();
     expect(await screen.findByTestId("config-workers")).toBeInTheDocument();
   });
+
+  it("renders the SDTM Terminology Select with the seeded selection when initial.sdtmTerminology is set", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => leader,
+      get_project_by_code: () =>
+        makeProject({
+          code: "alpha",
+          members: {
+            leaders: [{ code: "alice", name: "Alice" }],
+            workers: [{ code: "bob", name: "Bob" }],
+          },
+          unblindMembers: { leaders: [], workers: [] },
+          configurations: {
+            language: "en",
+            tags: [{ key: "Product", value: "DEMO-001" }],
+            sdtmig: { versionId: 2, versionName: "SDTMIG v3.2" },
+            sdtmTerminology: {
+              versionId: 10,
+              versionName: "2024-03-29",
+            },
+          },
+        }),
+      list_sdtm_versions: () => sdtmVersionsResponse,
+      list_terminology_versions: () => terminologyVersionsResponse,
+    });
+    await renderPage();
+    expect(await screen.findByText("2024-03-29")).toBeInTheDocument();
+  });
+
+  it("SDTM Terminology picker filters out Adam releases", async () => {
+    await renderPage();
+    await userEvent.click(await screen.findByLabelText(/sdtm terminology/i));
+    expect(
+      await screen.findByRole("option", { name: "2024-03-29" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("option", { name: "ADAM-2024" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("picking a SDTM Terminology release enables Save", async () => {
+    await renderPage();
+    const save = await screen.findByTestId("config-general-save");
+    expect(save).toBeDisabled();
+
+    await userEvent.click(await screen.findByLabelText(/sdtm terminology/i));
+    await userEvent.click(
+      await screen.findByRole("option", { name: "2024-03-29" }),
+    );
+
+    await waitFor(() => expect(save).not.toBeDisabled());
+  });
+
+  it("picking '(unspecified)' on SDTM Terminology → Save → body.configurations.sdtmTerminology === null", async () => {
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => leader,
+      get_project_by_code: () =>
+        makeProject({
+          code: "alpha",
+          members: {
+            leaders: [{ code: "alice", name: "Alice" }],
+            workers: [{ code: "bob", name: "Bob" }],
+          },
+          unblindMembers: { leaders: [], workers: [] },
+          configurations: {
+            language: "en",
+            tags: [{ key: "Product", value: "DEMO-001" }],
+            sdtmig: { versionId: 2, versionName: "SDTMIG v3.2" },
+            sdtmTerminology: {
+              versionId: 10,
+              versionName: "2024-03-29",
+            },
+          },
+        }),
+      list_sdtm_versions: () => sdtmVersionsResponse,
+      list_terminology_versions: () => terminologyVersionsResponse,
+      update_project: () => projectFixture,
+    });
+    await renderPage();
+
+    await userEvent.click(await screen.findByLabelText(/sdtm terminology/i));
+    await userEvent.click(
+      await screen.findByRole("option", { name: /\(unspecified\)/i }),
+    );
+
+    const save = await screen.findByTestId("config-general-save");
+    await waitFor(() => expect(save).not.toBeDisabled());
+    await userEvent.click(save);
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        "update_project",
+        expect.objectContaining({
+          code: "alpha",
+          body: expect.objectContaining({
+            configurations: expect.objectContaining({
+              sdtmTerminology: null,
+            }),
+          }),
+        }),
+      ),
+    );
+  });
 });
 
 describe("ProjectConfigurationPage — non-leader view", () => {
@@ -298,6 +430,7 @@ describe("ProjectConfigurationPage — non-leader view", () => {
       current_user: () => other,
       get_project_by_code: () => projectFixture,
       list_sdtm_versions: () => sdtmVersionsResponse,
+      list_terminology_versions: () => terminologyVersionsResponse,
     });
   });
 
@@ -333,6 +466,19 @@ describe("ProjectConfigurationPage — non-leader view", () => {
   it("SDTMIG Select is disabled for non-leaders", async () => {
     await renderPage();
     const select = await screen.findByLabelText(/sdtmig version/i);
+    await waitFor(() => {
+      const fc = select.closest(".MuiFormControl-root");
+      const root = select.closest(".MuiInputBase-root");
+      expect(
+        fc!.classList.contains("Mui-disabled") ||
+          root!.classList.contains("Mui-disabled"),
+      ).toBe(true);
+    });
+  });
+
+  it("SDTM Terminology Select is disabled for non-leaders", async () => {
+    await renderPage();
+    const select = await screen.findByLabelText(/sdtm terminology/i);
     await waitFor(() => {
       const fc = select.closest(".MuiFormControl-root");
       const root = select.closest(".MuiInputBase-root");

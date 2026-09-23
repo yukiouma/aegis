@@ -9,11 +9,11 @@ use apis::project::{
 
 use crate::domain::{
     ModelVersion, ProjectConfiguration, ProjectLanguage, ProjectMember, ProjectRepository, ProjectTag,
-    UserService,
+    TerminologyVersionData, UserService,
 };
 use crate::usecase::{
-    CreateProject, ModelVersionView, ProjectConfigurationView, ProjectUsecase, UpdateProject,
-    UserSummaryView as DomainUserSummaryView,
+    CreateProject, ModelVersionView, ProjectConfigurationView, ProjectUsecase,
+    TerminologyVersionView, UpdateProject, UserSummaryView as DomainUserSummaryView,
 };
 
 /// Facade adapting `ProjectUsecase<R, U>` to
@@ -117,7 +117,12 @@ fn configuration_data_to_domain(d: ProjectConfigurationData) -> ProjectConfigura
         d.language.map(api_language_to_domain),
         tag_data_vec_to_domain(d.tags),
         d.sdtmig.map(model_version_data_to_domain),
+        d.sdtm_terminology.map(terminology_version_data_to_domain),
     )
+}
+
+fn terminology_version_data_to_domain(d: apis::project::TerminologyVersionData) -> TerminologyVersionData {
+    TerminologyVersionData::for_repository(d.version_id, d.version_name)
 }
 
 fn model_version_data_to_domain(d: ModelVersionData) -> ModelVersion {
@@ -175,7 +180,15 @@ impl From<ProjectConfigurationView> for apis::project::ProjectConfigurationView 
             language: v.language.map(domain_language_to_api),
             tags: v.tags.into_iter().map(Into::into).collect(),
             sdtmig: v.sdtmig.map(model_version_view_to_api),
+            sdtm_terminology: v.sdtm_terminology.map(terminology_version_view_to_api),
         }
+    }
+}
+
+fn terminology_version_view_to_api(v: TerminologyVersionView) -> apis::project::TerminologyVersionView {
+    apis::project::TerminologyVersionView {
+        version_id: v.version_id,
+        version_name: v.version_name,
     }
 }
 

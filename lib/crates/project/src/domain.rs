@@ -6,6 +6,7 @@ mod project_language;
 mod project_member;
 mod project_tag;
 mod team_role;
+mod terminology_version;
 #[cfg(test)]
 mod tests;
 mod user;
@@ -18,4 +19,5 @@ pub use project_language::ProjectLanguage;
 pub use project_member::ProjectMember;
 pub use project_tag::ProjectTag;
 pub use team_role::{RoleType, TeamType};
+pub use terminology_version::TerminologyVersionData;
 pub use user::{UserService, UserSummary};

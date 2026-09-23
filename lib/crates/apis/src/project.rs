@@ -89,14 +89,38 @@ pub struct ModelVersionView {
     pub version_name: String,
 }
 
+/// Wire-shaped pointer to a `TerminologyVersion` (controlled
+/// terminology release) a project pins. Mirrors the shape of
+/// [`ModelVersionData`] but lives at a distinct type so the wire
+/// field name (`sdtm_terminology`) is free to evolve independently.
+/// `version_id` is the surrogate key from
+/// `terminology::TerminologyVersion::id`; `version_name` is the
+/// workbook suffix (e.g. `"2024-03-29"`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TerminologyVersionData {
+    pub version_id: i64,
+    pub version_name: String,
+}
+
+/// Server-side projection of [`TerminologyVersionData`]. Kept as a
+/// distinct type so the request DTO can diverge later without
+/// breaking the projection contract.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TerminologyVersionView {
+    pub version_id: i64,
+    pub version_name: String,
+}
+
 /// Request-side configuration: optional locale plus the tag list
-/// plus an optional SDTM-IG version pointer. Carries `TagData`
-/// because it travels into the backend.
+/// plus the optional SDTM-IG version pointer plus the optional
+/// SDTM terminology pointer. Carries `TagData` because it travels
+/// into the backend.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProjectConfigurationData {
     pub language: Option<ProjectLanguage>,
     pub tags: Vec<TagData>,
     pub sdtmig: Option<ModelVersionData>,
+    pub sdtm_terminology: Option<TerminologyVersionData>,
 }
 
 /// Server-side projection of the configuration. Carries `TagView`
@@ -106,6 +130,7 @@ pub struct ProjectConfigurationView {
     pub language: Option<ProjectLanguage>,
     pub tags: Vec<TagView>,
     pub sdtmig: Option<ModelVersionView>,
+    pub sdtm_terminology: Option<TerminologyVersionView>,
 }
 
 /// Safe projection of a project: membership lists are hydrated to

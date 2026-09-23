@@ -15,11 +15,13 @@ import {
   type ApiError,
   type ProjectConfiguration,
   type ProjectConfigurationSdtmig,
+  type ProjectConfigurationTerminology,
   type ProjectLanguage,
   type Tag,
 } from "../../../shared/api";
 import { errorMessage } from "../../../shared/api/error";
 import { useListSdtmVersions } from "../../domain-model/data/list";
+import { useListTerminologyVersions } from "../../terminology/data/list";
 import { useUpdateProject } from "../../project-list";
 import { TagEditor } from "../../project-list/components/TagEditor";
 
@@ -56,11 +58,22 @@ export function ConfigurationGeneralSection({
   const [sdtmig, setSdtmig] = useState<ProjectConfigurationSdtmig | null>(
     initial.sdtmig ?? null,
   );
+  const [sdtmTerminology, setSdtmTerminology] =
+    useState<ProjectConfigurationTerminology | null>(
+      initial.sdtmTerminology ?? null,
+    );
   const languageTouchedRef = useRef(false);
   const tagsTouchedRef = useRef(false);
   const sdtmTouchedRef = useRef(false);
+  const sdtmTerminologyTouchedRef = useRef(false);
 
   const versions = useListSdtmVersions();
+  const terminologyVersions = useListTerminologyVersions();
+  // The terminology service mixes SDTM and ADaM releases; the picker
+  // surfaces only SDTM because that's what a project pins.
+  const sdtmTerminologyReleases = (terminologyVersions.data ?? []).filter(
+    (v) => v.kind === "sdtm",
+  );
 
   // Reseed the local state whenever a fresh `initial` arrives
   // (e.g. after `useUpdateProject` invalidates the project cache
@@ -72,19 +85,27 @@ export function ConfigurationGeneralSection({
     setLanguage(initial.language);
     setTags(initial.tags);
     setSdtmig(initial.sdtmig ?? null);
+    setSdtmTerminology(initial.sdtmTerminology ?? null);
     languageTouchedRef.current = false;
     tagsTouchedRef.current = false;
     sdtmTouchedRef.current = false;
+    sdtmTerminologyTouchedRef.current = false;
   }, [initial]);
 
   const dirty =
     languageTouchedRef.current ||
     tagsTouchedRef.current ||
-    sdtmTouchedRef.current;
+    sdtmTouchedRef.current ||
+    sdtmTerminologyTouchedRef.current;
   const submitDisabled = readonly || !dirty || update.isPending;
 
   async function onSave() {
-    const configurations: ProjectConfiguration = { language, tags, sdtmig };
+    const configurations: ProjectConfiguration = {
+      language,
+      tags,
+      sdtmig,
+      sdtmTerminology,
+    };
     await update.mutateAsync({
       code: projectCode,
       body: { configurations },
@@ -155,6 +176,50 @@ export function ConfigurationGeneralSection({
               </MenuItem>
             )}
           {(versions.data ?? []).map((v) => (
+            <MenuItem key={v.id} value={String(v.id)}>
+              {v.name}
+            </MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+
+      <FormControl size="small" disabled={readonly}>
+        <InputLabel id="config-sdtm-terminology-label">
+          {t("project.configuration.general.sdtmTerminology")}
+        </InputLabel>
+        <Select<string>
+          labelId="config-sdtm-terminology-label"
+          label={t("project.configuration.general.sdtmTerminology")}
+          value={sdtmTerminology ? String(sdtmTerminology.versionId) : ""}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === "") {
+              setSdtmTerminology(null);
+            } else {
+              const id = Number(v);
+              const found = sdtmTerminologyReleases.find((x) => x.id === id);
+              setSdtmTerminology(
+                found
+                  ? { versionId: found.id, versionName: found.name }
+                  : { versionId: id, versionName: "" },
+              );
+            }
+            sdtmTerminologyTouchedRef.current = true;
+          }}
+          inputProps={{ "data-testid": "config-sdtm-terminology-input" }}
+        >
+          <MenuItem value="">
+            {t("project.configuration.general.sdtmTerminology.none")}
+          </MenuItem>
+          {sdtmTerminology &&
+            !sdtmTerminologyReleases.some(
+              (v) => v.id === sdtmTerminology.versionId,
+            ) && (
+              <MenuItem value={String(sdtmTerminology.versionId)}>
+                {sdtmTerminology.versionName}
+              </MenuItem>
+            )}
+          {sdtmTerminologyReleases.map((v) => (
             <MenuItem key={v.id} value={String(v.id)}>
               {v.name}
             </MenuItem>

@@ -11,5 +11,5 @@ pub use error::UsecaseError;
 pub use project_usecase::{ProjectUsecase, ProjectUsecaseConfig};
 pub use views::{
     ModelVersionView, ProjectConfigurationView, ProjectMemberView, ProjectView, TagView,
-    UserSummaryView,
+    TerminologyVersionView, UserSummaryView,
 };

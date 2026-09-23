@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::domain::{
     DomainError, ModelVersion, Project, ProjectConfiguration, ProjectMember, ProjectNew,
-    ProjectRepository, ProjectTag, ProjectUpdate, UserService, UserSummary,
+    ProjectRepository, ProjectTag, ProjectUpdate, TerminologyVersionData, UserService, UserSummary,
 };
 
 use super::commands::{CreateProject, UpdateProject};
@@ -196,6 +196,15 @@ fn validate_configuration(c: &ProjectConfiguration) -> Result<(), UsecaseError> 
             Ok(_) => {}
             Err(DomainError::EmptySdtmigName) => {
                 return Err(UsecaseError::Validation(DomainError::EmptySdtmigName));
+            }
+            Err(other) => return Err(UsecaseError::Repository(other)),
+        }
+    }
+    if let Some(ref t) = c.sdtm_terminology {
+        match TerminologyVersionData::new(t.version_id, t.version_name.clone()) {
+            Ok(_) => {}
+            Err(DomainError::EmptySdtmTerminologyName) => {
+                return Err(UsecaseError::Validation(DomainError::EmptySdtmTerminologyName));
             }
             Err(other) => return Err(UsecaseError::Repository(other)),
         }

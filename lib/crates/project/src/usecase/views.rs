@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
 
-use crate::domain::{ModelVersion, Project, ProjectConfiguration, ProjectTag, UserSummary};
+use crate::domain::{ModelVersion, Project, ProjectConfiguration, ProjectTag, TerminologyVersionData, UserSummary};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserSummaryView {
@@ -54,15 +54,34 @@ impl From<ModelVersion> for ModelVersionView {
     }
 }
 
+/// Server-side projection of a single `TerminologyVersionData`
+/// pointer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TerminologyVersionView {
+    pub version_id: i64,
+    pub version_name: String,
+}
+
+impl From<TerminologyVersionData> for TerminologyVersionView {
+    fn from(v: TerminologyVersionData) -> Self {
+        Self {
+            version_id: v.version_id,
+            version_name: v.version_name,
+        }
+    }
+}
+
 /// Server-side projection of the project's configuration: an
-/// optional locale, the tag list, and the optional SDTM-IG version
-/// pointer. Mirrors the apis `ProjectConfigurationView` so the
-/// facade `From` impl is a straight rename.
+/// optional locale, the tag list, the optional SDTM-IG version
+/// pointer, and the optional SDTM terminology pointer. Mirrors the
+/// apis `ProjectConfigurationView` so the facade `From` impl is a
+/// straight rename.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct ProjectConfigurationView {
     pub language: Option<crate::domain::ProjectLanguage>,
     pub tags: Vec<TagView>,
     pub sdtmig: Option<ModelVersionView>,
+    pub sdtm_terminology: Option<TerminologyVersionView>,
 }
 
 impl From<ProjectConfiguration> for ProjectConfigurationView {
@@ -71,6 +90,7 @@ impl From<ProjectConfiguration> for ProjectConfigurationView {
             language: c.language,
             tags: c.tags.into_iter().map(Into::into).collect(),
             sdtmig: c.sdtmig.map(Into::into),
+            sdtm_terminology: c.sdtm_terminology.map(Into::into),
         }
     }
 }

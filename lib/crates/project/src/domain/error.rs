@@ -14,6 +14,9 @@ pub enum DomainError {
     #[error("sdtmig version name must not be empty")]
     EmptySdtmigName,
 
+    #[error("sdtm terminology version name must not be empty")]
+    EmptySdtmTerminologyName,
+
     #[error("duplicate code in leaders: {0}")]
     DuplicateLeader(String),
 

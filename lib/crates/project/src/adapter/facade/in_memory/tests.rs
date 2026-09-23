@@ -199,6 +199,7 @@ fn configuration_with_tags(tags: Vec<TagData>) -> ProjectConfigurationData {
         language: None,
         tags,
         sdtmig: None,
+        sdtm_terminology: None,
     }
 }
 
@@ -392,6 +393,7 @@ async fn create_project_with_sdtmig_round_trips_through_ap_view() {
                     version_id: 7,
                     version_name: "2024-03-29".into(),
                 }),
+                sdtm_terminology: None,
             }),
         })
         .await

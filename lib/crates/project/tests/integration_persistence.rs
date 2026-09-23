@@ -159,6 +159,7 @@ async fn project_create_with_configuration_round_trip() {
                         ProjectTag::for_repository("Region".into(), "EU".into()),
                     ],
                     None,
+                    None,
                 )),
             })
             .await
@@ -185,6 +186,7 @@ async fn project_update_replaces_configuration_whole_list() {
                     None,
                     vec![ProjectTag::for_repository("k1".into(), "v1".into())],
                     None,
+                    None,
                 )),
             })
             .await
@@ -198,6 +200,7 @@ async fn project_update_replaces_configuration_whole_list() {
                         ProjectTag::for_repository("k2".into(), "v2".into()),
                         ProjectTag::for_repository("k3".into(), "v3".into()),
                     ],
+                    None,
                     None,
                 )),
                 ..Default::default()

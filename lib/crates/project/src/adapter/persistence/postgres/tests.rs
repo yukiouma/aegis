@@ -171,6 +171,34 @@ fn sdtmig_migration_updates_default_to_include_sdtmig_null() {
     );
 }
 
+#[test]
+fn sdtm_terminology_migration_adds_sdtm_terminology_key_to_configuration() {
+    let sql = load_migration("0004_add_project_configuration_sdtm_terminology.sql");
+    let upper = sql.to_uppercase();
+    assert!(
+        upper.contains("SDTM_TERMINOLOGY"),
+        "the 0004 migration must add the sdtm_terminology key to the configuration JSONB; got:\n{sql}"
+    );
+    assert!(
+        upper.contains("CONFIGURATION = CONFIGURATION ||"),
+        "the 0004 migration must merge the sdtm_terminology key into existing rows; got:\n{sql}"
+    );
+}
+
+#[test]
+fn sdtm_terminology_migration_updates_default_to_include_sdtm_terminology_null() {
+    let sql = load_migration("0004_add_project_configuration_sdtm_terminology.sql");
+    let upper = sql.to_uppercase();
+    assert!(
+        upper.contains("DEFAULT"),
+        "the 0004 migration must update the column default; got:\n{sql}"
+    );
+    assert!(
+        upper.contains("SDTM_TERMINOLOGY"),
+        "the column default must include sdtm_terminology; got:\n{sql}"
+    );
+}
+
 #[cfg(test)]
 mod row_tests {
     use chrono::{TimeZone, Utc};
@@ -214,6 +242,7 @@ mod row_tests {
                     ProjectTag::for_repository("Product".into(), "DEMO-001".into()),
                     ProjectTag::for_repository("Region".into(), "EU".into()),
                 ],
+                None,
                 None,
             )),
             created_at: ts(),
