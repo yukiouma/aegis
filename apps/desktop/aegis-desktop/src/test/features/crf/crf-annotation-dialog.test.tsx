@@ -484,4 +484,17 @@ describe("AnnotationDialog", () => {
     fireEvent.click(screen.getByTestId("crf-annotation-dialog-supp"));
     expect(content).toHaveValue(" in SUPPAE");
   });
+
+  it("re-evaluates the SUPP draft when the domain annotation changes", () => {
+    mountWithSeed({ owner: { kind: "form", id: 11 } });
+    // Default picked domain annotation is AE — click SUPP first.
+    fireEvent.click(screen.getByTestId("crf-annotation-dialog-supp"));
+    expect(screen.getByLabelText(/Content/i)).toHaveValue(" in SUPPAE");
+    // Switch the picked domain annotation to VS.
+    fireEvent.mouseDown(screen.getByRole("combobox"));
+    fireEvent.click(screen.getByRole("option", { name: "VS" }));
+    // Click SUPP again — domain code now reads VS.
+    fireEvent.click(screen.getByTestId("crf-annotation-dialog-supp"));
+    expect(screen.getByLabelText(/Content/i)).toHaveValue(" in SUPPVS");
+  });
 });
