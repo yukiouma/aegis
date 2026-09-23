@@ -475,4 +475,13 @@ describe("AnnotationDialog", () => {
     );
     expect(onSubmit).not.toHaveBeenCalled();
   });
+
+  it("SUPP replaces existing content in the field (does not append)", () => {
+    mountWithSeed({ owner: { kind: "form", id: 11 } });
+    const content = screen.getByLabelText(/Content/i);
+    fireEvent.change(content, { target: { value: "pre-existing note" } });
+    expect(content).toHaveValue("pre-existing note");
+    fireEvent.click(screen.getByTestId("crf-annotation-dialog-supp"));
+    expect(content).toHaveValue(" in SUPPAE");
+  });
 });
