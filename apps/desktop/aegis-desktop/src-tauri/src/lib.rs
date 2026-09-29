@@ -7,6 +7,7 @@ use tauri_plugin_store::StoreExt;
 mod commands;
 mod http;
 mod system;
+mod trace_id_setup;
 mod tracing_init;
 
 #[tauri::command]
