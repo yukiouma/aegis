@@ -2,6 +2,7 @@
 
 use tauri::State;
 use trace_id::TraceIdGenerator;
+use tracing::Instrument;
 
 use crate::http::client::{HttpClient, TRACE_ID};
 use crate::http::crf::annotation::{
@@ -17,17 +18,24 @@ pub async fn create_crf_annotation(
     body: CreateAnnotationRequest,
 ) -> Result<AnnotationViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async { annotation::create(&client, body).await })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "create_crf_annotation"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { annotation::create(&client, body).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -38,19 +46,24 @@ pub async fn update_crf_annotation(
     body: UpdateAnnotationRequest,
 ) -> Result<AnnotationViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            annotation::update(&client, id, body).await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "update_crf_annotation"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { annotation::update(&client, id, body).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -60,17 +73,24 @@ pub async fn delete_crf_annotation(
     id: i64,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async { annotation::delete(&client, id).await })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "delete_crf_annotation"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { annotation::delete(&client, id).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -81,17 +101,24 @@ pub async fn search_crf_annotations_by_version(
     fragment: String,
 ) -> Result<AnnotationListResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            annotation::search_by_version(&client, version_id, fragment).await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "search_crf_annotations_by_version"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                annotation::search_by_version(&client, version_id, fragment).await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }

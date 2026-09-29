@@ -1,5 +1,6 @@
 use tauri::State;
 use trace_id::TraceIdGenerator;
+use tracing::Instrument;
 
 use crate::http::client::{HttpClient, TRACE_ID};
 use crate::http::dto::ApiError;
@@ -19,29 +20,33 @@ pub async fn create_project(
     unblind_members: Option<ProjectMemberDataRequest>,
 ) -> Result<ProjectViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            project::create(
-                &client,
-                CreateProjectRequest {
-                    code,
-                    description,
-                    configurations,
-                    members,
-                    unblind_members,
-                },
-            )
-            .await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "create_project");
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                project::create(
+                    &client,
+                    CreateProjectRequest {
+                        code,
+                        description,
+                        configurations,
+                        members,
+                        unblind_members,
+                    },
+                )
+                .await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -50,17 +55,21 @@ pub async fn list_projects(
     generator: State<'_, TraceIdGenerator>,
 ) -> Result<Vec<ProjectViewResponse>, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async { project::list(&client).await })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "list_projects");
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { project::list(&client).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -70,19 +79,21 @@ pub async fn get_project_by_code(
     code: String,
 ) -> Result<ProjectViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            project::get_by_code(&client, &code).await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "get_project_by_code");
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { project::get_by_code(&client, &code).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -93,17 +104,19 @@ pub async fn update_project(
     body: UpdateProjectRequest,
 ) -> Result<ProjectViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            project::update(&client, &code, body).await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "update_project");
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { project::update(&client, &code, body).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }

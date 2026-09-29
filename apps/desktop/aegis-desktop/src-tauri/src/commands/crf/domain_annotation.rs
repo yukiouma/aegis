@@ -2,6 +2,7 @@
 
 use tauri::State;
 use trace_id::TraceIdGenerator;
+use tracing::Instrument;
 
 use crate::http::client::{HttpClient, TRACE_ID};
 use crate::http::crf::domain_annotation::{
@@ -18,19 +19,26 @@ pub async fn create_crf_domain_annotation(
     body: CreateDomainAnnotationRequest,
 ) -> Result<DomainAnnotationViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            domain_annotation::create(&client, form_id, body).await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "create_crf_domain_annotation"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                domain_annotation::create(&client, form_id, body).await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -40,19 +48,26 @@ pub async fn list_crf_domain_annotations_by_form(
     form_id: i64,
 ) -> Result<domain_annotation::DomainAnnotationListResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            domain_annotation::list_by_form(&client, form_id).await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "list_crf_domain_annotations_by_form"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                domain_annotation::list_by_form(&client, form_id).await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -63,19 +78,26 @@ pub async fn update_crf_domain_annotation(
     body: UpdateDomainAnnotationRequest,
 ) -> Result<DomainAnnotationViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            domain_annotation::update(&client, id, body).await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "update_crf_domain_annotation"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                domain_annotation::update(&client, id, body).await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -85,19 +107,26 @@ pub async fn delete_crf_domain_annotation(
     id: i64,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            domain_annotation::delete(&client, id).await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "delete_crf_domain_annotation"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                domain_annotation::delete(&client, id).await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -108,17 +137,24 @@ pub async fn search_crf_domain_annotations_by_version(
     fragment: String,
 ) -> Result<domain_annotation::DomainAnnotationListResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            domain_annotation::search_by_version(&client, version_id, fragment).await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "search_crf_domain_annotations_by_version"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                domain_annotation::search_by_version(&client, version_id, fragment).await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }

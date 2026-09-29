@@ -2,6 +2,7 @@
 
 use tauri::State;
 use trace_id::TraceIdGenerator;
+use tracing::Instrument;
 
 use crate::http::client::{HttpClient, TRACE_ID};
 use crate::http::crf::form::{
@@ -18,19 +19,24 @@ pub async fn list_crf_forms_by_version(
     version_id: i64,
 ) -> Result<CrfFormListResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            form::list_by_version(&client, version_id).await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "list_crf_forms_by_version"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { form::list_by_version(&client, version_id).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -41,19 +47,26 @@ pub async fn create_crf_form(
     body: CreateCrfFormRequest,
 ) -> Result<CrfFormViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            form::create(&client, version_id, body).await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "create_crf_form"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                form::create(&client, version_id, body).await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -64,17 +77,24 @@ pub async fn update_crf_form(
     body: UpdateCrfFormRequest,
 ) -> Result<CrfFormViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async { form::update(&client, id, body).await })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "update_crf_form"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { form::update(&client, id, body).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -84,17 +104,24 @@ pub async fn delete_crf_form(
     id: i64,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async { form::delete(&client, id).await })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "delete_crf_form"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { form::delete(&client, id).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -104,17 +131,24 @@ pub async fn get_crf_form_by_id(
     id: i64,
 ) -> Result<CrfFormViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async { form::get_by_id(&client, id).await })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "get_crf_form_by_id"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { form::get_by_id(&client, id).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -124,17 +158,24 @@ pub async fn get_crf_form_details(
     id: i64,
 ) -> Result<CrfFormDetailResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async { form::details(&client, id).await })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "get_crf_form_details"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { form::details(&client, id).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -145,19 +186,26 @@ pub async fn search_crf_forms_by_version(
     fragment: String,
 ) -> Result<CrfFormListResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            form::search_by_version(&client, version_id, fragment).await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "search_crf_forms_by_version"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                form::search_by_version(&client, version_id, fragment).await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 /// Toggle the `approved` flag on a CRF form. Re-fetches the
@@ -178,19 +226,26 @@ pub async fn set_crf_form_approved(
     mission_id: i64,
 ) -> Result<CrfFormViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            set_approved_impl(&client, id, approved, mission_id).await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "set_crf_form_approved"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                set_approved_impl(&client, id, approved, mission_id).await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 /// Gate + proxy implementation. `#[tauri::command]` shims over

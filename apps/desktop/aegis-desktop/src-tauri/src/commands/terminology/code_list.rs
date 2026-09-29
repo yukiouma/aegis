@@ -2,12 +2,13 @@
 
 use tauri::State;
 use trace_id::TraceIdGenerator;
+use tracing::Instrument;
 
 use crate::http::client::{HttpClient, TRACE_ID};
 use crate::http::dto::ApiError;
 use crate::http::terminology::code_list::{
-    self, CodeListListQuery, CodeListPagedResponse, CodeListViewResponse, CreateCodeListRequest,
-    UpdateCodeListRequest,
+    self, CodeListListQuery, CodeListPagedResponse, CodeListViewResponse,
+    CreateCodeListRequest, UpdateCodeListRequest,
 };
 
 #[tauri::command]
@@ -24,32 +25,39 @@ pub async fn create_code_list(
     nci_preferred_term: String,
 ) -> Result<CodeListViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            code_list::create(
-                &client,
-                CreateCodeListRequest {
-                    version_id,
-                    code,
-                    extensible,
-                    name,
-                    submission_value,
-                    synonym,
-                    definition,
-                    nci_preferred_term,
-                },
-            )
-            .await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "create_code_list"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                code_list::create(
+                    &client,
+                    CreateCodeListRequest {
+                        version_id,
+                        code,
+                        extensible,
+                        name,
+                        submission_value,
+                        synonym,
+                        definition,
+                        nci_preferred_term,
+                    },
+                )
+                .await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -62,28 +70,35 @@ pub async fn list_code_lists(
     limit: u32,
 ) -> Result<CodeListPagedResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            code_list::list_paged(
-                &client,
-                CodeListListQuery {
-                    version_id,
-                    fragment,
-                    offset,
-                    limit,
-                },
-            )
-            .await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "list_code_lists"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                code_list::list_paged(
+                    &client,
+                    CodeListListQuery {
+                        version_id,
+                        fragment,
+                        offset,
+                        limit,
+                    },
+                )
+                .await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -93,17 +108,24 @@ pub async fn get_code_list_by_id(
     id: i64,
 ) -> Result<CodeListViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async { code_list::get_by_id(&client, id).await })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "get_code_list_by_id"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { code_list::get_by_id(&client, id).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -114,19 +136,24 @@ pub async fn update_code_list(
     body: UpdateCodeListRequest,
 ) -> Result<CodeListViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            code_list::update(&client, id, body).await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "update_code_list"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { code_list::update(&client, id, body).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -136,15 +163,22 @@ pub async fn delete_code_list(
     id: i64,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async { code_list::delete(&client, id).await })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "delete_code_list"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { code_list::delete(&client, id).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }

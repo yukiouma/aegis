@@ -1,5 +1,6 @@
 use tauri::State;
 use trace_id::TraceIdGenerator;
+use tracing::Instrument;
 
 use crate::http::client::{HttpClient, TRACE_ID};
 use crate::http::dto::ApiError;
@@ -20,30 +21,34 @@ pub async fn register_user(
     password: String,
 ) -> Result<RegisterUserResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            user_credential::register(
-                &client,
-                RegisterUserRequest {
-                    user_code,
-                    user_name,
-                    domain_name,
-                    hostname,
-                    sid,
-                    password,
-                },
-            )
-            .await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "register_user");
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                user_credential::register(
+                    &client,
+                    RegisterUserRequest {
+                        user_code,
+                        user_name,
+                        domain_name,
+                        hostname,
+                        sid,
+                        password,
+                    },
+                )
+                .await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
@@ -54,24 +59,28 @@ pub async fn update_user_credential(
     password: Option<String>,
 ) -> Result<UserCredentialViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    tracing::info!(trace_id = %trace_id, "enter");
-
-    let result = TRACE_ID
-        .scope(trace_id.clone(), async {
-            user_credential::update(
-                &client,
-                UpdateUserCredentialRequest {
-                    user_code,
-                    password,
-                },
-            )
-            .await
-        })
-        .await;
-
-    match &result {
-        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
-        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "update_user_credential"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                user_credential::update(
+                    &client,
+                    UpdateUserCredentialRequest { user_code, password },
+                )
+                .await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
     }
-    result
+    .instrument(span)
+    .await
 }
