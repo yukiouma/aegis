@@ -53,14 +53,14 @@ Add this block immediately after the `tower-http` entry and before the `tokio` e
 # `trace-id` is the workspace crate that mints `C-/S-…` ids. We
 # use `server_side()` as the fallback when the inbound request has
 # no `X-Trace-ID` (or sends one we can't trust).
-trace-id = { path = "../../../../lib/crates/trace-id" }
+trace-id = { path = "../../../lib/crates/trace-id" }
 ```
 
 The resulting dependency block reads (new line bolded in review only):
 
 ```toml
 tower-http = { workspace = true, features = ["trace"] }
-trace-id = { path = "../../../../lib/crates/trace-id" }
+trace-id = { path = "../../../lib/crates/trace-id" }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
 ```
 
