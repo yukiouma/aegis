@@ -25,6 +25,13 @@ export type ApiError =
   | { kind: "store"; message: string }
   | { kind: "parse"; message: string };
 
+// Mirrors `commands::webview_log::WebviewLogLevel`. The Rust enum
+// uses `#[serde(rename_all = "lowercase")]`, so the wire form is
+// `"warn"` / `"error"`. Other level strings are rejected at the wire
+// boundary, so a stale frontend build cannot widen the surface even
+// by mistake.
+export type WebviewLogLevel = "warn" | "error";
+
 // Mirrors `system::identity::Identity` in src-tauri. That struct carries
 // `#[serde(rename_all = "camelCase")]`, so unlike the other response
 // shapes in this file its JSON keys really are camelCase — `hostMachine`,
