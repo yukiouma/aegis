@@ -120,6 +120,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::crf::domain_annotation::search_crf_domain_annotations_by_version,
             // health
             commands::healthz::healthz,
+            // webview log forwarder (sink for console.warn / console.error)
+            commands::webview_log::forward_webview_log,
             // legacy greet (kept for the existing test)
             greet,
         ])
