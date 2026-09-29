@@ -1,8 +1,9 @@
 //! Tauri command shims for the terminology version HTTP layer.
 
 use tauri::State;
+use trace_id::TraceIdGenerator;
 
-use crate::http::client::HttpClient;
+use crate::http::client::{HttpClient, TRACE_ID};
 use crate::http::dto::{ApiError, TerminologyKind};
 use crate::http::terminology::version::{
     self, CreateTerminologyVersionRequest, TerminologyVersionViewResponse,
@@ -12,44 +13,124 @@ use crate::http::terminology::version::{
 #[tauri::command]
 pub async fn create_terminology_version(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     kind: TerminologyKind,
     name: String,
 ) -> Result<TerminologyVersionViewResponse, ApiError> {
-    version::create(
-        &client,
-        CreateTerminologyVersionRequest { kind, name },
-    )
-    .await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "create_terminology_version");
+    let _enter = span.enter();
+    tracing::info!("enter");
+
+    let result = TRACE_ID
+        .scope(trace_id, async {
+            version::create(
+                &client,
+                CreateTerminologyVersionRequest { kind, name },
+            )
+            .await
+        })
+        .await;
+
+    match &result {
+        Ok(_) => tracing::info!("success"),
+        Err(e) => tracing::error!(error = %e, "failed"),
+    }
+    result
 }
 
 #[tauri::command]
 pub async fn list_terminology_versions(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
 ) -> Result<Vec<TerminologyVersionViewResponse>, ApiError> {
-    version::list(&client).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "list_terminology_versions");
+    let _enter = span.enter();
+    tracing::info!("enter");
+
+    let result = TRACE_ID
+        .scope(trace_id, async {
+            version::list(&client).await
+        })
+        .await;
+
+    match &result {
+        Ok(_) => tracing::info!("success"),
+        Err(e) => tracing::error!(error = %e, "failed"),
+    }
+    result
 }
 
 #[tauri::command]
 pub async fn get_terminology_version_by_id(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     id: i64,
 ) -> Result<TerminologyVersionViewResponse, ApiError> {
-    version::get_by_id(&client, id).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "get_terminology_version_by_id");
+    let _enter = span.enter();
+    tracing::info!("enter");
+
+    let result = TRACE_ID
+        .scope(trace_id, async {
+            version::get_by_id(&client, id).await
+        })
+        .await;
+
+    match &result {
+        Ok(_) => tracing::info!("success"),
+        Err(e) => tracing::error!(error = %e, "failed"),
+    }
+    result
 }
 
 #[tauri::command]
 pub async fn update_terminology_version(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     id: i64,
     body: UpdateTerminologyVersionRequest,
 ) -> Result<TerminologyVersionViewResponse, ApiError> {
-    version::update(&client, id, body).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "update_terminology_version");
+    let _enter = span.enter();
+    tracing::info!("enter");
+
+    let result = TRACE_ID
+        .scope(trace_id, async {
+            version::update(&client, id, body).await
+        })
+        .await;
+
+    match &result {
+        Ok(_) => tracing::info!("success"),
+        Err(e) => tracing::error!(error = %e, "failed"),
+    }
+    result
 }
 
 #[tauri::command]
 pub async fn delete_terminology_version(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     id: i64,
 ) -> Result<(), ApiError> {
-    version::delete(&client, id).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "delete_terminology_version");
+    let _enter = span.enter();
+    tracing::info!("enter");
+
+    let result = TRACE_ID
+        .scope(trace_id, async {
+            version::delete(&client, id).await
+        })
+        .await;
+
+    match &result {
+        Ok(_) => tracing::info!("success"),
+        Err(e) => tracing::error!(error = %e, "failed"),
+    }
+    result
 }

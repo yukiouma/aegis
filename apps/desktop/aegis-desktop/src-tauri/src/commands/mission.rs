@@ -1,6 +1,7 @@
 use tauri::State;
+use trace_id::TraceIdGenerator;
 
-use crate::http::client::HttpClient;
+use crate::http::client::{HttpClient, TRACE_ID};
 use crate::http::dto::ApiError;
 use crate::http::mission::{
     self, AssigneeDataArg, AssigneeViewResponse, CreateMissionRequest, MissionViewResponse,
@@ -43,110 +44,254 @@ fn parse_issue_state(s: &str) -> Result<crate::http::mission::IssueState, ApiErr
 #[tauri::command]
 pub async fn list_missions_by_project(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     project_code: String,
     kind: Option<String>,
 ) -> Result<Vec<MissionViewResponse>, ApiError> {
-    let kind = match kind.as_deref() {
-        Some(s) => Some(parse_kind(s)?),
-        None => None,
-    };
-    mission::list_by_project(&client, &project_code, kind).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "list_missions_by_project");
+    let _enter = span.enter();
+    tracing::info!("enter");
+
+    let result = TRACE_ID
+        .scope(trace_id, async {
+            let kind = match kind.as_deref() {
+                Some(s) => Some(parse_kind(s)?),
+                None => None,
+            };
+            mission::list_by_project(&client, &project_code, kind).await
+        })
+        .await;
+
+    match &result {
+        Ok(_) => tracing::info!("success"),
+        Err(e) => tracing::error!(error = %e, "failed"),
+    }
+    result
 }
 
 #[tauri::command]
 pub async fn add_assignee(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     mission_id: i64,
     body: AssigneeDataArg,
 ) -> Result<AssigneeViewResponse, ApiError> {
-    mission::add_assignee(&client, mission_id, body).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "add_assignee");
+    let _enter = span.enter();
+    tracing::info!("enter");
+
+    let result = TRACE_ID
+        .scope(trace_id, async {
+            mission::add_assignee(&client, mission_id, body).await
+        })
+        .await;
+
+    match &result {
+        Ok(_) => tracing::info!("success"),
+        Err(e) => tracing::error!(error = %e, "failed"),
+    }
+    result
 }
 
 #[tauri::command]
 pub async fn remove_assignee(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     mission_id: i64,
     assignee_id: i64,
 ) -> Result<(), ApiError> {
-    mission::remove_assignee(&client, mission_id, assignee_id).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "remove_assignee");
+    let _enter = span.enter();
+    tracing::info!("enter");
+
+    let result = TRACE_ID
+        .scope(trace_id, async {
+            mission::remove_assignee(&client, mission_id, assignee_id).await
+        })
+        .await;
+
+    match &result {
+        Ok(_) => tracing::info!("success"),
+        Err(e) => tracing::error!(error = %e, "failed"),
+    }
+    result
 }
 
 #[tauri::command]
 pub async fn create_mission(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     project_code: String,
     mission_kind: String,
     mission_code: String,
     assignees: Vec<CreateMissionAssigneeArg>,
 ) -> Result<MissionViewResponse, ApiError> {
-    let assignees = assignees
-        .into_iter()
-        .map(|a| -> Result<AssigneeDataArg, ApiError> {
-            Ok(AssigneeDataArg {
-                user_code: a.user_code,
-                role: parse_role(&a.role)?,
-            })
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "create_mission");
+    let _enter = span.enter();
+    tracing::info!("enter");
+
+    let result = TRACE_ID
+        .scope(trace_id, async {
+            let assignees = assignees
+                .into_iter()
+                .map(|a| -> Result<AssigneeDataArg, ApiError> {
+                    Ok(AssigneeDataArg {
+                        user_code: a.user_code,
+                        role: parse_role(&a.role)?,
+                    })
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            mission::create_mission(
+                &client,
+                CreateMissionRequest {
+                    project_code,
+                    mission_kind: parse_kind(&mission_kind)?,
+                    mission_code,
+                    assignees,
+                },
+            )
+            .await
         })
-        .collect::<Result<Vec<_>, _>>()?;
-    mission::create_mission(
-        &client,
-        CreateMissionRequest {
-            project_code,
-            mission_kind: parse_kind(&mission_kind)?,
-            mission_code,
-            assignees,
-        },
-    )
-    .await
+        .await;
+
+    match &result {
+        Ok(_) => tracing::info!("success"),
+        Err(e) => tracing::error!(error = %e, "failed"),
+    }
+    result
 }
 
 #[tauri::command]
 pub async fn list_issues_by_mission(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     mission_id: i64,
     state: Option<String>,
 ) -> Result<Vec<mission::IssueViewResponse>, ApiError> {
-    let parsed = match state.as_deref() {
-        Some(s) => Some(parse_issue_state(s)?),
-        None => None,
-    };
-    mission::list_issues_by_mission(&client, mission_id, parsed).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "list_issues_by_mission");
+    let _enter = span.enter();
+    tracing::info!("enter");
+
+    let result = TRACE_ID
+        .scope(trace_id, async {
+            let parsed = match state.as_deref() {
+                Some(s) => Some(parse_issue_state(s)?),
+                None => None,
+            };
+            mission::list_issues_by_mission(&client, mission_id, parsed).await
+        })
+        .await;
+
+    match &result {
+        Ok(_) => tracing::info!("success"),
+        Err(e) => tracing::error!(error = %e, "failed"),
+    }
+    result
 }
 
 #[tauri::command]
 pub async fn create_issue(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     mission_id: i64,
     body: mission::CreateIssueRequest,
 ) -> Result<mission::IssueViewResponse, ApiError> {
-    mission::create_issue(&client, mission_id, body).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "create_issue");
+    let _enter = span.enter();
+    tracing::info!("enter");
+
+    let result = TRACE_ID
+        .scope(trace_id, async {
+            mission::create_issue(&client, mission_id, body).await
+        })
+        .await;
+
+    match &result {
+        Ok(_) => tracing::info!("success"),
+        Err(e) => tracing::error!(error = %e, "failed"),
+    }
+    result
 }
 
 #[tauri::command]
 pub async fn patch_issue_state(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     issue_id: i64,
     state: String,
 ) -> Result<mission::IssueViewResponse, ApiError> {
-    mission::patch_issue_state(&client, issue_id, parse_issue_state(&state)?).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "patch_issue_state");
+    let _enter = span.enter();
+    tracing::info!("enter");
+
+    let result = TRACE_ID
+        .scope(trace_id, async {
+            mission::patch_issue_state(&client, issue_id, parse_issue_state(&state)?).await
+        })
+        .await;
+
+    match &result {
+        Ok(_) => tracing::info!("success"),
+        Err(e) => tracing::error!(error = %e, "failed"),
+    }
+    result
 }
 
 #[tauri::command]
 pub async fn update_issue_description(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     issue_id: i64,
     body: mission::UpdateIssueDescriptionRequest,
 ) -> Result<mission::IssueViewResponse, ApiError> {
-    mission::update_issue_description(&client, issue_id, body).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "update_issue_description");
+    let _enter = span.enter();
+    tracing::info!("enter");
+
+    let result = TRACE_ID
+        .scope(trace_id, async {
+            mission::update_issue_description(&client, issue_id, body).await
+        })
+        .await;
+
+    match &result {
+        Ok(_) => tracing::info!("success"),
+        Err(e) => tracing::error!(error = %e, "failed"),
+    }
+    result
 }
 
 #[tauri::command]
 pub async fn append_comment(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     issue_id: i64,
     body: mission::AppendCommentRequest,
 ) -> Result<mission::IssueViewResponse, ApiError> {
-    mission::append_comment(&client, issue_id, body).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "append_comment");
+    let _enter = span.enter();
+    tracing::info!("enter");
+
+    let result = TRACE_ID
+        .scope(trace_id, async {
+            mission::append_comment(&client, issue_id, body).await
+        })
+        .await;
+
+    match &result {
+        Ok(_) => tracing::info!("success"),
+        Err(e) => tracing::error!(error = %e, "failed"),
+    }
+    result
 }
 
 #[cfg(test)]
@@ -183,7 +328,7 @@ mod tests {
 
     #[test]
     fn create_mission_assignee_arg_rejects_snake_case_payload() {
-        // The frontend always emits camelCase; if a future refactor
+        // The frontend always sends camelCase; if a future refactor
         // forgets the rename_all, this guard catches it before runtime.
         let raw = json!({ "user_code": "carol", "role": "qc" });
         let result: Result<CreateMissionAssigneeArg, _> = serde_json::from_value(raw);
@@ -195,7 +340,7 @@ mod tests {
 
     #[test]
     fn create_issue_request_deserializes_camel_case_payload() {
-        // Frontend emits { missionId, body: { targetItem?, description } }.
+        // Frontend sends { missionId, body: { targetItem?, description } }.
         let raw = json!({
             "missionId": 10,
             "body": { "targetItem": "AE", "description": "missing row" }
