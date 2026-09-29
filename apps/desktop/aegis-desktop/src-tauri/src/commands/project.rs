@@ -74,12 +74,15 @@ pub async fn get_project_by_code(
     code: String,
 ) -> Result<ProjectViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "get_project_by_code");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "get_project_by_code");
     let _enter = span.enter();
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async { project::get_by_code(&client, &code).await })
+        .scope(trace_id, async {
+            project::get_by_code(&client, &code).await
+        })
         .await;
 
     match &result {
@@ -102,7 +105,9 @@ pub async fn update_project(
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async { project::update(&client, &code, body).await })
+        .scope(trace_id, async {
+            project::update(&client, &code, body).await
+        })
         .await;
 
     match &result {

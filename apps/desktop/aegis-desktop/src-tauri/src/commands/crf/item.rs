@@ -16,7 +16,8 @@ pub async fn list_crf_items_by_form(
     form_id: i64,
 ) -> Result<CrfItemListResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "list_crf_items_by_form");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "list_crf_items_by_form");
     let _enter = span.enter();
     tracing::info!("enter");
 
@@ -45,9 +46,7 @@ pub async fn get_crf_item_by_id(
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            item::get_by_id(&client, id).await
-        })
+        .scope(trace_id, async { item::get_by_id(&client, id).await })
         .await;
 
     match &result {
@@ -70,9 +69,7 @@ pub async fn update_crf_item(
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            item::update(&client, id, body).await
-        })
+        .scope(trace_id, async { item::update(&client, id, body).await })
         .await;
 
     match &result {

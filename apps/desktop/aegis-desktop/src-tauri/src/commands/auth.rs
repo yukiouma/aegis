@@ -19,11 +19,7 @@ pub async fn login(
 
     let result = TRACE_ID
         .scope(trace_id, async {
-            auth::login(
-                &client,
-                LoginRequest { code, password },
-            )
-            .await
+            auth::login(&client, LoginRequest { code, password }).await
         })
         .await;
 
@@ -65,7 +61,11 @@ pub async fn is_logged_in(
     let _enter = span.enter();
     tracing::info!("enter");
 
-    let result = client.tokens().access_token().await.map(|opt| opt.is_some());
+    let result = client
+        .tokens()
+        .access_token()
+        .await
+        .map(|opt| opt.is_some());
 
     match &result {
         Ok(_) => tracing::info!("success"),

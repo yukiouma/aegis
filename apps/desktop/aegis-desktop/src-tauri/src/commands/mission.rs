@@ -49,7 +49,8 @@ pub async fn list_missions_by_project(
     kind: Option<String>,
 ) -> Result<Vec<MissionViewResponse>, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "list_missions_by_project");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "list_missions_by_project");
     let _enter = span.enter();
     tracing::info!("enter");
 
@@ -173,7 +174,8 @@ pub async fn list_issues_by_mission(
     state: Option<String>,
 ) -> Result<Vec<mission::IssueViewResponse>, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "list_issues_by_mission");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "list_issues_by_mission");
     let _enter = span.enter();
     tracing::info!("enter");
 
@@ -252,7 +254,8 @@ pub async fn update_issue_description(
     body: mission::UpdateIssueDescriptionRequest,
 ) -> Result<mission::IssueViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "update_issue_description");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "update_issue_description");
     let _enter = span.enter();
     tracing::info!("enter");
 

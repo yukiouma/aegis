@@ -22,9 +22,7 @@ pub async fn update_crf_option(
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            option::update(&client, id, body).await
-        })
+        .scope(trace_id, async { option::update(&client, id, body).await })
         .await;
 
     match &result {
@@ -41,14 +39,13 @@ pub async fn get_crf_option_by_id(
     id: i64,
 ) -> Result<CrfOptionViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "get_crf_option_by_id");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "get_crf_option_by_id");
     let _enter = span.enter();
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            option::get_by_id(&client, id).await
-        })
+        .scope(trace_id, async { option::get_by_id(&client, id).await })
         .await;
 
     match &result {

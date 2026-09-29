@@ -93,7 +93,9 @@ pub async fn current_user(
                 .tokens()
                 .access_token()
                 .await?
-                .ok_or_else(|| ApiError::Store { message: "no access token".into() })?;
+                .ok_or_else(|| ApiError::Store {
+                    message: "no access token".into(),
+                })?;
             let code = crate::system::jwt_claims::decode_sub(&token)?;
             user::get_by_code(&client, &code).await
         })
@@ -174,7 +176,9 @@ mod current_user_tests {
         let client = HttpClient::new(server.uri(), store);
         // Direct call into the http layer — we are testing the command's
         // plumbing, not the tauri command framework.
-        let view = crate::http::user::get_by_code(&client, "alice").await.unwrap();
+        let view = crate::http::user::get_by_code(&client, "alice")
+            .await
+            .unwrap();
         assert_eq!(view.code, "alice");
         assert_eq!(view.name, "Alice");
         assert_eq!(view.role, crate::http::dto::Role::Admin);

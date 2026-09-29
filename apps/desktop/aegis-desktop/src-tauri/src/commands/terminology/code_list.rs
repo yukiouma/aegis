@@ -6,8 +6,8 @@ use trace_id::TraceIdGenerator;
 use crate::http::client::{HttpClient, TRACE_ID};
 use crate::http::dto::ApiError;
 use crate::http::terminology::code_list::{
-    self, CodeListListQuery, CodeListPagedResponse, CodeListViewResponse,
-    CreateCodeListRequest, UpdateCodeListRequest,
+    self, CodeListListQuery, CodeListPagedResponse, CodeListViewResponse, CreateCodeListRequest,
+    UpdateCodeListRequest,
 };
 
 #[tauri::command]
@@ -72,7 +72,12 @@ pub async fn list_code_lists(
         .scope(trace_id, async {
             code_list::list_paged(
                 &client,
-                CodeListListQuery { version_id, fragment, offset, limit },
+                CodeListListQuery {
+                    version_id,
+                    fragment,
+                    offset,
+                    limit,
+                },
             )
             .await
         })
@@ -92,14 +97,13 @@ pub async fn get_code_list_by_id(
     id: i64,
 ) -> Result<CodeListViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "get_code_list_by_id");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "get_code_list_by_id");
     let _enter = span.enter();
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            code_list::get_by_id(&client, id).await
-        })
+        .scope(trace_id, async { code_list::get_by_id(&client, id).await })
         .await;
 
     match &result {
@@ -146,9 +150,7 @@ pub async fn delete_code_list(
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            code_list::delete(&client, id).await
-        })
+        .scope(trace_id, async { code_list::delete(&client, id).await })
         .await;
 
     match &result {

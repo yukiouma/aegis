@@ -9,12 +9,11 @@ use trace_id::TraceIdGenerator;
 
 use crate::http::client::{HttpClient, TRACE_ID};
 use crate::http::dto::{ApiError, TerminologyKind};
-use crate::http::terminology::code_item::{
-    self, BatchCodeItemEntry, BatchCreateCodeItemsRequest,
-};
+use crate::http::terminology::code_item::{self, BatchCodeItemEntry, BatchCreateCodeItemsRequest};
 use crate::http::terminology::code_list::{self, CreateCodeListRequest};
-use crate::http::terminology::version::{self, CreateTerminologyVersionRequest,
-    TerminologyVersionViewResponse};
+use crate::http::terminology::version::{
+    self, CreateTerminologyVersionRequest, TerminologyVersionViewResponse,
+};
 
 #[tauri::command]
 pub async fn import_terminology(

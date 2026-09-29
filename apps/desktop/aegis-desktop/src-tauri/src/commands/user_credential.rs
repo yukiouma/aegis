@@ -56,7 +56,8 @@ pub async fn update_user_credential(
     password: Option<String>,
 ) -> Result<UserCredentialViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "update_user_credential");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "update_user_credential");
     let _enter = span.enter();
     tracing::info!("enter");
 
@@ -64,7 +65,10 @@ pub async fn update_user_credential(
         .scope(trace_id, async {
             user_credential::update(
                 &client,
-                UpdateUserCredentialRequest { user_code, password },
+                UpdateUserCredentialRequest {
+                    user_code,
+                    password,
+                },
             )
             .await
         })

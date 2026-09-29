@@ -6,8 +6,8 @@ use trace_id::TraceIdGenerator;
 use crate::http::client::{HttpClient, TRACE_ID};
 use crate::http::dto::ApiError;
 use crate::http::terminology::code_item::{
-    self, CodeItemListQuery, CodeItemListResponse, CodeItemPagedResponse,
-    CodeItemViewResponse, CreateCodeItemRequest, UpdateCodeItemRequest,
+    self, CodeItemListQuery, CodeItemListResponse, CodeItemPagedResponse, CodeItemViewResponse,
+    CreateCodeItemRequest, UpdateCodeItemRequest,
 };
 
 #[tauri::command]
@@ -127,9 +127,7 @@ pub async fn delete_code_item(
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            code_item::delete(&client, id).await
-        })
+        .scope(trace_id, async { code_item::delete(&client, id).await })
         .await;
 
     match &result {

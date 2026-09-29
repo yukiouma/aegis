@@ -22,9 +22,7 @@ pub async fn update_crf_unit(
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            unit::update(&client, id, body).await
-        })
+        .scope(trace_id, async { unit::update(&client, id, body).await })
         .await;
 
     match &result {
@@ -46,9 +44,7 @@ pub async fn get_crf_unit_by_id(
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            unit::get_by_id(&client, id).await
-        })
+        .scope(trace_id, async { unit::get_by_id(&client, id).await })
         .await;
 
     match &result {

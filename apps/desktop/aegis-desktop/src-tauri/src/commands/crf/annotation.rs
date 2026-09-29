@@ -17,14 +17,13 @@ pub async fn create_crf_annotation(
     body: CreateAnnotationRequest,
 ) -> Result<AnnotationViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "create_crf_annotation");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "create_crf_annotation");
     let _enter = span.enter();
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            annotation::create(&client, body).await
-        })
+        .scope(trace_id, async { annotation::create(&client, body).await })
         .await;
 
     match &result {
@@ -42,7 +41,8 @@ pub async fn update_crf_annotation(
     body: UpdateAnnotationRequest,
 ) -> Result<AnnotationViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "update_crf_annotation");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "update_crf_annotation");
     let _enter = span.enter();
     tracing::info!("enter");
 
@@ -66,14 +66,13 @@ pub async fn delete_crf_annotation(
     id: i64,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "delete_crf_annotation");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "delete_crf_annotation");
     let _enter = span.enter();
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            annotation::delete(&client, id).await
-        })
+        .scope(trace_id, async { annotation::delete(&client, id).await })
         .await;
 
     match &result {

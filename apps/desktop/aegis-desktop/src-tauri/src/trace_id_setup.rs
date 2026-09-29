@@ -78,7 +78,10 @@ mod tests {
         let tail = id.rsplit('-').next().expect("at least one segment");
         assert_eq!(tail.len(), 26, "ULID tail should be 26 chars, got {tail:?}");
         let middle = &id["C-".len()..id.len() - tail.len() - 1];
-        assert_eq!(middle, persisted, "middle segment should match persisted prefix");
+        assert_eq!(
+            middle, persisted,
+            "middle segment should match persisted prefix"
+        );
     }
 
     #[test]
@@ -146,6 +149,9 @@ mod tests {
         // working generator. We only assert it does not panic and
         // produces a well-formed id.
         assert!(id.starts_with("C-"), "got {id:?}");
-        assert!(id.len() > "C-".len() + 10, "expected a ULID tail, got {id:?}");
+        assert!(
+            id.len() > "C-".len() + 10,
+            "expected a ULID tail, got {id:?}"
+        );
     }
 }

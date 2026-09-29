@@ -135,8 +135,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                         .expect("app_data_dir resolves")
                         .join("logs")
                 });
-            let log_guard = tracing_init::init_tracing(&log_dir)
-                .map_err(|e| format!("init_tracing: {e}"))?;
+            let log_guard =
+                tracing_init::init_tracing(&log_dir).map_err(|e| format!("init_tracing: {e}"))?;
             tracing::info!(
                 log_dir = %log_dir.display(),
                 "aegis-desktop tracing initialised"

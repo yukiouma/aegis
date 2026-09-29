@@ -45,27 +45,43 @@ impl TauriStore {
 #[async_trait]
 impl TokenStore for TauriStore {
     async fn access_token(&self) -> Result<Option<String>, ApiError> {
-        Ok(self.store.get("access_token").and_then(|v| v.as_str().map(|s| s.to_string())))
+        Ok(self
+            .store
+            .get("access_token")
+            .and_then(|v| v.as_str().map(|s| s.to_string())))
     }
 
     async fn refresh_token(&self) -> Result<Option<String>, ApiError> {
-        Ok(self.store.get("refresh_token").and_then(|v| v.as_str().map(|s| s.to_string())))
+        Ok(self
+            .store
+            .get("refresh_token")
+            .and_then(|v| v.as_str().map(|s| s.to_string())))
     }
 
     async fn set_access_token(&self, value: &str) -> Result<(), ApiError> {
-        self.store.set("access_token", serde_json::Value::String(value.to_string()));
-        self.store.save().map_err(|e| ApiError::Store { message: e.to_string() })
+        self.store
+            .set("access_token", serde_json::Value::String(value.to_string()));
+        self.store.save().map_err(|e| ApiError::Store {
+            message: e.to_string(),
+        })
     }
 
     async fn set_refresh_token(&self, value: &str) -> Result<(), ApiError> {
-        self.store.set("refresh_token", serde_json::Value::String(value.to_string()));
-        self.store.save().map_err(|e| ApiError::Store { message: e.to_string() })
+        self.store.set(
+            "refresh_token",
+            serde_json::Value::String(value.to_string()),
+        );
+        self.store.save().map_err(|e| ApiError::Store {
+            message: e.to_string(),
+        })
     }
 
     async fn clear(&self) -> Result<(), ApiError> {
         self.store.delete("access_token");
         self.store.delete("refresh_token");
-        self.store.save().map_err(|e| ApiError::Store { message: e.to_string() })
+        self.store.save().map_err(|e| ApiError::Store {
+            message: e.to_string(),
+        })
     }
 }
 
@@ -77,7 +93,9 @@ pub struct MemoryStore {
 
 #[cfg(test)]
 impl MemoryStore {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 }
 
 #[cfg(test)]
@@ -90,11 +108,17 @@ impl TokenStore for MemoryStore {
         Ok(self.inner.lock().await.get("refresh_token").cloned())
     }
     async fn set_access_token(&self, value: &str) -> Result<(), ApiError> {
-        self.inner.lock().await.insert("access_token".into(), value.into());
+        self.inner
+            .lock()
+            .await
+            .insert("access_token".into(), value.into());
         Ok(())
     }
     async fn set_refresh_token(&self, value: &str) -> Result<(), ApiError> {
-        self.inner.lock().await.insert("refresh_token".into(), value.into());
+        self.inner
+            .lock()
+            .await
+            .insert("refresh_token".into(), value.into());
         Ok(())
     }
     async fn clear(&self) -> Result<(), ApiError> {
@@ -157,7 +181,12 @@ impl HttpClient {
             .user_agent(concat!("aegis-desktop/", env!("CARGO_PKG_VERSION")))
             .build()
             .expect("reqwest client builds");
-        Self { http, base_url, tokens, refresh_lock }
+        Self {
+            http,
+            base_url,
+            tokens,
+            refresh_lock,
+        }
     }
 
     fn url(&self, path: &str) -> String {
@@ -215,9 +244,8 @@ impl HttpClient {
                         .ok_or(ApiError::RefreshFailed)?
                 }
             };
-            let (retry_status, retry_bytes) = self
-                .send(method, path, body, Some(token_for_retry))
-                .await?;
+            let (retry_status, retry_bytes) =
+                self.send(method, path, body, Some(token_for_retry)).await?;
             if retry_status.is_success() {
                 Ok(retry_bytes)
             } else {
@@ -356,9 +384,9 @@ mod tests {
                 Mock::given(method("GET"))
                     .and(path("/api/user"))
                     .and(header("X-Trace-ID", trace_id))
-                    .respond_with(ResponseTemplate::new(200).set_body_json(
-                        serde_json::json!({"users": []})
-                    )),
+                    .respond_with(
+                        ResponseTemplate::new(200).set_body_json(serde_json::json!({"users": []})),
+                    ),
             )
             .await;
         let c = client_for(&server, store);
@@ -384,9 +412,9 @@ mod tests {
                     .and(path("/api/user"))
                     .and(header("authorization", "Bearer AT_AAA"))
                     .and(NoHeader("X-Trace-ID"))
-                    .respond_with(ResponseTemplate::new(200).set_body_json(
-                        serde_json::json!({"users": []})
-                    )),
+                    .respond_with(
+                        ResponseTemplate::new(200).set_body_json(serde_json::json!({"users": []})),
+                    ),
             )
             .await;
         let c = client_for(&server, store);
@@ -411,9 +439,10 @@ mod tests {
                 Mock::given(method("POST"))
                     .and(path("/api/auth/refresh"))
                     .and(header("X-Trace-ID", trace_id))
-                    .respond_with(ResponseTemplate::new(200).set_body_json(
-                        serde_json::json!({"accessToken": "AT_NEW"})
-                    )),
+                    .respond_with(
+                        ResponseTemplate::new(200)
+                            .set_body_json(serde_json::json!({"accessToken": "AT_NEW"})),
+                    ),
             )
             .await;
         server
@@ -431,9 +460,9 @@ mod tests {
                 Mock::given(method("GET"))
                     .and(path("/api/user"))
                     .and(header("authorization", "Bearer AT_NEW"))
-                    .respond_with(ResponseTemplate::new(200).set_body_json(
-                        serde_json::json!({"users": []})
-                    )),
+                    .respond_with(
+                        ResponseTemplate::new(200).set_body_json(serde_json::json!({"users": []})),
+                    ),
             )
             .await;
 
@@ -471,29 +500,38 @@ mod tests {
         let m = Mock::given(method("GET"))
             .and(path("/api/user"))
             .and(header("authorization", "Bearer AT_AAA"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"users": []})));
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({"users": []})),
+            );
         server.register(m).await;
         let c = client_for(&server, store);
-        let _: serde_json::Value = c.request(reqwest::Method::GET, "/api/user", None::<&()>).await.unwrap();
+        let _: serde_json::Value = c
+            .request(reqwest::Method::GET, "/api/user", None::<&()>)
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
     async fn bearer_header_absent_on_login() {
         let server = MockServer::start().await;
         let store = Arc::new(MemoryStore::default());
-        let m = Mock::given(method("POST"))
-            .and(path("/api/auth/login"))
-            .and(NoHeader("authorization"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(
-                serde_json::json!({"access_token": "AT", "refresh_token": "RT"})
-            ));
+        let m =
+            Mock::given(method("POST"))
+                .and(path("/api/auth/login"))
+                .and(NoHeader("authorization"))
+                .respond_with(ResponseTemplate::new(200).set_body_json(
+                    serde_json::json!({"access_token": "AT", "refresh_token": "RT"}),
+                ));
         server.register(m).await;
         let c = client_for(&server, store);
         let bytes = c
             .request_bytes(
                 reqwest::Method::POST,
                 "/api/auth/login",
-                Some(&LoginReq { code: "u".into(), password: "p".into() }),
+                Some(&LoginReq {
+                    code: "u".into(),
+                    password: "p".into(),
+                }),
             )
             .await
             .unwrap();
@@ -514,7 +552,11 @@ mod tests {
         server.register(m).await;
         let c = client_for(&server, store);
         let _: serde_json::Value = c
-            .request(reqwest::Method::POST, "/api/auth/user-credential", None::<&()>)
+            .request(
+                reqwest::Method::POST,
+                "/api/auth/user-credential",
+                None::<&()>,
+            )
             .await
             .unwrap();
     }
@@ -527,9 +569,10 @@ mod tests {
         store.set_refresh_token("RT").await.unwrap();
         let m = Mock::given(method("GET"))
             .and(path("/api/user/foo"))
-            .respond_with(ResponseTemplate::new(404).set_body_json(
-                serde_json::json!({"code": "not_found", "message": "user foo"})
-            ));
+            .respond_with(
+                ResponseTemplate::new(404)
+                    .set_body_json(serde_json::json!({"code": "not_found", "message": "user foo"})),
+            );
         server.register(m).await;
         let c = client_for(&server, store);
         let err = c
@@ -561,7 +604,11 @@ mod tests {
             .await
             .unwrap_err();
         match err {
-            ApiError::Http { status, code, message } => {
+            ApiError::Http {
+                status,
+                code,
+                message,
+            } => {
                 assert_eq!(status, 500);
                 assert_eq!(code, "Internal Server Error");
                 assert!(message.contains("internal boom"));
@@ -598,9 +645,10 @@ mod tests {
             .register(
                 Mock::given(method("POST"))
                     .and(path("/api/auth/refresh"))
-                    .respond_with(ResponseTemplate::new(200).set_body_json(
-                        serde_json::json!({"accessToken": "AT_NEW"})
-                    )),
+                    .respond_with(
+                        ResponseTemplate::new(200)
+                            .set_body_json(serde_json::json!({"accessToken": "AT_NEW"})),
+                    ),
             )
             .await;
 
@@ -619,7 +667,9 @@ mod tests {
                 Mock::given(method("GET"))
                     .and(path("/api/user"))
                     .and(header("authorization", "Bearer AT_NEW"))
-                    .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({"users": []}))),
+                    .respond_with(
+                        ResponseTemplate::new(200).set_body_json(serde_json::json!({"users": []})),
+                    ),
             )
             .await;
 
@@ -629,7 +679,10 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(v["users"].as_array().unwrap().len(), 0);
-        assert_eq!(store.access_token().await.unwrap().as_deref(), Some("AT_NEW"));
+        assert_eq!(
+            store.access_token().await.unwrap().as_deref(),
+            Some("AT_NEW")
+        );
     }
 
     #[tokio::test]
@@ -644,7 +697,7 @@ mod tests {
                 Mock::given(method("POST"))
                     .and(path("/api/auth/refresh"))
                     .respond_with(ResponseTemplate::new(401).set_body_json(
-                        serde_json::json!({"code": "token_verification_failed", "message": "dead"})
+                        serde_json::json!({"code": "token_verification_failed", "message": "dead"}),
                     )),
             )
             .await;
@@ -653,8 +706,8 @@ mod tests {
                 Mock::given(method("GET"))
                     .and(path("/api/user"))
                     .respond_with(ResponseTemplate::new(401).set_body_json(
-                        serde_json::json!({"code": "token_verification_failed", "message": "expired"})
-                    )),
+                    serde_json::json!({"code": "token_verification_failed", "message": "expired"}),
+                )),
             )
             .await;
 
@@ -677,9 +730,10 @@ mod tests {
 
         let refresh_mock = Mock::given(method("POST"))
             .and(path("/api/auth/refresh"))
-            .respond_with(ResponseTemplate::new(200).set_body_json(
-                serde_json::json!({"accessToken": "AT_NEW"})
-            ))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(serde_json::json!({"accessToken": "AT_NEW"})),
+            )
             .expect(1);
         server.register(refresh_mock).await;
 
@@ -689,7 +743,7 @@ mod tests {
                     .and(path("/api/user"))
                     .and(header("authorization", "Bearer AT_STALE"))
                     .respond_with(ResponseTemplate::new(401).set_body_json(
-                        serde_json::json!({"code": "token_verification_failed", "message": ""})
+                        serde_json::json!({"code": "token_verification_failed", "message": ""}),
                     )),
             )
             .await;

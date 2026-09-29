@@ -17,14 +17,13 @@ pub async fn create_sdtm_variable(
     input: CreateSdtmVariableRequest,
 ) -> Result<SdtmVariableViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "create_sdtm_variable");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "create_sdtm_variable");
     let _enter = span.enter();
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            variable::create(&client, input).await
-        })
+        .scope(trace_id, async { variable::create(&client, input).await })
         .await;
 
     match &result {
@@ -65,14 +64,13 @@ pub async fn get_sdtm_variable_by_id(
     id: i64,
 ) -> Result<SdtmVariableViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "get_sdtm_variable_by_id");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "get_sdtm_variable_by_id");
     let _enter = span.enter();
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            variable::get_by_id(&client, id).await
-        })
+        .scope(trace_id, async { variable::get_by_id(&client, id).await })
         .await;
 
     match &result {
@@ -90,7 +88,8 @@ pub async fn update_sdtm_variable(
     body: UpdateSdtmVariableRequest,
 ) -> Result<SdtmVariableViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "update_sdtm_variable");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "update_sdtm_variable");
     let _enter = span.enter();
     tracing::info!("enter");
 
@@ -114,14 +113,13 @@ pub async fn delete_sdtm_variable(
     id: i64,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "delete_sdtm_variable");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "delete_sdtm_variable");
     let _enter = span.enter();
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            variable::delete(&client, id).await
-        })
+        .scope(trace_id, async { variable::delete(&client, id).await })
         .await;
 
     match &result {

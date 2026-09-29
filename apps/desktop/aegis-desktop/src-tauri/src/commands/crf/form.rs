@@ -18,7 +18,8 @@ pub async fn list_crf_forms_by_version(
     version_id: i64,
 ) -> Result<CrfFormListResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "list_crf_forms_by_version");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "list_crf_forms_by_version");
     let _enter = span.enter();
     tracing::info!("enter");
 
@@ -73,9 +74,7 @@ pub async fn update_crf_form(
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            form::update(&client, id, body).await
-        })
+        .scope(trace_id, async { form::update(&client, id, body).await })
         .await;
 
     match &result {
@@ -97,9 +96,7 @@ pub async fn delete_crf_form(
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            form::delete(&client, id).await
-        })
+        .scope(trace_id, async { form::delete(&client, id).await })
         .await;
 
     match &result {
@@ -121,9 +118,7 @@ pub async fn get_crf_form_by_id(
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            form::get_by_id(&client, id).await
-        })
+        .scope(trace_id, async { form::get_by_id(&client, id).await })
         .await;
 
     match &result {
@@ -140,14 +135,13 @@ pub async fn get_crf_form_details(
     id: i64,
 ) -> Result<CrfFormDetailResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "get_crf_form_details");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "get_crf_form_details");
     let _enter = span.enter();
     tracing::info!("enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
-            form::details(&client, id).await
-        })
+        .scope(trace_id, async { form::details(&client, id).await })
         .await;
 
     match &result {
@@ -200,7 +194,8 @@ pub async fn set_crf_form_approved(
     mission_id: i64,
 ) -> Result<CrfFormViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "set_crf_form_approved");
+    let span =
+        tracing::info_span!("command", trace_id = %trace_id, command = "set_crf_form_approved");
     let _enter = span.enter();
     tracing::info!("enter");
 

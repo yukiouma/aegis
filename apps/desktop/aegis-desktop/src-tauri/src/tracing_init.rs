@@ -91,7 +91,9 @@ mod tests {
     fn set_env(key: &'static str, value: &str) -> EnvGuard {
         let prev = std::env::var(key).ok();
         // SAFETY: serialized via ENV_LOCK.
-        unsafe { std::env::set_var(key, value); }
+        unsafe {
+            std::env::set_var(key, value);
+        }
         EnvGuard { key, prev }
     }
 
@@ -137,7 +139,9 @@ mod tests {
     fn build_filter_defaults_to_info_when_env_missing() {
         let _g = lock_env();
         // SAFETY: serialized via ENV_LOCK.
-        unsafe { std::env::remove_var("AEGIS_LOG_LEVEL"); }
+        unsafe {
+            std::env::remove_var("AEGIS_LOG_LEVEL");
+        }
         let filter = build_filter();
         assert_eq!(filter.to_string(), "info");
     }
