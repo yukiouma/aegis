@@ -72,6 +72,7 @@ import type {
   UpdateUserCredentialInput,
   UserCredentialView,
   UserView,
+  WebviewLogLevel,
 } from "./types";
 
 // Thin wrapper that loosens the `args` parameter type from
@@ -131,6 +132,16 @@ export const api = {
 
   // health
   healthz: (): Promise<string> => call<string>("healthz"),
+
+  // webview console forwarder — sink for `console.warn` /
+  // `console.error` and the corresponding window error events.
+  // The Rust command emits through tracing under the
+  // `aegis_desktop_lib::webview` target with no trace id.
+  forwardWebviewLog: (
+    level: WebviewLogLevel,
+    message: string,
+  ): Promise<void> =>
+    call<void>("forward_webview_log", { level, message }),
 
   // workspace window
   openProjectWorkspace: async (code: string): Promise<void> => {
@@ -595,4 +606,5 @@ export type {
   UserCredentialView,
   UserSummary,
   UserView,
+  WebviewLogLevel,
 } from "./types";
