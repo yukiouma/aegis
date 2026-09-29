@@ -13,19 +13,17 @@ pub async fn login(
     password: String,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "login");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             auth::login(&client, LoginRequest { code, password }).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -36,17 +34,15 @@ pub async fn login_domain(
     generator: State<'_, TraceIdGenerator>,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "login_domain");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async { auth::login_domain(&client).await })
+        .scope(trace_id.clone(), async { auth::login_domain(&client).await })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -57,9 +53,7 @@ pub async fn is_logged_in(
     generator: State<'_, TraceIdGenerator>,
 ) -> Result<bool, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "is_logged_in");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = client
         .tokens()
@@ -68,8 +62,8 @@ pub async fn is_logged_in(
         .map(|opt| opt.is_some());
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -80,17 +74,15 @@ pub async fn refresh(
     generator: State<'_, TraceIdGenerator>,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "refresh");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async { auth::refresh(&client).await })
+        .scope(trace_id.clone(), async { auth::refresh(&client).await })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -101,17 +93,15 @@ pub async fn logout(
     generator: State<'_, TraceIdGenerator>,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "logout");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async { auth::logout(&client).await })
+        .scope(trace_id.clone(), async { auth::logout(&client).await })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }

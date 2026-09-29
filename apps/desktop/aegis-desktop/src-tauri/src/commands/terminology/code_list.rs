@@ -24,12 +24,10 @@ pub async fn create_code_list(
     nci_preferred_term: String,
 ) -> Result<CodeListViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "create_code_list");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             code_list::create(
                 &client,
                 CreateCodeListRequest {
@@ -48,8 +46,8 @@ pub async fn create_code_list(
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -64,12 +62,10 @@ pub async fn list_code_lists(
     limit: u32,
 ) -> Result<CodeListPagedResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "list_code_lists");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             code_list::list_paged(
                 &client,
                 CodeListListQuery {
@@ -84,8 +80,8 @@ pub async fn list_code_lists(
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -97,18 +93,15 @@ pub async fn get_code_list_by_id(
     id: i64,
 ) -> Result<CodeListViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "get_code_list_by_id");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async { code_list::get_by_id(&client, id).await })
+        .scope(trace_id.clone(), async { code_list::get_by_id(&client, id).await })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -121,19 +114,17 @@ pub async fn update_code_list(
     body: UpdateCodeListRequest,
 ) -> Result<CodeListViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "update_code_list");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             code_list::update(&client, id, body).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -145,17 +136,15 @@ pub async fn delete_code_list(
     id: i64,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "delete_code_list");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async { code_list::delete(&client, id).await })
+        .scope(trace_id.clone(), async { code_list::delete(&client, id).await })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }

@@ -14,19 +14,17 @@ pub async fn list_crf_versions(
     project_code: String,
 ) -> Result<CrfVersionListResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "list_crf_versions");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             version::list_by_project(&client, &project_code).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -41,19 +39,17 @@ pub async fn import_als(
     edc_type: EdcType,
 ) -> Result<CrfVersionViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "import_als");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             version::import_als(&client, &project_code, &name, &filepath, edc_type).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }

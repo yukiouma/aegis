@@ -49,13 +49,10 @@ pub async fn list_missions_by_project(
     kind: Option<String>,
 ) -> Result<Vec<MissionViewResponse>, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "list_missions_by_project");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             let kind = match kind.as_deref() {
                 Some(s) => Some(parse_kind(s)?),
                 None => None,
@@ -65,8 +62,8 @@ pub async fn list_missions_by_project(
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -79,19 +76,17 @@ pub async fn add_assignee(
     body: AssigneeDataArg,
 ) -> Result<AssigneeViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "add_assignee");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             mission::add_assignee(&client, mission_id, body).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -104,19 +99,17 @@ pub async fn remove_assignee(
     assignee_id: i64,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "remove_assignee");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             mission::remove_assignee(&client, mission_id, assignee_id).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -131,12 +124,10 @@ pub async fn create_mission(
     assignees: Vec<CreateMissionAssigneeArg>,
 ) -> Result<MissionViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "create_mission");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             let assignees = assignees
                 .into_iter()
                 .map(|a| -> Result<AssigneeDataArg, ApiError> {
@@ -160,8 +151,8 @@ pub async fn create_mission(
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -174,13 +165,10 @@ pub async fn list_issues_by_mission(
     state: Option<String>,
 ) -> Result<Vec<mission::IssueViewResponse>, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "list_issues_by_mission");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             let parsed = match state.as_deref() {
                 Some(s) => Some(parse_issue_state(s)?),
                 None => None,
@@ -190,8 +178,8 @@ pub async fn list_issues_by_mission(
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -204,19 +192,17 @@ pub async fn create_issue(
     body: mission::CreateIssueRequest,
 ) -> Result<mission::IssueViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "create_issue");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             mission::create_issue(&client, mission_id, body).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -229,19 +215,17 @@ pub async fn patch_issue_state(
     state: String,
 ) -> Result<mission::IssueViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "patch_issue_state");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             mission::patch_issue_state(&client, issue_id, parse_issue_state(&state)?).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -254,20 +238,17 @@ pub async fn update_issue_description(
     body: mission::UpdateIssueDescriptionRequest,
 ) -> Result<mission::IssueViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "update_issue_description");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             mission::update_issue_description(&client, issue_id, body).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -280,19 +261,17 @@ pub async fn append_comment(
     body: mission::AppendCommentRequest,
 ) -> Result<mission::IssueViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "append_comment");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             mission::append_comment(&client, issue_id, body).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }

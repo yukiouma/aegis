@@ -18,19 +18,17 @@ pub async fn create_crf_domain_annotation(
     body: CreateDomainAnnotationRequest,
 ) -> Result<DomainAnnotationViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "create_crf_domain_annotation");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             domain_annotation::create(&client, form_id, body).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -42,19 +40,17 @@ pub async fn list_crf_domain_annotations_by_form(
     form_id: i64,
 ) -> Result<domain_annotation::DomainAnnotationListResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "list_crf_domain_annotations_by_form");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             domain_annotation::list_by_form(&client, form_id).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -67,19 +63,17 @@ pub async fn update_crf_domain_annotation(
     body: UpdateDomainAnnotationRequest,
 ) -> Result<DomainAnnotationViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "update_crf_domain_annotation");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             domain_annotation::update(&client, id, body).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -91,19 +85,17 @@ pub async fn delete_crf_domain_annotation(
     id: i64,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "delete_crf_domain_annotation");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             domain_annotation::delete(&client, id).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -116,19 +108,17 @@ pub async fn search_crf_domain_annotations_by_version(
     fragment: String,
 ) -> Result<domain_annotation::DomainAnnotationListResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "search_crf_domain_annotations_by_version");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             domain_annotation::search_by_version(&client, version_id, fragment).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }

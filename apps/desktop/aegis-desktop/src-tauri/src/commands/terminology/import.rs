@@ -23,12 +23,10 @@ pub async fn import_terminology(
     filepath: String,
 ) -> Result<TerminologyVersionViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "import_terminology");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             // 1. Parse the workbook off-thread (calamine is sync / CPU-bound).
             let parsed = tokio::task::spawn_blocking(move || terminology::from_path(&filepath))
                 .await
@@ -96,8 +94,8 @@ pub async fn import_terminology(
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }

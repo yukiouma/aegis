@@ -17,18 +17,15 @@ pub async fn create_sdtm_variable(
     input: CreateSdtmVariableRequest,
 ) -> Result<SdtmVariableViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "create_sdtm_variable");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async { variable::create(&client, input).await })
+        .scope(trace_id.clone(), async { variable::create(&client, input).await })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -40,19 +37,17 @@ pub async fn list_sdtm_variables_by_domain(
     domain_id: i64,
 ) -> Result<SdtmVariableListResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "list_sdtm_variables_by_domain");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             variable::list_by_domain(&client, domain_id).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -64,18 +59,15 @@ pub async fn get_sdtm_variable_by_id(
     id: i64,
 ) -> Result<SdtmVariableViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "get_sdtm_variable_by_id");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async { variable::get_by_id(&client, id).await })
+        .scope(trace_id.clone(), async { variable::get_by_id(&client, id).await })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -88,20 +80,17 @@ pub async fn update_sdtm_variable(
     body: UpdateSdtmVariableRequest,
 ) -> Result<SdtmVariableViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "update_sdtm_variable");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async {
+        .scope(trace_id.clone(), async {
             variable::update(&client, id, body).await
         })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
@@ -113,18 +102,15 @@ pub async fn delete_sdtm_variable(
     id: i64,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "delete_sdtm_variable");
-    let _enter = span.enter();
-    tracing::info!("enter");
+    tracing::info!(trace_id = %trace_id, "enter");
 
     let result = TRACE_ID
-        .scope(trace_id, async { variable::delete(&client, id).await })
+        .scope(trace_id.clone(), async { variable::delete(&client, id).await })
         .await;
 
     match &result {
-        Ok(_) => tracing::info!("success"),
-        Err(e) => tracing::error!(error = %e, "failed"),
+        Ok(_) => tracing::info!(trace_id = %trace_id, "success"),
+        Err(e) => tracing::error!(trace_id = %trace_id, error = %e, "failed"),
     }
     result
 }
