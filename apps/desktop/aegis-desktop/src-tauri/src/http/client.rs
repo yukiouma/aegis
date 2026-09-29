@@ -13,6 +13,16 @@ use tokio::sync::Mutex;
 use super::config::is_no_auth;
 use super::dto::{ApiError, ErrorBody};
 
+/// Per-task trace id minted by the command shim and consumed by
+/// `HttpClient::send` to attach `X-Trace-ID` to every outbound
+/// request. Set via `TRACE_ID.scope(id, async { … })` at the top of
+/// every `#[tauri::command]`. Read with `TRACE_ID.try_with(|id|
+/// id.clone()).ok()` inside `send` — `None` means no trace id is
+/// available and the header is omitted.
+tokio::task_local! {
+    pub static TRACE_ID: String;
+}
+
 #[async_trait]
 pub trait TokenStore: Send + Sync {
     async fn access_token(&self) -> Result<Option<String>, ApiError>;
@@ -281,6 +291,15 @@ impl HttpClient {
         if let Some(b) = body {
             rb = rb.json(b);
         }
+        // The command shim scopes a fresh trace id around the http
+        // fn call; if one is present, attach it as X-Trace-ID so the
+        // server can correlate the request with our log line. We
+        // intentionally do NOT mint a fallback id here — every
+        // trace id in logs must have been minted explicitly by the
+        // shim.
+        if let Ok(id) = TRACE_ID.try_with(|id| id.clone()) {
+            rb = rb.header("X-Trace-ID", id);
+        }
         let resp = rb.send().await?;
         let status = resp.status();
         let bytes = resp.bytes().await?.to_vec();
@@ -321,6 +340,58 @@ mod tests {
         fn matches(&self, req: &Request) -> bool {
             !req.headers.contains_key(self.0)
         }
+    }
+
+    #[tokio::test]
+    async fn trace_id_header_attached_when_task_local_set() {
+        use crate::http::client::TRACE_ID;
+
+        let server = MockServer::start().await;
+        let store = Arc::new(MemoryStore::default());
+        let trace_id = "C-desktop-01H9XQ8Z6VK3FJ4P5N2W7Y0T8CB";
+        server
+            .register(
+                Mock::given(method("GET"))
+                    .and(path("/api/user"))
+                    .and(header("X-Trace-ID", trace_id))
+                    .respond_with(ResponseTemplate::new(200).set_body_json(
+                        serde_json::json!({"users": []})
+                    )),
+            )
+            .await;
+        let c = client_for(&server, store);
+        let _: serde_json::Value = TRACE_ID
+            .scope(trace_id.to_string(), async {
+                c.request::<(), serde_json::Value>(reqwest::Method::GET, "/api/user", None)
+                    .await
+            })
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn trace_id_header_absent_when_no_task_local() {
+        let server = MockServer::start().await;
+        let store = Arc::new(MemoryStore::default());
+        store.set_access_token("AT_AAA").await.unwrap();
+        // NoHeader on X-Trace-ID + a positive match on auth so the
+        // request still succeeds.
+        server
+            .register(
+                Mock::given(method("GET"))
+                    .and(path("/api/user"))
+                    .and(header("authorization", "Bearer AT_AAA"))
+                    .and(NoHeader("X-Trace-ID"))
+                    .respond_with(ResponseTemplate::new(200).set_body_json(
+                        serde_json::json!({"users": []})
+                    )),
+            )
+            .await;
+        let c = client_for(&server, store);
+        let _: serde_json::Value = c
+            .request::<(), serde_json::Value>(reqwest::Method::GET, "/api/user", None)
+            .await
+            .unwrap();
     }
 
     #[derive(Serialize, Debug)]
