@@ -7,6 +7,7 @@ use tauri_plugin_store::StoreExt;
 mod commands;
 mod http;
 mod system;
+mod tracing_init;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
