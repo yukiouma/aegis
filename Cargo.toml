@@ -43,7 +43,7 @@ tower = "0.5.3"
 # `ulid` generates the time-sortable log ids that compose a trace
 # id. Pinned in the workspace so the `trace-id` crate and any
 # downstream consumer resolve the same version.
-ulid = "1.2"
+ulid = "3.0"
 # `serde` provides Serialize / Deserialize for wire-level DTOs (HTTP
 # request / response bodies). Centralized here so every workspace
 # crate that needs serialization inherits the same version and feature

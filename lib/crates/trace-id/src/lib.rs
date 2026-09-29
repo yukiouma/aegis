@@ -60,7 +60,7 @@ impl TraceIdGenerator {
             Side::Client => "C",
             Side::Server => "S",
         };
-        let ulid = Ulid::new().to_string();
+        let ulid = Ulid::generate().to_string();
         match &self.device_prefix {
             Some(device) => format!("{prefix}-{device}-{ulid}"),
             None => format!("{prefix}-{ulid}"),
