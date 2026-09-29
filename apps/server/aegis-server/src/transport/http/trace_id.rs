@@ -14,8 +14,8 @@
 use axum::body::Body;
 use axum::http::{HeaderMap, Request};
 use tower_http::trace::MakeSpan;
-use tracing::{info_span, Span};
 use trace_id::TraceIdGenerator;
+use tracing::{Span, info_span};
 
 /// Header name. `HeaderMap` matches case-insensitively; the
 /// lowercase form is the project-wide convention for
@@ -60,6 +60,10 @@ pub(crate) fn extract_trace_id(raw: Option<&str>, generator: &TraceIdGenerator) 
 /// `trace_id`, `method`, and `path`. The `trace_id` is taken from
 /// the inbound `X-Trace-ID` header when present and valid; otherwise
 /// it is freshly minted via [`TraceIdGenerator::server_side`].
+///
+/// `Clone` is required by `tower_http::trace::TraceLayer`, which
+/// holds onto the span maker on every request clone.
+#[derive(Clone)]
 pub(crate) struct TraceIdMakeSpan {
     generator: TraceIdGenerator,
 }
@@ -139,14 +143,20 @@ mod tests {
     fn extract_trace_id_generates_when_header_missing() {
         let generator = TraceIdGenerator::new(None);
         let id = extract_trace_id(None, &generator);
-        assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
+        assert!(
+            id.starts_with("S-"),
+            "expected server-side fallback, got {id:?}"
+        );
     }
 
     #[test]
     fn extract_trace_id_generates_when_header_empty() {
         let generator = TraceIdGenerator::new(None);
         let id = extract_trace_id(Some(""), &generator);
-        assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
+        assert!(
+            id.starts_with("S-"),
+            "expected server-side fallback, got {id:?}"
+        );
     }
 
     #[test]
@@ -154,7 +164,10 @@ mod tests {
         let huge = "x".repeat(MAX_TRACE_ID_LEN + 1);
         let generator = TraceIdGenerator::new(None);
         let id = extract_trace_id(Some(&huge), &generator);
-        assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
+        assert!(
+            id.starts_with("S-"),
+            "expected server-side fallback, got {id:?}"
+        );
     }
 
     #[test]
@@ -165,7 +178,10 @@ mod tests {
         // accepts control bytes).
         let generator = TraceIdGenerator::new(None);
         let id = extract_trace_id(Some("bad\nvalue"), &generator);
-        assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
+        assert!(
+            id.starts_with("S-"),
+            "expected server-side fallback, got {id:?}"
+        );
     }
 
     #[test]
@@ -199,7 +215,10 @@ mod tests {
         let headers = HeaderMap::new();
         let generator = TraceIdGenerator::new(None);
         let id = extract_trace_id_from(&headers, &generator);
-        assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
+        assert!(
+            id.starts_with("S-"),
+            "expected server-side fallback, got {id:?}"
+        );
     }
 
     #[test]
@@ -215,10 +234,15 @@ mod tests {
         let span = maker.make_span(&request);
 
         let metadata = span.metadata().expect("span has metadata");
-        let field_names: Vec<&'static str> =
-            metadata.fields().iter().map(|f| f.name()).collect();
-        assert!(field_names.contains(&"trace_id"), "fields were {field_names:?}");
-        assert!(field_names.contains(&"method"), "fields were {field_names:?}");
+        let field_names: Vec<&'static str> = metadata.fields().iter().map(|f| f.name()).collect();
+        assert!(
+            field_names.contains(&"trace_id"),
+            "fields were {field_names:?}"
+        );
+        assert!(
+            field_names.contains(&"method"),
+            "fields were {field_names:?}"
+        );
         assert!(field_names.contains(&"path"), "fields were {field_names:?}");
     }
 }

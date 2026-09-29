@@ -62,6 +62,7 @@ dependencies = [
  "tokio",
  "tower",
  "tower-http 0.7.0",
+ "trace-id",
  "tracing",
  "tracing-appender",
  "tracing-subscriber",
