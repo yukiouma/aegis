@@ -28,8 +28,9 @@ pub struct Identity {
 pub fn current() -> Result<Identity, ApiError> {
     #[cfg(target_os = "windows")]
     {
-        let info = windows_utils::get_user_info()
-            .map_err(|e| ApiError::Store { message: e.to_string() })?;
+        let info = windows_utils::get_user_info().map_err(|e| ApiError::Store {
+            message: e.to_string(),
+        })?;
         Ok(Identity {
             domain: info.domain,
             host_machine: info.host_machine,

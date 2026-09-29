@@ -586,6 +586,9 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(f.id, 11);
-        assert!(!f.approved, "fixture helper defaults to false; mock body matches");
+        assert!(
+            !f.approved,
+            "fixture helper defaults to false; mock body matches"
+        );
     }
 }

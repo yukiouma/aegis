@@ -7,8 +7,7 @@ use async_trait::async_trait;
 use sqlx::{FromRow, PgPool};
 
 use crate::domain::{
-    CodeList, CodeListListQuery, CodeListNew, CodeListRepository, CodeListUpdate, DomainError,
-    Page,
+    CodeList, CodeListListQuery, CodeListNew, CodeListRepository, CodeListUpdate, DomainError, Page,
 };
 
 const SQLSTATE_UNIQUE_VIOLATION: &str = "23505";
@@ -104,10 +103,7 @@ impl CodeListRepository for CodeListRepo {
         row.try_into()
     }
 
-    async fn search_or_list(
-        &self,
-        q: CodeListListQuery,
-    ) -> Result<Page<CodeList>, DomainError> {
+    async fn search_or_list(&self, q: CodeListListQuery) -> Result<Page<CodeList>, DomainError> {
         let mut qb: sqlx::QueryBuilder<sqlx::Postgres> = sqlx::QueryBuilder::new(
             "SELECT id, version_id, code, extensible, name, submission_value, synonym, definition, nci_preferred_term, created_at, updated_at FROM code_lists WHERE version_id = ",
         );

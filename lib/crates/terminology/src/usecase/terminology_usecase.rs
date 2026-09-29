@@ -1,15 +1,17 @@
 use crate::domain::{
     CodeItemListQuery, CodeItemNew, CodeItemRepository, CodeItemUpdate, CodeListListQuery,
-    CodeListNew, CodeListRepository, CodeListUpdate, DomainError, Page,
-    TerminologyVersionNew, TerminologyVersionRepository, TerminologyVersionUpdate,
+    CodeListNew, CodeListRepository, CodeListUpdate, DomainError, Page, TerminologyVersionNew,
+    TerminologyVersionRepository, TerminologyVersionUpdate,
 };
 
 use super::commands::{
-    BatchCreateCodeItems, CreateCodeItem, CreateCodeList, CreateTerminologyVersion,
-    UpdateCodeItem, UpdateCodeList, UpdateTerminologyVersion,
+    BatchCreateCodeItems, CreateCodeItem, CreateCodeList, CreateTerminologyVersion, UpdateCodeItem,
+    UpdateCodeList, UpdateTerminologyVersion,
 };
 use super::error::UsecaseError;
-use super::views::{BatchCreateCodeItemsResponse, CodeItemView, CodeListView, TerminologyVersionView};
+use super::views::{
+    BatchCreateCodeItemsResponse, CodeItemView, CodeListView, TerminologyVersionView,
+};
 
 /// Configuration for `TerminologyUsecase::new`. Wraps the three
 /// concrete (or fake) repositories so the constructor stays
@@ -343,9 +345,9 @@ fn validate_update_code_item(cmd: &UpdateCodeItem) -> Result<(), UsecaseError> {
 fn validate_batch_code_items(cmd: &BatchCreateCodeItems) -> Result<(), UsecaseError> {
     for (i, item) in cmd.items.iter().enumerate() {
         if item.code.trim().is_empty() {
-            return Err(UsecaseError::Validation(
-                DomainError::EmptyCodeAtPosition(i),
-            ));
+            return Err(UsecaseError::Validation(DomainError::EmptyCodeAtPosition(
+                i,
+            )));
         }
     }
     Ok(())
@@ -371,7 +373,9 @@ fn normalize_fragment(fragment: Option<&str>) -> Result<Option<String>, UsecaseE
 /// (or `Some("")`) when the caller wants the plain list path, so
 /// empty / whitespace-only fragments never reach this helper.
 fn validate_tsquery_fragment(s: &str) -> Result<&str, UsecaseError> {
-    if s.chars().any(|c| matches!(c, '&' | '|' | '!' | '(' | ')' | ':')) {
+    if s.chars()
+        .any(|c| matches!(c, '&' | '|' | '!' | '(' | ')' | ':'))
+    {
         return Err(UsecaseError::Validation(DomainError::InvalidFragment));
     }
     Ok(s)

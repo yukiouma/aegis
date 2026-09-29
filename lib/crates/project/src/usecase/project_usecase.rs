@@ -98,10 +98,7 @@ impl<R: ProjectRepository, U: UserService> ProjectUsecase<R, U> {
 /// Bucket the supplied user summaries into a project's two teams and
 /// produce a `ProjectView`. Pure (no I/O) so tests can exercise it
 /// directly through the usecase.
-fn hydrate_with(
-    users: &[UserSummary],
-    project: Project,
-) -> Result<ProjectView, UsecaseError> {
+fn hydrate_with(users: &[UserSummary], project: Project) -> Result<ProjectView, UsecaseError> {
     let by_code: HashMap<&str, &UserSummary> = users.iter().map(|u| (u.code.as_str(), u)).collect();
     let members = project.members.clone();
     let unblind_members = project.unblind_members.clone();
@@ -120,7 +117,11 @@ fn hydrate_with(
         workers: unblind_workers.into_iter().map(Into::into).collect(),
     };
 
-    Ok(ProjectView::from_project(project, members_view, unblind_view))
+    Ok(ProjectView::from_project(
+        project,
+        members_view,
+        unblind_view,
+    ))
 }
 
 fn lookup_set<'a>(
@@ -204,7 +205,9 @@ fn validate_configuration(c: &ProjectConfiguration) -> Result<(), UsecaseError> 
         match TerminologyVersionData::new(t.version_id, t.version_name.clone()) {
             Ok(_) => {}
             Err(DomainError::EmptySdtmTerminologyName) => {
-                return Err(UsecaseError::Validation(DomainError::EmptySdtmTerminologyName));
+                return Err(UsecaseError::Validation(
+                    DomainError::EmptySdtmTerminologyName,
+                ));
             }
             Err(other) => return Err(UsecaseError::Repository(other)),
         }

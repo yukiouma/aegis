@@ -54,7 +54,9 @@ pub async fn update_crf_annotation(
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async { annotation::update(&client, id, body).await })
+            .scope(trace_id, async {
+                annotation::update(&client, id, body).await
+            })
             .await;
         match &result {
             Ok(_) => tracing::info!("success"),

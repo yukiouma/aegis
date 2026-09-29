@@ -8,8 +8,8 @@ use apis::project::{
 };
 
 use crate::domain::{
-    ModelVersion, ProjectConfiguration, ProjectLanguage, ProjectMember, ProjectRepository, ProjectTag,
-    TerminologyVersionData, UserService,
+    ModelVersion, ProjectConfiguration, ProjectLanguage, ProjectMember, ProjectRepository,
+    ProjectTag, TerminologyVersionData, UserService,
 };
 use crate::usecase::{
     CreateProject, ModelVersionView, ProjectConfigurationView, ProjectUsecase,
@@ -63,7 +63,11 @@ where
     }
 
     async fn get_project_by_id(&self, id: i32) -> Result<ProjectView, ProjectApiError> {
-        let view = self.usecase.get_project_by_id(id).await.map_err(map_error)?;
+        let view = self
+            .usecase
+            .get_project_by_id(id)
+            .await
+            .map_err(map_error)?;
         Ok(view.into())
     }
 
@@ -121,7 +125,9 @@ fn configuration_data_to_domain(d: ProjectConfigurationData) -> ProjectConfigura
     )
 }
 
-fn terminology_version_data_to_domain(d: apis::project::TerminologyVersionData) -> TerminologyVersionData {
+fn terminology_version_data_to_domain(
+    d: apis::project::TerminologyVersionData,
+) -> TerminologyVersionData {
     TerminologyVersionData::for_repository(d.version_id, d.version_name)
 }
 
@@ -185,7 +191,9 @@ impl From<ProjectConfigurationView> for apis::project::ProjectConfigurationView 
     }
 }
 
-fn terminology_version_view_to_api(v: TerminologyVersionView) -> apis::project::TerminologyVersionView {
+fn terminology_version_view_to_api(
+    v: TerminologyVersionView,
+) -> apis::project::TerminologyVersionView {
     apis::project::TerminologyVersionView {
         version_id: v.version_id,
         version_name: v.version_name,

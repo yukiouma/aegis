@@ -46,10 +46,8 @@ pub trait CodeListRepository: Send + Sync {
     /// - `fragment = Some(_)`        → `WHERE version_id = $1 AND tsv @@ to_tsquery('english', $2 || ':*')
     ///                                  ORDER BY ts_rank(tsv, to_tsquery('english', $2 || ':*')) DESC, id ASC`
     /// Implementations fetch `limit + 1` rows to compute `next_offset`.
-    async fn search_or_list(
-        &self,
-        query: CodeListListQuery,
-    ) -> Result<Page<CodeList>, DomainError>;
+    async fn search_or_list(&self, query: CodeListListQuery)
+    -> Result<Page<CodeList>, DomainError>;
     async fn update(&self, input: CodeListUpdate) -> Result<CodeList, DomainError>;
     /// Hard delete; cascades to code_items via the schema's
     /// `ON DELETE CASCADE`.
@@ -64,10 +62,8 @@ pub trait CodeItemRepository: Send + Sync {
     /// Unified list+search under a codelist. Returns a single page.
     /// Same shape semantics as
     /// [`CodeListRepository::search_or_list`].
-    async fn search_or_list(
-        &self,
-        query: CodeItemListQuery,
-    ) -> Result<Page<CodeItem>, DomainError>;
+    async fn search_or_list(&self, query: CodeItemListQuery)
+    -> Result<Page<CodeItem>, DomainError>;
     /// Natural-key lookup on the `code_items` table itself. Returns
     /// every item whose `version_id` matches the given value and
     /// whose `code` matches the given value — i.e. all items with

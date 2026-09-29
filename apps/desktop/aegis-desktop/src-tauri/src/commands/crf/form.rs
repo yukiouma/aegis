@@ -27,7 +27,9 @@ pub async fn list_crf_forms_by_version(
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async { form::list_by_version(&client, version_id).await })
+            .scope(trace_id, async {
+                form::list_by_version(&client, version_id).await
+            })
             .await;
         match &result {
             Ok(_) => tracing::info!("success"),

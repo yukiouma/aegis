@@ -40,9 +40,7 @@ impl ProjectRepository for ProjectRepo {
         .push_bind(true)
         .push(", ")
         .push_bind(configuration_json)
-        .push(
-            ") RETURNING id, code, description, active, configuration, created_at, updated_at",
-        )
+        .push(") RETURNING id, code, description, active, configuration, created_at, updated_at")
         .build_query_as::<ProjectRow>()
         .fetch_one(&mut *tx)
         .await

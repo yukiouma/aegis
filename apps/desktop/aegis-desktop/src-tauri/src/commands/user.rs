@@ -62,8 +62,7 @@ pub async fn get_user_by_code(
     code: String,
 ) -> Result<UserViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "get_user_by_code");
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "get_user_by_code");
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
@@ -93,11 +92,14 @@ pub async fn current_user(
         tracing::info!("enter");
         let result = TRACE_ID
             .scope(trace_id, async {
-                let token = client
-                    .tokens()
-                    .access_token()
-                    .await?
-                    .ok_or_else(|| ApiError::Store { message: "no access token".into() })?;
+                let token =
+                    client
+                        .tokens()
+                        .access_token()
+                        .await?
+                        .ok_or_else(|| ApiError::Store {
+                            message: "no access token".into(),
+                        })?;
                 let code = crate::system::jwt_claims::decode_sub(&token)?;
                 user::get_by_code(&client, &code).await
             })
@@ -181,7 +183,9 @@ mod current_user_tests {
         let client = HttpClient::new(server.uri(), store);
         // Direct call into the http layer — we are testing the command's
         // plumbing, not the tauri command framework.
-        let view = crate::http::user::get_by_code(&client, "alice").await.unwrap();
+        let view = crate::http::user::get_by_code(&client, "alice")
+            .await
+            .unwrap();
         assert_eq!(view.code, "alice");
         assert_eq!(view.name, "Alice");
         assert_eq!(view.role, crate::http::dto::Role::Admin);

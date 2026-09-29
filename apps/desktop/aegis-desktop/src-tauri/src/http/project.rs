@@ -186,10 +186,7 @@ pub async fn list(c: &HttpClient) -> Result<Vec<ProjectViewResponse>, ApiError> 
     Ok(resp.projects)
 }
 
-pub async fn get_by_code(
-    c: &HttpClient,
-    code: &str,
-) -> Result<ProjectViewResponse, ApiError> {
+pub async fn get_by_code(c: &HttpClient, code: &str) -> Result<ProjectViewResponse, ApiError> {
     c.request(
         reqwest::Method::GET,
         &format!("/api/project/{code}"),
@@ -230,23 +227,21 @@ mod tests {
             .register(
                 Mock::given(method("GET"))
                     .and(path("/api/project"))
-                    .respond_with(ResponseTemplate::new(200).set_body_json(
-                        serde_json::json!({
-                            "projects": [{
-                                "id": 1, "code": "p", "description": "",
-                                "configurations": {
-                                    "language": "en",
-                                    "tags": [{ "key": "Product", "value": "DEMO-001" }],
-                                    "sdtmig": { "versionId": 2, "versionName": "SDTMIG v3.2" }
-                                },
-                                "members": { "leaders": [], "workers": [] },
-                                "unblindMembers": { "leaders": [], "workers": [] },
-                                "active": true,
-                                "createdAt": "2026-01-01T00:00:00Z",
-                                "updatedAt": "2026-01-02T00:00:00Z"
-                            }]
-                        }),
-                    )),
+                    .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                        "projects": [{
+                            "id": 1, "code": "p", "description": "",
+                            "configurations": {
+                                "language": "en",
+                                "tags": [{ "key": "Product", "value": "DEMO-001" }],
+                                "sdtmig": { "versionId": 2, "versionName": "SDTMIG v3.2" }
+                            },
+                            "members": { "leaders": [], "workers": [] },
+                            "unblindMembers": { "leaders": [], "workers": [] },
+                            "active": true,
+                            "createdAt": "2026-01-01T00:00:00Z",
+                            "updatedAt": "2026-01-02T00:00:00Z"
+                        }]
+                    }))),
             )
             .await;
         let c = HttpClient::new(server.uri(), store);
@@ -327,7 +322,10 @@ mod tests {
             sdtm_terminology: None,
         };
         let j = serde_json::to_string(&body).unwrap();
-        assert_eq!(j, r#"{"sdtmig":{"versionId":3,"versionName":"SDTMIG v3.3"}}"#);
+        assert_eq!(
+            j,
+            r#"{"sdtmig":{"versionId":3,"versionName":"SDTMIG v3.3"}}"#
+        );
     }
 
     #[test]

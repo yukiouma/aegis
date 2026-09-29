@@ -108,7 +108,9 @@ pub async fn refresh(c: &HttpClient) -> Result<(), ApiError> {
     let resp = c
         .http()
         .post(&url)
-        .json(&Req { refresh_token: &refresh_token })
+        .json(&Req {
+            refresh_token: &refresh_token,
+        })
         .send()
         .await?;
     let status = resp.status();
@@ -137,7 +139,9 @@ pub async fn logout(c: &HttpClient) -> Result<(), ApiError> {
         struct Req<'a> {
             refresh_token: &'a str,
         }
-        let body = Req { refresh_token: &refresh_token };
+        let body = Req {
+            refresh_token: &refresh_token,
+        };
         // Best-effort server logout; swallow network errors but still clear.
         let _ = c
             .request_bytes(reqwest::Method::POST, "/api/auth/logout", Some(&body))
@@ -166,7 +170,7 @@ mod tests {
                     .and(path("/api/auth/login"))
                     .and(body_json(serde_json::json!({"code": "u", "password": "p"})))
                     .respond_with(ResponseTemplate::new(200).set_body_json(
-                        serde_json::json!({"accessToken": "AT", "refreshToken": "RT"})
+                        serde_json::json!({"accessToken": "AT", "refreshToken": "RT"}),
                     )),
             )
             .await;
@@ -193,7 +197,7 @@ mod tests {
                 Mock::given(method("POST"))
                     .and(path("/api/auth/login"))
                     .respond_with(ResponseTemplate::new(401).set_body_json(
-                        serde_json::json!({"code": "invalid_credentials", "message": "bad"})
+                        serde_json::json!({"code": "invalid_credentials", "message": "bad"}),
                     )),
             )
             .await;
@@ -244,7 +248,8 @@ mod tests {
 
     #[cfg(not(target_os = "windows"))]
     #[tokio::test]
-    async fn login_domain_propagates_the_identity_error() {        let server = MockServer::start().await;
+    async fn login_domain_propagates_the_identity_error() {
+        let server = MockServer::start().await;
         let store = Arc::new(MemoryStore::default());
         let c = HttpClient::new(server.uri(), store.clone());
 

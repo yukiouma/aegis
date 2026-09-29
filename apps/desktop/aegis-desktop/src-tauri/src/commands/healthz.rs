@@ -12,8 +12,7 @@ pub async fn healthz(
     generator: State<'_, TraceIdGenerator>,
 ) -> Result<String, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "healthz");
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "healthz");
     async move {
         tracing::info!("enter");
         let result = TRACE_ID

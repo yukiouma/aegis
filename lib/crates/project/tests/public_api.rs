@@ -6,14 +6,14 @@
 
 use apis::project::{
     CreateProjectRequest, ProjectApiError, ProjectConfigurationData, ProjectConfigurationView,
-    ProjectMemberData, ProjectMemberView as ApiProjectMemberView, ProjectService, TagData,
-    TagView, UpdateProjectRequest, UserSummaryView as ApiUserSummaryView,
+    ProjectMemberData, ProjectMemberView as ApiProjectMemberView, ProjectService, TagData, TagView,
+    UpdateProjectRequest, UserSummaryView as ApiUserSummaryView,
 };
 use project::{
     CreateProject, DomainError, ModelVersion, ProjectConfiguration, ProjectLanguage, ProjectMember,
     ProjectNew, ProjectRepo, ProjectRepository, ProjectServiceImpl, ProjectTag, ProjectUpdate,
-    ProjectUsecaseConfig, ProjectView, RoleType, TeamType, UpdateProject, UsecaseError, UserService,
-    UserServiceImpl, UserSummary, UserSummaryView,
+    ProjectUsecaseConfig, ProjectView, RoleType, TeamType, UpdateProject, UsecaseError,
+    UserService, UserServiceImpl, UserSummary, UserSummaryView,
 };
 use sqlx::PgPool;
 
@@ -116,11 +116,10 @@ fn api_requests_have_expected_field_shape() {
 
 #[test]
 fn project_usecase_config_has_expected_field_shape() {
-    let _assert_config_shape: fn(cfg: ProjectUsecaseConfig<ProjectRepo, UserServiceImpl>) =
-        |cfg| {
-            let _: &ProjectRepo = &cfg.project_repo;
-            let _: &UserServiceImpl = &cfg.users;
-        };
+    let _assert_config_shape: fn(cfg: ProjectUsecaseConfig<ProjectRepo, UserServiceImpl>) = |cfg| {
+        let _: &ProjectRepo = &cfg.project_repo;
+        let _: &UserServiceImpl = &cfg.users;
+    };
 }
 
 #[test]
@@ -152,9 +151,8 @@ fn usecase_error_wraps_domain_error() {
 fn project_service_impl_is_object_safe() {
     // Pin the trait surface through a function pointer so object-safety
     // is checked at compile time without ever constructing an instance.
-    let _: fn(
-        ProjectServiceImpl<ProjectRepo, UserServiceImpl>,
-    ) -> Box<dyn ProjectService> = |s| Box::new(s);
+    let _: fn(ProjectServiceImpl<ProjectRepo, UserServiceImpl>) -> Box<dyn ProjectService> =
+        |s| Box::new(s);
 }
 
 #[test]

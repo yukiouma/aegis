@@ -138,10 +138,7 @@ pub async fn list_by_domain(
     Ok(resp)
 }
 
-pub async fn get_by_id(
-    c: &HttpClient,
-    id: i64,
-) -> Result<SdtmVariableViewResponse, ApiError> {
+pub async fn get_by_id(c: &HttpClient, id: i64) -> Result<SdtmVariableViewResponse, ApiError> {
     c.request(
         reqwest::Method::GET,
         &format!("/api/domain-model/variables/{id}"),

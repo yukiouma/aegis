@@ -20,8 +20,7 @@ pub async fn create_project(
     unblind_members: Option<ProjectMemberDataRequest>,
 ) -> Result<ProjectViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "create_project");
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "create_project");
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
@@ -55,8 +54,7 @@ pub async fn list_projects(
     generator: State<'_, TraceIdGenerator>,
 ) -> Result<Vec<ProjectViewResponse>, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "list_projects");
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "list_projects");
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
@@ -84,7 +82,9 @@ pub async fn get_project_by_code(
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async { project::get_by_code(&client, &code).await })
+            .scope(trace_id, async {
+                project::get_by_code(&client, &code).await
+            })
             .await;
         match &result {
             Ok(_) => tracing::info!("success"),
@@ -104,12 +104,13 @@ pub async fn update_project(
     body: UpdateProjectRequest,
 ) -> Result<ProjectViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "update_project");
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "update_project");
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async { project::update(&client, &code, body).await })
+            .scope(trace_id, async {
+                project::update(&client, &code, body).await
+            })
             .await;
         match &result {
             Ok(_) => tracing::info!("success"),

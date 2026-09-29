@@ -28,11 +28,7 @@ pub async fn create_terminology_version(
         tracing::info!("enter");
         let result = TRACE_ID
             .scope(trace_id, async {
-                version::create(
-                    &client,
-                    CreateTerminologyVersionRequest { kind, name },
-                )
-                .await
+                version::create(&client, CreateTerminologyVersionRequest { kind, name }).await
             })
             .await;
         match &result {

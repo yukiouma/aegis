@@ -7,8 +7,8 @@ use tracing::Instrument;
 use crate::http::client::{HttpClient, TRACE_ID};
 use crate::http::dto::ApiError;
 use crate::http::terminology::code_list::{
-    self, CodeListListQuery, CodeListPagedResponse, CodeListViewResponse,
-    CreateCodeListRequest, UpdateCodeListRequest,
+    self, CodeListListQuery, CodeListPagedResponse, CodeListViewResponse, CreateCodeListRequest,
+    UpdateCodeListRequest,
 };
 
 #[tauri::command]
@@ -144,7 +144,9 @@ pub async fn update_code_list(
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async { code_list::update(&client, id, body).await })
+            .scope(trace_id, async {
+                code_list::update(&client, id, body).await
+            })
             .await;
         match &result {
             Ok(_) => tracing::info!("success"),

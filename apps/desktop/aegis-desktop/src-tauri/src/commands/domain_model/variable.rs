@@ -110,7 +110,9 @@ pub async fn update_sdtm_variable(
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async { variable::update(&client, id, body).await })
+            .scope(trace_id, async {
+                variable::update(&client, id, body).await
+            })
             .await;
         match &result {
             Ok(_) => tracing::info!("success"),

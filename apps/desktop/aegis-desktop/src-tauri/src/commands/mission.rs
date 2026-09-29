@@ -110,8 +110,7 @@ pub async fn remove_assignee(
     assignee_id: i64,
 ) -> Result<(), ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "remove_assignee");
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "remove_assignee");
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
@@ -139,8 +138,7 @@ pub async fn create_mission(
     assignees: Vec<CreateMissionAssigneeArg>,
 ) -> Result<MissionViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "create_mission");
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "create_mission");
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
@@ -244,8 +242,7 @@ pub async fn patch_issue_state(
     state: String,
 ) -> Result<mission::IssueViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "patch_issue_state");
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "patch_issue_state");
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
@@ -301,8 +298,7 @@ pub async fn append_comment(
     body: mission::AppendCommentRequest,
 ) -> Result<mission::IssueViewResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "append_comment");
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "append_comment");
     async move {
         tracing::info!("enter");
         let result = TRACE_ID

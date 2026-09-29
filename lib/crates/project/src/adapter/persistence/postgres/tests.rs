@@ -204,7 +204,9 @@ mod row_tests {
     use chrono::{TimeZone, Utc};
 
     use super::super::row::{ProjectMemberRow, ProjectRow};
-    use crate::domain::{ProjectConfiguration, ProjectLanguage, ProjectMember, ProjectTag, RoleType, TeamType};
+    use crate::domain::{
+        ProjectConfiguration, ProjectLanguage, ProjectMember, ProjectTag, RoleType, TeamType,
+    };
 
     fn ts() -> chrono::DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 8, 9, 0, 0, 0).unwrap()

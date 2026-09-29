@@ -21,8 +21,7 @@ pub async fn register_user(
     password: String,
 ) -> Result<RegisterUserResponse, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "register_user");
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "register_user");
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
@@ -70,7 +69,10 @@ pub async fn update_user_credential(
             .scope(trace_id, async {
                 user_credential::update(
                     &client,
-                    UpdateUserCredentialRequest { user_code, password },
+                    UpdateUserCredentialRequest {
+                        user_code,
+                        password,
+                    },
                 )
                 .await
             })

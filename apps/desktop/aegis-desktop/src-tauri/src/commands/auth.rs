@@ -60,8 +60,7 @@ pub async fn is_logged_in(
     generator: State<'_, TraceIdGenerator>,
 ) -> Result<bool, ApiError> {
     let trace_id = generator.client_side();
-    let span =
-        tracing::info_span!("command", trace_id = %trace_id, command = "is_logged_in");
+    let span = tracing::info_span!("command", trace_id = %trace_id, command = "is_logged_in");
     async move {
         tracing::info!("enter");
         let result = client

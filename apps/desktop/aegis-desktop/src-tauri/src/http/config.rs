@@ -13,14 +13,16 @@ pub const BASE_URL: &str = env!("AEGIS_SERVER_URL");
 pub const NO_AUTH_PATHS: &[(&str, &str)] = &[
     ("POST", "/api/auth/login"),
     ("POST", "/api/auth/login-domain"),
-    ("GET",  "/healthz"),
+    ("GET", "/healthz"),
     ("POST", "/api/auth/user-credential"),
     ("POST", "/api/auth/refresh"),
 ];
 
 /// Returns true if the given `(method, path)` is exempt from Bearer auth.
 pub fn is_no_auth(method: &str, path: &str) -> bool {
-    NO_AUTH_PATHS.iter().any(|(m, p)| *m == method && *p == path)
+    NO_AUTH_PATHS
+        .iter()
+        .any(|(m, p)| *m == method && *p == path)
 }
 
 #[cfg(test)]

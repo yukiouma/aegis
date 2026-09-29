@@ -180,10 +180,7 @@ impl CodeListRepository for FakeCodeListRepo {
             .cloned()
             .ok_or(DomainError::CodeListNotFound(id))
     }
-    async fn search_or_list(
-        &self,
-        q: CodeListListQuery,
-    ) -> Result<Page<CodeList>, DomainError> {
+    async fn search_or_list(&self, q: CodeListListQuery) -> Result<Page<CodeList>, DomainError> {
         let mut all: Vec<CodeList> = self
             .state
             .lock()
@@ -314,10 +311,7 @@ impl CodeItemRepository for FakeCodeItemRepo {
             .cloned()
             .ok_or(DomainError::CodeItemNotFound(id))
     }
-    async fn search_or_list(
-        &self,
-        q: CodeItemListQuery,
-    ) -> Result<Page<CodeItem>, DomainError> {
+    async fn search_or_list(&self, q: CodeItemListQuery) -> Result<Page<CodeItem>, DomainError> {
         let mut all: Vec<CodeItem> = self
             .state
             .lock()
