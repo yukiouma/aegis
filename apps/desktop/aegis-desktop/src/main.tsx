@@ -12,6 +12,13 @@ import {
   SettingsSyncBridge,
 } from "./features/app/components/SettingsSyncBridge";
 import { shouldRedirectToBootstrap } from "./features/bootstrap/redirect";
+import { installWebviewLogForwarder } from "./shared/webview-log";
+
+// Install the webview console forwarder as the very first thing the
+// app does, so even the bootstrap probes' failures (logged via
+// console.error in the showWindow effect below) reach the Rust
+// tracing sink. Idempotent — safe under React StrictMode double-mount.
+installWebviewLogForwarder();
 
 // Set the app entry to /bootstrap so the health check and login
 // status probe always run before the user reaches the login page
