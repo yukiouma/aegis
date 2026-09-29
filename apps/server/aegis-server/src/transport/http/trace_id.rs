@@ -56,6 +56,32 @@ pub(crate) fn extract_trace_id(raw: Option<&str>, generator: &TraceIdGenerator) 
         .unwrap_or_else(|| generator.server_side())
 }
 
+/// `MakeSpan` impl that produces an `http_request` span carrying
+/// `trace_id`, `method`, and `path`. The `trace_id` is taken from
+/// the inbound `X-Trace-ID` header when present and valid; otherwise
+/// it is freshly minted via [`TraceIdGenerator::server_side`].
+pub(crate) struct TraceIdMakeSpan {
+    generator: TraceIdGenerator,
+}
+
+impl TraceIdMakeSpan {
+    pub(crate) fn new(generator: TraceIdGenerator) -> Self {
+        Self { generator }
+    }
+}
+
+impl MakeSpan<Body> for TraceIdMakeSpan {
+    fn make_span(&mut self, request: &Request<Body>) -> Span {
+        let trace_id = extract_trace_id_from(request.headers(), &self.generator);
+        info_span!(
+            SPAN_NAME,
+            trace_id = %trace_id,
+            method   = %request.method(),
+            path     = %request.uri().path(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,5 +200,25 @@ mod tests {
         let generator = TraceIdGenerator::new(None);
         let id = extract_trace_id_from(&headers, &generator);
         assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
+    }
+
+    #[test]
+    fn make_span_includes_required_field_names() {
+        let request = Request::builder()
+            .method("GET")
+            .uri("/healthz")
+            .header(X_TRACE_ID_HEADER, "C-desktop-01H9XQ8Z6VK3FJ4P5N2W7Y0T8CB")
+            .body(Body::empty())
+            .expect("valid request");
+
+        let mut maker = TraceIdMakeSpan::new(TraceIdGenerator::new(None));
+        let span = maker.make_span(&request);
+
+        let metadata = span.metadata().expect("span has metadata");
+        let field_names: Vec<&'static str> =
+            metadata.fields().iter().map(|f| f.name()).collect();
+        assert!(field_names.contains(&"trace_id"), "fields were {field_names:?}");
+        assert!(field_names.contains(&"method"), "fields were {field_names:?}");
+        assert!(field_names.contains(&"path"), "fields were {field_names:?}");
     }
 }
