@@ -181,10 +181,11 @@ Three rules for the wrap:
 In `src-tauri/src/http/client.rs` (existing test module):
 - `#[tokio::test] async fn trace_id_header_attached_when_task_local_set()` — mints a fake id, scopes `request_bytes` in `TRACE_ID.scope(…)`, asserts `wiremock::matchers::header("X-Trace-ID", id)` matches.
 - `#[tokio::test] async fn trace_id_header_absent_when_no_task_local()` — calls without scoping, asserts a `NoHeader("X-Trace-ID")` matcher matches.
+- `#[tokio::test] async fn refresh_with_lock_attaches_trace_id_header()` — drives a 401 → refresh → retry against a wiremock that asserts the refresh POST also carries `X-Trace-ID`.
 
 In `src-tauri/src/commands/auth.rs`:
-- Existing `login_persists_tokens` and `login_propagates_401` stay green because the new args are pulled from `State` (test setup builds the state).
-- One new `#[tokio::test] async fn login_logs_enter_and_success()` that captures log output (a custom `tracing_subscriber::fmt::TestWriter`-style guard, or just verify via the command layer via `State` plumbing).
+- Existing `login_persists_tokens`, `login_propagates_401`, `logout_clears_tokens`, `assert_login_domain_takes_only_the_client`, `login_domain_propagates_the_identity_error` stay green. They exercise the `http::*` layer; the wrap above is transparent to them because the shim adds `State<'_, TraceIdGenerator>` as an extra parameter — the http fns don't see it.
+- **No shim-level captured-log test.** `tauri::State<'_, T>` exposes no public constructor in Tauri 2 (`State(&'r T)` with a private field), so constructing a `State` directly in a unit test requires either `tauri::test::mock_app()` (a full app + plugin chain — disproportionate) or a refactor that splits every shim into a thin Tauri wrapper around an inner pure fn that takes raw `&HttpClient` + `&TraceIdGenerator`. The wrap pattern is verified end-to-end by the manual smoke test in the verification gate, and the wrap correctness is verified by `cargo check -p aegis-desktop --all-targets` (every shim follows the template).
 
 ## Data model & wire shape
 
