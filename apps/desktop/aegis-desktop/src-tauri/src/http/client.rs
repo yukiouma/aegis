@@ -247,14 +247,15 @@ impl HttpClient {
             access_token: String,
         }
         let url = self.url("/api/auth/refresh");
-        let resp = self
-            .http
-            .post(&url)
-            .json(&Req {
-                refresh_token: &refresh_token,
-            })
-            .send()
-            .await?;
+        let mut rb = self.http.post(&url).json(&Req {
+            refresh_token: &refresh_token,
+        });
+        // The refresh path bypasses `send`, so attach the trace id
+        // header directly here when the command shim has scoped one.
+        if let Ok(id) = TRACE_ID.try_with(|id| id.clone()) {
+            rb = rb.header("X-Trace-ID", id);
+        }
+        let resp = rb.send().await?;
         let status = resp.status();
         let bytes = resp.bytes().await?.to_vec();
         if !status.is_success() {
@@ -273,6 +274,7 @@ impl HttpClient {
         Ok(())
     }
 
+    #[tracing::instrument(level = "debug", skip_all, fields(method = %method, path = %path))]
     async fn send<TReq>(
         &self,
         method: reqwest::Method,
@@ -390,6 +392,57 @@ mod tests {
         let c = client_for(&server, store);
         let _: serde_json::Value = c
             .request::<(), serde_json::Value>(reqwest::Method::GET, "/api/user", None)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn refresh_with_lock_attaches_trace_id_header() {
+        use crate::http::client::TRACE_ID;
+
+        let server = MockServer::start().await;
+        let store = Arc::new(MemoryStore::default());
+        store.set_access_token("AT_STALE").await.unwrap();
+        store.set_refresh_token("RT").await.unwrap();
+        let trace_id = "C-desktop-refreshtoken";
+
+        server
+            .register(
+                Mock::given(method("POST"))
+                    .and(path("/api/auth/refresh"))
+                    .and(header("X-Trace-ID", trace_id))
+                    .respond_with(ResponseTemplate::new(200).set_body_json(
+                        serde_json::json!({"accessToken": "AT_NEW"})
+                    )),
+            )
+            .await;
+        server
+            .register(
+                Mock::given(method("GET"))
+                    .and(path("/api/user"))
+                    .and(header("authorization", "Bearer AT_STALE"))
+                    .respond_with(ResponseTemplate::new(401).set_body_json(
+                        serde_json::json!({"code": "token_verification_failed", "message": "expired"})
+                    )),
+            )
+            .await;
+        server
+            .register(
+                Mock::given(method("GET"))
+                    .and(path("/api/user"))
+                    .and(header("authorization", "Bearer AT_NEW"))
+                    .respond_with(ResponseTemplate::new(200).set_body_json(
+                        serde_json::json!({"users": []})
+                    )),
+            )
+            .await;
+
+        let c = client_for(&server, store);
+        let _: serde_json::Value = TRACE_ID
+            .scope(trace_id.to_string(), async {
+                c.request::<(), serde_json::Value>(reqwest::Method::GET, "/api/user", None)
+                    .await
+            })
             .await
             .unwrap();
     }
