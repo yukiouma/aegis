@@ -24,6 +24,8 @@ use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
+use trace_id::TraceIdGenerator;
+
 use crate::state::AppState;
 use crate::transport::http::auth;
 use crate::transport::http::crf::router as crf_router;
@@ -33,6 +35,7 @@ use crate::transport::http::mission::router as mission_router;
 use crate::transport::http::openapi::ApiDoc;
 use crate::transport::http::project::router as project_router;
 use crate::transport::http::terminology::router as terminology_router;
+use crate::transport::http::trace_id::TraceIdMakeSpan;
 use crate::transport::http::user;
 
 /// Build the full HTTP router with `state` attached.
@@ -71,7 +74,10 @@ pub fn router(state: AppState) -> axum::Router {
     // handlers do not extract state).
     router
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", api))
-        .layer(tower_http::trace::TraceLayer::new_for_http())
+        .layer(
+            tower_http::trace::TraceLayer::new_for_http()
+                .make_span_with(TraceIdMakeSpan::new(TraceIdGenerator::new(None))),
+        )
 }
 
 #[cfg(test)]
@@ -459,6 +465,29 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), AxStatus::NOT_FOUND);
+    }
+
+    /// `GET /healthz` with a valid `X-Trace-ID` header still
+    /// returns 200 OK — proves the new `TraceIdMakeSpan` layer
+    /// does not break the existing path. The value-level
+    /// extraction is covered by the unit tests on
+    /// `extract_trace_id` / `is_valid_trace_id` in
+    /// `transport::http::trace_id`.
+    #[tokio::test]
+    async fn request_with_trace_id_header_succeeds() {
+        let app = router(test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("GET")
+                    .uri("/healthz")
+                    .header("x-trace-id", "C-desktop-01ABCDEF01234567890ABCDEF")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::OK);
     }
 
     #[tokio::test]
