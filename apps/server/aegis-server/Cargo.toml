@@ -13,6 +13,10 @@ tower = { workspace = true }
 # tower-http's TraceLayer adds a tracing span around every request.
 # The `trace` feature is required for the layer constructor.
 tower-http = { workspace = true, features = ["trace"] }
+# `trace-id` is the workspace crate that mints `C-/S-…` ids. We
+# use `server_side()` as the fallback when the inbound request has
+# no `X-Trace-ID` (or sends one we can't trust).
+trace-id = { path = "../../../lib/crates/trace-id" }
 # tokio with macros + rt-multi-thread for `#[tokio::main]` in main.rs
 # + the spawn / signal utilities used by axum::serve.
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
