@@ -283,7 +283,8 @@ async fn create_project_with_configuration_succeeds() {
                     ProjectTag::for_repository("Region".into(), "EU".into()),
                 ],
                 None,
-                None,)),
+                None,
+            )),
         })
         .await
         .expect("create");
@@ -310,7 +311,8 @@ async fn create_project_with_duplicate_tag_keys_succeeds() {
                     ProjectTag::for_repository("Product".into(), "DEMO-002".into()),
                 ],
                 None,
-                None,)),
+                None,
+            )),
         })
         .await
         .expect("create");
@@ -332,7 +334,8 @@ async fn create_project_with_empty_tag_key_returns_validation_error() {
                 None,
                 vec![ProjectTag::for_repository("".into(), "v".into())],
                 None,
-                None,)),
+                None,
+            )),
         })
         .await
         .expect_err("empty key rejected");
@@ -355,7 +358,8 @@ async fn create_project_with_empty_tag_value_returns_validation_error() {
                 None,
                 vec![ProjectTag::for_repository("k".into(), "   ".into())],
                 None,
-                None,)),
+                None,
+            )),
         })
         .await
         .expect_err("empty value rejected");
@@ -378,7 +382,8 @@ async fn create_project_with_sdtmig_succeeds() {
                 None,
                 vec![],
                 Some(ModelVersion::for_repository(7, "2024-03-29".into())),
-                None,)),
+                None,
+            )),
         })
         .await
         .expect("create");
@@ -400,7 +405,8 @@ async fn create_project_with_empty_sdtmig_name_returns_validation_error() {
                 None,
                 vec![],
                 Some(ModelVersion::for_repository(7, "   ".into())),
-                None,)),
+                None,
+            )),
         })
         .await
         .expect_err("empty sdtmig name rejected");
@@ -455,7 +461,8 @@ async fn update_project_replaces_configuration_whole_list() {
                 None,
                 vec![ProjectTag::for_repository("k1".into(), "v1".into())],
                 None,
-                None,)),
+                None,
+            )),
         })
         .await
         .expect("create");
@@ -471,7 +478,8 @@ async fn update_project_replaces_configuration_whole_list() {
                     ProjectTag::for_repository("k3".into(), "v3".into()),
                 ],
                 None,
-                None,)),
+                None,
+            )),
             ..Default::default()
         })
         .await
@@ -494,7 +502,8 @@ async fn update_project_leaves_configuration_unchanged_when_none() {
                 None,
                 vec![ProjectTag::for_repository("k1".into(), "v1".into())],
                 None,
-                None,)),
+                None,
+            )),
         })
         .await
         .expect("create");

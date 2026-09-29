@@ -7,11 +7,9 @@ mod views;
 mod tests;
 
 pub use commands::{
-    BatchCreateCodeItems, CreateCodeItem, CreateCodeList, CreateTerminologyVersion,
-    UpdateCodeItem, UpdateCodeList, UpdateTerminologyVersion,
+    BatchCreateCodeItems, CreateCodeItem, CreateCodeList, CreateTerminologyVersion, UpdateCodeItem,
+    UpdateCodeList, UpdateTerminologyVersion,
 };
 pub use error::UsecaseError;
 pub use terminology_usecase::{TerminologyUsecase, TerminologyUsecaseConfig};
-pub use views::{
-    BatchCreateCodeItemsResponse, CodeItemView, CodeListView, TerminologyVersionView,
-};
+pub use views::{BatchCreateCodeItemsResponse, CodeItemView, CodeListView, TerminologyVersionView};

@@ -46,7 +46,8 @@ pub struct UpdateUserRequest {
 }
 
 pub async fn create(c: &HttpClient, body: CreateUserRequest) -> Result<UserViewResponse, ApiError> {
-    c.request(reqwest::Method::POST, "/api/user", Some(&body)).await
+    c.request(reqwest::Method::POST, "/api/user", Some(&body))
+        .await
 }
 
 pub async fn list(c: &HttpClient) -> Result<Vec<UserViewResponse>, ApiError> {
@@ -57,8 +58,12 @@ pub async fn list(c: &HttpClient) -> Result<Vec<UserViewResponse>, ApiError> {
 }
 
 pub async fn get_by_code(c: &HttpClient, code: &str) -> Result<UserViewResponse, ApiError> {
-    c.request(reqwest::Method::GET, &format!("/api/user/{code}"), None::<&()>)
-        .await
+    c.request(
+        reqwest::Method::GET,
+        &format!("/api/user/{code}"),
+        None::<&()>,
+    )
+    .await
 }
 
 pub async fn update(
@@ -94,16 +99,14 @@ mod tests {
             .register(
                 Mock::given(method("GET"))
                     .and(path("/api/user"))
-                    .respond_with(ResponseTemplate::new(200).set_body_json(
-                        serde_json::json!({
-                            "users": [{
-                                "id": 1, "code": "a", "name": "Alice",
-                                "role": "admin", "active": true,
-                                "createdAt": "2026-01-01T00:00:00Z",
-                                "updatedAt": "2026-01-02T00:00:00Z"
-                            }]
-                        }),
-                    )),
+                    .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                        "users": [{
+                            "id": 1, "code": "a", "name": "Alice",
+                            "role": "admin", "active": true,
+                            "createdAt": "2026-01-01T00:00:00Z",
+                            "updatedAt": "2026-01-02T00:00:00Z"
+                        }]
+                    }))),
             )
             .await;
         let c = HttpClient::new(server.uri(), store);

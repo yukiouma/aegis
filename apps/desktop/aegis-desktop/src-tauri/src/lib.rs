@@ -1,4 +1,5 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use tauri::Manager;
@@ -7,6 +8,8 @@ use tauri_plugin_store::StoreExt;
 mod commands;
 mod http;
 mod system;
+mod trace_id_setup;
+mod tracing_init;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -121,6 +124,43 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             greet,
         ])
         .setup(|app| {
+            // Tracing init: prefer $AEGIS_LOG_DIR; fall back to
+            // <app_data_dir>/logs. LogGuard is stashed in managed
+            // state so the buffered writer lives for the process.
+            let log_dir = std::env::var("AEGIS_LOG_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| {
+                    app.path()
+                        .app_data_dir()
+                        .expect("app_data_dir resolves")
+                        .join("logs")
+                });
+            let log_guard =
+                tracing_init::init_tracing(&log_dir).map_err(|e| format!("init_tracing: {e}"))?;
+            tracing::info!(
+                log_dir = %log_dir.display(),
+                "aegis-desktop tracing initialised"
+            );
+            app.manage(log_guard);
+
+            // Per-install device prefix: persisted in app-data dir
+            // so a workstation keeps a stable middle segment on
+            // every trace id it emits. load_or_create is best-effort
+            // and falls back to a freshly-minted, non-persisted
+            // prefix on I/O errors.
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| format!("app_data_dir: {e}"))?;
+            let generator = trace_id_setup::load_or_create(&app_data_dir);
+            tracing::info!(
+                device_prefix_file = %app_data_dir
+                    .join(trace_id_setup::DEVICE_PREFIX_FILE_NAME)
+                    .display(),
+                "trace id generator ready"
+            );
+            app.manage(generator);
+
             let store = app
                 .store("auth.bin")
                 .map_err(|e| format!("failed to open auth.bin store: {e}"))?;

@@ -172,7 +172,8 @@ fn project_configuration_for_repository_carries_language_and_tags() {
         Some(ProjectLanguage::SimplifiedChinese),
         vec![ProjectTag::for_repository("k".into(), "v".into())],
         None,
-        None,);
+        None,
+    );
     assert_eq!(c.language, Some(ProjectLanguage::SimplifiedChinese));
     assert_eq!(c.tags.len(), 1);
     assert_eq!(c.tags[0].key, "k");
@@ -190,7 +191,8 @@ fn project_configuration_for_repository_carries_sdtmig() {
         None,
         vec![],
         Some(ModelVersion::for_repository(3, "2024-03-29".into())),
-        None,);
+        None,
+    );
     assert_eq!(
         c.sdtmig,
         Some(ModelVersion::for_repository(3, "2024-03-29".into()))
@@ -261,10 +263,16 @@ fn project_configuration_for_repository_carries_sdtm_terminology() {
         None,
         vec![],
         None,
-        Some(TerminologyVersionData::for_repository(7, "2024-03-29".into())),
+        Some(TerminologyVersionData::for_repository(
+            7,
+            "2024-03-29".into(),
+        )),
     );
     assert_eq!(
         c.sdtm_terminology,
-        Some(TerminologyVersionData::for_repository(7, "2024-03-29".into()))
+        Some(TerminologyVersionData::for_repository(
+            7,
+            "2024-03-29".into()
+        ))
     );
 }

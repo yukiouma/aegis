@@ -1,17 +1,20 @@
 //! Tauri command shims for the terminology code-item HTTP layer.
 
 use tauri::State;
+use trace_id::TraceIdGenerator;
+use tracing::Instrument;
 
-use crate::http::client::HttpClient;
+use crate::http::client::{HttpClient, TRACE_ID};
 use crate::http::dto::ApiError;
 use crate::http::terminology::code_item::{
-    self, CodeItemListQuery, CodeItemListResponse, CodeItemPagedResponse,
-    CodeItemViewResponse, CreateCodeItemRequest, UpdateCodeItemRequest,
+    self, CodeItemListQuery, CodeItemListResponse, CodeItemPagedResponse, CodeItemViewResponse,
+    CreateCodeItemRequest, UpdateCodeItemRequest,
 };
 
 #[tauri::command]
 pub async fn create_code_item(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     codelist_id: i64,
     version_id: i64,
     code: String,
@@ -20,65 +23,167 @@ pub async fn create_code_item(
     definition: String,
     nci_preferred_term: String,
 ) -> Result<CodeItemViewResponse, ApiError> {
-    code_item::create(
-        &client,
-        CreateCodeItemRequest {
-            codelist_id,
-            version_id,
-            code,
-            submission_value,
-            synonym,
-            definition,
-            nci_preferred_term,
-        },
-    )
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "create_code_item"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                code_item::create(
+                    &client,
+                    CreateCodeItemRequest {
+                        codelist_id,
+                        version_id,
+                        code,
+                        submission_value,
+                        synonym,
+                        definition,
+                        nci_preferred_term,
+                    },
+                )
+                .await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
+    }
+    .instrument(span)
     .await
 }
 
 #[tauri::command]
 pub async fn list_code_items(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     codelist_id: Option<i64>,
     version_id: Option<i64>,
     fragment: Option<String>,
     offset: u32,
     limit: u32,
 ) -> Result<CodeItemPagedResponse, ApiError> {
-    code_item::list_paged(
-        &client,
-        CodeItemListQuery {
-            codelist_id,
-            version_id,
-            fragment,
-            offset,
-            limit,
-        },
-    )
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "list_code_items"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                code_item::list_paged(
+                    &client,
+                    CodeItemListQuery {
+                        codelist_id,
+                        version_id,
+                        fragment,
+                        offset,
+                        limit,
+                    },
+                )
+                .await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
+    }
+    .instrument(span)
     .await
 }
 
 #[tauri::command]
 pub async fn update_code_item(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     id: i64,
     body: UpdateCodeItemRequest,
 ) -> Result<CodeItemViewResponse, ApiError> {
-    code_item::update(&client, id, body).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "update_code_item"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                code_item::update(&client, id, body).await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
+    }
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
 pub async fn delete_code_item(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     id: i64,
 ) -> Result<(), ApiError> {
-    code_item::delete(&client, id).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "delete_code_item"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { code_item::delete(&client, id).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
+    }
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
 pub async fn list_code_items_by_version_and_code(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     version_id: i64,
     code: String,
 ) -> Result<CodeItemListResponse, ApiError> {
-    code_item::list_by_version_and_code(&client, version_id, &code).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "list_code_items_by_version_and_code"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                code_item::list_by_version_and_code(&client, version_id, &code).await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
+    }
+    .instrument(span)
+    .await
 }

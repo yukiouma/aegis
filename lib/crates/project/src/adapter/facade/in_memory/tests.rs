@@ -15,8 +15,8 @@ use apis::project::{
 
 use crate::adapter::facade::in_memory::ProjectServiceImpl;
 use crate::domain::{
-    DomainError, Project, ProjectMember, ProjectNew, ProjectRepository,
-    ProjectTag, ProjectUpdate, RoleType, TeamType, UserService, UserSummary,
+    DomainError, Project, ProjectMember, ProjectNew, ProjectRepository, ProjectTag, ProjectUpdate,
+    RoleType, TeamType, UserService, UserSummary,
 };
 use crate::usecase::{ProjectUsecase, ProjectUsecaseConfig};
 

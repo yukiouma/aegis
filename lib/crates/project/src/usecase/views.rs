@@ -1,6 +1,8 @@
 use chrono::{DateTime, Utc};
 
-use crate::domain::{ModelVersion, Project, ProjectConfiguration, ProjectTag, TerminologyVersionData, UserSummary};
+use crate::domain::{
+    ModelVersion, Project, ProjectConfiguration, ProjectTag, TerminologyVersionData, UserSummary,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UserSummaryView {

@@ -95,7 +95,9 @@ pub enum ApiError {
 
 impl From<reqwest::Error> for ApiError {
     fn from(err: reqwest::Error) -> Self {
-        ApiError::Network { message: err.to_string() }
+        ApiError::Network {
+            message: err.to_string(),
+        }
     }
 }
 
@@ -107,7 +109,10 @@ mod tests {
     fn role_serializes_camel_case() {
         assert_eq!(serde_json::to_string(&Role::Root).unwrap(), "\"root\"");
         assert_eq!(serde_json::to_string(&Role::Admin).unwrap(), "\"admin\"");
-        assert_eq!(serde_json::to_string(&Role::General).unwrap(), "\"general\"");
+        assert_eq!(
+            serde_json::to_string(&Role::General).unwrap(),
+            "\"general\""
+        );
     }
 
     #[test]
@@ -118,7 +123,10 @@ mod tests {
 
     #[test]
     fn error_body_roundtrip() {
-        let body = ErrorBody { code: "validation_failed".into(), message: "bad code".into() };
+        let body = ErrorBody {
+            code: "validation_failed".into(),
+            message: "bad code".into(),
+        };
         let j = serde_json::to_string(&body).unwrap();
         let back: ErrorBody = serde_json::from_str(&j).unwrap();
         assert_eq!(body, back);
@@ -139,7 +147,9 @@ mod tests {
 
     #[test]
     fn api_error_network_serializes() {
-        let e = ApiError::Network { message: "dns".into() };
+        let e = ApiError::Network {
+            message: "dns".into(),
+        };
         let j = serde_json::to_string(&e).unwrap();
         assert!(j.contains("\"kind\":\"network\""));
         assert!(j.contains("\"message\":\"dns\""));
@@ -175,13 +185,28 @@ mod tests {
     #[test]
     fn domain_category_serializes_human_strings() {
         use super::DomainCategory::*;
-        assert_eq!(serde_json::to_string(&SpecialPurpose).unwrap(), "\"Special Purpose\"");
-        assert_eq!(serde_json::to_string(&Interventions).unwrap(), "\"Interventions\"");
+        assert_eq!(
+            serde_json::to_string(&SpecialPurpose).unwrap(),
+            "\"Special Purpose\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Interventions).unwrap(),
+            "\"Interventions\""
+        );
         assert_eq!(serde_json::to_string(&Events).unwrap(), "\"Events\"");
         assert_eq!(serde_json::to_string(&Findings).unwrap(), "\"Findings\"");
-        assert_eq!(serde_json::to_string(&TrialDesign).unwrap(), "\"Trial Design\"");
-        assert_eq!(serde_json::to_string(&Relationships).unwrap(), "\"Relationships\"");
-        assert_eq!(serde_json::to_string(&StudyReference).unwrap(), "\"Study Reference\"");
+        assert_eq!(
+            serde_json::to_string(&TrialDesign).unwrap(),
+            "\"Trial Design\""
+        );
+        assert_eq!(
+            serde_json::to_string(&Relationships).unwrap(),
+            "\"Relationships\""
+        );
+        assert_eq!(
+            serde_json::to_string(&StudyReference).unwrap(),
+            "\"Study Reference\""
+        );
     }
 
     #[test]
@@ -195,14 +220,18 @@ mod tests {
 
     #[test]
     fn parse_error_serializes_camel_case() {
-        let e = super::ApiError::Parse { message: "no sheet".into() };
+        let e = super::ApiError::Parse {
+            message: "no sheet".into(),
+        };
         let j = serde_json::to_string(&e).unwrap();
         assert_eq!(j, r#"{"kind":"parse","message":"no sheet"}"#);
     }
 
     #[test]
     fn parse_error_roundtrips() {
-        let e = super::ApiError::Parse { message: "bad row".into() };
+        let e = super::ApiError::Parse {
+            message: "bad row".into(),
+        };
         let j = serde_json::to_string(&e).unwrap();
         let v: serde_json::Value = serde_json::from_str(&j).unwrap();
         assert_eq!(v["kind"], "parse");

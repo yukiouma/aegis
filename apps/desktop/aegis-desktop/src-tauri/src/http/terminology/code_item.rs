@@ -101,8 +101,9 @@ fn percent_encode_fragment(input: &str) -> String {
     let mut out = String::with_capacity(input.len());
     for b in input.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9'
-            | b'-' | b'.' | b'_' | b'~' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(b as char)
+            }
             b' ' => out.push('+'),
             _ => out.push_str(&format!("%{b:02X}")),
         }
@@ -540,8 +541,7 @@ mod tests {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/api/terminology/code-items/batch"))
-            .respond_with(ResponseTemplate::new(201)
-                .set_body_json(batch_response_json(11, 7, 42)))
+            .respond_with(ResponseTemplate::new(201).set_body_json(batch_response_json(11, 7, 42)))
             .mount(&server)
             .await;
         let resp = batch_create(
@@ -586,15 +586,17 @@ mod tests {
     }
 
     fn list_response_json(version_id: i64, count: usize) -> serde_json::Value {
-        let items: Vec<_> = (0..count).map(|i| {
-            serde_json::json!({
-                "id": i, "codelistId": 10 + i as i64, "versionId": version_id,
-                "code": "YES", "submissionValue": "SV",
-                "synonym": "syn", "definition": "def", "nciPreferredTerm": "nci",
-                "createdAt": "2026-01-01T00:00:00Z",
-                "updatedAt": "2026-01-01T00:00:00Z"
+        let items: Vec<_> = (0..count)
+            .map(|i| {
+                serde_json::json!({
+                    "id": i, "codelistId": 10 + i as i64, "versionId": version_id,
+                    "code": "YES", "submissionValue": "SV",
+                    "synonym": "syn", "definition": "def", "nciPreferredTerm": "nci",
+                    "createdAt": "2026-01-01T00:00:00Z",
+                    "updatedAt": "2026-01-01T00:00:00Z"
+                })
             })
-        }).collect();
+            .collect();
         serde_json::json!({ "items": items })
     }
 
@@ -605,11 +607,12 @@ mod tests {
             .and(path("/api/terminology/code-items/by-version-and-code"))
             .and(query_param("versionId", "7"))
             .and(query_param("code", "YES"))
-            .respond_with(ResponseTemplate::new(200)
-                .set_body_json(list_response_json(7, 2)))
+            .respond_with(ResponseTemplate::new(200).set_body_json(list_response_json(7, 2)))
             .mount(&server)
             .await;
-        let resp = list_by_version_and_code(&client(&server), 7, "YES").await.unwrap();
+        let resp = list_by_version_and_code(&client(&server), 7, "YES")
+            .await
+            .unwrap();
         assert_eq!(resp.items.len(), 2);
         assert_eq!(resp.items[0].code, "YES");
         assert_eq!(resp.items[0].version_id, 7);
@@ -626,12 +629,12 @@ mod tests {
             .and(path("/api/terminology/code-items/by-version-and-code"))
             .and(query_param("versionId", "7"))
             .and(query_param("code", "A B"))
-            .respond_with(ResponseTemplate::new(200)
-                .set_body_json(list_response_json(7, 1)))
+            .respond_with(ResponseTemplate::new(200).set_body_json(list_response_json(7, 1)))
             .mount(&server)
             .await;
         let resp = list_by_version_and_code(&client(&server), 7, "A B")
-            .await.unwrap();
+            .await
+            .unwrap();
         assert_eq!(resp.items.len(), 1);
     }
 }

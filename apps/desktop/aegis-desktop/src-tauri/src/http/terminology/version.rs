@@ -42,8 +42,12 @@ pub async fn create(
     c: &HttpClient,
     body: CreateTerminologyVersionRequest,
 ) -> Result<TerminologyVersionViewResponse, ApiError> {
-    c.request(reqwest::Method::POST, "/api/terminology/versions", Some(&body))
-        .await
+    c.request(
+        reqwest::Method::POST,
+        "/api/terminology/versions",
+        Some(&body),
+    )
+    .await
 }
 
 pub async fn list(c: &HttpClient) -> Result<Vec<TerminologyVersionViewResponse>, ApiError> {

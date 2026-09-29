@@ -1,8 +1,10 @@
 //! Tauri command shims for the SDTM domain-model version HTTP layer.
 
 use tauri::State;
+use trace_id::TraceIdGenerator;
+use tracing::Instrument;
 
-use crate::http::client::HttpClient;
+use crate::http::client::{HttpClient, TRACE_ID};
 use crate::http::domain_model::version::{
     self, CreateSdtmVersionRequest, SdtmVersionListResponse, SdtmVersionViewResponse,
     UpdateSdtmVersionRequest,
@@ -12,36 +14,136 @@ use crate::http::dto::ApiError;
 #[tauri::command]
 pub async fn create_sdtm_version(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     name: String,
 ) -> Result<SdtmVersionViewResponse, ApiError> {
-    version::create(&client, CreateSdtmVersionRequest { name }).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "create_sdtm_version"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async {
+                version::create(&client, CreateSdtmVersionRequest { name }).await
+            })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
+    }
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
 pub async fn list_sdtm_versions(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
 ) -> Result<SdtmVersionListResponse, ApiError> {
-    version::list(&client).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "list_sdtm_versions"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { version::list(&client).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
+    }
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
 pub async fn get_sdtm_version_by_id(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     id: i64,
 ) -> Result<SdtmVersionViewResponse, ApiError> {
-    version::get_by_id(&client, id).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "get_sdtm_version_by_id"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { version::get_by_id(&client, id).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
+    }
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
 pub async fn update_sdtm_version(
     client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
     id: i64,
     body: UpdateSdtmVersionRequest,
 ) -> Result<SdtmVersionViewResponse, ApiError> {
-    version::update(&client, id, body).await
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "update_sdtm_version"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { version::update(&client, id, body).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
+    }
+    .instrument(span)
+    .await
 }
 
 #[tauri::command]
-pub async fn delete_sdtm_version(client: State<'_, HttpClient>, id: i64) -> Result<(), ApiError> {
-    version::delete(&client, id).await
+pub async fn delete_sdtm_version(
+    client: State<'_, HttpClient>,
+    generator: State<'_, TraceIdGenerator>,
+    id: i64,
+) -> Result<(), ApiError> {
+    let trace_id = generator.client_side();
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %trace_id,
+        command = "delete_sdtm_version"
+    );
+    async move {
+        tracing::info!("enter");
+        let result = TRACE_ID
+            .scope(trace_id, async { version::delete(&client, id).await })
+            .await;
+        match &result {
+            Ok(_) => tracing::info!("success"),
+            Err(e) => tracing::error!(error = %e, "failed"),
+        }
+        result
+    }
+    .instrument(span)
+    .await
 }

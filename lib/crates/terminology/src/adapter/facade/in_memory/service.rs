@@ -12,10 +12,11 @@ use async_trait::async_trait;
 use apis::terminology::TerminologyKind as ApiKind;
 use apis::terminology::{
     BatchCreateCodeItemsRequest, BatchCreateCodeItemsResponse as ApiBatchResp,
-    CodeItemListQuery as ApiCodeItemListQuery, CodeItemView, CodeListListQuery as ApiCodeListListQuery,
-    CodeListView, CreateCodeItemRequest, CreateCodeListRequest, CreateTerminologyVersionRequest,
-    Page as ApiPage, TerminologyApiError, TerminologyService, TerminologyVersionView,
-    UpdateCodeItemRequest, UpdateCodeListRequest, UpdateTerminologyVersionRequest,
+    CodeItemListQuery as ApiCodeItemListQuery, CodeItemView,
+    CodeListListQuery as ApiCodeListListQuery, CodeListView, CreateCodeItemRequest,
+    CreateCodeListRequest, CreateTerminologyVersionRequest, Page as ApiPage, TerminologyApiError,
+    TerminologyService, TerminologyVersionView, UpdateCodeItemRequest, UpdateCodeListRequest,
+    UpdateTerminologyVersionRequest,
 };
 
 use crate::domain::{
@@ -24,8 +25,8 @@ use crate::domain::{
 };
 use crate::usecase::{
     BatchCreateCodeItems, CodeItemView as InternalCodeItemView,
-    CodeListView as InternalCodeListView, CreateCodeItem, CreateCodeList,
-    CreateTerminologyVersion, TerminologyUsecase, TerminologyUsecaseConfig,
+    CodeListView as InternalCodeListView, CreateCodeItem, CreateCodeList, CreateTerminologyVersion,
+    TerminologyUsecase, TerminologyUsecaseConfig,
     TerminologyVersionView as InternalTerminologyVersionView, UpdateCodeItem, UpdateCodeList,
     UpdateTerminologyVersion, UsecaseError,
 };
@@ -253,10 +254,7 @@ where
         Ok(code_list_view_from_internal(view))
     }
 
-    async fn get_code_list_by_id(
-        &self,
-        id: i64,
-    ) -> Result<CodeListView, TerminologyApiError> {
+    async fn get_code_list_by_id(&self, id: i64) -> Result<CodeListView, TerminologyApiError> {
         let view = self
             .usecase
             .get_code_list_by_id(id)
@@ -277,7 +275,11 @@ where
         };
         let page = self.usecase.list_code_lists(internal_q).await?;
         Ok(ApiPage {
-            items: page.items.into_iter().map(code_list_view_from_internal).collect(),
+            items: page
+                .items
+                .into_iter()
+                .map(code_list_view_from_internal)
+                .collect(),
             next_offset: page.next_offset,
         })
     }
@@ -337,7 +339,11 @@ where
         };
         let page = self.usecase.list_code_items(internal_q).await?;
         Ok(ApiPage {
-            items: page.items.into_iter().map(code_item_view_from_internal).collect(),
+            items: page
+                .items
+                .into_iter()
+                .map(code_item_view_from_internal)
+                .collect(),
             next_offset: page.next_offset,
         })
     }

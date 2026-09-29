@@ -2,7 +2,7 @@
 //! signature verification. The token lives in the local token store, so
 //! any tampering still fails closed on the next server call.
 
-use base64::{Engine, engine::general_purpose::URL_SAFE_NO_PAD};
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde_json::Value;
 
 use crate::http::dto::ApiError;
@@ -26,16 +26,21 @@ pub fn decode_sub(token: &str) -> Result<String, ApiError> {
 
     let bytes = URL_SAFE_NO_PAD
         .decode(payload.as_bytes())
-        .map_err(|e| ApiError::Store { message: format!("base64 decode: {e}") })?;
+        .map_err(|e| ApiError::Store {
+            message: format!("base64 decode: {e}"),
+        })?;
 
-    let value: Value = serde_json::from_slice(&bytes)
-        .map_err(|e| ApiError::Store { message: format!("json parse: {e}") })?;
+    let value: Value = serde_json::from_slice(&bytes).map_err(|e| ApiError::Store {
+        message: format!("json parse: {e}"),
+    })?;
 
     value
         .get("sub")
         .and_then(Value::as_str)
         .map(str::to_owned)
-        .ok_or_else(|| ApiError::Store { message: "missing sub claim".into() })
+        .ok_or_else(|| ApiError::Store {
+            message: "missing sub claim".into(),
+        })
 }
 
 #[cfg(test)]
@@ -79,11 +84,7 @@ mod tests {
 
     #[test]
     fn rejects_payload_without_sub() {
-        let token = jwt(
-            r#"{"alg":"HS256"}"#,
-            r#"{"role":"admin"}"#,
-            "sig",
-        );
+        let token = jwt(r#"{"alg":"HS256"}"#, r#"{"role":"admin"}"#, "sig");
         let err = decode_sub(&token).unwrap_err();
         match err {
             ApiError::Store { message } => {
@@ -95,11 +96,7 @@ mod tests {
 
     #[test]
     fn rejects_payload_with_non_string_sub() {
-        let token = jwt(
-            r#"{"alg":"HS256"}"#,
-            r#"{"sub":42}"#,
-            "sig",
-        );
+        let token = jwt(r#"{"alg":"HS256"}"#, r#"{"sub":42}"#, "sig");
         assert!(matches!(decode_sub(&token), Err(ApiError::Store { .. })));
     }
 }

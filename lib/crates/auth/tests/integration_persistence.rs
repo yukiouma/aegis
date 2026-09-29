@@ -258,11 +258,7 @@ impl UserService for FakeUserService {
     async fn get_by_code(&self, _code: &str) -> Result<UserSummary, DomainError> {
         Err(DomainError::NotFound)
     }
-    async fn create(
-        &self,
-        _code: &str,
-        _name: &str,
-    ) -> Result<UserSummary, DomainError> {
+    async fn create(&self, _code: &str, _name: &str) -> Result<UserSummary, DomainError> {
         // The smoke test never exercises this path — `register_user`
         // requires `allow_domains` and a live fixture row, neither of
         // which the integration harness sets up.

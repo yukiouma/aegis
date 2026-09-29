@@ -144,15 +144,15 @@ pub async fn list_by_project(
     let mut url = format!("/api/mission/by-project/{project_code}");
     if let Some(k) = kind {
         let kind_str = serde_json::to_string(&k)
-            .map_err(|e| ApiError::Parse { message: e.to_string() })?
+            .map_err(|e| ApiError::Parse {
+                message: e.to_string(),
+            })?
             .trim_matches('"')
             .to_string();
         url.push_str("?kind=");
         url.push_str(&kind_str);
     }
-    let resp: MissionListResponse = c
-        .request(reqwest::Method::GET, &url, None::<&()>)
-        .await?;
+    let resp: MissionListResponse = c.request(reqwest::Method::GET, &url, None::<&()>).await?;
     Ok(resp.missions)
 }
 
@@ -221,15 +221,15 @@ pub async fn list_issues_by_mission(
     let mut url = format!("/api/mission/by-mission/{mission_id}/issues");
     if let Some(s) = state {
         let state_str = serde_json::to_string(&s)
-            .map_err(|e| ApiError::Parse { message: e.to_string() })?
+            .map_err(|e| ApiError::Parse {
+                message: e.to_string(),
+            })?
             .trim_matches('"')
             .to_string();
         url.push_str("?state=");
         url.push_str(&state_str);
     }
-    let resp: IssueListResponse = c
-        .request(reqwest::Method::GET, &url, None::<&()>)
-        .await?;
+    let resp: IssueListResponse = c.request(reqwest::Method::GET, &url, None::<&()>).await?;
     Ok(resp.issues)
 }
 
@@ -252,7 +252,9 @@ pub async fn patch_issue_state(
     target: IssueState,
 ) -> Result<IssueViewResponse, ApiError> {
     let state_str = serde_json::to_string(&target)
-        .map_err(|e| ApiError::Parse { message: e.to_string() })?
+        .map_err(|e| ApiError::Parse {
+            message: e.to_string(),
+        })?
         .trim_matches('"')
         .to_string();
     let url = format!("/api/mission/issues/{issue_id}/state?state={state_str}");
@@ -284,7 +286,7 @@ pub async fn append_comment(
         &format!("/api/mission/issues/{issue_id}/comments"),
         Some(&body),
     )
-        .await
+    .await
 }
 
 #[cfg(test)]
@@ -333,10 +335,7 @@ mod tests {
 
     #[test]
     fn mission_kind_serializes_snake_case() {
-        assert_eq!(
-            serde_json::to_string(&MissionKind::Crf).unwrap(),
-            "\"crf\""
-        );
+        assert_eq!(serde_json::to_string(&MissionKind::Crf).unwrap(), "\"crf\"");
         assert_eq!(
             serde_json::to_string(&MissionKind::Sdtm).unwrap(),
             "\"sdtm\""
@@ -345,22 +344,13 @@ mod tests {
             serde_json::to_string(&MissionKind::Adam).unwrap(),
             "\"adam\""
         );
-        assert_eq!(
-            serde_json::to_string(&MissionKind::Tfl).unwrap(),
-            "\"tfl\""
-        );
+        assert_eq!(serde_json::to_string(&MissionKind::Tfl).unwrap(), "\"tfl\"");
     }
 
     #[test]
     fn mission_role_serializes_snake_case() {
-        assert_eq!(
-            serde_json::to_string(&MissionRole::Dev).unwrap(),
-            "\"dev\""
-        );
-        assert_eq!(
-            serde_json::to_string(&MissionRole::Qc).unwrap(),
-            "\"qc\""
-        );
+        assert_eq!(serde_json::to_string(&MissionRole::Dev).unwrap(), "\"dev\"");
+        assert_eq!(serde_json::to_string(&MissionRole::Qc).unwrap(), "\"qc\"");
     }
 
     #[test]

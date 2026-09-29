@@ -201,10 +201,7 @@ impl CodeListRepository for InMemoryCodeListRepo {
             .ok_or(DomainError::CodeListNotFound(id))
     }
 
-    async fn search_or_list(
-        &self,
-        q: CodeListListQuery,
-    ) -> Result<Page<CodeList>, DomainError> {
+    async fn search_or_list(&self, q: CodeListListQuery) -> Result<Page<CodeList>, DomainError> {
         let mut all: Vec<CodeList> = self
             .state
             .lock()
@@ -349,10 +346,7 @@ impl CodeItemRepository for InMemoryCodeItemRepo {
             .ok_or(DomainError::CodeItemNotFound(id))
     }
 
-    async fn search_or_list(
-        &self,
-        q: CodeItemListQuery,
-    ) -> Result<Page<CodeItem>, DomainError> {
+    async fn search_or_list(&self, q: CodeItemListQuery) -> Result<Page<CodeItem>, DomainError> {
         let mut all: Vec<CodeItem> = self
             .state
             .lock()
@@ -859,7 +853,9 @@ async fn delete_code_list_returns_not_found_for_unknown_id() {
 async fn list_code_lists_with_fragment_returns_matching_codelists() {
     let svc = service();
     let v = svc.create_version(create_version_req("v1")).await.unwrap();
-    svc.create_code_list(create_code_list_req(v.id, "C66741")).await.unwrap();
+    svc.create_code_list(create_code_list_req(v.id, "C66741"))
+        .await
+        .unwrap();
     let page = svc
         .list_code_lists(apis::terminology::CodeListListQuery {
             version_id: v.id,
@@ -880,7 +876,9 @@ async fn list_code_lists_pagination_signals_next_offset() {
     let v = svc.create_version(create_version_req("v1")).await.unwrap();
     // Three codelists under v1.
     for code in ["C1", "C2", "C3"] {
-        svc.create_code_list(create_code_list_req(v.id, code)).await.unwrap();
+        svc.create_code_list(create_code_list_req(v.id, code))
+            .await
+            .unwrap();
     }
     let page1 = svc
         .list_code_lists(apis::terminology::CodeListListQuery {
@@ -1229,7 +1227,10 @@ async fn list_code_items_without_codelist_id_returns_all_codelists() {
     // return items from every codelist (not silently restrict to
     // a default).
     let svc = service();
-    let v = svc.create_version(create_version_req("v-all")).await.unwrap();
+    let v = svc
+        .create_version(create_version_req("v-all"))
+        .await
+        .unwrap();
     let cl1 = svc
         .create_code_list(create_code_list_req(v.id, "C1"))
         .await
@@ -1269,10 +1270,20 @@ async fn list_code_items_with_version_id_filters_to_that_version() {
     let svc = service();
     let v1 = svc.create_version(create_version_req("v1")).await.unwrap();
     let v2 = svc.create_version(create_version_req("v2")).await.unwrap();
-    let cl1 = svc.create_code_list(create_code_list_req(v1.id, "C1")).await.unwrap();
-    let cl2 = svc.create_code_list(create_code_list_req(v2.id, "C2")).await.unwrap();
-    svc.create_code_item(create_code_item_req(cl1.id, v1.id, "ALPHA")).await.unwrap();
-    svc.create_code_item(create_code_item_req(cl2.id, v2.id, "BETA")).await.unwrap();
+    let cl1 = svc
+        .create_code_list(create_code_list_req(v1.id, "C1"))
+        .await
+        .unwrap();
+    let cl2 = svc
+        .create_code_list(create_code_list_req(v2.id, "C2"))
+        .await
+        .unwrap();
+    svc.create_code_item(create_code_item_req(cl1.id, v1.id, "ALPHA"))
+        .await
+        .unwrap();
+    svc.create_code_item(create_code_item_req(cl2.id, v2.id, "BETA"))
+        .await
+        .unwrap();
 
     let page = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
@@ -1295,10 +1306,20 @@ async fn list_code_items_with_version_id_combined_with_codelist_id() {
     // the result must satisfy BOTH predicates.
     let svc = service();
     let v = svc.create_version(create_version_req("v")).await.unwrap();
-    let cl1 = svc.create_code_list(create_code_list_req(v.id, "C1")).await.unwrap();
-    let cl2 = svc.create_code_list(create_code_list_req(v.id, "C2")).await.unwrap();
-    svc.create_code_item(create_code_item_req(cl1.id, v.id, "IN_CL1")).await.unwrap();
-    svc.create_code_item(create_code_item_req(cl2.id, v.id, "IN_CL2")).await.unwrap();
+    let cl1 = svc
+        .create_code_list(create_code_list_req(v.id, "C1"))
+        .await
+        .unwrap();
+    let cl2 = svc
+        .create_code_list(create_code_list_req(v.id, "C2"))
+        .await
+        .unwrap();
+    svc.create_code_item(create_code_item_req(cl1.id, v.id, "IN_CL1"))
+        .await
+        .unwrap();
+    svc.create_code_item(create_code_item_req(cl2.id, v.id, "IN_CL2"))
+        .await
+        .unwrap();
 
     let page = svc
         .list_code_items(apis::terminology::CodeItemListQuery {
