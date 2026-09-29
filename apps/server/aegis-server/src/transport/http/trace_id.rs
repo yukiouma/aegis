@@ -38,6 +38,24 @@ pub(crate) fn is_valid_trace_id(s: &str) -> bool {
     !s.is_empty() && s.len() <= MAX_TRACE_ID_LEN && s.chars().all(|c| c.is_ascii_graphic())
 }
 
+/// Extract `X-Trace-ID` from the request headers, falling back to a
+/// freshly-minted server-side id when the header is missing,
+/// malformed UTF-8, empty, too long, or contains non-graphic bytes.
+pub(crate) fn extract_trace_id_from(headers: &HeaderMap, generator: &TraceIdGenerator) -> String {
+    let raw = headers.get(X_TRACE_ID_HEADER).and_then(|v| v.to_str().ok());
+    extract_trace_id(raw, generator)
+}
+
+/// Pure validation + fallback. `raw` is the already-decoded header
+/// value (`None` if absent or not valid UTF-8). Splitting the
+/// `HeaderMap` lookup out of this helper keeps it trivially
+/// unit-testable without building a `HeaderValue`.
+pub(crate) fn extract_trace_id(raw: Option<&str>, generator: &TraceIdGenerator) -> String {
+    raw.filter(|s| is_valid_trace_id(s))
+        .map(str::to_owned)
+        .unwrap_or_else(|| generator.server_side())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -79,5 +97,82 @@ mod tests {
         // Exactly 128 'x' characters — at the cap, must be accepted.
         let max = "x".repeat(MAX_TRACE_ID_LEN);
         assert!(is_valid_trace_id(&max));
+    }
+
+    #[test]
+    fn extract_trace_id_uses_header_when_present_and_valid() {
+        let raw = Some("C-desktop-01H9XQ8Z6VK3FJ4P5N2W7Y0T8CB");
+        let generator = TraceIdGenerator::new(None);
+        assert_eq!(
+            extract_trace_id(raw, &generator),
+            "C-desktop-01H9XQ8Z6VK3FJ4P5N2W7Y0T8CB"
+        );
+    }
+
+    #[test]
+    fn extract_trace_id_generates_when_header_missing() {
+        let generator = TraceIdGenerator::new(None);
+        let id = extract_trace_id(None, &generator);
+        assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
+    }
+
+    #[test]
+    fn extract_trace_id_generates_when_header_empty() {
+        let generator = TraceIdGenerator::new(None);
+        let id = extract_trace_id(Some(""), &generator);
+        assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
+    }
+
+    #[test]
+    fn extract_trace_id_generates_when_header_too_long() {
+        let huge = "x".repeat(MAX_TRACE_ID_LEN + 1);
+        let generator = TraceIdGenerator::new(None);
+        let id = extract_trace_id(Some(&huge), &generator);
+        assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
+    }
+
+    #[test]
+    fn extract_trace_id_generates_when_header_non_graphic() {
+        // `extract_trace_id` takes the already-decoded &str so we
+        // can drive the non-graphic path without building a
+        // `HeaderValue` (the `http` crate has no constructor that
+        // accepts control bytes).
+        let generator = TraceIdGenerator::new(None);
+        let id = extract_trace_id(Some("bad\nvalue"), &generator);
+        assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
+    }
+
+    #[test]
+    fn extract_trace_id_generates_distinct_ids_across_calls() {
+        // Sanity check that we are falling back to the generator and
+        // not returning a constant.
+        let generator = TraceIdGenerator::new(None);
+        let a = extract_trace_id(None, &generator);
+        let b = extract_trace_id(None, &generator);
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn extract_trace_id_from_uses_header_when_present_and_valid() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            X_TRACE_ID_HEADER,
+            "C-desktop-01H9XQ8Z6VK3FJ4P5N2W7Y0T8CB"
+                .parse()
+                .expect("valid HeaderValue"),
+        );
+        let generator = TraceIdGenerator::new(None);
+        assert_eq!(
+            extract_trace_id_from(&headers, &generator),
+            "C-desktop-01H9XQ8Z6VK3FJ4P5N2W7Y0T8CB"
+        );
+    }
+
+    #[test]
+    fn extract_trace_id_from_generates_when_header_absent() {
+        let headers = HeaderMap::new();
+        let generator = TraceIdGenerator::new(None);
+        let id = extract_trace_id_from(&headers, &generator);
+        assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
     }
 }

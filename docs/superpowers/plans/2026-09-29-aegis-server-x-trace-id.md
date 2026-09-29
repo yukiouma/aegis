@@ -227,103 +227,119 @@ git commit -m "feat(server): add trace_id module with is_valid_trace_id helper"
 **Interfaces:**
 - Consumes: `is_valid_trace_id` (defined in Task 2), `X_TRACE_ID_HEADER`, `MAX_TRACE_ID_LEN`.
 - Produces:
-  - `pub(crate) fn extract_trace_id(headers: &HeaderMap, generator: &TraceIdGenerator) -> String`
+  - `pub(crate) fn extract_trace_id(raw: Option<&str>, generator: &TraceIdGenerator) -> String`
+  - `pub(crate) fn extract_trace_id_from(headers: &HeaderMap, generator: &TraceIdGenerator) -> String` — thin lookup wrapper.
+
+The split exists because the `http` crate has no `HeaderValue` constructor that accepts control bytes — driving the "non-graphic" path through `HeaderMap` directly is impossible. Keeping the validation logic in `extract_trace_id(Option<&str>, &gen)` lets the test inject arbitrary `&str`s.
 
 - [ ] **Step 1: Add the failing tests**
 
-In `apps/server/aegis-server/src/transport/http/trace_id.rs`, append the following block to the `mod tests` block (after the `is_valid_trace_id_accepts_max_length` test). The test cases drive the new `extract_trace_id` helper against `HeaderMap`s.
+In `apps/server/aegis-server/src/transport/http/trace_id.rs`, append the following block to the `mod tests` block (after the `is_valid_trace_id_accepts_max_length` test). The test cases drive `extract_trace_id` against raw `Option<&str>` values, plus two header-level tests for the `extract_trace_id_from` wrapper.
 
 ```rust
-    fn headers_with(kv: &[(&'static str, &'static str)]) -> HeaderMap {
-        let mut h = HeaderMap::new();
-        for (k, v) in kv {
-            h.insert(*k, (*v).parse().expect("valid HeaderValue"));
-        }
-        h
-    }
-
     #[test]
     fn extract_trace_id_uses_header_when_present_and_valid() {
-        let headers = headers_with(&[("x-trace-id", "C-desktop-01H9XQ8Z6VK3FJ4P5N2W7Y0T8CB")]);
-        let gen = TraceIdGenerator::new(None);
+        let raw = Some("C-desktop-01H9XQ8Z6VK3FJ4P5N2W7Y0T8CB");
+        let generator = TraceIdGenerator::new(None);
         assert_eq!(
-            extract_trace_id(&headers, &gen),
+            extract_trace_id(raw, &generator),
             "C-desktop-01H9XQ8Z6VK3FJ4P5N2W7Y0T8CB"
         );
     }
 
     #[test]
     fn extract_trace_id_generates_when_header_missing() {
-        let headers = HeaderMap::new();
-        let gen = TraceIdGenerator::new(None);
-        let id = extract_trace_id(&headers, &gen);
+        let generator = TraceIdGenerator::new(None);
+        let id = extract_trace_id(None, &generator);
         assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
     }
 
     #[test]
     fn extract_trace_id_generates_when_header_empty() {
-        let headers = headers_with(&[("x-trace-id", "")]);
-        let gen = TraceIdGenerator::new(None);
-        let id = extract_trace_id(&headers, &gen);
+        let generator = TraceIdGenerator::new(None);
+        let id = extract_trace_id(Some(""), &generator);
         assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
     }
 
     #[test]
     fn extract_trace_id_generates_when_header_too_long() {
         let huge = "x".repeat(MAX_TRACE_ID_LEN + 1);
-        let headers = headers_with(&[("x-trace-id", &huge)]);
-        let gen = TraceIdGenerator::new(None);
-        let id = extract_trace_id(&headers, &gen);
+        let generator = TraceIdGenerator::new(None);
+        let id = extract_trace_id(Some(&huge), &generator);
         assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
     }
 
     #[test]
     fn extract_trace_id_generates_when_header_non_graphic() {
-        let headers = headers_with(&[("x-trace-id", "bad\nvalue")]);
-        let gen = TraceIdGenerator::new(None);
-        let id = extract_trace_id(&headers, &gen);
+        let generator = TraceIdGenerator::new(None);
+        let id = extract_trace_id(Some("bad\nvalue"), &generator);
         assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
     }
 
     #[test]
     fn extract_trace_id_generates_distinct_ids_across_calls() {
-        // Sanity check that we are falling back to the generator and
-        // not returning a constant.
-        let headers = HeaderMap::new();
-        let gen = TraceIdGenerator::new(None);
-        let a = extract_trace_id(&headers, &gen);
-        let b = extract_trace_id(&headers, &gen);
+        let generator = TraceIdGenerator::new(None);
+        let a = extract_trace_id(None, &generator);
+        let b = extract_trace_id(None, &generator);
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn extract_trace_id_from_uses_header_when_present_and_valid() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            X_TRACE_ID_HEADER,
+            "C-desktop-01H9XQ8Z6VK3FJ4P5N2W7Y0T8CB"
+                .parse()
+                .expect("valid HeaderValue"),
+        );
+        let generator = TraceIdGenerator::new(None);
+        assert_eq!(
+            extract_trace_id_from(&headers, &generator),
+            "C-desktop-01H9XQ8Z6VK3FJ4P5N2W7Y0T8CB"
+        );
+    }
+
+    #[test]
+    fn extract_trace_id_from_generates_when_header_absent() {
+        let headers = HeaderMap::new();
+        let generator = TraceIdGenerator::new(None);
+        let id = extract_trace_id_from(&headers, &generator);
+        assert!(id.starts_with("S-"), "expected server-side fallback, got {id:?}");
     }
 ```
 
 - [ ] **Step 2: Run the tests to confirm they fail**
 
 Run: `cargo test -p aegis-server --lib transport::http::trace_id::tests::extract_trace_id`
-Expected: FAIL — `extract_trace_id` is not defined; the compiler reports an unresolved import / undefined function error.
+Expected: FAIL — `extract_trace_id` and `extract_trace_id_from` are not defined; the compiler reports unresolved imports / undefined functions.
 
-- [ ] **Step 3: Implement `extract_trace_id`**
+- [ ] **Step 3: Implement `extract_trace_id` and `extract_trace_id_from`**
 
 In `apps/server/aegis-server/src/transport/http/trace_id.rs`, add this implementation just below `is_valid_trace_id`:
 
 ```rust
-/// Extract `X-Trace-ID` from the request headers, falling back to a
-/// freshly-minted server-side id when the header is missing,
-/// malformed UTF-8, empty, too long, or contains non-graphic bytes.
-pub(crate) fn extract_trace_id(headers: &HeaderMap, generator: &TraceIdGenerator) -> String {
-    headers
-        .get(X_TRACE_ID_HEADER)
-        .and_then(|v| v.to_str().ok())
-        .filter(|s| is_valid_trace_id(s))
+/// Pure validation + fallback. `raw` is the already-decoded header
+/// value (`None` if absent or not valid UTF-8).
+pub(crate) fn extract_trace_id(raw: Option<&str>, generator: &TraceIdGenerator) -> String {
+    raw.filter(|s| is_valid_trace_id(s))
         .map(str::to_owned)
         .unwrap_or_else(|| generator.server_side())
+}
+
+/// Extract `X-Trace-ID` from the request headers. Performs the
+/// `HeaderValue` -> `&str` decoding (which itself drops non-UTF-8
+/// values) and delegates to [`extract_trace_id`].
+pub(crate) fn extract_trace_id_from(headers: &HeaderMap, generator: &TraceIdGenerator) -> String {
+    let raw = headers.get(X_TRACE_ID_HEADER).and_then(|v| v.to_str().ok());
+    extract_trace_id(raw, generator)
 }
 ```
 
 - [ ] **Step 4: Run the tests to confirm they pass**
 
 Run: `cargo test -p aegis-server --lib transport::http::trace_id::tests`
-Expected: 12 PASS (6 `is_valid_trace_id` + 6 `extract_trace_id`).
+Expected: 14 PASS (6 `is_valid_trace_id` + 6 `extract_trace_id` + 2 `extract_trace_id_from`).
 
 - [ ] **Step 5: Commit**
 
