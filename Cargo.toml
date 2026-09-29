@@ -61,3 +61,13 @@ reqwest = { version = "0.13", default-features = false, features = ["json", "rus
 # without depending on the server's signing key. Centralized so the
 # desktop `Cargo.toml` stays a one-liner.
 base64 = "0.22"
+# `nanoid` mints the URL-safe device prefix persisted to
+# `<app_data_dir>/aegis-desktop-device-prefix`. The default 21-char
+# length + alphanumeric + `-_` alphabet gives ~10^36 ids, so collisions
+# across installs are vanishingly unlikely without coordination.
+nanoid = "0.5"
+# `tempfile` provides scoped temp dirs for tests that exercise the
+# filesystem (tracing_init writes a log file; trace_id_setup reads /
+# writes the device-prefix file). Used only as a dev-dep; production
+# builds don't link it.
+tempfile = "3"

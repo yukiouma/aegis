@@ -37,6 +37,28 @@ als-resolver = { git = "https://github.com/yukiouma/ypsilo.git", tag = "v0.1.0-a
 # to guarantee type compatibility with als-resolver.
 entities = { git = "https://github.com/yukiouma/ypsilo.git", tag = "v0.1.0-alpha.4", package = "entities" }
 tauri-plugin-dialog = "2"
+# `nanoid` mints the per-install device prefix that becomes the
+# middle segment of every trace id. Workspace-pinned so the same
+# version is used by any future crate that wants to mint ids.
+nanoid = { workspace = true }
+# `tracing` is the logging facade the desktop backend emits through.
+# Every command shim logs `enter` / `success` / `failed` events on a
+# span that carries `trace_id`; HttpClient emits request lines.
+tracing = { workspace = true }
+# `tracing-subscriber` initialises the global subscriber in
+# `tracing_init::init_tracing`. `env-filter` + `json` features let us
+# filter by level and emit machine-readable events.
+tracing-subscriber = { workspace = true }
+# `tracing-appender` provides the rolling file writer (one file per
+# day) used by `tracing_init`. The `non_blocking` wrapper keeps the
+# request path off the log-write critical section.
+tracing-appender = { workspace = true }
+# `trace-id` mints the per-trace-id strings. Used by
+# `trace_id_setup::load_or_create` at startup; commands pull the
+# constructed `TraceIdGenerator` from managed state and call
+# `client_side()` per invocation. Local path dep so any change to
+# the crate is picked up without a registry bump.
+trace-id = { path = "../../../../lib/crates/trace-id" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-utils = { path = "../../../../lib/crates/windows-utils" }
@@ -45,3 +67,7 @@ windows-utils = { path = "../../../../lib/crates/windows-utils" }
 [dev-dependencies]
 wiremock = "0.6"
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+# `tempfile::tempdir()` scopes a per-test temp directory so
+# `tracing_init` and `trace_id_setup` tests don't touch the repo
+# working tree.
+tempfile = { workspace = true }
