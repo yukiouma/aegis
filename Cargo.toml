@@ -6,6 +6,7 @@ members = [
     "lib/crates/auth", "lib/crates/crf", "lib/crates/domain-model", "lib/crates/mission",
     "lib/crates/project",
     "lib/crates/terminology",
+    "lib/crates/trace-id",
     "lib/crates/user",
     "lib/crates/windows-utils",
 ]
@@ -39,6 +40,10 @@ utoipa = { version = "5.5.0", features = ["axum_extras", "debug", "chrono"] }
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 utoipa-axum = { version = "0.2.0", features = ["debug"] }
 tower = "0.5.3"
+# `ulid` generates the time-sortable log ids that compose a trace
+# id. Pinned in the workspace so the `trace-id` crate and any
+# downstream consumer resolve the same version.
+ulid = "3.0"
 # `serde` provides Serialize / Deserialize for wire-level DTOs (HTTP
 # request / response bodies). Centralized here so every workspace
 # crate that needs serialization inherits the same version and feature
