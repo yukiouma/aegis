@@ -13,10 +13,6 @@ tower = { workspace = true }
 # tower-http's TraceLayer adds a tracing span around every request.
 # The `trace` feature is required for the layer constructor.
 tower-http = { workspace = true, features = ["trace"] }
-# `trace-id` is the workspace crate that mints `C-/S-…` ids. We
-# use `server_side()` as the fallback when the inbound request has
-# no `X-Trace-ID` (or sends one we can't trust).
-trace-id = { path = "../../../lib/crates/trace-id" }
 # `logging-utils` owns the unified tracing init (`LoggingConfig` +
 # `init_tracing`) and a `TraceIdGenerator` carry copy. Adopted by
 # the server to replace the local `init_tracing` in `run.rs` and
