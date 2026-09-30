@@ -13,10 +13,12 @@ tower = { workspace = true }
 # tower-http's TraceLayer adds a tracing span around every request.
 # The `trace` feature is required for the layer constructor.
 tower-http = { workspace = true, features = ["trace"] }
-# `trace-id` is the workspace crate that mints `C-/S-…` ids. We
-# use `server_side()` as the fallback when the inbound request has
-# no `X-Trace-ID` (or sends one we can't trust).
-trace-id = { path = "../../../lib/crates/trace-id" }
+# `logging-utils` owns the unified tracing init (`LoggingConfig` +
+# `init_tracing`) and a `TraceIdGenerator` carry copy. Adopted by
+# the server to replace the local `init_tracing` in `run.rs` and
+# to source `TraceIdGenerator` from a single crate. Local path
+# dep.
+logging-utils = { path = "../../../lib/crates/logging-utils" }
 # tokio with macros + rt-multi-thread for `#[tokio::main]` in main.rs
 # + the spawn / signal utilities used by axum::serve.
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "signal"] }
@@ -32,10 +34,9 @@ utoipa-swagger-ui = { workspace = true }
 # tracing + tracing-subscriber log every request via TraceLayer; the
 # subscriber is initialized in main.rs.
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-# tracing-appender provides rolling file appenders (used by
-# run::init_tracing to write daily JSON logs into $AEGIS_LOG_DIR).
-tracing-appender = { workspace = true }
+# tracing-subscriber and tracing-appender are no longer used by
+# the server directly — logging-utils owns the rolling file
+# writer and the global subscriber via `init_tracing`.
 # sqlx provides the PgPool used by the AuthUsecase / UserUsecase
 # wiring. The runtime-tokio + postgres features come from the
 # workspace dep.

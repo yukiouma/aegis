@@ -17,6 +17,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "entities",
+ "logging-utils",
  "nanoid",
  "reqwest",
  "serde",
@@ -30,9 +31,7 @@ dependencies = [
  "terminology 0.1.0 (git+https://github.com/yukiouma/ypsilo.git?tag=v0.1.0-alpha.4)",
  "thiserror 2.0.19",
  "tokio",
- "trace-id",
  "tracing",
- "tracing-appender",
  "tracing-subscriber",
  "windows-utils",
  "wiremock",
@@ -51,6 +50,7 @@ dependencies = [
  "crf",
  "domain-model",
  "dotenvy",
+ "logging-utils",
  "mission",
  "project",
  "rand_core 0.6.4",
@@ -62,9 +62,7 @@ dependencies = [
  "tokio",
  "tower",
  "tower-http 0.7.0",
- "trace-id",
  "tracing",
- "tracing-appender",
  "tracing-subscriber",
  "user",
  "utoipa",
@@ -2786,6 +2784,18 @@ name = "log"
 version = "0.4.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
+
+[[package]]
+name = "logging-utils"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
+ "thiserror 2.0.19",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "ulid",
+]
 
 [[package]]
 name = "lru-slab"
@@ -5797,13 +5807,6 @@ name = "tower-service"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
-
-[[package]]
-name = "trace-id"
-version = "0.1.0"
-dependencies = [
- "ulid",
-]
 
 [[package]]
 name = "tracing"

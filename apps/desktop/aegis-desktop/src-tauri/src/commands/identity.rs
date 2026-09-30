@@ -1,5 +1,5 @@
+use logging_utils::TraceIdGenerator;
 use tauri::State;
-use trace_id::TraceIdGenerator;
 use tracing::Instrument;
 
 use crate::http::dto::ApiError;

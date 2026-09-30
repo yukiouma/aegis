@@ -4,8 +4,8 @@
 //! per-resource HTTP wrappers to create the version, its code lists,
 //! and the items of each code list.
 
+use logging_utils::TraceIdGenerator;
 use tauri::State;
-use trace_id::TraceIdGenerator;
 use tracing::Instrument;
 
 use crate::http::client::{HttpClient, TRACE_ID};

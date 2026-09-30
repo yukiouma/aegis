@@ -45,20 +45,18 @@ nanoid = { workspace = true }
 # Every command shim logs `enter` / `success` / `failed` events on a
 # span that carries `trace_id`; HttpClient emits request lines.
 tracing = { workspace = true }
-# `tracing-subscriber` initialises the global subscriber in
-# `tracing_init::init_tracing`. `env-filter` + `json` features let us
-# filter by level and emit machine-readable events.
+# `tracing-subscriber` is used by the webview-log forwarder
+# (`commands/webview_log.rs`) to register a custom Layer that
+# captures console.warn / console.error from the embedded
+# webviews. The global subscriber itself is installed by
+# `logging_utils::init_tracing` at boot.
 tracing-subscriber = { workspace = true }
-# `tracing-appender` provides the rolling file writer (one file per
-# day) used by `tracing_init`. The `non_blocking` wrapper keeps the
-# request path off the log-write critical section.
-tracing-appender = { workspace = true }
-# `trace-id` mints the per-trace-id strings. Used by
-# `trace_id_setup::load_or_create` at startup; commands pull the
-# constructed `TraceIdGenerator` from managed state and call
-# `client_side()` per invocation. Local path dep so any change to
-# the crate is picked up without a registry bump.
-trace-id = { path = "../../../../lib/crates/trace-id" }
+# `logging-utils` owns the unified tracing init (`LoggingConfig` +
+# `init_tracing`) and a `TraceIdGenerator` carry copy. Adopted by
+# the desktop to replace the local `tracing_init::init_tracing`
+# copy and to source `TraceIdGenerator` from a single crate.
+# Local path dep.
+logging-utils = { path = "../../../../lib/crates/logging-utils" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-utils = { path = "../../../../lib/crates/windows-utils" }

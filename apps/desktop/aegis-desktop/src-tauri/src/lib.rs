@@ -9,7 +9,6 @@ mod commands;
 mod http;
 mod system;
 mod trace_id_setup;
-mod tracing_init;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -137,8 +136,11 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                         .expect("app_data_dir resolves")
                         .join("logs")
                 });
-            let log_guard =
-                tracing_init::init_tracing(&log_dir).map_err(|e| format!("init_tracing: {e}"))?;
+            let log_guard = logging_utils::init_tracing(&logging_utils::LoggingConfig {
+                log_dir: log_dir.clone(),
+                file_name_prefix: "aegis-desktop.log".into(),
+            })
+            .map_err(|e| format!("init_tracing: {e}"))?;
             tracing::info!(
                 log_dir = %log_dir.display(),
                 "aegis-desktop tracing initialised"

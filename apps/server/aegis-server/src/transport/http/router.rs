@@ -24,7 +24,7 @@ use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_swagger_ui::SwaggerUi;
 
-use trace_id::TraceIdGenerator;
+use logging_utils::TraceIdGenerator;
 
 use crate::state::AppState;
 use crate::transport::http::auth;

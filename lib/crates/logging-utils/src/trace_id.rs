@@ -1,8 +1,6 @@
-//! `trace-id` workspace crate.
-//!
-//! Generates trace ids that identify a single unit of work as it
-//! crosses a client ↔ server boundary. A trace id is composed of
-//! three optional segments joined by `-`:
+//! Trace ids that identify a single unit of work as it crosses a
+//! client ↔ server boundary. A trace id is composed of three optional
+//! segments joined by `-`:
 //!
 //! 1. **Side identifier** — `C` for client, `S` for server.
 //! 2. **Device prefix** — caller-supplied free-form label
@@ -15,6 +13,14 @@
 //! C-01H9XQ8Z6VK3FJ4P5N2W7Y0T8CB
 //! S-desktop-01H9XQ9A2DF4GJ7M5P1R3V6X9BC
 //! ```
+//!
+//! This module is an independent copy of the same logic that lives
+//! in `lib/crates/trace-id`. The two crates do NOT depend on each
+//! other — `logging-utils` keeps its own copy so the logging
+//! utilities are self-contained, and `trace-id` continues to exist as
+//! a standalone workspace crate for `aegis-server` and
+//! `aegis-desktop` to depend on directly. A future PR may
+//! consolidate them.
 
 use ulid::Ulid;
 

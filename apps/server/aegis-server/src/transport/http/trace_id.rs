@@ -13,8 +13,8 @@
 
 use axum::body::Body;
 use axum::http::{HeaderMap, Request};
+use logging_utils::TraceIdGenerator;
 use tower_http::trace::MakeSpan;
-use trace_id::TraceIdGenerator;
 use tracing::{Span, info_span};
 
 /// Header name. `HeaderMap` matches case-insensitively; the
