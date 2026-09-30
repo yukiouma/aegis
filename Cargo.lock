@@ -2788,6 +2788,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
+name = "logging-utils"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
+ "thiserror 2.0.19",
+ "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
+ "ulid",
+]
+
+[[package]]
 name = "lru-slab"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5802,7 +5814,7 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 name = "trace-id"
 version = "0.1.0"
 dependencies = [
- "ulid",
+ "logging-utils",
 ]
 
 [[package]]
