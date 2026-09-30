@@ -45,14 +45,16 @@ nanoid = { workspace = true }
 # Every command shim logs `enter` / `success` / `failed` events on a
 # span that carries `trace_id`; HttpClient emits request lines.
 tracing = { workspace = true }
-# `tracing-subscriber` initialises the global subscriber in
-# `tracing_init::init_tracing`. `env-filter` + `json` features let us
-# filter by level and emit machine-readable events.
+# `tracing-subscriber` is used by the webview-log forwarder
+# (`commands/webview_log.rs`) to register a custom Layer that
+# captures console.warn / console.error from the embedded
+# webviews. The global subscriber itself is installed by
+# `logging_utils::init_tracing` at boot.
 tracing-subscriber = { workspace = true }
-# `tracing-appender` provides the rolling file writer (one file per
-# day) used by `tracing_init`. The `non_blocking` wrapper keeps the
-# request path off the log-write critical section.
-tracing-appender = { workspace = true }
+# `tracing-appender` is no longer used by the desktop directly —
+# `logging-utils` owns the rolling file writer via its
+# `init_tracing`. The desktop gets the writer indirectly through
+# the `LogGuard` returned by `init_tracing`.
 # `trace-id` mints the per-trace-id strings. Used by
 # `trace_id_setup::load_or_create` at startup; commands pull the
 # constructed `TraceIdGenerator` from managed state and call
