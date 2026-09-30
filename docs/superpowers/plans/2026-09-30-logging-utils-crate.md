@@ -71,7 +71,8 @@ tracing-subscriber = { workspace = true }
 tracing-appender   = { workspace = true }
 thiserror          = { workspace = true }
 # `ulid` generates the time-sortable log ids that compose a trace id
-# (moved from the `trace-id` crate, now a backwards-compat shim).
+# (mirrored from the `trace-id` crate — the two crates carry the
+# same logic independently, not via a dep).
 ulid               = { workspace = true }
 
 [dev-dependencies]
@@ -121,33 +122,24 @@ has no modules yet — those land in follow-up tasks."
 
 ---
 
-### Task 2: Absorb `trace-id` source into `logging-utils` and convert `trace-id` to a shim
+### Task 2: Carry an independent copy of `trace-id` logic into `logging-utils`
 
-> **Status: REVERTED.** This task was executed (commit `57e252f`) and then reverted (commit `4158bbe`) on user request. The `trace-id` crate stays untouched and independent for this PR. The current `logging-utils` crate has no `trace_id` module and no `ulid` dep; see Tasks 3 and 4 for the final implementation.
-
-The original Task 2 content is preserved below for reference.
-
----
-
-(Original Task 2 content follows — DO NOT execute; kept for context only.)
+> **Iteration note.** This task replaces an earlier design that absorbed `trace-id`'s source into `logging-utils` and rewrote `trace-id` as a backwards-compat shim. That design was started, committed, then reverted. The current task takes a different approach: `logging-utils` carries its own independent copy of the same logic; `lib/crates/trace-id` stays untouched. The two crates do NOT depend on each other.
 
 **Files:**
-- Create: `lib/crates/logging-utils/src/trace_id.rs` — full moved content from `lib/crates/trace-id/src/lib.rs`
+- Create: `lib/crates/logging-utils/src/trace_id.rs` — independent copy of `lib/crates/trace-id/src/lib.rs` (with the six-test suite)
+- Modify: `lib/crates/logging-utils/Cargo.toml` — add `ulid = { workspace = true }` dep (with a comment explaining why the duplicate)
 - Modify: `lib/crates/logging-utils/src/lib.rs` — declare `pub mod trace_id;` + `pub use trace_id::{Side, TraceIdGenerator};`
-- Modify: `lib/crates/trace-id/src/lib.rs` — replace contents with `pub use logging_utils::{Side, TraceIdGenerator};`
-- Modify: `lib/crates/trace-id/Cargo.toml` — drop `ulid`, add `logging-utils = { path = "../logging-utils" }`
+- **No changes to `lib/crates/trace-id/`** — it stays exactly as it is today
 
 **Interfaces:**
-- Consumes: `lib/crates/trace-id/src/lib.rs` (read for source content to move)
-- Produces: `logging_utils::{Side, TraceIdGenerator}` (canonical home); `trace_id::{Side, TraceIdGenerator}` (still resolvable via the shim)
+- Produces:
+  - `logging_utils::{Side, TraceIdGenerator}` — independent copy, not coupled to `trace-id`
+  - `trace_id::{Side, TraceIdGenerator}` — unchanged; still relied on directly by `aegis-server` and `aegis-desktop`
 
-- [ ] **Step 1: Read the current `lib/crates/trace-id/src/lib.rs` source**
+- [ ] **Step 1: Create `lib/crates/logging-utils/src/trace_id.rs`**
 
-Read `lib/crates/trace-id/src/lib.rs`. Copy the `Side` enum, `TraceIdGenerator` struct + impl block, and the `#[cfg(test)] mod tests` block (with all six tests: `client_side_starts_with_c`, `server_side_starts_with_s`, `no_device_prefix_omits_middle_segment`, `device_prefix_appears_in_middle`, `each_call_yields_a_fresh_ulid`, `side_enum_variants_are_distinct`) verbatim into the new file in Task 2 Step 2.
-
-- [ ] **Step 2: Create `lib/crates/logging-utils/src/trace_id.rs`**
-
-This file is a verbatim copy of `lib/crates/trace-id/src/lib.rs` (after the move). Update the top-level module doc-comment to mention it has been moved:
+The file's top-level doc-comment must make the duplication explicit:
 
 ```rust
 //! Trace ids that identify a single unit of work as it crosses a
@@ -166,9 +158,13 @@ This file is a verbatim copy of `lib/crates/trace-id/src/lib.rs` (after the move
 //! S-desktop-01H9XQ9A2DF4GJ7M5P1R3V6X9BC
 //! ```
 //!
-//! Moved verbatim from `lib/crates/trace-id/src/lib.rs`; the
-//! `trace-id` crate now re-exports these types as a backwards-compat
-//! shim so existing consumers keep compiling.
+//! This module is an independent copy of the same logic that lives
+//! in `lib/crates/trace-id`. The two crates do NOT depend on each
+//! other — `logging-utils` keeps its own copy so the logging
+//! utilities are self-contained, and `trace-id` continues to exist as
+//! a standalone workspace crate for `aegis-server` and
+//! `aegis-desktop` to depend on directly. A future PR may
+//! consolidate them.
 
 use ulid::Ulid;
 
@@ -290,90 +286,85 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: Update `lib/crates/logging-utils/src/lib.rs` to expose `trace_id`**
+- [ ] **Step 2: Add `ulid` dep to `lib/crates/logging-utils/Cargo.toml`**
 
-Replace the placeholder `lib/crates/logging-utils/src/lib.rs` with:
+Add the `ulid` workspace dep (with a comment explaining the duplicate) to `[dependencies]`:
+
+```toml
+[dependencies]
+tracing            = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender   = { workspace = true }
+thiserror          = { workspace = true }
+# `ulid` generates the time-sortable log ids that compose a trace id
+# (mirrored from the `trace-id` crate — the two crates carry the
+# same logic independently, not via a dep).
+ulid               = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+```
+
+- [ ] **Step 3: Update `lib/crates/logging-utils/src/lib.rs`**
+
+Add `pub mod trace_id;` and re-export `Side` + `TraceIdGenerator`. The full file becomes:
 
 ```rust
 //! `logging-utils` workspace crate.
 //!
 //! Unifies the `tracing` bootstrap used by `aegis-server` and
-//! `aegis-desktop`, and owns the `TraceIdGenerator` / `Side` types
-//! moved from `lib/crates/trace-id`.
+//! `aegis-desktop`, and carries an independent copy of the
+//! `TraceIdGenerator` / `Side` types (mirrored from
+//! `lib/crates/trace-id`). The two crates do not depend on each
+//! other — both carry the same logic on their own.
+//!
+//! ```ignore
+//! use logging_utils::{LoggingConfig, init_tracing};
+//!
+//! let _guard = init_tracing(&LoggingConfig {
+//!     log_dir: "./logs".into(),
+//!     file_name_prefix: "aegis-server.log".into(),
+//! })?;
+//! # Ok::<(), logging_utils::LoggingInitError>(())
+//! ```
 
 pub mod trace_id;
 pub mod tracing_init;
 
 pub use trace_id::{Side, TraceIdGenerator};
+pub use tracing_init::{LogGuard, LoggingConfig, LoggingInitError, build_filter, init_tracing};
 ```
 
-(`tracing_init` is declared but not yet defined — that's fine, the empty `pub mod tracing_init;` will fail to compile until Task 3 creates the file. If Task 3 is in the same commit / before the verification step, leave the line out for now and add it in Task 3.)
+(If `tracing_init` doesn't exist yet — it lands in Task 3 — leave just `pub mod trace_id;` and the trace_id re-export at this step, then add the rest in Task 3.)
 
-- [ ] **Step 4: Replace `lib/crates/trace-id/src/lib.rs` with the shim**
-
-Overwrite `lib/crates/trace-id/src/lib.rs` with:
-
-```rust
-//! `trace-id` workspace crate — backwards-compat shim.
-//!
-//! The `TraceIdGenerator` and `Side` types now live in
-//! `logging-utils` (their canonical home). This crate re-exports
-//! them so existing consumers (`aegis-server`, `aegis-desktop`) keep
-//! compiling untouched. Delete this crate once those consumers
-//! migrate to `use logging_utils::…` directly.
-
-pub use logging_utils::{Side, TraceIdGenerator};
-```
-
-- [ ] **Step 5: Update `lib/crates/trace-id/Cargo.toml`**
-
-Replace the existing `lib/crates/trace-id/Cargo.toml`:
-
-```toml
-[package]
-name = "trace-id"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-# `logging-utils` is the canonical home for `TraceIdGenerator` /
-# `Side`. This crate is a backwards-compat shim that re-exports
-# them so existing consumers keep compiling.
-logging-utils = { path = "../logging-utils" }
-```
-
-(If there were any other entries — there shouldn't be — keep only what's shown.)
-
-- [ ] **Step 6: Verify both crates build and test cleanly**
+- [ ] **Step 4: Verify both crates build and test independently**
 
 Run from workspace root:
+
 ```bash
 cargo check --workspace
 cargo test  -p logging-utils
 cargo test  -p trace-id
 ```
 
-Expected: PASS for all three. `logging-utils` has its six trace_id tests passing. `trace-id` shim compiles and re-exports resolve. The rest of the workspace (`aegis-server`, `aegis-desktop`, etc.) still compiles because nothing has changed for them.
+Expected: PASS for all three. `logging-utils` has its six `trace_id` tests passing. `lib/crates/trace-id` still has its own six tests passing — untouched. The two crates compile independently (no `logging-utils ↔ trace-id` edge in the dep graph).
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add lib/crates/logging-utils/src/trace_id.rs \
-        lib/crates/logging-utils/src/lib.rs \
-        lib/crates/trace-id/src/lib.rs \
-        lib/crates/trace-id/Cargo.toml
-git commit -m "feat(logging-utils): absorb trace-id source, shim trace-id crate
+        lib/crates/logging-utils/Cargo.toml \
+        lib/crates/logging-utils/src/lib.rs
+git commit -m "feat(logging-utils): carry independent copy of trace-id logic
 
-Moves the TraceIdGenerator and Side source (and its six-test suite)
-from lib/crates/trace-id/src/lib.rs into
-lib/crates/logging-utils/src/trace_id.rs. logging-utils now owns
-the canonical types.
+logging-utils now owns its own copy of the TraceIdGenerator and
+Side types (with the full six-test suite) so the logging crate
+is self-contained. The lib/crates/trace-id crate stays
+untouched and independent — it does NOT depend on
+logging-utils, and logging-utils does NOT depend on it. Both
+crates carry the same logic on their own.
 
-lib/crates/trace-id is rewritten as a one-line re-export shim so
-aegis-server and aegis-desktop keep compiling untouched — their
-path-deps and use statements do not change. The shim is deleted in
-a follow-up PR once both apps migrate to use logging_utils::*
-directly."
+Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
 
 **Files:**
