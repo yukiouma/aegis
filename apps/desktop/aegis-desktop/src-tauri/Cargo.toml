@@ -51,16 +51,6 @@ tracing = { workspace = true }
 # webviews. The global subscriber itself is installed by
 # `logging_utils::init_tracing` at boot.
 tracing-subscriber = { workspace = true }
-# `tracing-appender` is no longer used by the desktop directly —
-# `logging-utils` owns the rolling file writer via its
-# `init_tracing`. The desktop gets the writer indirectly through
-# the `LogGuard` returned by `init_tracing`.
-# `trace-id` mints the per-trace-id strings. Used by
-# `trace_id_setup::load_or_create` at startup; commands pull the
-# constructed `TraceIdGenerator` from managed state and call
-# `client_side()` per invocation. Local path dep so any change to
-# the crate is picked up without a registry bump.
-trace-id = { path = "../../../../lib/crates/trace-id" }
 # `logging-utils` owns the unified tracing init (`LoggingConfig` +
 # `init_tracing`) and a `TraceIdGenerator` carry copy. Adopted by
 # the desktop to replace the local `tracing_init::init_tracing`

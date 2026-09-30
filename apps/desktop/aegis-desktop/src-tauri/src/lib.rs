@@ -136,12 +136,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                         .expect("app_data_dir resolves")
                         .join("logs")
                 });
-            let log_guard = logging_utils::init_tracing(
-                &logging_utils::LoggingConfig {
-                    log_dir: log_dir.clone(),
-                    file_name_prefix: "aegis-desktop.log".into(),
-                },
-            )
+            let log_guard = logging_utils::init_tracing(&logging_utils::LoggingConfig {
+                log_dir: log_dir.clone(),
+                file_name_prefix: "aegis-desktop.log".into(),
+            })
             .map_err(|e| format!("init_tracing: {e}"))?;
             tracing::info!(
                 log_dir = %log_dir.display(),

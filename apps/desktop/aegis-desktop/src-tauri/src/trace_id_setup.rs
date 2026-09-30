@@ -10,7 +10,7 @@
 
 use std::path::Path;
 
-use trace_id::TraceIdGenerator;
+use logging_utils::TraceIdGenerator;
 
 pub const DEVICE_PREFIX_FILE_NAME: &str = "aegis-desktop-device-prefix";
 

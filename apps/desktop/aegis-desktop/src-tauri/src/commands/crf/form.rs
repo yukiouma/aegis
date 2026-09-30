@@ -1,7 +1,7 @@
 //! Tauri command shims for `http::crf::form`.
 
+use logging_utils::TraceIdGenerator;
 use tauri::State;
-use trace_id::TraceIdGenerator;
 use tracing::Instrument;
 
 use crate::http::client::{HttpClient, TRACE_ID};
