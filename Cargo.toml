@@ -8,7 +8,6 @@ members = [
     "lib/crates/mission",
     "lib/crates/project",
     "lib/crates/terminology",
-    "lib/crates/trace-id",
     "lib/crates/user",
     "lib/crates/windows-utils",
 ]
