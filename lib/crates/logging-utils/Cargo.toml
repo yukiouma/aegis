@@ -8,6 +8,10 @@ tracing            = { workspace = true }
 tracing-subscriber = { workspace = true }
 tracing-appender   = { workspace = true }
 thiserror          = { workspace = true }
+# `ulid` generates the time-sortable log ids that compose a trace id
+# (mirrored from the `trace-id` crate — the two crates carry the
+# same logic independently, not via a dep).
+ulid               = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
