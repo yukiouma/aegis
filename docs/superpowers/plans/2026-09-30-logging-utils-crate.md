@@ -2,11 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add the `lib/crates/logging-utils` workspace crate that unifies the tracing bootstrap currently duplicated in `aegis-server` and `aegis-desktop`, and absorbs the `TraceIdGenerator` / `Side` source from `lib/crates/trace-id`.
+**Goal:** Add the `lib/crates/logging-utils` workspace crate that unifies the tracing bootstrap currently duplicated in `aegis-server` and `aegis-desktop`.
 
-**Architecture:** New workspace crate with two modules (`tracing_init`, `trace_id`). `tracing_init` exposes `LoggingConfig { log_dir, file_name_prefix }` + `init_tracing(&LoggingConfig) -> Result<LogGuard, LoggingInitError>` that both apps can call once they migrate. `trace_id` owns the moved `Side` enum and `TraceIdGenerator` struct verbatim. The `trace-id` crate becomes a one-line backwards-compat shim so `aegis-server` / `aegis-desktop` keep compiling untouched.
+> **Note on iteration:** An earlier draft of this plan included a Task 2 to absorb `lib/crates/trace-id`'s source into `logging-utils`. That work was started, committed, then reverted on user request ("let it be independence for this time"). The plan below reflects the narrower scope — `trace-id` stays untouched.
 
-**Tech Stack:** Rust 2024 edition, resolver 3, `tracing` + `tracing-subscriber` + `tracing-appender` + `thiserror` + `ulid` (all workspace deps), `tempfile` (dev dep).
+**Architecture:** New workspace crate with a single `tracing_init` module exposing `LoggingConfig { log_dir, file_name_prefix }` + `init_tracing(&LoggingConfig) -> Result<LogGuard, LoggingInitError>` that both apps can call once they migrate.
+
+**Tech Stack:** Rust 2024 edition, resolver 3, `tracing` + `tracing-subscriber` + `tracing-appender` + `thiserror` (all workspace deps), `tempfile` (dev dep). No `ulid` / `trace-id` dependency in this PR.
 
 ## Global Constraints
 
@@ -15,7 +17,7 @@
 - One-line `why` comment on each non-obvious workspace dep
 - No DDD layered structure (this crate is not a business lib; `lib-crate-development.md` does not apply)
 - Workspace member names use kebab-case (`logging-utils`)
-- No edits to `aegis-server` / `aegis-desktop` / any other consumer crate in this PR
+- No edits to `aegis-server` / `aegis-desktop` / `trace-id` / any other workspace member in this PR
 - Crate-level doc-comment in `src/lib.rs` shows the canonical `use` line
 - README at the crate root with: one-line purpose, file tree, `LoggingConfig` snippet, verification command
 
@@ -120,6 +122,259 @@ has no modules yet — those land in follow-up tasks."
 ---
 
 ### Task 2: Absorb `trace-id` source into `logging-utils` and convert `trace-id` to a shim
+
+> **Status: REVERTED.** This task was executed (commit `57e252f`) and then reverted (commit `4158bbe`) on user request. The `trace-id` crate stays untouched and independent for this PR. The current `logging-utils` crate has no `trace_id` module and no `ulid` dep; see Tasks 3 and 4 for the final implementation.
+
+The original Task 2 content is preserved below for reference.
+
+---
+
+(Original Task 2 content follows — DO NOT execute; kept for context only.)
+
+**Files:**
+- Create: `lib/crates/logging-utils/src/trace_id.rs` — full moved content from `lib/crates/trace-id/src/lib.rs`
+- Modify: `lib/crates/logging-utils/src/lib.rs` — declare `pub mod trace_id;` + `pub use trace_id::{Side, TraceIdGenerator};`
+- Modify: `lib/crates/trace-id/src/lib.rs` — replace contents with `pub use logging_utils::{Side, TraceIdGenerator};`
+- Modify: `lib/crates/trace-id/Cargo.toml` — drop `ulid`, add `logging-utils = { path = "../logging-utils" }`
+
+**Interfaces:**
+- Consumes: `lib/crates/trace-id/src/lib.rs` (read for source content to move)
+- Produces: `logging_utils::{Side, TraceIdGenerator}` (canonical home); `trace_id::{Side, TraceIdGenerator}` (still resolvable via the shim)
+
+- [ ] **Step 1: Read the current `lib/crates/trace-id/src/lib.rs` source**
+
+Read `lib/crates/trace-id/src/lib.rs`. Copy the `Side` enum, `TraceIdGenerator` struct + impl block, and the `#[cfg(test)] mod tests` block (with all six tests: `client_side_starts_with_c`, `server_side_starts_with_s`, `no_device_prefix_omits_middle_segment`, `device_prefix_appears_in_middle`, `each_call_yields_a_fresh_ulid`, `side_enum_variants_are_distinct`) verbatim into the new file in Task 2 Step 2.
+
+- [ ] **Step 2: Create `lib/crates/logging-utils/src/trace_id.rs`**
+
+This file is a verbatim copy of `lib/crates/trace-id/src/lib.rs` (after the move). Update the top-level module doc-comment to mention it has been moved:
+
+```rust
+//! Trace ids that identify a single unit of work as it crosses a
+//! client ↔ server boundary. A trace id is composed of three optional
+//! segments joined by `-`:
+//!
+//! 1. **Side identifier** — `C` for client, `S` for server.
+//! 2. **Device prefix** — caller-supplied free-form label
+//!    (e.g. `"desktop"`). Omitted entirely when not provided.
+//! 3. **Log id** — a time-sortable ULID.
+//!
+//! Examples:
+//!
+//! ```text
+//! C-01H9XQ8Z6VK3FJ4P5N2W7Y0T8CB
+//! S-desktop-01H9XQ9A2DF4GJ7M5P1R3V6X9BC
+//! ```
+//!
+//! Moved verbatim from `lib/crates/trace-id/src/lib.rs`; the
+//! `trace-id` crate now re-exports these types as a backwards-compat
+//! shim so existing consumers keep compiling.
+
+use ulid::Ulid;
+
+/// Which side of the wire a trace id was minted on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Side {
+    /// Mints ids prefixed with `C`.
+    Client,
+    /// Mints ids prefixed with `S`.
+    Server,
+}
+
+/// Mints trace ids composed of a side identifier, optional device
+/// prefix, and a fresh ULID on every call.
+///
+/// Construct once per process (or per request-handling task) and
+/// reuse — the generator itself is stateless; only `device_prefix`
+/// is captured at construction time.
+#[derive(Debug, Clone)]
+pub struct TraceIdGenerator {
+    device_prefix: Option<String>,
+}
+
+impl TraceIdGenerator {
+    /// Build a generator. `device_prefix` is embedded between the
+    /// side identifier and the ULID; pass `None` to omit it.
+    pub fn new(device_prefix: Option<String>) -> Self {
+        Self { device_prefix }
+    }
+
+    /// Mint a client-side trace id (`C-…`).
+    pub fn client_side(&self) -> String {
+        self.build(Side::Client)
+    }
+
+    /// Mint a server-side trace id (`S-…`).
+    pub fn server_side(&self) -> String {
+        self.build(Side::Server)
+    }
+
+    fn build(&self, side: Side) -> String {
+        let prefix = match side {
+            Side::Client => "C",
+            Side::Server => "S",
+        };
+        let ulid = Ulid::generate().to_string();
+        match &self.device_prefix {
+            Some(device) => format!("{prefix}-{device}-{ulid}"),
+            None => format!("{prefix}-{ulid}"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn client_side_starts_with_c() {
+        let generator = TraceIdGenerator::new(None);
+        let id = generator.client_side();
+        assert!(
+            id.starts_with('C'),
+            "expected to start with 'C', got {id:?}"
+        );
+        assert_eq!(
+            id.chars().nth(1),
+            Some('-'),
+            "expected '-' after 'C', got {id:?}"
+        );
+    }
+
+    #[test]
+    fn server_side_starts_with_s() {
+        let generator = TraceIdGenerator::new(None);
+        let id = generator.server_side();
+        assert!(
+            id.starts_with('S'),
+            "expected to start with 'S', got {id:?}"
+        );
+        assert_eq!(
+            id.chars().nth(1),
+            Some('-'),
+            "expected '-' after 'S', got {id:?}"
+        );
+    }
+
+    #[test]
+    fn no_device_prefix_omits_middle_segment() {
+        let generator = TraceIdGenerator::new(None);
+        let id = generator.client_side();
+        let parts: Vec<&str> = id.split('-').collect();
+        assert_eq!(parts.len(), 2, "expected 2 segments, got {id:?}");
+        assert_eq!(parts[0], "C");
+    }
+
+    #[test]
+    fn device_prefix_appears_in_middle() {
+        let generator = TraceIdGenerator::new(Some("desktop".to_string()));
+        let id = generator.server_side();
+        let parts: Vec<&str> = id.split('-').collect();
+        assert_eq!(parts.len(), 3, "expected 3 segments, got {id:?}");
+        assert_eq!(parts[0], "S");
+        assert_eq!(parts[1], "desktop");
+    }
+
+    #[test]
+    fn each_call_yields_a_fresh_ulid() {
+        let generator = TraceIdGenerator::new(None);
+        let a = generator.client_side();
+        let b = generator.client_side();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn side_enum_variants_are_distinct() {
+        assert_ne!(Side::Client, Side::Server);
+    }
+}
+```
+
+- [ ] **Step 3: Update `lib/crates/logging-utils/src/lib.rs` to expose `trace_id`**
+
+Replace the placeholder `lib/crates/logging-utils/src/lib.rs` with:
+
+```rust
+//! `logging-utils` workspace crate.
+//!
+//! Unifies the `tracing` bootstrap used by `aegis-server` and
+//! `aegis-desktop`, and owns the `TraceIdGenerator` / `Side` types
+//! moved from `lib/crates/trace-id`.
+
+pub mod trace_id;
+pub mod tracing_init;
+
+pub use trace_id::{Side, TraceIdGenerator};
+```
+
+(`tracing_init` is declared but not yet defined — that's fine, the empty `pub mod tracing_init;` will fail to compile until Task 3 creates the file. If Task 3 is in the same commit / before the verification step, leave the line out for now and add it in Task 3.)
+
+- [ ] **Step 4: Replace `lib/crates/trace-id/src/lib.rs` with the shim**
+
+Overwrite `lib/crates/trace-id/src/lib.rs` with:
+
+```rust
+//! `trace-id` workspace crate — backwards-compat shim.
+//!
+//! The `TraceIdGenerator` and `Side` types now live in
+//! `logging-utils` (their canonical home). This crate re-exports
+//! them so existing consumers (`aegis-server`, `aegis-desktop`) keep
+//! compiling untouched. Delete this crate once those consumers
+//! migrate to `use logging_utils::…` directly.
+
+pub use logging_utils::{Side, TraceIdGenerator};
+```
+
+- [ ] **Step 5: Update `lib/crates/trace-id/Cargo.toml`**
+
+Replace the existing `lib/crates/trace-id/Cargo.toml`:
+
+```toml
+[package]
+name = "trace-id"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# `logging-utils` is the canonical home for `TraceIdGenerator` /
+# `Side`. This crate is a backwards-compat shim that re-exports
+# them so existing consumers keep compiling.
+logging-utils = { path = "../logging-utils" }
+```
+
+(If there were any other entries — there shouldn't be — keep only what's shown.)
+
+- [ ] **Step 6: Verify both crates build and test cleanly**
+
+Run from workspace root:
+```bash
+cargo check --workspace
+cargo test  -p logging-utils
+cargo test  -p trace-id
+```
+
+Expected: PASS for all three. `logging-utils` has its six trace_id tests passing. `trace-id` shim compiles and re-exports resolve. The rest of the workspace (`aegis-server`, `aegis-desktop`, etc.) still compiles because nothing has changed for them.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add lib/crates/logging-utils/src/trace_id.rs \
+        lib/crates/logging-utils/src/lib.rs \
+        lib/crates/trace-id/src/lib.rs \
+        lib/crates/trace-id/Cargo.toml
+git commit -m "feat(logging-utils): absorb trace-id source, shim trace-id crate
+
+Moves the TraceIdGenerator and Side source (and its six-test suite)
+from lib/crates/trace-id/src/lib.rs into
+lib/crates/logging-utils/src/trace_id.rs. logging-utils now owns
+the canonical types.
+
+lib/crates/trace-id is rewritten as a one-line re-export shim so
+aegis-server and aegis-desktop keep compiling untouched — their
+path-deps and use statements do not change. The shim is deleted in
+a follow-up PR once both apps migrate to use logging_utils::*
+directly."
+```
 
 **Files:**
 - Create: `lib/crates/logging-utils/src/trace_id.rs` — full moved content from `lib/crates/trace-id/src/lib.rs`
