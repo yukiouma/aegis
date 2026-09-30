@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ulid = { workspace = true }
+# `logging-utils` is the canonical home for `TraceIdGenerator` /
+# `Side`. This crate is a backwards-compat shim that re-exports
+# them so existing consumers keep compiling.
+logging-utils = { path = "../logging-utils" }
