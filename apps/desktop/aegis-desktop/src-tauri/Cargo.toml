@@ -59,6 +59,12 @@ tracing-appender = { workspace = true }
 # `client_side()` per invocation. Local path dep so any change to
 # the crate is picked up without a registry bump.
 trace-id = { path = "../../../../lib/crates/trace-id" }
+# `logging-utils` owns the unified tracing init (`LoggingConfig` +
+# `init_tracing`) and a `TraceIdGenerator` carry copy. Adopted by
+# the desktop to replace the local `tracing_init::init_tracing`
+# copy and to source `TraceIdGenerator` from a single crate.
+# Local path dep.
+logging-utils = { path = "../../../../lib/crates/logging-utils" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-utils = { path = "../../../../lib/crates/windows-utils" }
