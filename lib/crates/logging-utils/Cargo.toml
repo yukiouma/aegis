@@ -12,6 +12,12 @@ thiserror          = { workspace = true }
 # (mirrored from the `trace-id` crate — the two crates carry the
 # same logic independently, not via a dep).
 ulid               = { workspace = true }
+# `moka` provides the dedup cache that remembers `batch_id`s for
+# `LogIngestor::submit`; `sync` is enough (no async API surface).
+moka               = { workspace = true }
+# `crossbeam-channel` is the bounded mpsc between `submit` callers
+# and the writer thread; sync `send` / `recv` is enough.
+crossbeam-channel  = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

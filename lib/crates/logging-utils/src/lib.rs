@@ -16,6 +16,7 @@
 //! # Ok::<(), logging_utils::LoggingInitError>(())
 //! ```
 
+pub mod log_ingestor;
 pub mod trace_id;
 pub mod tracing_init;
 

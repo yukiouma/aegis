@@ -45,6 +45,13 @@ tower = "0.5.3"
 # id. Pinned in the workspace so the `trace-id` crate and any
 # downstream consumer resolve the same version.
 ulid = "3.0"
+# `moka` provides the TinyLFU-backed dedup cache used by
+# `logging-utils::log_ingestor`. Pinned so every consumer resolves
+# the same version.
+moka              = { version = "0.12", default-features = false, features = ["sync"] }
+# `crossbeam-channel` is the bounded mpsc that carries accepted
+# batches from producers to the writer thread.
+crossbeam-channel = "0.5"
 # `serde` provides Serialize / Deserialize for wire-level DTOs (HTTP
 # request / response bodies). Centralized here so every workspace
 # crate that needs serialization inherits the same version and feature
