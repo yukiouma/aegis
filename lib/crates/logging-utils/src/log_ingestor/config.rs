@@ -40,7 +40,7 @@ impl LogIngestorConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct LogIngestorConfigBuilder {
     log_dir: Option<PathBuf>,
     file_name_prefix: Option<String>,
@@ -48,19 +48,6 @@ pub struct LogIngestorConfigBuilder {
     cache_ttl: Option<Duration>,
     channel_capacity: Option<usize>,
     shutdown_deadline: Option<Duration>,
-}
-
-impl Default for LogIngestorConfigBuilder {
-    fn default() -> Self {
-        Self {
-            log_dir: None,
-            file_name_prefix: None,
-            cache_capacity: None,
-            cache_ttl: None,
-            channel_capacity: None,
-            shutdown_deadline: None,
-        }
-    }
 }
 
 impl LogIngestorConfigBuilder {
@@ -107,10 +94,7 @@ mod tests {
 
     #[test]
     fn defaults_apply_when_only_dir_and_prefix_set() {
-        let cfg = LogIngestorConfig::new(
-            PathBuf::from("/tmp/aegis"),
-            "test.log".to_string(),
-        );
+        let cfg = LogIngestorConfig::new(PathBuf::from("/tmp/aegis"), "test.log".to_string());
         assert_eq!(cfg.log_dir, PathBuf::from("/tmp/aegis"));
         assert_eq!(cfg.file_name_prefix, "test.log");
         assert_eq!(cfg.cache_capacity, DEFAULT_CACHE_CAPACITY);
@@ -139,10 +123,8 @@ mod tests {
 
     #[test]
     fn clone_preserves_fields() {
-        let original = LogIngestorConfig::new(
-            PathBuf::from("/tmp/aegis-clone"),
-            "clone.log".to_string(),
-        );
+        let original =
+            LogIngestorConfig::new(PathBuf::from("/tmp/aegis-clone"), "clone.log".to_string());
         let cloned = original.clone();
         assert_eq!(original.log_dir, cloned.log_dir);
         assert_eq!(original.file_name_prefix, cloned.file_name_prefix);

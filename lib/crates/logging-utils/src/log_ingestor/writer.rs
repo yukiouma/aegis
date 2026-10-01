@@ -22,11 +22,8 @@ pub(crate) fn run_writer(
     mut appender: RollingFileAppender,
     done_tx: Sender<()>,
 ) {
-    loop {
-        match rx.recv() {
-            Ok(envelope) => write_envelope(&mut appender, &envelope),
-            Err(_) => break, // sender dropped; channel closed
-        }
+    while let Ok(envelope) = rx.recv() {
+        write_envelope(&mut appender, &envelope);
     }
     let _ = done_tx.send(());
 }
@@ -35,10 +32,7 @@ pub(crate) fn run_writer(
 /// per entry, then `flush()`. I/O errors are swallowed — the writer
 /// thread is best-effort and should not panic on a transient disk
 /// problem.
-pub(crate) fn write_envelope(
-    writer: &mut RollingFileAppender,
-    envelope: &BatchEnvelope,
-) {
+pub(crate) fn write_envelope(writer: &mut RollingFileAppender, envelope: &BatchEnvelope) {
     let _ = writeln!(writer, "BATCH {}", envelope.batch_id);
     for line in &envelope.entries {
         let _ = writeln!(writer, "{line}");
@@ -56,11 +50,7 @@ mod tests {
         let entry = std::fs::read_dir(dir)
             .unwrap()
             .filter_map(|e| e.ok())
-            .find(|e| {
-                e.file_name()
-                    .to_string_lossy()
-                    .starts_with(prefix)
-            })
+            .find(|e| e.file_name().to_string_lossy().starts_with(prefix))
             .expect("expected at least one daily-rotate file under prefix");
         let name = entry.file_name().to_string_lossy().into_owned();
         let contents = std::fs::read_to_string(entry.path()).unwrap();
@@ -139,8 +129,15 @@ mod tests {
             .unwrap()
             .filter_map(|e| e.ok())
             .filter(|e| e.file_name().to_string_lossy().starts_with("drop.log"))
-            .any(|e| std::fs::metadata(e.path()).map(|m| m.len() > 0).unwrap_or(false));
-        assert!(!any_with_content, "no log content should be written when no envelopes are sent");
+            .any(|e| {
+                std::fs::metadata(e.path())
+                    .map(|m| m.len() > 0)
+                    .unwrap_or(false)
+            });
+        assert!(
+            !any_with_content,
+            "no log content should be written when no envelopes are sent"
+        );
     }
 
     #[test]

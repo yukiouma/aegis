@@ -1,19 +1,19 @@
 //! [`LogIngestor`] — sync, deduplicated, bounded-queue log submitter
-//! + the background writer thread lifecycle. See the spec for
-//! rationale; see [`crate::LogIngestorConfig`] for knobs.
+//! plus the background writer thread lifecycle. See the spec for
+//! rationale; see [`crate::LogIngestorConfig`] for the knobs.
 
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use crossbeam_channel::{bounded, Receiver, Sender, TrySendError};
+use crossbeam_channel::{Receiver, RecvTimeoutError, Sender, TrySendError, bounded};
 use moka::policy::EvictionPolicy;
 use moka::sync::Cache;
 use thiserror::Error;
 
 use super::config::LogIngestorConfig;
-use super::writer::{run_writer, BatchEnvelope};
+use super::writer::{BatchEnvelope, run_writer};
 
 #[derive(Debug, Error)]
 pub enum IngestorError {
@@ -30,10 +30,7 @@ pub enum IngestorError {
     #[error("ingestor has been shut down")]
     ShutDown,
     #[error("writer thread failed to join within {deadline:?}: {message}")]
-    WriterJoinTimeout {
-        deadline: Duration,
-        message: String,
-    },
+    WriterJoinTimeout { deadline: Duration, message: String },
     #[error("writer thread panicked: {0}")]
     WriterPanic(String),
 }
@@ -54,16 +51,11 @@ impl LogIngestor {
     /// the log directory (failure → [`IngestorError::CreateDir`])
     /// and spawns the writer thread.
     pub fn new(config: LogIngestorConfig) -> Result<Self, IngestorError> {
-        std::fs::create_dir_all(&config.log_dir).map_err(|source| {
-            IngestorError::CreateDir {
-                dir: config.log_dir.clone(),
-                source,
-            }
+        std::fs::create_dir_all(&config.log_dir).map_err(|source| IngestorError::CreateDir {
+            dir: config.log_dir.clone(),
+            source,
         })?;
-        let appender = tracing_appender::rolling::daily(
-            &config.log_dir,
-            &config.file_name_prefix,
-        );
+        let appender = tracing_appender::rolling::daily(&config.log_dir, &config.file_name_prefix);
         let cache = Cache::builder()
             .max_capacity(config.cache_capacity)
             .time_to_live(config.cache_ttl)
@@ -129,24 +121,67 @@ impl LogIngestor {
     }
 
     /// Drain the channel and join the writer thread within
-    /// `config.shutdown_deadline`. Idempotent.
+    /// `config.shutdown_deadline`. Idempotent: a second call after
+    /// the first returns `Ok(())`.
     ///
-    /// **Stub:** Task 4 ships the minimal drain-and-join version so
-    /// the submit-path tests can run. Task 6 replaces this with
-    /// the deadline-aware implementation that distinguishes
-    /// `WriterJoinTimeout` from `WriterPanic`.
+    /// Distinguishes three failure modes:
+    /// - `WriterJoinTimeout` — the writer thread did not exit within
+    ///   the deadline (e.g., it is blocked on a Sender kept alive
+    ///   somewhere).
+    /// - `WriterPanic` — the writer thread panicked; the panic
+    ///   payload is included.
+    /// - `Ok(())` — clean drain and exit.
     pub fn shutdown(&mut self) -> Result<(), IngestorError> {
         if self.writer.is_none() {
             return Ok(()); // already shut down
         }
         self.shutdown_flag.store(true, Ordering::Release);
+        // Dropping `tx` closes the channel; the writer exits its
+        // recv loop and signals done_tx.
         self.tx.take();
-        self.done_rx.take();
-        let writer = self.writer.take()
+        let done_rx = self.done_rx.take().expect("done_rx present iff writer is");
+        let writer = self
+            .writer
+            .take()
             .expect("writer present iff not yet shut down");
-        match writer.join() {
-            Ok(()) => Ok(()),
-            Err(payload) => Err(IngestorError::WriterPanic(format!("{payload:?}"))),
+        match done_rx.recv_timeout(self.deadline) {
+            Ok(()) => match writer.join() {
+                Ok(()) => Ok(()),
+                Err(payload) => Err(IngestorError::WriterPanic(format!("{payload:?}"))),
+            },
+            Err(RecvTimeoutError::Timeout) => {
+                // Deadline elapsed. Check whether the writer
+                // already finished (it may have panicked and
+                // dropped done_tx without sending, but that case
+                // surfaces as Disconnected, not Timeout — so a
+                // finished writer here is "exited cleanly but the
+                // done signal did not arrive in time", a real
+                // anomaly).
+                if writer.is_finished() {
+                    match writer.join() {
+                        Ok(()) => Err(IngestorError::WriterJoinTimeout {
+                            deadline: self.deadline,
+                            message: "writer exited but did not signal done".into(),
+                        }),
+                        Err(payload) => Err(IngestorError::WriterPanic(format!("{payload:?}"))),
+                    }
+                } else {
+                    Err(IngestorError::WriterJoinTimeout {
+                        deadline: self.deadline,
+                        message: "writer thread did not exit in time".into(),
+                    })
+                }
+            }
+            Err(RecvTimeoutError::Disconnected) => {
+                // done_tx dropped without sending — writer panicked.
+                match writer.join() {
+                    Ok(()) => Err(IngestorError::WriterJoinTimeout {
+                        deadline: self.deadline,
+                        message: "writer dropped done channel but exited cleanly".into(),
+                    }),
+                    Err(payload) => Err(IngestorError::WriterPanic(format!("{payload:?}"))),
+                }
+            }
         }
     }
 }
@@ -273,7 +308,8 @@ mod tests {
 
         ingestor.submit("ttl", &["first".into()]).unwrap();
         thread::sleep(Duration::from_millis(100));
-        ingestor.submit("ttl", &["second".into()])
+        ingestor
+            .submit("ttl", &["second".into()])
             .expect("submit after TTL expiry succeeds");
 
         ingestor.shutdown().expect("shutdown ok");
@@ -286,7 +322,7 @@ mod tests {
         // 200 must appear in the file (moka is thread-safe, the
         // bounded channel is thread-safe).
         let tmp = tempfile::tempdir().unwrap();
-        let mut ingestor = LogIngestor::new(cfg(tmp.path())).expect("new succeeds");
+        let ingestor = LogIngestor::new(cfg(tmp.path())).expect("new succeeds");
         let ingestor = Arc::new(ingestor);
 
         let mut handles = Vec::new();
@@ -320,10 +356,7 @@ mod tests {
         for t in 0..8 {
             for i in 0..25 {
                 let header = format!("BATCH t{t}-i{i}");
-                let count = contents
-                    .lines()
-                    .filter(|&l| l == header)
-                    .count();
+                let count = contents.lines().filter(|&l| l == header).count();
                 assert_eq!(count, 1, "id {header} must appear exactly once");
             }
         }
@@ -349,7 +382,7 @@ mod tests {
         let big: Vec<String> = (0..5000).map(|i| format!("entry-{i:06}")).collect();
         let mut observed_channel_full = false;
         for i in 0..20 {
-            match ingestor.submit(&format!("b-{i}"), &big) {
+            match ingestor.submit(format!("b-{i}"), &big) {
                 Ok(()) => continue,
                 Err(IngestorError::ChannelFull(2)) => {
                     observed_channel_full = true;
@@ -430,7 +463,10 @@ mod tests {
                 Err(other) => panic!("unexpected error after writer drain: {other:?}"),
             }
         }
-        assert!(succeeded, "retry never succeeded — cache.invalidate not wired");
+        assert!(
+            succeeded,
+            "retry never succeeded — cache.invalidate not wired"
+        );
 
         ingestor.shutdown().expect("shutdown ok");
     }
@@ -458,7 +494,9 @@ mod tests {
 
         // Fill the cache to capacity with distinct ids.
         for i in 0..4 {
-            ingestor.submit(format!("id-{i}"), &[format!("e-{i}")]).unwrap();
+            ingestor
+                .submit(format!("id-{i}"), &[format!("e-{i}")])
+                .unwrap();
         }
         // One more distinct id triggers eviction of the oldest entry.
         ingestor.submit("id-5", &["e-5".into()]).unwrap();
@@ -481,5 +519,108 @@ mod tests {
         assert!(succeeded, "oldest id should be evicted and re-acceptable");
 
         ingestor.shutdown().expect("shutdown ok");
+    }
+
+    #[test]
+    fn submit_returns_shut_down_after_shutdown() {
+        // Review Focus #5.
+        let tmp = tempfile::tempdir().unwrap();
+        let mut ingestor = LogIngestor::new(cfg(tmp.path())).expect("new succeeds");
+
+        ingestor.shutdown().expect("shutdown ok");
+        let err = ingestor.submit("post", &["x".into()]).unwrap_err();
+        assert!(
+            matches!(err, IngestorError::ShutDown),
+            "submit after shutdown must return ShutDown, got {err:?}",
+        );
+    }
+
+    #[test]
+    fn shutdown_drains_pending_envelopes_before_returning() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut ingestor = LogIngestor::new(
+            LogIngestorConfig::builder()
+                .log_dir(tmp.path().to_path_buf())
+                .file_name_prefix("drain.log".to_string())
+                .channel_capacity(100)
+                .shutdown_deadline(Duration::from_secs(5))
+                .build(),
+        )
+        .expect("new succeeds");
+
+        for i in 0..50 {
+            ingestor
+                .submit(format!("d-{i}"), &[format!("line-{i}")])
+                .unwrap();
+        }
+        ingestor.shutdown().expect("shutdown drains pending");
+
+        let (_name, contents) = read_log(tmp.path(), "drain.log");
+        let batch_count = contents.lines().filter(|l| l.starts_with("BATCH ")).count();
+        assert_eq!(batch_count, 50, "all 50 batches must be in the file");
+    }
+
+    #[test]
+    fn shutdown_is_idempotent() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut ingestor = LogIngestor::new(cfg(tmp.path())).expect("new succeeds");
+
+        ingestor.shutdown().expect("first shutdown ok");
+        ingestor
+            .shutdown()
+            .expect("second shutdown ok (idempotent)");
+    }
+
+    #[test]
+    fn drop_drains_best_effort() {
+        let tmp = tempfile::tempdir().unwrap();
+        let ingestor = LogIngestor::new(cfg(tmp.path())).expect("new succeeds");
+
+        ingestor
+            .submit("drop-1", &["a".into(), "b".into()])
+            .unwrap();
+        ingestor.submit("drop-2", &["c".into()]).unwrap();
+
+        // Drop without explicit shutdown — Drop's best-effort path
+        // must drain the channel and join the writer.
+        drop(ingestor);
+
+        let (_name, contents) = read_log(tmp.path(), "ingestor-test.log");
+        assert_eq!(contents, "BATCH drop-1\na\nb\nBATCH drop-2\nc\n");
+    }
+
+    #[test]
+    fn shutdown_deadline_exceeded_returns_writer_join_timeout() {
+        // Review Focus #4: make the writer too slow to finish
+        // within the deadline. We submit enough work to fill the
+        // channel AND make each envelope large enough that even one
+        // envelope takes longer than the deadline to write to
+        // disk. With a 1-ms budget, the writer cannot finish
+        // 4 × 100_000-entry envelopes (≈ 1.5 MB per envelope)
+        // before the deadline expires; `shutdown` then returns
+        // `WriterJoinTimeout` instead of `Ok(())`.
+        let tmp = tempfile::tempdir().unwrap();
+        let mut ingestor = LogIngestor::new(
+            LogIngestorConfig::builder()
+                .log_dir(tmp.path().to_path_buf())
+                .file_name_prefix("deadline.log".to_string())
+                .channel_capacity(4)
+                .shutdown_deadline(Duration::from_millis(1))
+                .build(),
+        )
+        .expect("new succeeds");
+
+        let big: Vec<String> = (0..100_000).map(|i| format!("x-{i}")).collect();
+        for i in 0..4 {
+            ingestor.submit(format!("d-{i}"), &big).unwrap();
+        }
+
+        let err = ingestor.shutdown().unwrap_err();
+        match err {
+            IngestorError::WriterJoinTimeout { deadline, .. } => {
+                assert_eq!(deadline, Duration::from_millis(1));
+            }
+            other => panic!("expected WriterJoinTimeout, got {other:?}"),
+        }
     }
 }
