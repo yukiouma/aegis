@@ -322,7 +322,9 @@ mod tests {
         ingestor.shutdown().expect("shutdown ok");
 
         let (_name, contents) = read_log(tmp.path(), "ingestor-test.log");
-        assert_eq!(contents, "BATCH b-1\nalpha\nbeta\ngamma\n");
+        // `batch_id` is intentionally NOT written — see
+        // `LogIngestor::submit` and `write_envelope` docs.
+        assert_eq!(contents, "alpha\nbeta\ngamma\n");
     }
 
     #[test]
@@ -336,7 +338,7 @@ mod tests {
         ingestor.shutdown().expect("shutdown ok");
 
         let (_name, contents) = read_log(tmp.path(), "ingestor-test.log");
-        assert_eq!(contents, "BATCH a\n1\nBATCH b\n2\n");
+        assert_eq!(contents, "1\n2\n");
     }
 
     #[test]
@@ -410,20 +412,23 @@ mod tests {
         ingestor.shutdown().expect("shutdown ok");
 
         let (_name, contents) = read_log(tmp.path(), "ingestor-test.log");
-        let batches: Vec<&str> = contents
+        // `batch_id` is no longer written — assert on the entry
+        // payload instead. Each batch submitted one line of the form
+        // `payload tX-iY`, so 200 distinct payloads must appear.
+        let payloads: Vec<&str> = contents
             .lines()
-            .filter(|l| l.starts_with("BATCH "))
+            .filter(|l| l.starts_with("payload "))
             .collect();
-        assert_eq!(batches.len(), 200, "all 200 batch headers must appear");
+        assert_eq!(payloads.len(), 200, "all 200 batch payloads must appear");
 
         // Spot-check that every distinct id appears exactly once.
         // (Use exact line equality, not substring `matches`, so
         // `t0-i1` is not counted as a match inside `t0-i10`.)
         for t in 0..8 {
             for i in 0..25 {
-                let header = format!("BATCH t{t}-i{i}");
-                let count = contents.lines().filter(|&l| l == header).count();
-                assert_eq!(count, 1, "id {header} must appear exactly once");
+                let payload = format!("payload t{t}-i{i}");
+                let count = contents.lines().filter(|&l| l == payload).count();
+                assert_eq!(count, 1, "id {payload} must appear exactly once");
             }
         }
     }
@@ -622,8 +627,9 @@ mod tests {
         ingestor.shutdown().expect("shutdown drains pending");
 
         let (_name, contents) = read_log(tmp.path(), "drain.log");
-        let batch_count = contents.lines().filter(|l| l.starts_with("BATCH ")).count();
-        assert_eq!(batch_count, 50, "all 50 batches must be in the file");
+        // `batch_id` is no longer written — assert on entry lines.
+        let line_count = contents.lines().filter(|l| l.starts_with("line-")).count();
+        assert_eq!(line_count, 50, "all 50 batch entries must be in the file");
     }
 
     #[test]
@@ -652,7 +658,11 @@ mod tests {
         drop(ingestor);
 
         let (_name, contents) = read_log(tmp.path(), "ingestor-test.log");
-        assert_eq!(contents, "BATCH drop-1\na\nb\nBATCH drop-2\nc\n");
+        // `batch_id` is intentionally NOT written — only the entry
+        // payloads survive. Note that channel drain order is FIFO,
+        // so `drop-1`'s entries (`a`, `b`) precede `drop-2`'s
+        // (`c`).
+        assert_eq!(contents, "a\nb\nc\n");
     }
 
     #[test]

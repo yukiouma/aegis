@@ -28,12 +28,13 @@ pub(crate) fn run_writer(
     let _ = done_tx.send(());
 }
 
-/// Write one envelope: `"BATCH {batch_id}\n"` header, then one line
-/// per entry, then `flush()`. I/O errors are swallowed — the writer
-/// thread is best-effort and should not panic on a transient disk
-/// problem.
+/// Write one envelope: one line per entry, then `flush()`. The
+/// `batch_id` is intentionally not written — the dedup cache in
+/// `LogIngestor::submit` guarantees at-most-once delivery per id, so
+/// re-deriving identity from the file is not needed downstream. I/O
+/// errors are swallowed — the writer thread is best-effort and
+/// should not panic on a transient disk problem.
 pub(crate) fn write_envelope(writer: &mut RollingFileAppender, envelope: &BatchEnvelope) {
-    let _ = writeln!(writer, "BATCH {}", envelope.batch_id);
     for line in &envelope.entries {
         let _ = writeln!(writer, "{line}");
     }
@@ -58,7 +59,7 @@ mod tests {
     }
 
     #[test]
-    fn writer_writes_header_then_entries() {
+    fn writer_writes_one_line_per_entry() {
         let tmp = tempfile::tempdir().unwrap();
         let (tx, rx) = crossbeam_channel::bounded::<BatchEnvelope>(4);
         let (done_tx, done_rx) = crossbeam_channel::bounded::<()>(1);
@@ -79,11 +80,13 @@ mod tests {
         handle.join().unwrap();
 
         let (_name, contents) = read_log(tmp.path(), "happy.log");
-        assert_eq!(contents, "BATCH b-1\nline a\nline b\nline c\n");
+        // `batch_id` is intentionally NOT written — see
+        // `write_envelope` doc. Only the entries land in the file.
+        assert_eq!(contents, "line a\nline b\nline c\n");
     }
 
     #[test]
-    fn writer_writes_empty_entries_as_header_only() {
+    fn writer_writes_empty_entries_as_blank_file() {
         let tmp = tempfile::tempdir().unwrap();
         let (tx, rx) = crossbeam_channel::bounded::<BatchEnvelope>(4);
         let (done_tx, done_rx) = crossbeam_channel::bounded::<()>(1);
@@ -103,8 +106,10 @@ mod tests {
             .unwrap();
         handle.join().unwrap();
 
+        // Empty entries → nothing written, so the file (which the
+        // appender opens eagerly) is left blank.
         let (_name, contents) = read_log(tmp.path(), "empty.log");
-        assert_eq!(contents, "BATCH b-empty\n");
+        assert_eq!(contents, "");
     }
 
     #[test]

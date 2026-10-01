@@ -228,7 +228,8 @@ fn write_envelope(
     envelope: &BatchEnvelope,
 ) {
     use std::io::Write;
-    let _ = writeln!(writer, "BATCH {}", envelope.batch_id);
+    // `batch_id` is intentionally NOT written — see "Data model &
+    // wire shape" below.
     for line in &envelope.entries {
         let _ = writeln!(writer, "{line}");
     }
@@ -408,16 +409,14 @@ Tests live as `mod tests` inside each module file (`config.rs`, `ingestor.rs`, `
 No DDL, no DTO, no request/response changes. The crate writes to the local filesystem via `tracing_appender::rolling::daily`. On-disk format:
 
 ```
-BATCH <batch_id>
 <line 1>
 <line 2>
 …
-BATCH <batch_id>
 <line 1>
 …
 ```
 
-Plain UTF-8, LF line endings, one flush per batch. No JSON rendering — the caller decides the line format upstream.
+`batch_id` is intentionally **not** written. The dedup cache in `LogIngestor::submit` guarantees at-most-once delivery per id, so re-deriving identity from the file is not needed downstream. Plain UTF-8, LF line endings, one flush per batch. No JSON rendering — the caller decides the line format upstream.
 
 ## Out of scope (explicitly NOT in this PR)
 
