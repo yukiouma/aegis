@@ -30,8 +30,8 @@ lib/crates/logging-utils/src/
 ├── lib.rs                       # adds `pub mod log_ingestor;` + re-exports
 ├── tracing_init.rs              # unchanged
 ├── trace_id.rs                  # unchanged
-└── log_ingestor/                # new
-    ├── mod.rs                   # pub use surface
+├── log_ingestor.rs              # new — module surface + pub use
+└── log_ingestor/                # new — submodules (no mod.rs; matches crate convention)
     ├── config.rs                # LogIngestorConfig + builder
     ├── ingestor.rs              # LogIngestor, IngestorError, BatchEnvelope
     └── writer.rs                # writer thread fn + write helpers
