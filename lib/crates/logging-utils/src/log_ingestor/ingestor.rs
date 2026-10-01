@@ -7,7 +7,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-use crossbeam_channel::{bounded, Receiver, Sender};
+use crossbeam_channel::{bounded, Receiver, Sender, TrySendError};
+use moka::policy::EvictionPolicy;
 use moka::sync::Cache;
 use thiserror::Error;
 
@@ -66,6 +67,15 @@ impl LogIngestor {
         let cache = Cache::builder()
             .max_capacity(config.cache_capacity)
             .time_to_live(config.cache_ttl)
+            // `EvictionPolicy::lru()` makes the "least recently
+            // used" contract observable: with moka's default
+            // `tiny_lfu`, a never-touched entry from the first
+            // insert can be promoted into the protected segment
+            // and survive longer than a freshly inserted id.
+            // `lru` matches the spec's "least recently used" line
+            // and the test's expectation that the oldest id is
+            // re-acceptable after eviction.
+            .eviction_policy(EvictionPolicy::lru())
             .build();
         let (tx, rx) = bounded::<BatchEnvelope>(config.channel_capacity);
         let (done_tx, done_rx) = bounded::<()>(1);
@@ -102,14 +112,18 @@ impl LogIngestor {
             batch_id: id,
             entries: entries.to_vec(),
         };
-        match tx.send(envelope) {
+        match tx.try_send(envelope) {
             Ok(()) => Ok(()),
-            Err(crossbeam_channel::SendError(env)) => {
+            Err(TrySendError::Full(env)) => {
                 // Channel full: undo the cache insert so the same id
-                // can be retried later. `SendError` carries the
-                // un-sent envelope back.
+                // can be retried later.
                 self.cache.invalidate(&env.batch_id);
                 Err(IngestorError::ChannelFull(self.channel_capacity))
+            }
+            Err(TrySendError::Disconnected(env)) => {
+                // Writer thread is gone — receiver was dropped.
+                self.cache.invalidate(&env.batch_id);
+                Err(IngestorError::ShutDown)
             }
         }
     }
@@ -313,5 +327,159 @@ mod tests {
                 assert_eq!(count, 1, "id {header} must appear exactly once");
             }
         }
+    }
+
+    #[test]
+    fn submit_returns_channel_full_when_capacity_exceeded() {
+        // The writer is concurrent and may recv between back-to-back
+        // submits (moka's insert briefly yields, the OS may preempt).
+        // We poll with distinct ids until ChannelFull is observed,
+        // which is deterministic without sleeping for a fixed time.
+        let tmp = tempfile::tempdir().unwrap();
+        let mut ingestor = LogIngestor::new(
+            LogIngestorConfig::builder()
+                .log_dir(tmp.path().to_path_buf())
+                .file_name_prefix("full.log".to_string())
+                .channel_capacity(2)
+                .shutdown_deadline(Duration::from_secs(2))
+                .build(),
+        )
+        .expect("new succeeds");
+
+        let big: Vec<String> = (0..5000).map(|i| format!("entry-{i:06}")).collect();
+        let mut observed_channel_full = false;
+        for i in 0..20 {
+            match ingestor.submit(&format!("b-{i}"), &big) {
+                Ok(()) => continue,
+                Err(IngestorError::ChannelFull(2)) => {
+                    observed_channel_full = true;
+                    break;
+                }
+                Err(other) => panic!("unexpected error: {other:?}"),
+            }
+        }
+        assert!(
+            observed_channel_full,
+            "ChannelFull(2) must be reachable with capacity 2",
+        );
+
+        ingestor.shutdown().expect("shutdown ok");
+    }
+
+    #[test]
+    fn submit_channel_full_invalidates_cache_entry_so_retry_succeeds() {
+        // Review Focus companion: a ChannelFull must NOT poison
+        // the dedup cache — the same batch_id should be retryable
+        // after the writer drains.
+        //
+        // The writer is concurrent and may recv between back-to-back
+        // submits (moka's insert briefly yields, the OS may preempt).
+        // To trigger ChannelFull deterministically, we poll with
+        // distinct ids until one fails with ChannelFull; we capture
+        // that id and retry it. The retry must succeed — proving the
+        // cache entry was invalidated on the ChannelFull path.
+        // Moka's invalidate is async, so the retry may briefly see
+        // DuplicateBatchId until the invalidation queue processes.
+        let tmp = tempfile::tempdir().unwrap();
+        let mut ingestor = LogIngestor::new(
+            LogIngestorConfig::builder()
+                .log_dir(tmp.path().to_path_buf())
+                .file_name_prefix("retry.log".to_string())
+                .channel_capacity(1)
+                .cache_ttl(Duration::from_secs(60))
+                .shutdown_deadline(Duration::from_secs(5))
+                .build(),
+        )
+        .expect("new succeeds");
+
+        let big: Vec<String> = (0..5000).map(|i| format!("entry-{i:06}")).collect();
+
+        // Spin until ChannelFull is observed; capture the id that
+        // failed so we can retry exactly that id below.
+        let failed_id: String = {
+            let mut id = String::new();
+            let mut found = false;
+            for i in 0..50 {
+                let candidate = format!("fill-{i}");
+                match ingestor.submit(&candidate, &big) {
+                    Ok(()) => continue,
+                    Err(IngestorError::ChannelFull(1)) => {
+                        id = candidate;
+                        found = true;
+                        break;
+                    }
+                    Err(other) => panic!("unexpected error: {other:?}"),
+                }
+            }
+            assert!(found, "ChannelFull(1) must be reachable with capacity 1");
+            id
+        };
+
+        // Wait for writer to drain AND for moka's async invalidation
+        // of `failed_id` to take effect, then retry `failed_id`.
+        let mut succeeded = false;
+        for _ in 0..500 {
+            thread::sleep(Duration::from_millis(10));
+            match ingestor.submit(&failed_id, &big) {
+                Ok(()) => {
+                    succeeded = true;
+                    break;
+                }
+                Err(IngestorError::ChannelFull(_)) => continue,
+                Err(IngestorError::DuplicateBatchId(_)) => continue, // moka invalidate still pending
+                Err(other) => panic!("unexpected error after writer drain: {other:?}"),
+            }
+        }
+        assert!(succeeded, "retry never succeeded — cache.invalidate not wired");
+
+        ingestor.shutdown().expect("shutdown ok");
+    }
+
+    #[test]
+    fn cache_evicts_oldest_at_capacity() {
+        // moka's LRU eviction is asynchronous — the cache map can
+        // exceed max_capacity briefly until the background
+        // maintenance worker processes the eviction queue.
+        // Polling is required because the worker runs on its own
+        // schedule (observed latency: ~1-3s after the triggering
+        // insert). Poll up to 100 × 100ms = 10s, treating
+        // DuplicateBatchId as "eviction still pending".
+        let tmp = tempfile::tempdir().unwrap();
+        let mut ingestor = LogIngestor::new(
+            LogIngestorConfig::builder()
+                .log_dir(tmp.path().to_path_buf())
+                .file_name_prefix("evict.log".to_string())
+                .cache_capacity(4)
+                .channel_capacity(1000)
+                .shutdown_deadline(Duration::from_secs(2))
+                .build(),
+        )
+        .expect("new succeeds");
+
+        // Fill the cache to capacity with distinct ids.
+        for i in 0..4 {
+            ingestor.submit(format!("id-{i}"), &[format!("e-{i}")]).unwrap();
+        }
+        // One more distinct id triggers eviction of the oldest entry.
+        ingestor.submit("id-5", &["e-5".into()]).unwrap();
+
+        // Poll until the oldest id ("id-0") is evicted and re-usable.
+        let mut succeeded = false;
+        for _ in 0..100 {
+            match ingestor.submit("id-0", &["e-0-again".into()]) {
+                Ok(()) => {
+                    succeeded = true;
+                    break;
+                }
+                Err(IngestorError::DuplicateBatchId(_)) => {
+                    thread::sleep(Duration::from_millis(100));
+                    continue; // moka eviction worker still pending
+                }
+                Err(other) => panic!("unexpected error: {other:?}"),
+            }
+        }
+        assert!(succeeded, "oldest id should be evicted and re-acceptable");
+
+        ingestor.shutdown().expect("shutdown ok");
     }
 }
