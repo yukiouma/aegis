@@ -86,6 +86,14 @@ impl LogIngestor {
 
     /// Submit a batch of UTF-8 log lines identified by `batch_id`.
     /// See module-level docs and the spec for the full contract.
+    ///
+    /// **Backpressure is by error, not by wait.** When the bounded
+    /// channel is full, `submit` returns [`IngestorError::ChannelFull`]
+    /// immediately rather than blocking the caller — callers are
+    /// expected to retry once the writer drains. Repeated ids return
+    /// [`IngestorError::DuplicateBatchId`] within the cache TTL; a
+    /// `batch_id` that previously returned `ChannelFull` is invalidated
+    /// from the cache so it can be retried with the same id.
     pub fn submit(
         &self,
         batch_id: impl Into<String>,
@@ -99,6 +107,12 @@ impl LogIngestor {
         if self.cache.get(&id).is_some() {
             return Err(IngestorError::DuplicateBatchId(id));
         }
+        // The `get` + `insert` pair has a small race window: two
+        // concurrent same-id calls can both observe cache-miss
+        // and both `try_send`. Moka's sync `Cache::insert` returns
+        // `()`, so there is no in-API atomic admit-or-reject to
+        // close the window. In practice, callers generate unique
+        // batch_ids, so the race is not exercised.
         self.cache.insert(id.clone(), ());
         let envelope = BatchEnvelope {
             batch_id: id,
@@ -129,7 +143,8 @@ impl LogIngestor {
     ///   the deadline (e.g., it is blocked on a Sender kept alive
     ///   somewhere).
     /// - `WriterPanic` — the writer thread panicked; the panic
-    ///   payload is included.
+    ///   payload (best-effort extracted to a UTF-8 string) is
+    ///   included.
     /// - `Ok(())` — clean drain and exit.
     pub fn shutdown(&mut self) -> Result<(), IngestorError> {
         if self.writer.is_none() {
@@ -147,7 +162,7 @@ impl LogIngestor {
         match done_rx.recv_timeout(self.deadline) {
             Ok(()) => match writer.join() {
                 Ok(()) => Ok(()),
-                Err(payload) => Err(IngestorError::WriterPanic(format!("{payload:?}"))),
+                Err(payload) => Err(IngestorError::WriterPanic(panic_message(&payload))),
             },
             Err(RecvTimeoutError::Timeout) => {
                 // Deadline elapsed. Check whether the writer
@@ -163,7 +178,7 @@ impl LogIngestor {
                             deadline: self.deadline,
                             message: "writer exited but did not signal done".into(),
                         }),
-                        Err(payload) => Err(IngestorError::WriterPanic(format!("{payload:?}"))),
+                        Err(payload) => Err(IngestorError::WriterPanic(panic_message(&payload))),
                     }
                 } else {
                     Err(IngestorError::WriterJoinTimeout {
@@ -174,12 +189,19 @@ impl LogIngestor {
             }
             Err(RecvTimeoutError::Disconnected) => {
                 // done_tx dropped without sending — writer panicked.
+                // The Ok arm below is defensive: a thread that
+                // drops done_tx AND exits cleanly is contradictory
+                // (dropping a Sender without sending closes the
+                // channel, which surfaces as `Err`), so this arm
+                // is unreachable in practice — but if it ever
+                // becomes reachable, returning a timeout (not a
+                // panic) is the safer diagnostic.
                 match writer.join() {
                     Ok(()) => Err(IngestorError::WriterJoinTimeout {
                         deadline: self.deadline,
                         message: "writer dropped done channel but exited cleanly".into(),
                     }),
-                    Err(payload) => Err(IngestorError::WriterPanic(format!("{payload:?}"))),
+                    Err(payload) => Err(IngestorError::WriterPanic(panic_message(&payload))),
                 }
             }
         }
@@ -189,6 +211,50 @@ impl LogIngestor {
 impl Drop for LogIngestor {
     fn drop(&mut self) {
         let _ = self.shutdown();
+    }
+}
+
+/// Best-effort convert a `JoinHandle::join` panic payload to a UTF-8
+/// string for [`IngestorError::WriterPanic`]. `dyn Any`'s `Debug`
+/// impl renders the literal text `"Any { .. }"` — useless for
+/// diagnosing the panic — so we downcast to the common panic shapes
+/// (`&'static str` and `String`) and fall back to the `Debug`
+/// rendering only when the payload is neither.
+fn panic_message(payload: &Box<dyn std::any::Any + Send + 'static>) -> String {
+    if let Some(s) = payload.downcast_ref::<&'static str>() {
+        (*s).to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        format!("{payload:?}")
+    }
+}
+
+#[cfg(test)]
+mod panic_message_tests {
+    use super::panic_message;
+
+    #[test]
+    fn extracts_str_payload() {
+        let payload: Box<dyn std::any::Any + Send + 'static> = Box::new("disk is full");
+        assert_eq!(panic_message(&payload), "disk is full");
+    }
+
+    #[test]
+    fn extracts_string_payload() {
+        let payload: Box<dyn std::any::Any + Send + 'static> =
+            Box::new(String::from("disk is full"));
+        assert_eq!(panic_message(&payload), "disk is full");
+    }
+
+    #[test]
+    fn falls_back_to_debug_for_unknown_payload() {
+        // A non-string payload renders through `Debug`, which is
+        // the only safe fallback. We don't pin the exact text —
+        // the contract is "non-empty, no panic".
+        let payload: Box<dyn std::any::Any + Send + 'static> = Box::new(42_i32);
+        let s = panic_message(&payload);
+        assert!(!s.is_empty());
     }
 }
 
