@@ -6,3 +6,5 @@
 mod config;
 mod ingestor;
 mod writer;
+
+pub(super) use writer::BatchEnvelope;
