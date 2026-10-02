@@ -13,6 +13,7 @@ pub mod domain_model;
 pub mod dto;
 pub mod error;
 pub mod healthz;
+pub mod log_ingest;
 pub mod mission;
 pub mod openapi;
 pub mod project;

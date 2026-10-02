@@ -53,7 +53,7 @@ use crate::transport;
 pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let log_dir = std::env::var("AEGIS_LOG_DIR").unwrap_or_else(|_| "./logs".to_string());
     let _log_guard = logging_utils::init_tracing(&logging_utils::LoggingConfig {
-        log_dir: std::path::PathBuf::from(log_dir),
+        log_dir: std::path::PathBuf::from(log_dir.clone()),
         file_name_prefix: "aegis-server.log".into(),
     })
     .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
@@ -71,6 +71,20 @@ pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send 
     let mission = build_mission_service(pool.clone(), project.clone(), user.clone());
     let crf = build_crf_service(pool, project.clone());
 
+    // Build the client-log ingestor. Reuses the same `log_dir` as the
+    // server's tracing logs; per-source separation comes from the
+    // file-name prefix (`aegis-server.log` vs the configured ingestor
+    // prefix, default `aegis-desktop.log`).
+    let log_ingest_cfg = logging_utils::LogIngestorConfig::builder()
+        .log_dir(std::path::PathBuf::from(&log_dir))
+        .file_name_prefix(config.log_ingest_prefix.clone())
+        .build();
+    let log_ingestor = Arc::new(logging_utils::LogIngestor::new(log_ingest_cfg).map_err(
+        |e| -> Box<dyn std::error::Error + Send + Sync> {
+            format!("log_ingestor init: {e}").into()
+        },
+    )?);
+
     let state = AppState {
         auth,
         user,
@@ -79,6 +93,7 @@ pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send 
         domain_model,
         mission,
         crf,
+        log_ingestor,
     };
     let app = transport::http::router(state);
 

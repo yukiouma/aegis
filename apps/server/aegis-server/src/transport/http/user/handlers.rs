@@ -399,6 +399,7 @@ mod tests {
                 as Arc<dyn apis::domain_model::DomainModelService>,
             mission: Arc::new(NullMissionService) as Arc<dyn apis::mission::MissionService>,
             crf: Arc::new(NullCrfService) as Arc<dyn apis::crf::CrfService>,
+            log_ingestor: crate::state::test_support::unused_log_ingestor(),
         }
     }
 

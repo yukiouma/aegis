@@ -42,6 +42,7 @@ use auth::{
     AuthServiceImpl, AuthUsecase, AuthUsecaseConfig, DomainIdentityRepo, InMemoryTokenVersionCache,
     TokenVersionCache, UserCredentialsRepo, UserServiceImpl as AuthUserServiceImpl,
 };
+use logging_utils::{LogIngestor, LogIngestorConfig};
 use user::{UserRepo, UserServiceImpl, UserUsecase};
 
 /// Fixed test password. The matching Argon2 hash is seeded into
@@ -53,6 +54,22 @@ const SEED_PASSWORD: &str = "correct horse battery staple";
 /// database.
 fn signing_key() -> Vec<u8> {
     vec![0u8; 32]
+}
+
+/// Build a `LogIngestor` for the live-DB auth test. Mirrors
+/// `state::test_support::unused_log_ingestor` from the lib crate;
+/// the integration test cannot reach `pub(crate)` items, so it
+/// builds its own against a scoped tempdir. This test never calls
+/// `submit` — the directory is created eagerly and torn down when
+/// `LogIngestor::shutdown` runs (with its deadline) at `AppState`
+/// drop.
+fn build_unused_log_ingestor() -> Arc<LogIngestor> {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let cfg = LogIngestorConfig::builder()
+        .log_dir(tmp.path().to_path_buf())
+        .file_name_prefix("integration-auth.log".into())
+        .build();
+    Arc::new(LogIngestor::new(cfg).expect("ingestor init"))
 }
 
 /// Build a fresh `PgPool` from `AEGIS_DATABASE_URL`. Aborts the test
@@ -195,6 +212,7 @@ fn build_app(pool: PgPool) -> Router {
             as Arc<dyn apis::domain_model::DomainModelService>,
         mission: Arc::new(NullMissionService) as Arc<dyn apis::mission::MissionService>,
         crf: Arc::new(NullCrfService) as Arc<dyn apis::crf::CrfService>,
+        log_ingestor: build_unused_log_ingestor(),
     };
 
     http_router(state)
