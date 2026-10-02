@@ -14,12 +14,13 @@ gap:
 1. `aegis-server` exposes `POST /api/log-ingest/submit`, accepting
    `(batch_id, entries)` from clients and routing them through
    `logging_utils::LogIngestor` to a server-side daily-rotated file.
-2. `aegis-desktop` calls that endpoint when flushing its client log
-   buffer, so the endpoint is actually exercised.
 
 The ingestor stays single-tenant; the server runs one ingestor per
-process and writes to one daily-rotated file (default prefix
-`aegis-desktop.log`, per request).
+process and writes to one daily-rotated file with the configured
+prefix. The server's own `tracing` log file (`aegis-server.log`) and
+the ingestor's client-log file (`aegis-desktop.log`) coexist under
+the same `AEGIS_LOG_DIR` — `tracing_appender::rolling::daily` separates
+them by file-name prefix.
 
 ## Server side — `aegis-server`
 
@@ -28,24 +29,27 @@ process and writes to one daily-rotated file (default prefix
 Add one field:
 
 ```rust
-pub log_ingest: LogIngestorConfig,
+/// File-name prefix for the server's daily-rotated client-log file.
+/// The ingestor writes under `AEGIS_LOG_DIR` (the same dir as the
+/// server's tracing logs) and uses this prefix to keep the two
+/// streams separate on disk.
+pub log_ingest_prefix: String,
 ```
 
-Read two new env vars in `Config::from_env`, defaulting when unset:
+Read one new env var in `Config::from_env`, defaulting when unset:
 
 | Var | Default | Maps to |
 |---|---|---|
-| `AEGIS_LOG_INGEST_DIR` | `./.data/logs/aegis-client` | `LogIngestorConfig::log_dir` |
-| `AEGIS_LOG_INGEST_PREFIX` | `aegis-desktop.log` | `LogIngestorConfig::file_name_prefix` |
+| `AEGIS_LOG_INGEST_PREFIX` | `aegis-desktop.log` | `Config.log_ingest_prefix` |
+
+**Reuse `AEGIS_LOG_DIR` directly.** Both the server's `init_tracing`
+call (existing, `run.rs`) and the new `LogIngestor` read it from the
+same env var — no parallel var. The per-source separation comes from
+the file-name prefix (`aegis-server.log` vs `aegis-desktop.log`).
 
 Other ingestor knobs (`cache_capacity`, `cache_ttl`, `channel_capacity`,
 `shutdown_deadline`) use `LogIngestorConfig::builder` defaults. No new
 env vars for them — YAGNI; expose them when a real knob is needed.
-
-Do **not** reuse `AEGIS_LOG_DIR` — that var is the server's own
-`tracing` log dir, with prefix `aegis-server.log`. Mixing them
-collapses per-source separation that `tracing_appender::rolling::daily`
-relies on.
 
 ### State — `AppState`
 
@@ -57,11 +61,18 @@ straightforward to build per-test.
 
 ### Construction — `run.rs`
 
-After `init_tracing` and the service pool:
+`AEGIS_LOG_DIR` is already read inline in `run.rs` for
+`init_tracing`. Reuse the same `log_dir` for the ingestor so the two
+log streams share one dir and rely on the per-source prefix for
+separation:
 
 ```rust
+let log_ingest = logging_utils::LogIngestorConfig::builder()
+    .log_dir(std::path::PathBuf::from(&log_dir))
+    .file_name_prefix(config.log_ingest_prefix.clone())
+    .build();
 let log_ingestor = Arc::new(
-    logging_utils::LogIngestor::new(config.log_ingest.clone())
+    logging_utils::LogIngestor::new(log_ingest)
         .map_err(|e| format!("log_ingestor init: {e}"))?,
 );
 ```
@@ -164,46 +175,12 @@ arm if present, otherwise a new arm.
 
 Add `tempfile` as a dev-dependency on `aegis-server`.
 
-## Client side — `aegis-desktop`
-
-### Rust shim
-
-A new Tauri command
-`src-tauri/src/commands/submit_client_logs.rs` that:
-
-1. Reads the request JSON (`{ batch_id, entries }`).
-2. POSTs it to `${server_url}/api/log-ingest/submit` with the
-   current access token in `Authorization: Bearer …`.
-3. Maps non-2xx to a typed `ApiError` variant
-   `LogIngestSubmitFailed { status, code }`.
-
-Shimmed over `src-tauri/src/http/log_ingest.rs` (1:1 mirror of the
-Rust HTTP client pattern used elsewhere in `src-tauri/src/http/`).
-
-### Where it gets called
-
-The desktop's client-log buffering path (the one in scope for the
-ingestor) calls `submit_client_logs` on each flush. Generate
-`batch_id` per submission (uuid v4 or monotonic counter — chosen at
-implementation time). Existing client-side batching is the natural
-extension point.
-
-### OpenAPI / typed contract
-
-Add `LogIngestRequest` / `LogIngestResponse` mirrors to
-`src/shared/api/types.ts`, hand-duplicated per the repo's "wire DTOs
-duplicated by hand" convention.
-
-### Tests
-
-- A Rust unit test on `submit_client_logs` that asserts the request
-  shape (bearer header, JSON body) using a fake `reqwest::Client`
-  mock.
-- A TS unit test on the call site that asserts `batch_id` is generated
-  per flush and the entries are the buffered ones.
-
 ## Out of scope (explicitly NOT in this PR)
 
+- `aegis-desktop` client-side wiring — the desktop will call this
+  endpoint from a separate work thread in a follow-up PR, not via a
+  Tauri command. The endpoint is built and exercised by tests in this
+  PR; no desktop integration yet.
 - Per-batch idempotency-key header — `batchId` already covers it.
 - Compression, archival, log shipping — plain daily-rotated files.
 - Multi-tenant routing or per-`batch_id` filtering — single tenant by
@@ -224,10 +201,6 @@ duplicated by hand" convention.
 ```bash
 cargo test  -p aegis-server
 cargo clippy -p aegis-server --all-targets --all-features -- -D warnings
-cargo test  -p aegis-desktop
-cargo clippy -p aegis-desktop --all-targets --all-features -- -D warnings
-pnpm --filter aegis-desktop typecheck
-pnpm --filter aegis-desktop test
 cargo test --workspace
 cargo check --workspace
 ```
@@ -237,13 +210,11 @@ cargo check --workspace
 1. `POST /api/log-ingest/submit` is mounted under `/api/log-ingest` and
    registered in `/api-docs/openapi.json` with the bearer lock icon.
 2. Valid submission lands in the daily-rotated file under
-   `AEGIS_LOG_INGEST_DIR` with the configured prefix, one entry per
-   line, no `BATCH` header (per the previous spec's writer format).
+   `AEGIS_LOG_DIR` with prefix `AEGIS_LOG_INGEST_PREFIX` (default
+   `aegis-desktop.log`), one entry per line, no `BATCH` header (per
+   the previous spec's writer format).
 3. Duplicate `batch_id` returns `409 duplicate_batch_id` (no file
    write, since the cache short-circuits before the channel).
 4. Empty / over-cap `entries` returns `400 validation_failed`.
 5. Missing / invalid bearer returns `401`.
-6. `aegis-desktop` flush path calls the new endpoint with the
-   access token in `Authorization`; non-2xx maps to a typed
-   `ApiError::LogIngestSubmitFailed`.
-7. All tests + clippy + fmt + workspace check pass.
+6. All tests + clippy + fmt + workspace check pass.
