@@ -2344,6 +2344,29 @@ pub struct IssueListQuery {
     pub state: Option<String>,
 }
 
+/// Wire shape for `POST /api/log-ingest/submit`. Mirrors
+/// `logging_utils::LogIngestor::submit` semantics: `batch_id` is
+/// the dedup key, `entries` are the UTF-8 log lines (one per
+/// element).
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LogIngestRequest {
+    pub batch_id: String,
+    pub entries: Vec<String>,
+}
+
+/// Wire shape returned from `POST /api/log-ingest/submit`.
+/// `accepted` is the number of entries the ingestor accepted
+/// (always equals `entries.len()` on the happy path; on duplicate
+/// `batch_id` the request is rejected before reaching the
+/// ingestor, so this DTO is not returned).
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct LogIngestResponse {
+    pub batch_id: String,
+    pub accepted: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2403,6 +2426,28 @@ mod tests {
         let res: LogoutResponse = serde_json::from_str("{}").unwrap();
         let out = serde_json::to_string(&res).unwrap();
         assert_eq!(out, "{}");
+    }
+
+    // ---- log-ingest DTO round-trips (new) -----
+
+    #[test]
+    fn log_ingest_request_roundtrip() {
+        let json = r#"{"batchId":"b-1","entries":["a","b","c"]}"#;
+        let req: LogIngestRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(req.batch_id, "b-1");
+        assert_eq!(req.entries, vec!["a", "b", "c"]);
+        let out = serde_json::to_string(&req).unwrap();
+        assert_eq!(out, json);
+    }
+
+    #[test]
+    fn log_ingest_response_roundtrip() {
+        let json = r#"{"batchId":"b-1","accepted":3}"#;
+        let resp: LogIngestResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.batch_id, "b-1");
+        assert_eq!(resp.accepted, 3);
+        let out = serde_json::to_string(&resp).unwrap();
+        assert_eq!(out, json);
     }
 
     #[test]

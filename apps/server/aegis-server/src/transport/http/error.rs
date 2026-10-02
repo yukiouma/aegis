@@ -57,6 +57,9 @@ pub enum ApiError {
     #[error("{0}")]
     Mission(#[from] apis::mission::MissionApiError),
 
+    #[error("{0}")]
+    LogIngest(#[from] logging_utils::IngestorError),
+
     #[error("admin or root role required")]
     Forbidden,
 }
@@ -72,6 +75,7 @@ impl ApiError {
             Self::DomainModel(e) => domain_model_status(e),
             Self::Crf(e) => crf_status(e),
             Self::Mission(e) => mission_status(e),
+            Self::LogIngest(e) => log_ingest_status(e),
             Self::Forbidden => StatusCode::FORBIDDEN,
         }
     }
@@ -86,6 +90,7 @@ impl ApiError {
             Self::DomainModel(e) => domain_model_code(e),
             Self::Crf(e) => crf_code(e),
             Self::Mission(e) => mission_code(e),
+            Self::LogIngest(e) => log_ingest_code(e),
             Self::Forbidden => "forbidden",
         }
     }
@@ -310,6 +315,31 @@ fn mission_code(e: &apis::mission::MissionApiError) -> &'static str {
         MissionApiError::DuplicateMission { .. } => "duplicate_mission",
         MissionApiError::DuplicateAssignee { .. } => "duplicate_assignee",
         MissionApiError::Repository(_) => "repository_error",
+    }
+}
+
+fn log_ingest_status(e: &logging_utils::IngestorError) -> StatusCode {
+    use logging_utils::IngestorError;
+    match e {
+        IngestorError::DuplicateBatchId(_) => StatusCode::CONFLICT,
+        IngestorError::ChannelFull(_) | IngestorError::ShutDown => {
+            StatusCode::SERVICE_UNAVAILABLE
+        }
+        IngestorError::CreateDir { .. }
+        | IngestorError::WriterJoinTimeout { .. }
+        | IngestorError::WriterPanic(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn log_ingest_code(e: &logging_utils::IngestorError) -> &'static str {
+    use logging_utils::IngestorError;
+    match e {
+        IngestorError::DuplicateBatchId(_) => "duplicate_batch_id",
+        IngestorError::ChannelFull(_) => "channel_full",
+        IngestorError::ShutDown => "ingestor_shut_down",
+        IngestorError::CreateDir { .. } => "log_dir_create_failed",
+        IngestorError::WriterJoinTimeout { .. } => "writer_join_timeout",
+        IngestorError::WriterPanic(_) => "writer_panic",
     }
 }
 
@@ -872,5 +902,58 @@ mod tests {
             render_mission(apis::mission::MissionApiError::MissionNotFoundForIssue(42)).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(body.code, "mission_not_found_for_issue");
+    }
+
+    // ---- IngestorError (log-ingest) mapping (new) -----
+
+    use logging_utils::IngestorError;
+    use std::path::PathBuf;
+
+    #[test]
+    fn log_ingest_dispatch_duplicate_batch_id_is_409() {
+        let err = ApiError::LogIngest(IngestorError::DuplicateBatchId("b-1".into()));
+        assert_eq!(err.status(), StatusCode::CONFLICT);
+        assert_eq!(err.code(), "duplicate_batch_id");
+    }
+
+    #[test]
+    fn log_ingest_dispatch_channel_full_is_503() {
+        let err = ApiError::LogIngest(IngestorError::ChannelFull(1000));
+        assert_eq!(err.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(err.code(), "channel_full");
+    }
+
+    #[test]
+    fn log_ingest_dispatch_shut_down_is_503() {
+        let err = ApiError::LogIngest(IngestorError::ShutDown);
+        assert_eq!(err.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(err.code(), "ingestor_shut_down");
+    }
+
+    #[test]
+    fn log_ingest_dispatch_writer_join_timeout_is_500() {
+        let err = ApiError::LogIngest(IngestorError::WriterJoinTimeout {
+            deadline: std::time::Duration::from_millis(1),
+            message: "test".into(),
+        });
+        assert_eq!(err.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(err.code(), "writer_join_timeout");
+    }
+
+    #[test]
+    fn log_ingest_dispatch_writer_panic_is_500() {
+        let err = ApiError::LogIngest(IngestorError::WriterPanic("disk full".into()));
+        assert_eq!(err.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(err.code(), "writer_panic");
+    }
+
+    #[test]
+    fn log_ingest_dispatch_create_dir_is_500() {
+        let err = ApiError::LogIngest(IngestorError::CreateDir {
+            dir: PathBuf::from("/nope"),
+            source: std::io::Error::other("test"),
+        });
+        assert_eq!(err.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(err.code(), "log_dir_create_failed");
     }
 }

@@ -155,6 +155,8 @@ use crate::transport::http::error::ErrorBody;
         dto::MissionViewResponse,
         dto::MissionListResponse,
         dto::MissionByProjectQuery,
+        dto::LogIngestRequest,
+        dto::LogIngestResponse,
         ErrorBody,
     )),
     tags(
@@ -167,6 +169,7 @@ use crate::transport::http::error::ErrorBody;
         (name = "domain-model", description = "SDTM domain model version / domain / variable endpoints"),
         (name = "crf", description = "Case Report Form version / form / item / option / unit / annotation endpoints"),
         (name = "mission", description = "Mission lifecycle endpoints (leader-only writes)"),
+        (name = "log-ingest", description = "Accepts client log submissions and routes them through the LogIngestor."),
     ),
 )]
 pub struct ApiDoc;
