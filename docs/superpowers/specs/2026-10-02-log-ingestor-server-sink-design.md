@@ -97,9 +97,6 @@ reuses its access token (no new token type).
   integration tests
 
 **Files (edited):**
-- `Cargo.toml` — add `flate2 = { workspace = true }` (no new
-  workspace dep — add the entry to `[workspace.dependencies]` if it
-  isn't there yet).
 - `transport/http/http.rs` — add `pub mod log_ingest;`
 - `transport/http/router.rs` — mount with
   `.nest("/log-ingest", log_ingest::router())`
@@ -148,42 +145,6 @@ pub struct LogIngestResponse {
 
 Validation failures render through the existing `ApiError::Validation`
 arm if present, otherwise a new arm.
-
-### Content-Encoding: gzip
-
-The endpoint accepts an optional `Content-Encoding: gzip` request
-header. When present, the body is gzip-compressed JSON; the server
-decompresses before parsing. Symmetric to the most common HTTP
-client (`reqwest`'s `.send()` + `.gzip(true)`-equivalent). Uncompressed
-JSON remains the default — clients that don't send the header work
-unchanged.
-
-**Wire flow:**
-1. Read raw `Bytes` body (axum's default `Json` extractor does not
-   read raw bytes; the handler takes `Bytes` directly).
-2. If `Content-Encoding: gzip` is set, decompress via
-   `flate2::read::GzDecoder` into a `Vec<u8>`. Anything else
-   (unknown encoding, malformed gzip) → `400 validation_failed`.
-3. Parse the decompressed bytes as `LogIngestRequest`. JSON parse
-   errors → `400 validation_failed`.
-4. Run the per-field validation (empty / over-cap) on the parsed
-   struct.
-
-**Validation cap is post-decompression.** The 10 000-entry cap is
-applied to the decompressed `entries` vector, so a compressed batch
-of 9 999 entries that decompresses to 10 001 → `400`, not a
-decompression-time error. The wire-level body size is bounded by
-axum's default 2 MB limit, well below zip-bomb territory for the
-documented entry sizes.
-
-**Failures:**
-- `Content-Encoding: gzip` with malformed gzip body → `400
-  validation_failed` (code `validation_failed`, message includes
-  "gzip decode").
-- `Content-Encoding: <anything other than identity>` (e.g.
-  `deflate`, `br`) → `400 validation_failed` (only `gzip` is
-  recognised).
-- Missing / `identity` header → use bytes as-is (current behaviour).
 
 ### Error mapping
 
@@ -256,7 +217,4 @@ cargo check --workspace
    write, since the cache short-circuits before the channel).
 4. Empty / over-cap `entries` returns `400 validation_failed`.
 5. Missing / invalid bearer returns `401`.
-6. `Content-Encoding: gzip` requests decompress successfully and
-   route through the same validation + ingestor path; malformed gzip
-   and unrecognised encodings return `400 validation_failed`.
-7. All tests + clippy + fmt + workspace check pass.
+6. All tests + clippy + fmt + workspace check pass.
