@@ -316,6 +316,7 @@ mod tests {
             domain_model: Arc::new(NullDomainModelService)
                 as Arc<dyn apis::domain_model::DomainModelService>,
             mission: Arc::new(NullMissionService) as Arc<dyn apis::mission::MissionService>,
+            log_ingestor: crate::state::test_support::unused_log_ingestor(),
         }
     }
 

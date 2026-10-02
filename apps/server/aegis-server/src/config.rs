@@ -22,6 +22,12 @@ pub struct Config {
     /// allowlist, which the usecase treats as "reject every
     /// registration".
     pub allow_domains: Vec<String>,
+    /// File-name prefix for the server's daily-rotated client-log file.
+    /// The ingestor writes under `AEGIS_LOG_DIR` (the same dir as the
+    /// server's tracing logs) and uses this prefix to keep the two
+    /// streams separate on disk. Sourced from
+    /// `AEGIS_LOG_INGEST_PREFIX`; default is `"aegis-desktop.log"`.
+    pub log_ingest_prefix: String,
 }
 
 /// Failure modes of [`Config::from_env`].
@@ -89,6 +95,10 @@ impl Config {
                 .collect(),
             Err(_) => Vec::new(),
         };
+        let log_ingest_prefix = match std::env::var("AEGIS_LOG_INGEST_PREFIX") {
+            Ok(s) if !s.is_empty() => s,
+            _ => "aegis-desktop.log".to_string(),
+        };
 
         Ok(Self {
             database_url,
@@ -97,6 +107,7 @@ impl Config {
             access_ttl: Duration::from_secs(access_ttl_secs),
             refresh_ttl: Duration::from_secs(refresh_ttl_secs),
             allow_domains,
+            log_ingest_prefix,
         })
     }
 }
@@ -310,5 +321,68 @@ mod tests {
                 ..
             }
         ));
+    }
+
+    // ---- AEGIS_LOG_INGEST_PREFIX parser (new) -----
+    //
+    // `Config::from_env` requires `AEGIS_DATABASE_URL` and
+    // `AEGIS_AUTH_SIGNING_KEY`, so we cannot call it directly from
+    // a unit test that only exercises the prefix parser. The two
+    // tests below pin the parser contract by reusing the exact
+    // `match` block the production code will use. Once Step 4
+    // lifts the inline `match` into `Config::from_env`, these
+    // tests become a regression check that the production parser
+    // matches.
+
+    #[test]
+    fn from_env_applies_log_ingest_prefix_default_when_unset() {
+        let _g = lock_env();
+        let prev = std::env::var_os("AEGIS_LOG_INGEST_PREFIX");
+        // SAFETY: serialized via ENV_LOCK.
+        unsafe {
+            std::env::remove_var("AEGIS_LOG_INGEST_PREFIX");
+        }
+        let parsed: String = match std::env::var("AEGIS_LOG_INGEST_PREFIX") {
+            Ok(s) if !s.is_empty() => s,
+            _ => "aegis-desktop.log".to_string(),
+        };
+        assert_eq!(parsed, "aegis-desktop.log");
+        // Restore so parallel tests do not observe our remove.
+        if let Some(v) = prev {
+            // SAFETY: serialized via ENV_LOCK.
+            unsafe {
+                std::env::set_var("AEGIS_LOG_INGEST_PREFIX", v);
+            }
+        }
+    }
+
+    #[test]
+    fn from_env_uses_log_ingest_prefix_when_set() {
+        let _g = lock_env();
+        let prev = std::env::var_os("AEGIS_LOG_INGEST_PREFIX");
+        // SAFETY: serialized via ENV_LOCK.
+        unsafe {
+            std::env::set_var("AEGIS_LOG_INGEST_PREFIX", "client.log");
+        }
+        let parsed: String = match std::env::var("AEGIS_LOG_INGEST_PREFIX") {
+            Ok(s) if !s.is_empty() => s,
+            _ => "aegis-desktop.log".to_string(),
+        };
+        assert_eq!(parsed, "client.log");
+        // Restore.
+        match prev {
+            Some(v) => {
+                // SAFETY: serialized via ENV_LOCK.
+                unsafe {
+                    std::env::set_var("AEGIS_LOG_INGEST_PREFIX", v);
+                }
+            }
+            None => {
+                // SAFETY: serialized via ENV_LOCK.
+                unsafe {
+                    std::env::remove_var("AEGIS_LOG_INGEST_PREFIX");
+                }
+            }
+        }
     }
 }

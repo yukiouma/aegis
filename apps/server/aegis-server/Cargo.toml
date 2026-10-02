@@ -105,3 +105,8 @@ sqlx = { workspace = true }
 # `tracing-subscriber` is used by the integration test to silence
 # sqlx warnings during the live-DB run.
 tracing-subscriber = { workspace = true }
+# `tempfile` powers the new endpoint's handler tests (the
+# `LogIngestor` writes to a scoped tempdir) and the
+# `state::test_support::unused_log_ingestor()` helper for existing
+# test suites. Inherits the workspace version.
+tempfile = { workspace = true }

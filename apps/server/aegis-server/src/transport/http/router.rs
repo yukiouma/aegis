@@ -344,6 +344,7 @@ mod tests {
                 as Arc<dyn apis::mission::MissionService>,
             crf: Arc::new(crate::state::test_support::NullCrfService)
                 as Arc<dyn apis::crf::CrfService>,
+            log_ingestor: crate::state::test_support::unused_log_ingestor(),
         }
     }
 
@@ -363,6 +364,7 @@ mod tests {
                 as Arc<dyn apis::mission::MissionService>,
             crf: Arc::new(crate::state::test_support::NullCrfService)
                 as Arc<dyn apis::crf::CrfService>,
+            log_ingestor: crate::state::test_support::unused_log_ingestor(),
         }
     }
 
@@ -381,6 +383,7 @@ mod tests {
                 as Arc<dyn apis::mission::MissionService>,
             crf: Arc::new(crate::state::test_support::NullCrfService)
                 as Arc<dyn apis::crf::CrfService>,
+            log_ingestor: crate::state::test_support::unused_log_ingestor(),
         }
     }
 
@@ -1222,6 +1225,7 @@ mod tests {
                 as Arc<dyn apis::mission::MissionService>,
             crf: Arc::new(crate::state::test_support::NullCrfService)
                 as Arc<dyn apis::crf::CrfService>,
+            log_ingestor: crate::state::test_support::unused_log_ingestor(),
         }
     }
 
@@ -1728,6 +1732,7 @@ mod tests {
             mission: Arc::new(crate::state::test_support::NullMissionService)
                 as Arc<dyn apis::mission::MissionService>,
             crf: Arc::new(StubCrfService) as Arc<dyn apis::crf::CrfService>,
+            log_ingestor: crate::state::test_support::unused_log_ingestor(),
         }
     }
 

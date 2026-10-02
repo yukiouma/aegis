@@ -15,6 +15,7 @@ pub struct AppState {
     pub domain_model: Arc<dyn apis::domain_model::DomainModelService>,
     pub mission: Arc<dyn apis::mission::MissionService>,
     pub crf: Arc<dyn apis::crf::CrfService>,
+    pub log_ingestor: Arc<logging_utils::LogIngestor>,
 }
 
 #[cfg(test)]
@@ -26,7 +27,25 @@ pub(crate) mod test_support {
     //! copy-pasting 100-line `#[async_trait] impl` blocks across six
     //! test modules, the common null doubles live here.
 
+    use std::sync::Arc;
+
     use async_trait::async_trait;
+
+    /// A `LogIngestor` for tests that need an `AppState` but never
+    /// touch the `log_ingest` endpoint. The internal tempdir is
+    /// scoped to the returned `Arc`'s lifetime — when the test drops
+    /// `AppState`, `LogIngestor::shutdown` runs (with its deadline)
+    /// and the tempdir cleanup is best-effort. The dir does not need
+    /// to be writable for tests that never call `submit`.
+    pub(crate) fn unused_log_ingestor() -> Arc<logging_utils::LogIngestor> {
+        use logging_utils::{LogIngestor, LogIngestorConfig};
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let cfg = LogIngestorConfig::builder()
+            .log_dir(tmp.path().to_path_buf())
+            .file_name_prefix("unused.log".into())
+            .build();
+        Arc::new(LogIngestor::new(cfg).expect("ingestor init"))
+    }
 
     /// Null terminology service for tests that don't exercise the
     /// terminology surface. Every method panics with
