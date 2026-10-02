@@ -164,6 +164,10 @@ mod tests {
         );
         let resp = router(state).oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert!(
+            file_contents(tmp.path()).is_empty(),
+            "spec: empty entries → 400 with no file write",
+        );
     }
 
     #[tokio::test]
@@ -198,6 +202,10 @@ mod tests {
         );
         let resp = router(state).oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        assert!(
+            file_contents(tmp.path()).is_empty(),
+            "spec: over-cap entries → 400 with no file write",
+        );
     }
 
     #[tokio::test]
@@ -226,6 +234,11 @@ mod tests {
         );
         let resp2 = router(state).oneshot(req2).await.unwrap();
         assert_eq!(resp2.status(), StatusCode::CONFLICT);
+        assert_eq!(
+            file_contents(tmp.path()),
+            vec!["first".to_string()],
+            "spec: duplicate batch_id → 409 with no file write for the second batch",
+        );
     }
 
     #[tokio::test]
