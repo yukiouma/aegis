@@ -60,6 +60,9 @@ pub enum ApiError {
     #[error("{0}")]
     LogIngest(#[from] logging_utils::IngestorError),
 
+    #[error("validation failed: {0}")]
+    Validation(String),
+
     #[error("admin or root role required")]
     Forbidden,
 }
@@ -76,6 +79,7 @@ impl ApiError {
             Self::Crf(e) => crf_status(e),
             Self::Mission(e) => mission_status(e),
             Self::LogIngest(e) => log_ingest_status(e),
+            Self::Validation(_) => StatusCode::BAD_REQUEST,
             Self::Forbidden => StatusCode::FORBIDDEN,
         }
     }
@@ -91,6 +95,7 @@ impl ApiError {
             Self::Crf(e) => crf_code(e),
             Self::Mission(e) => mission_code(e),
             Self::LogIngest(e) => log_ingest_code(e),
+            Self::Validation(_) => "validation_failed",
             Self::Forbidden => "forbidden",
         }
     }
@@ -322,9 +327,7 @@ fn log_ingest_status(e: &logging_utils::IngestorError) -> StatusCode {
     use logging_utils::IngestorError;
     match e {
         IngestorError::DuplicateBatchId(_) => StatusCode::CONFLICT,
-        IngestorError::ChannelFull(_) | IngestorError::ShutDown => {
-            StatusCode::SERVICE_UNAVAILABLE
-        }
+        IngestorError::ChannelFull(_) | IngestorError::ShutDown => StatusCode::SERVICE_UNAVAILABLE,
         IngestorError::CreateDir { .. }
         | IngestorError::WriterJoinTimeout { .. }
         | IngestorError::WriterPanic(_) => StatusCode::INTERNAL_SERVER_ERROR,

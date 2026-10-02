@@ -31,6 +31,7 @@ use crate::transport::http::auth;
 use crate::transport::http::crf::router as crf_router;
 use crate::transport::http::domain_model::router as domain_model_router;
 use crate::transport::http::healthz;
+use crate::transport::http::log_ingest::router as log_ingest_router;
 use crate::transport::http::mission::router as mission_router;
 use crate::transport::http::openapi::ApiDoc;
 use crate::transport::http::project::router as project_router;
@@ -59,7 +60,8 @@ pub fn router(state: AppState) -> axum::Router {
         .nest("/terminology", terminology_routes)
         .nest("/domain-model", domain_model_routes)
         .nest("/crf", crf_routes)
-        .nest("/mission", mission_routes);
+        .nest("/mission", mission_routes)
+        .nest("/log-ingest", log_ingest_router::router());
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
         .nest("/api", api_routers)
@@ -776,6 +778,7 @@ mod tests {
                 "{method} {path} must advertise a 403 response (got {response_keys:?})",
             );
         }
+        assert!(doc["paths"]["/api/log-ingest/submit"].is_object());
     }
 
     // ---- /api/user integration --------------------------------------

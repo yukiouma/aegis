@@ -79,13 +79,11 @@ pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send 
         .log_dir(std::path::PathBuf::from(&log_dir))
         .file_name_prefix(config.log_ingest_prefix.clone())
         .build();
-    let log_ingestor = Arc::new(
-        logging_utils::LogIngestor::new(log_ingest_cfg).map_err(
-            |e| -> Box<dyn std::error::Error + Send + Sync> {
-                format!("log_ingestor init: {e}").into()
-            },
-        )?,
-    );
+    let log_ingestor = Arc::new(logging_utils::LogIngestor::new(log_ingest_cfg).map_err(
+        |e| -> Box<dyn std::error::Error + Send + Sync> {
+            format!("log_ingestor init: {e}").into()
+        },
+    )?);
 
     let state = AppState {
         auth,

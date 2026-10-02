@@ -660,4 +660,160 @@ pub(crate) mod test_support {
             unimplemented!()
         }
     }
+
+    /// Null auth service for tests that need an `AppState` but don't
+    /// exercise the auth surface. [`verify`](apis::auth::AuthService::verify)
+    /// accepts any non-empty bearer token and returns a fixed
+    /// `AuthClaims` so bearer-auth gates fire for tests that need a
+    /// logged-in identity. Every other method panics with
+    /// `unimplemented!()`.
+    #[derive(Clone)]
+    pub(crate) struct NullAuthService;
+
+    #[async_trait]
+    impl apis::auth::AuthService for NullAuthService {
+        async fn login_with_password(
+            &self,
+            _req: apis::auth::LoginWithPasswordRequest,
+        ) -> Result<apis::auth::TokenPair, apis::auth::AuthApiError> {
+            unimplemented!()
+        }
+        async fn login_with_domain_user_info(
+            &self,
+            _req: apis::auth::LoginWithDomainUserInfoRequest,
+        ) -> Result<apis::auth::TokenPair, apis::auth::AuthApiError> {
+            unimplemented!()
+        }
+        async fn verify(
+            &self,
+            req: apis::auth::VerifyRequest,
+        ) -> Result<apis::auth::AuthClaims, apis::auth::AuthApiError> {
+            if req.access_token.is_empty() {
+                return Err(apis::auth::AuthApiError::Verification("empty token".into()));
+            }
+            Ok(apis::auth::AuthClaims {
+                code: "test-user".into(),
+                role: apis::user::Role::General,
+                token_version: 0,
+            })
+        }
+        async fn refresh(
+            &self,
+            _req: apis::auth::RefreshRequest,
+        ) -> Result<apis::auth::RefreshResponse, apis::auth::AuthApiError> {
+            unimplemented!()
+        }
+        async fn find_user_credential_by_code(
+            &self,
+            _code: &str,
+        ) -> Result<apis::auth::UserCredentialView, apis::auth::AuthApiError> {
+            unimplemented!()
+        }
+        async fn create_user_credential(
+            &self,
+            _req: apis::auth::CreateUserCredentialRequest,
+        ) -> Result<apis::auth::UserCredentialView, apis::auth::AuthApiError> {
+            unimplemented!()
+        }
+        async fn update_user_credential(
+            &self,
+            _req: apis::auth::UpdateUserCredentialRequest,
+        ) -> Result<apis::auth::UserCredentialView, apis::auth::AuthApiError> {
+            unimplemented!()
+        }
+        async fn remove_user_credential(
+            &self,
+            _code: &str,
+        ) -> Result<apis::auth::RemoveUserCredentialResponse, apis::auth::AuthApiError> {
+            unimplemented!()
+        }
+        async fn logout(
+            &self,
+            _req: apis::auth::LogoutRequest,
+        ) -> Result<apis::auth::LogoutResponse, apis::auth::AuthApiError> {
+            unimplemented!()
+        }
+        async fn register_user(
+            &self,
+            _req: apis::auth::RegisterUserRequest,
+        ) -> Result<apis::auth::RegisterUserResponse, apis::auth::AuthApiError> {
+            unimplemented!()
+        }
+    }
+
+    /// Null user service for tests that need an `AppState` but never
+    /// exercise the user surface. Every method panics with
+    /// `unimplemented!()`.
+    #[derive(Clone)]
+    pub(crate) struct NullUserService;
+
+    #[async_trait]
+    impl apis::user::UserService for NullUserService {
+        async fn create(
+            &self,
+            _req: apis::user::CreateUserRequest,
+        ) -> Result<apis::user::UserView, apis::user::UserApiError> {
+            unimplemented!()
+        }
+        async fn get_by_id(
+            &self,
+            _id: i32,
+        ) -> Result<apis::user::UserView, apis::user::UserApiError> {
+            unimplemented!()
+        }
+        async fn get_by_code(
+            &self,
+            _code: &str,
+        ) -> Result<apis::user::UserView, apis::user::UserApiError> {
+            unimplemented!()
+        }
+        async fn list(&self) -> Result<Vec<apis::user::UserView>, apis::user::UserApiError> {
+            unimplemented!()
+        }
+        async fn update(
+            &self,
+            _req: apis::user::UpdateUserRequest,
+        ) -> Result<apis::user::UserView, apis::user::UserApiError> {
+            unimplemented!()
+        }
+    }
+
+    /// Null project service for tests that need an `AppState` but
+    /// never exercise the project surface. Every method panics with
+    /// `unimplemented!()`.
+    #[derive(Clone)]
+    pub(crate) struct NullProjectService;
+
+    #[async_trait]
+    impl apis::project::ProjectService for NullProjectService {
+        async fn create_project(
+            &self,
+            _req: apis::project::CreateProjectRequest,
+        ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+        async fn get_project_by_id(
+            &self,
+            _id: i32,
+        ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+        async fn get_project_by_code(
+            &self,
+            _code: &str,
+        ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+        async fn list_projects(
+            &self,
+        ) -> Result<Vec<apis::project::ProjectView>, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+        async fn update_project(
+            &self,
+            _req: apis::project::UpdateProjectRequest,
+        ) -> Result<apis::project::ProjectView, apis::project::ProjectApiError> {
+            unimplemented!()
+        }
+    }
 }

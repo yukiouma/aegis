@@ -38,11 +38,11 @@ use aegis_server::transport::http::router as http_router;
 use apis::auth::AuthService;
 use apis::project::ProjectService;
 use apis::user::UserService;
-use logging_utils::{LogIngestor, LogIngestorConfig};
 use auth::{
     AuthServiceImpl, AuthUsecase, AuthUsecaseConfig, DomainIdentityRepo, InMemoryTokenVersionCache,
     TokenVersionCache, UserCredentialsRepo, UserServiceImpl as AuthUserServiceImpl,
 };
+use logging_utils::{LogIngestor, LogIngestorConfig};
 use user::{UserRepo, UserServiceImpl, UserUsecase};
 
 /// Fixed test password. The matching Argon2 hash is seeded into
