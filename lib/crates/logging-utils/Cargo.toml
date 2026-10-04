@@ -12,6 +12,10 @@ thiserror          = { workspace = true }
 # the submitter can hold an `Arc<dyn LogSender>` and stay
 # runtime-agnostic.
 async-trait = { workspace = true }
+# `serde_json` encodes/decodes the pending-dir file format (a JSON
+# array of log entries) and the tracing layer's per-event
+# formatting. Already a workspace dep.
+serde_json = { workspace = true }
 # `ulid` generates the time-sortable log ids that compose a trace id
 # (mirrored from the `trace-id` crate — the two crates carry the
 # same logic independently, not via a dep).
