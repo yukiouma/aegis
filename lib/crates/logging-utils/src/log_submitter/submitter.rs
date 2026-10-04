@@ -10,8 +10,9 @@ use std::time::Duration;
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use ulid::Ulid;
 
+use super::config::LogSubmitterConfig;
 use super::pending::PendingStore;
-use super::sender::LogSender;
+use super::sender::{LogSender, SubmitterError};
 
 /// Mint a batch id: `{device_id}-{ULID}`.
 ///
@@ -140,7 +141,6 @@ async fn flush(ctx: &WorkerCtx, batch: &mut Vec<String>) {
 #[cfg(test)]
 pub(crate) mod tests_support {
     use super::super::config::LogSubmitterConfig;
-    use super::super::sender::SubmitterError;
     use super::*;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, Mutex};
@@ -459,5 +459,320 @@ mod tests {
             store.list_newest_first().is_empty(),
             "an already-ingested batch is done; its file must go"
         );
+    }
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::tests_support::{RecordingSender, make_config};
+    use super::*;
+
+    fn wait_for(sender: &RecordingSender, n: usize) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while sender.accepted().len() < n {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "timed out waiting for {n} batches; got {:?}",
+                sender.accepted()
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    /// A sender that stalls on its *first* call only, so the worker
+    /// parks long enough for the test to fill the channel, then
+    /// drains promptly so shutdown is not serialised behind 64 slow
+    /// sends.
+    #[derive(Debug, Default)]
+    struct SlowSender {
+        stalled: std::sync::atomic::AtomicBool,
+    }
+
+    #[async_trait::async_trait]
+    impl LogSender for SlowSender {
+        async fn send(
+            &self,
+            _batch_id: &str,
+            _log_entries: Vec<String>,
+        ) -> Result<(), SubmitterError> {
+            if !self.stalled.swap(true, std::sync::atomic::Ordering::AcqRel) {
+                std::thread::sleep(Duration::from_millis(1_500));
+            }
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn submit_delivers_an_entry_to_the_sender() {
+        let sender = RecordingSender::shared();
+        let mut sub = LogSubmitter::new(make_config(sender.clone(), 2, 16)).unwrap();
+        sub.submit("one".into()).unwrap();
+        sub.submit("two".into()).unwrap();
+        wait_for(&sender, 1);
+        let accepted = sender.accepted();
+        assert_eq!(
+            accepted[0].1,
+            vec!["one".to_string(), "two".to_string()]
+        );
+        sub.shutdown().unwrap();
+    }
+
+    #[test]
+    fn dropped_counts_entries_lost_to_a_full_buffer() {
+        // Backpressure only bites while the worker is parked in an
+        // in-flight `send`; otherwise it drains the channel into its
+        // own in-memory batch and `try_send` never sees it full.
+        let sender = Arc::new(SlowSender::default());
+        let mut sub = LogSubmitter::new(make_config(sender, 1, 64)).unwrap();
+        sub.submit("occupy-the-worker".into()).unwrap();
+        // Give the worker time to reach the slow send.
+        std::thread::sleep(Duration::from_millis(100));
+        for i in 0..5_000 {
+            let _ = sub.submit(format!("flood-{i}"));
+        }
+        assert!(
+            sub.dropped() > 0,
+            "a full buffer should be counted, not silently swallowed"
+        );
+        sub.shutdown().unwrap();
+    }
+
+    #[test]
+    fn shutdown_is_idempotent() {
+        let sender = RecordingSender::shared();
+        let mut sub = LogSubmitter::new(make_config(sender, 100, 16)).unwrap();
+        sub.shutdown().unwrap();
+        sub.shutdown().unwrap();
+    }
+
+    #[test]
+    fn submit_after_shutdown_reports_channel_closed() {
+        let sender = RecordingSender::shared();
+        let mut sub = LogSubmitter::new(make_config(sender, 100, 16)).unwrap();
+        sub.shutdown().unwrap();
+        let err = sub.submit("late".into()).unwrap_err();
+        assert!(matches!(err, SubmitterError::ChannelClosed), "got {err:?}");
+    }
+
+    #[test]
+    fn handle_shares_the_dropped_counter_and_survives_shutdown() {
+        let sender = RecordingSender::shared();
+        let mut sub = LogSubmitter::new(make_config(sender, 100, 16)).unwrap();
+        let handle = sub.handle();
+        assert_eq!(handle.dropped(), sub.dropped());
+        handle.submit("via-handle".into()).unwrap();
+        sub.shutdown().unwrap();
+        // The layer's handle outlives shutdown; it must report the
+        // worker as gone rather than silently dropping.
+        assert!(matches!(
+            handle.submit("after".into()),
+            Err(SubmitterError::ChannelClosed)
+        ));
+    }
+}
+
+/// The producer side, shared with the `tracing` layer.
+///
+/// Cheap to clone and holds no thread handle, so the layer can keep
+/// one for the process lifetime without pinning the worker alive.
+#[derive(Clone)]
+pub struct SubmitHandle {
+    inner: Arc<Inner>,
+}
+
+struct Inner {
+    /// `None` once the worker is shut down. The sender lives behind
+    /// an `Option` rather than being dropped directly because the
+    /// `tracing` layer holds a clone of this handle: dropping only
+    /// the `LogSubmitter`'s copy would leave the channel open and
+    /// the worker blocked in `recv_timeout` until its full interval
+    /// elapsed, turning every shutdown into a timeout.
+    tx: std::sync::Mutex<Option<crossbeam_channel::Sender<String>>>,
+    dropped: std::sync::atomic::AtomicU64,
+}
+
+impl std::fmt::Debug for SubmitHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SubmitHandle")
+            .field("dropped", &self.dropped())
+            .finish()
+    }
+}
+
+impl SubmitHandle {
+    /// Hand one formatted entry to the worker.
+    ///
+    /// A full buffer is **not** an error: this is called from a
+    /// `tracing` layer's write path, where the only honest options
+    /// are to drop the line or to block the thread that emitted it.
+    /// The drop is counted instead, so the loss is observable via
+    /// [`SubmitHandle::dropped`].
+    pub fn submit(&self, entry: String) -> Result<(), SubmitterError> {
+        let guard = self
+            .inner
+            .tx
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let Some(tx) = guard.as_ref() else {
+            return Err(SubmitterError::ChannelClosed);
+        };
+        let outcome = tx.try_send(entry);
+        drop(guard);
+        match outcome {
+            Ok(()) => Ok(()),
+            Err(crossbeam_channel::TrySendError::Full(_)) => {
+                self.inner
+                    .dropped
+                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                Ok(())
+            }
+            Err(crossbeam_channel::TrySendError::Disconnected(_)) => Err(SubmitterError::ChannelClosed),
+        }
+    }
+
+    /// Entries lost to a full buffer since startup.
+    pub fn dropped(&self) -> u64 {
+        self.inner
+            .dropped
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+/// The batching worker. Owns the thread; manage it for the process
+/// lifetime or it stops submitting.
+#[derive(Debug)]
+pub struct LogSubmitter {
+    done_rx: Option<crossbeam_channel::Receiver<()>>,
+    worker: Option<std::thread::JoinHandle<()>>,
+    handle: SubmitHandle,
+    deadline: Duration,
+}
+
+impl LogSubmitter {
+    /// Create the pending directory and spawn the worker thread.
+    pub fn new(config: LogSubmitterConfig) -> Result<Self, SubmitterError> {
+        let pending = PendingStore::new(config.pending_dir.clone(), config.max_pending_files);
+        pending.create_dir()?;
+
+        let (tx, rx) = crossbeam_channel::bounded::<String>(config.buffer_capacity);
+        let (done_tx, done_rx) = crossbeam_channel::bounded::<()>(1);
+        let ctx = WorkerCtx {
+            device_id: config.device_id.clone(),
+            batch_size: config.batch_size,
+            interval: config.interval,
+            pending,
+            sender: config.sender,
+        };
+
+        // A current-thread runtime with `enable_all` cannot fail in
+        // practice; `HttpClient::new` makes the same bet for its
+        // client. `expect` keeps a second error variant off the
+        // public surface for a case that does not occur.
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("current-thread runtime builds");
+
+        let worker = std::thread::spawn(move || {
+            runtime.block_on(run_worker(rx, ctx, done_tx));
+        });
+
+        let handle = SubmitHandle {
+            inner: Arc::new(Inner {
+                tx: std::sync::Mutex::new(Some(tx)),
+                dropped: std::sync::atomic::AtomicU64::new(0),
+            }),
+        };
+
+        Ok(Self {
+            done_rx: Some(done_rx),
+            worker: Some(worker),
+            handle,
+            deadline: config.shutdown_deadline,
+        })
+    }
+
+    /// A cloneable producer handle for the `tracing` layer.
+    pub fn handle(&self) -> SubmitHandle {
+        self.handle.clone()
+    }
+
+    /// See [`SubmitHandle::submit`].
+    pub fn submit(&self, entry: String) -> Result<(), SubmitterError> {
+        self.handle.submit(entry)
+    }
+
+    /// See [`SubmitHandle::dropped`].
+    pub fn dropped(&self) -> u64 {
+        self.handle.dropped()
+    }
+
+    /// Drain the buffer and join the worker within
+    /// `shutdown_deadline`. Idempotent; also runs from `Drop`.
+    pub fn shutdown(&mut self) -> Result<(), SubmitterError> {
+        if self.worker.is_none() {
+            return Ok(());
+        }
+        // Taking the sender — which the `SubmitHandle` shares with
+        // the layer — is what closes the channel. The worker then
+        // sees `Disconnected`, flushes what it has, and signals done.
+        {
+            let mut guard = self
+                .handle
+                .inner
+                .tx
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            guard.take();
+        }
+        let done_rx = self
+            .done_rx
+            .take()
+            .expect("done_rx present iff worker is");
+        let worker = self
+            .worker
+            .take()
+            .expect("worker present iff not yet shut down");
+
+        match done_rx.recv_timeout(self.deadline) {
+            Ok(()) => match worker.join() {
+                Ok(()) => Ok(()),
+                Err(payload) => Err(SubmitterError::WorkerPanic(panic_message(&payload))),
+            },
+            Err(_) => {
+                if worker.is_finished() {
+                    match worker.join() {
+                        Ok(()) => Err(SubmitterError::WorkerJoinTimeout {
+                            deadline: self.deadline,
+                            message: "worker exited without signalling done".into(),
+                        }),
+                        Err(payload) => Err(SubmitterError::WorkerPanic(panic_message(&payload))),
+                    }
+                } else {
+                    Err(SubmitterError::WorkerJoinTimeout {
+                        deadline: self.deadline,
+                        message: "worker thread did not exit in time".into(),
+                    })
+                }
+            }
+        }
+    }
+}
+
+impl Drop for LogSubmitter {
+    fn drop(&mut self) {
+        let _ = self.shutdown();
+    }
+}
+
+/// Best-effort conversion of a panic payload to a UTF-8 string;
+/// mirrors the helper in `log_ingestor`.
+fn panic_message(payload: &Box<dyn std::any::Any + Send + 'static>) -> String {
+    if let Some(s) = payload.downcast_ref::<&'static str>() {
+        (*s).to_string()
+    } else if let Some(s) = payload.downcast_ref::<String>() {
+        s.clone()
+    } else {
+        format!("{payload:?}")
     }
 }

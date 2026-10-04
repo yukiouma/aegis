@@ -7,6 +7,7 @@
 mod config;
 mod pending;
 mod sender;
+pub use submitter::{LogSubmitter, SubmitHandle};
 mod submitter;
 
 pub use config::{LogSubmitterConfig, LogSubmitterConfigBuilder};
