@@ -9,9 +9,9 @@
 
 use std::io;
 
+use tracing_subscriber::Registry;
 use tracing_subscriber::fmt::MakeWriter;
 use tracing_subscriber::layer::Layer;
-use tracing_subscriber::Registry;
 
 use super::submitter::SubmitHandle;
 
@@ -124,8 +124,7 @@ mod tests {
     fn captured_entry_is_the_json_formatted_event() {
         let sender = RecordingSender::shared();
         let mut submitter = LogSubmitter::new(make_config(sender.clone(), 1, 256)).unwrap();
-        let subscriber = tracing_subscriber::registry()
-            .with(submit_layer(submitter.handle()));
+        let subscriber = tracing_subscriber::registry().with(submit_layer(submitter.handle()));
         tracing::subscriber::with_default(subscriber, || {
             tracing::info!(request_id = "abc", "hello from the layer");
         });
@@ -145,8 +144,7 @@ mod tests {
     fn two_events_produce_two_entries() {
         let sender = RecordingSender::shared();
         let mut submitter = LogSubmitter::new(make_config(sender.clone(), 1, 256)).unwrap();
-        let subscriber = tracing_subscriber::registry()
-            .with(submit_layer(submitter.handle()));
+        let subscriber = tracing_subscriber::registry().with(submit_layer(submitter.handle()));
         tracing::subscriber::with_default(subscriber, || {
             tracing::info!("first");
             tracing::info!("second");
@@ -161,14 +159,8 @@ mod tests {
                     .to_string()
             })
             .collect();
-        assert!(
-            messages.contains(&"first".to_string()),
-            "got {messages:?}"
-        );
-        assert!(
-            messages.contains(&"second".to_string()),
-            "got {messages:?}"
-        );
+        assert!(messages.contains(&"first".to_string()), "got {messages:?}");
+        assert!(messages.contains(&"second".to_string()), "got {messages:?}");
         submitter.shutdown().unwrap();
     }
 
@@ -176,8 +168,7 @@ mod tests {
     fn captured_entries_carry_no_trailing_newline() {
         let sender = RecordingSender::shared();
         let mut submitter = LogSubmitter::new(make_config(sender.clone(), 1, 256)).unwrap();
-        let subscriber = tracing_subscriber::registry()
-            .with(submit_layer(submitter.handle()));
+        let subscriber = tracing_subscriber::registry().with(submit_layer(submitter.handle()));
         tracing::subscriber::with_default(subscriber, || {
             tracing::info!("trimmed");
         });

@@ -52,10 +52,15 @@ use crate::transport;
 /// The function only returns on bind / serve failure or shutdown.
 pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let log_dir = std::env::var("AEGIS_LOG_DIR").unwrap_or_else(|_| "./logs".to_string());
-    let _log_guard = logging_utils::init_tracing(&logging_utils::LoggingConfig {
-        log_dir: std::path::PathBuf::from(log_dir.clone()),
-        file_name_prefix: "aegis-server.log".into(),
-    })
+    let _log_guard = logging_utils::init_tracing(
+        &logging_utils::LoggingConfig {
+            log_dir: std::path::PathBuf::from(log_dir.clone()),
+            file_name_prefix: "aegis-server.log".into(),
+        },
+        // The server is the sink for client logs, not a client: it
+        // has nothing of its own to submit.
+        Vec::new(),
+    )
     .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
         format!("init_tracing: {e}").into()
     })?;

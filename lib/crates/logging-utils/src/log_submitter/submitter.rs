@@ -510,10 +510,7 @@ mod lifecycle_tests {
         sub.submit("two".into()).unwrap();
         wait_for(&sender, 1);
         let accepted = sender.accepted();
-        assert_eq!(
-            accepted[0].1,
-            vec!["one".to_string(), "two".to_string()]
-        );
+        assert_eq!(accepted[0].1, vec!["one".to_string(), "two".to_string()]);
         sub.shutdown().unwrap();
     }
 
@@ -626,7 +623,9 @@ impl SubmitHandle {
                     .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 Ok(())
             }
-            Err(crossbeam_channel::TrySendError::Disconnected(_)) => Err(SubmitterError::ChannelClosed),
+            Err(crossbeam_channel::TrySendError::Disconnected(_)) => {
+                Err(SubmitterError::ChannelClosed)
+            }
         }
     }
 
@@ -725,10 +724,7 @@ impl LogSubmitter {
                 .unwrap_or_else(|poisoned| poisoned.into_inner());
             guard.take();
         }
-        let done_rx = self
-            .done_rx
-            .take()
-            .expect("done_rx present iff worker is");
+        let done_rx = self.done_rx.take().expect("done_rx present iff worker is");
         let worker = self
             .worker
             .take()

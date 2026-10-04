@@ -37,11 +37,7 @@ impl PendingStore {
     }
 
     /// Write `entries` under `batch_id`, then enforce the file cap.
-    pub(crate) fn persist(
-        &self,
-        batch_id: &str,
-        entries: &[String],
-    ) -> Result<(), SubmitterError> {
+    pub(crate) fn persist(&self, batch_id: &str, entries: &[String]) -> Result<(), SubmitterError> {
         // `serde_json::Error` is not an `io::Error`, so the codec
         // failure is boxed into one to keep `SubmitterError::Persist`
         // carrying a single inner type.
@@ -181,7 +177,11 @@ mod tests {
         }
         assert_eq!(
             s.list_newest_first(),
-            vec!["dev-A05HQ".to_string(), "dev-A03HQ".to_string(), "dev-A01HQ".to_string()]
+            vec![
+                "dev-A05HQ".to_string(),
+                "dev-A03HQ".to_string(),
+                "dev-A01HQ".to_string()
+            ]
         );
     }
 

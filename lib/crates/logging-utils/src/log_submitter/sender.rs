@@ -38,10 +38,7 @@ pub enum SubmitterError {
     #[error("submitter worker thread panicked: {0}")]
     WorkerPanic(String),
     #[error("submitter worker thread failed to join within {deadline:?}: {message}")]
-    WorkerJoinTimeout {
-        deadline: Duration,
-        message: String,
-    },
+    WorkerJoinTimeout { deadline: Duration, message: String },
 }
 
 /// Delivers a batch of log lines to the sink.
@@ -53,11 +50,7 @@ pub trait LogSender: Debug + Send + Sync {
     /// Submit one batch. `batch_id` identifies the batch for
     /// idempotency; a sink that has already accepted a given id must
     /// say so rather than accepting it twice.
-    async fn send(
-        &self,
-        batch_id: &str,
-        log_entries: Vec<String>,
-    ) -> Result<(), SubmitterError>;
+    async fn send(&self, batch_id: &str, log_entries: Vec<String>) -> Result<(), SubmitterError>;
 
     /// Classify `err` as "the sink already has this batch".
     ///

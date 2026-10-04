@@ -27,11 +27,7 @@ struct NoopSender;
 
 #[async_trait::async_trait]
 impl LogSender for NoopSender {
-    async fn send(
-        &self,
-        _batch_id: &str,
-        _log_entries: Vec<String>,
-    ) -> Result<(), SubmitterError> {
+    async fn send(&self, _batch_id: &str, _log_entries: Vec<String>) -> Result<(), SubmitterError> {
         Ok(())
     }
 }
@@ -215,11 +211,8 @@ mod tests {
 
     #[test]
     fn clone_preserves_scalar_fields() {
-        let original = LogSubmitterConfig::new(
-            "dev-4".to_string(),
-            sender(),
-            PathBuf::from("/tmp/p4"),
-        );
+        let original =
+            LogSubmitterConfig::new("dev-4".to_string(), sender(), PathBuf::from("/tmp/p4"));
         let cloned = original.clone();
         assert_eq!(original.device_id, cloned.device_id);
         assert_eq!(original.batch_size, cloned.batch_size);
