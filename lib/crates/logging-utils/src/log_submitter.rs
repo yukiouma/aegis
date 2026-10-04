@@ -4,6 +4,8 @@
 //!
 //! See `docs/superpowers/specs/2026-10-04-log-submitter-design.md`.
 
+mod config;
 mod sender;
 
+pub use config::{LogSubmitterConfig, LogSubmitterConfigBuilder};
 pub use sender::{LogSender, SubmitterError};
