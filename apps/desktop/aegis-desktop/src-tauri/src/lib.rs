@@ -125,36 +125,25 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             greet,
         ])
         .setup(|app| {
-            // Tracing init: prefer $AEGIS_LOG_DIR; fall back to
-            // <app_data_dir>/logs. LogGuard is stashed in managed
-            // state so the buffered writer lives for the process.
-            let log_dir = std::env::var("AEGIS_LOG_DIR")
-                .map(PathBuf::from)
-                .unwrap_or_else(|_| {
-                    app.path()
-                        .app_data_dir()
-                        .expect("app_data_dir resolves")
-                        .join("logs")
-                });
-            let log_guard = logging_utils::init_tracing(
-                &logging_utils::LoggingConfig {
-                    log_dir: log_dir.clone(),
-                    file_name_prefix: "aegis-desktop.log".into(),
-                },
-                Vec::new(),
-            )
-            .map_err(|e| format!("init_tracing: {e}"))?;
-            tracing::info!(
-                log_dir = %log_dir.display(),
-                "aegis-desktop tracing initialised"
-            );
-            app.manage(log_guard);
+            // Order matters. The submitter needs the HTTP client, and
+            // the submit layer has to be installed in the *same*
+            // `init_tracing` call that installs the file layer —
+            // `try_init` only takes effect once per process, so a
+            // second call would silently add nothing. Building the
+            // client first costs us only the logs emitted before
+            // `setup` runs, which the previous ordering lost anyway.
+            let store = app
+                .store("auth.bin")
+                .map_err(|e| format!("failed to open auth.bin store: {e}"))?;
+            let tokens = Arc::new(http::client::TauriStore::new(store));
+            let client = http::client::HttpClient::new(http::config::BASE_URL.to_string(), tokens);
 
-            // Per-install device prefix: persisted in app-data dir
-            // so a workstation keeps a stable middle segment on
-            // every trace id it emits. load_or_create is best-effort
-            // and falls back to a freshly-minted, non-persisted
-            // prefix on I/O errors.
+            // Per-install device prefix: persisted in app-data dir so
+            // a workstation keeps a stable middle segment on every
+            // trace id it emits — and, now, on every batch id the
+            // submitter mints. load_or_create is best-effort and
+            // falls back to a freshly-minted, non-persisted prefix
+            // on I/O errors.
             let app_data_dir = app
                 .path()
                 .app_data_dir()
@@ -166,13 +155,55 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .display(),
                 "trace id generator ready"
             );
+            // Read the prefix before the generator is moved into
+            // managed state, so a batch id and a trace id from this
+            // install always share the same middle segment.
+            let device_id = generator.device_prefix().unwrap_or("desktop").to_string();
             app.manage(generator);
 
-            let store = app
-                .store("auth.bin")
-                .map_err(|e| format!("failed to open auth.bin store: {e}"))?;
-            let tokens = Arc::new(http::client::TauriStore::new(store));
-            let client = http::client::HttpClient::new(http::config::BASE_URL.to_string(), tokens);
+            // Batched submission of this process's own logs to the
+            // server. A failed batch is persisted under
+            // <app_data_dir>/pending-logs and retried newest-first
+            // on later cycles, bounded by `max_pending_files`.
+            let submitter = logging_utils::LogSubmitter::new(
+                logging_utils::LogSubmitterConfig::builder()
+                    .device_id(device_id)
+                    .sender(Arc::new(http::log_ingest::HttpLogSender::new(Arc::new(
+                        client.clone(),
+                    ))))
+                    .pending_dir(app_data_dir.join("pending-logs"))
+                    .build(),
+            )
+            .map_err(|e| format!("log submitter init: {e}"))?;
+
+            // Tracing init: prefer $AEGIS_LOG_DIR; fall back to
+            // <app_data_dir>/logs. LogGuard is stashed in managed
+            // state so the buffered writer lives for the process.
+            let log_dir = std::env::var("AEGIS_LOG_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(|_| app_data_dir.join("logs"));
+            let log_guard = logging_utils::init_tracing(
+                &logging_utils::LoggingConfig {
+                    log_dir: log_dir.clone(),
+                    file_name_prefix: "aegis-desktop.log".into(),
+                },
+                // The submit layer is formatted by the same
+                // `fmt::Layer` configuration as the file layer, so a
+                // shipped entry is byte-identical to the local line.
+                vec![Box::new(logging_utils::submit_layer(submitter.handle()))],
+            )
+            .map_err(|e| format!("init_tracing: {e}"))?;
+            tracing::info!(
+                log_dir = %log_dir.display(),
+                "aegis-desktop tracing initialised"
+            );
+            app.manage(log_guard);
+
+            // The submitter must outlive the log guard: managed after
+            // it, so it is dropped last. The layer holds only a
+            // `SubmitHandle`, so it does not keep the worker alive
+            // on its own.
+            app.manage(submitter);
             app.manage(client);
             Ok(())
         })

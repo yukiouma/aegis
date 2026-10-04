@@ -60,22 +60,14 @@ impl HttpLogSender {
 
 #[async_trait]
 impl LogSender for HttpLogSender {
-    async fn send(
-        &self,
-        batch_id: &str,
-        log_entries: Vec<String>,
-    ) -> Result<(), SubmitterError> {
+    async fn send(&self, batch_id: &str, log_entries: Vec<String>) -> Result<(), SubmitterError> {
         let body = SubmitBody {
             batch_id,
             entries: &log_entries,
         };
         let _: SubmitResponse = self
             .client
-            .request(
-                reqwest::Method::POST,
-                "/api/log-ingest/submit",
-                Some(&body),
-            )
+            .request(reqwest::Method::POST, "/api/log-ingest/submit", Some(&body))
             .await
             .map_err(|source| SubmitterError::Send {
                 batch_id: batch_id.to_string(),
