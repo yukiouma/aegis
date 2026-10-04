@@ -16,6 +16,10 @@ async-trait = { workspace = true }
 # array of log entries) and the tracing layer's per-event
 # formatting. Already a workspace dep.
 serde_json = { workspace = true }
+# `tokio` supplies the current-thread runtime the worker thread
+# runs the async `LogSender` on. `rt` is all that is needed — the
+# batching timer is crossbeam's `recv_timeout`, not a tokio timer.
+tokio = { workspace = true, features = ["rt"] }
 # `ulid` generates the time-sortable log ids that compose a trace id
 # (mirrored from the `trace-id` crate — the two crates carry the
 # same logic independently, not via a dep).
