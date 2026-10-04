@@ -8,7 +8,9 @@ mod config;
 mod pending;
 mod sender;
 pub use submitter::{LogSubmitter, SubmitHandle};
+mod layer;
 mod submitter;
 
 pub use config::{LogSubmitterConfig, LogSubmitterConfigBuilder};
+pub use layer::submit_layer;
 pub use sender::{LogSender, SubmitterError};

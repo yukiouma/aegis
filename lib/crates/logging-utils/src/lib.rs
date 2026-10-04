@@ -24,6 +24,9 @@ pub mod trace_id;
 pub mod tracing_init;
 
 pub use log_ingestor::{IngestorError, LogIngestor, LogIngestorConfig, LogIngestorConfigBuilder};
-pub use log_submitter::{LogSender, LogSubmitter, LogSubmitterConfig, LogSubmitterConfigBuilder, SubmitHandle, SubmitterError};
+pub use log_submitter::{
+    LogSender, LogSubmitter, LogSubmitterConfig, LogSubmitterConfigBuilder, SubmitHandle,
+    SubmitterError, submit_layer,
+};
 pub use trace_id::{Side, TraceIdGenerator};
 pub use tracing_init::{LogGuard, LoggingConfig, LoggingInitError, build_filter, init_tracing};
