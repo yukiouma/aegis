@@ -127,6 +127,13 @@ impl TokenStore for MemoryStore {
     }
 }
 
+/// Clone is cheap and shares state: `reqwest::Client` and `String`
+/// are values, and `tokens` / `refresh_lock` are `Arc`s, so a clone
+/// keeps using the *same* token store and the *same* refresh mutex.
+/// That is what lets the log submitter and the command shims share
+/// one client — and one serialized 401 refresh — instead of each
+/// building their own.
+#[derive(Clone)]
 pub struct HttpClient {
     http: reqwest::Client,
     base_url: String,

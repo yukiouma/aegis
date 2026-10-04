@@ -2,8 +2,11 @@
 
 use std::path::PathBuf;
 use thiserror::Error;
+use tracing::Subscriber;
 use tracing_appender::non_blocking::WorkerGuard;
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{EnvFilter, Layer, Registry};
 
 #[derive(Debug, Error)]
 pub enum LoggingInitError {
@@ -31,29 +34,86 @@ pub fn build_filter() -> EnvFilter {
     EnvFilter::new(level)
 }
 
-/// Install the global JSON `tracing` subscriber writing to
-/// `{log_dir}/{file_name_prefix}.YYYY-MM-DD` (one file per day,
-/// rotation at local midnight). The `EnvFilter` is built from
-/// `AEGIS_LOG_LEVEL` (default `info`).
+/// A layer that does nothing.
 ///
-/// The returned [`LogGuard`] MUST be held for the lifetime of the
-/// program; dropping it flushes the buffered writer. `try_init`
-/// semantics make a re-entry from tests a no-op.
-pub fn init_tracing(config: &LoggingConfig) -> Result<LogGuard, LoggingInitError> {
+/// Present only to keep the caller-supplied layer stack non-empty —
+/// see the `register_callsite` note in [`build_subscriber`]. Its
+/// default impl returns `Interest::always()`, which is what an empty
+/// `Vec` fails to do.
+#[derive(Debug)]
+struct NoopLayer;
+
+impl<S: tracing::Subscriber> Layer<S> for NoopLayer {}
+
+/// Build the subscriber without installing it.
+///
+/// Split out from [`init_tracing`] so the composition can be tested
+/// through `tracing::subscriber::with_default`. `init_tracing`
+/// installs globally and is `try_init`-idempotent, so a test calling
+/// it would silently get whichever subscriber the first test in the
+/// process installed — the extra layers it passes would never be
+/// observed.
+fn build_subscriber(
+    config: &LoggingConfig,
+    layers: Vec<Box<dyn Layer<Registry> + Send + Sync>>,
+) -> Result<(impl Subscriber + Send + Sync, LogGuard), LoggingInitError> {
     std::fs::create_dir_all(&config.log_dir).map_err(|source| LoggingInitError::CreateDir {
         dir: config.log_dir.clone(),
         source,
     })?;
     let file_appender = tracing_appender::rolling::daily(&config.log_dir, &config.file_name_prefix);
     let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(build_filter())
+    let fmt_layer = tracing_subscriber::fmt::layer()
         .json()
         .with_current_span(true)
         .with_span_list(false)
-        .with_writer(non_blocking)
-        .try_init();
-    Ok(LogGuard(guard))
+        .with_writer(non_blocking);
+    // NEVER hand an empty `Vec` to `tracing_subscriber`'s blanket
+    // `Layer` impl for `Vec<L>`: its `register_callsite` starts from
+    // `Interest::never()` and only raises it per element, so an
+    // empty vec reports "this callsite can never fire" and `tracing`
+    // silently discards every event — the log file is created and
+    // stays empty. `aegis-server` passes no layers at all, so this
+    // is the common path, not an edge case. The default
+    // `register_callsite` on a real layer returns `always()`, so one
+    // no-op layer makes an otherwise-empty stack behave correctly.
+    let mut stack = layers;
+    if stack.is_empty() {
+        stack.push(Box::new(NoopLayer));
+    }
+    // Layer order matters twice over here.
+    //
+    // The boxed layers are `Layer<Registry>`, so they have to attach
+    // to the bare registry — they cannot sit outside an
+    // already-`Layered` subscriber. And the filter is added LAST,
+    // making it the outermost layer, where its `enabled`
+    // short-circuits before any inner layer sees the event. Left on
+    // `fmt_layer` it would gate only the file, and the desktop's
+    // submit layer would ship DEBUG events while the process runs
+    // at `info`.
+    let subscriber = tracing_subscriber::registry()
+        .with(stack)
+        .with(fmt_layer)
+        .with(build_filter());
+    Ok((subscriber, LogGuard(guard)))
+}
+
+/// Install the global JSON `tracing` subscriber writing to
+/// `{log_dir}/{file_name_prefix}.YYYY-MM-DD` (one file per day,
+/// rotation at local midnight), plus any extra `layers` the caller
+/// supplies. The `EnvFilter` is built from `AEGIS_LOG_LEVEL`
+/// (default `info`) and gates every layer, not just the file.
+///
+/// The returned [`LogGuard`] MUST be held for the lifetime of the
+/// program; dropping it flushes the buffered writer. `try_init`
+/// semantics make a re-entry from tests a no-op.
+pub fn init_tracing(
+    config: &LoggingConfig,
+    layers: Vec<Box<dyn Layer<Registry> + Send + Sync>>,
+) -> Result<LogGuard, LoggingInitError> {
+    let (subscriber, guard) = build_subscriber(config, layers)?;
+    let _ = subscriber.try_init();
+    Ok(guard)
 }
 
 // ---- Tests ----
@@ -99,6 +159,11 @@ mod tests {
         }
     }
 
+    fn no_layers()
+    -> Vec<Box<dyn tracing_subscriber::Layer<tracing_subscriber::Registry> + Send + Sync>> {
+        Vec::new()
+    }
+
     #[test]
     fn init_tracing_creates_log_dir_when_missing() {
         let tmp = tempfile::tempdir().unwrap();
@@ -106,7 +171,8 @@ mod tests {
         assert!(!log_dir.exists());
         let _g = lock_env();
         let _lvl = set_env("AEGIS_LOG_LEVEL", "info");
-        let guard = init_tracing(&cfg(&log_dir, "aegis-test.log")).expect("init_tracing succeeds");
+        let guard = init_tracing(&cfg(&log_dir, "aegis-test.log"), no_layers())
+            .expect("init_tracing succeeds");
         assert!(log_dir.is_dir(), "log dir should be created");
         let _ = guard;
     }
@@ -116,8 +182,9 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let _g = lock_env();
         let _lvl = set_env("AEGIS_LOG_LEVEL", "info");
-        let _a = init_tracing(&cfg(tmp.path(), "aegis-test.log")).expect("first init");
-        let _b = init_tracing(&cfg(tmp.path(), "aegis-test.log")).expect("second init");
+        let _a = init_tracing(&cfg(tmp.path(), "aegis-test.log"), no_layers()).expect("first init");
+        let _b =
+            init_tracing(&cfg(tmp.path(), "aegis-test.log"), no_layers()).expect("second init");
     }
 
     #[test]
@@ -126,7 +193,7 @@ mod tests {
         let blocker = tmp.path().join("blocker");
         std::fs::write(&blocker, b"not a dir").unwrap();
         let bad = blocker.join("inside");
-        let err = init_tracing(&cfg(&bad, "aegis-test.log")).unwrap_err();
+        let err = init_tracing(&cfg(&bad, "aegis-test.log"), no_layers()).unwrap_err();
         match err {
             LoggingInitError::CreateDir { dir, .. } => assert_eq!(dir, bad),
         }
@@ -137,8 +204,8 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let _g = lock_env();
         let _lvl = set_env("AEGIS_LOG_LEVEL", "info");
-        let guard =
-            init_tracing(&cfg(tmp.path(), "aegis-write-test.log")).expect("init_tracing succeeds");
+        let guard = init_tracing(&cfg(tmp.path(), "aegis-write-test.log"), no_layers())
+            .expect("init_tracing succeeds");
         tracing::info!("hello from test");
         drop(guard);
         let entries: Vec<_> = std::fs::read_dir(tmp.path())
@@ -174,6 +241,56 @@ mod tests {
         assert_eq!(filter.to_string(), "debug");
     }
 
+    /// The pre-existing test only asserted a file *exists*, which a
+    /// stack that silently discards every event satisfies. These two
+    /// assert content actually lands in it — for an empty layer
+    /// stack and a non-empty one.
+    #[test]
+    fn init_tracing_writes_event_content_with_an_empty_layer_stack() {
+        assert_layer_stack_writes_content(Vec::new(), "empty-stack");
+    }
+
+    #[test]
+    fn init_tracing_writes_event_content_with_a_populated_layer_stack() {
+        #[derive(Debug)]
+        struct Noop;
+        impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for Noop {}
+        let layers: Vec<Box<dyn Layer<Registry> + Send + Sync>> = vec![Box::new(Noop)];
+        assert_layer_stack_writes_content(layers, "populated-stack");
+    }
+
+    fn assert_layer_stack_writes_content(
+        layers: Vec<Box<dyn Layer<Registry> + Send + Sync>>,
+        label: &str,
+    ) {
+        let tmp = tempfile::tempdir().unwrap();
+        let _g = lock_env();
+        let _lvl = set_env("AEGIS_LOG_LEVEL", "info");
+        let (subscriber, guard) = build_subscriber(
+            &LoggingConfig {
+                log_dir: tmp.path().to_path_buf(),
+                file_name_prefix: "content-check.log".into(),
+            },
+            layers,
+        )
+        .expect("build_subscriber succeeds");
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::info!("CANARY-{}", label);
+        });
+        drop(guard);
+
+        let contents: String = std::fs::read_dir(tmp.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| std::fs::read_to_string(e.path()).unwrap_or_default())
+            .collect();
+        assert!(
+            contents.contains(&format!("CANARY-{label}")),
+            "[{label}] nothing reached the log file — an empty layer stack \
+             must not suppress every event"
+        );
+    }
+
     #[test]
     fn logging_config_clone_preserves_fields() {
         let original = LoggingConfig {
@@ -183,5 +300,82 @@ mod tests {
         let cloned = original.clone();
         assert_eq!(original.log_dir, cloned.log_dir);
         assert_eq!(original.file_name_prefix, cloned.file_name_prefix);
+    }
+
+    #[test]
+    fn init_tracing_installs_extra_layers() {
+        use std::sync::{Arc, Mutex};
+
+        let tmp = tempfile::tempdir().unwrap();
+        let _g = lock_env();
+        let _lvl = set_env("AEGIS_LOG_LEVEL", "info");
+
+        #[derive(Clone, Default)]
+        struct Counter(Arc<Mutex<usize>>);
+        impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for Counter {
+            fn on_event(
+                &self,
+                _ev: &tracing::Event<'_>,
+                _ctx: tracing_subscriber::layer::Context<'_, S>,
+            ) {
+                *self.0.lock().unwrap() += 1;
+            }
+        }
+
+        let counter = Counter::default();
+        let (subscriber, guard) = build_subscriber(
+            &cfg(tmp.path(), "aegis-layers.log"),
+            vec![Box::new(counter.clone())],
+        )
+        .expect("build_subscriber succeeds");
+        tracing::subscriber::with_default(subscriber, || tracing::info!("counted"));
+        drop(guard);
+        assert_eq!(
+            *counter.0.lock().unwrap(),
+            1,
+            "the extra layer should see the event"
+        );
+    }
+
+    #[test]
+    fn init_tracing_gates_every_layer_with_the_env_filter() {
+        // The filter must sit on the registry, not on the file
+        // layer: on the file layer it would gate only the file and
+        // a submit layer would ship DEBUG events while the process
+        // runs at `info`.
+        use std::sync::{Arc, Mutex};
+
+        let tmp = tempfile::tempdir().unwrap();
+        let _g = lock_env();
+        let _lvl = set_env("AEGIS_LOG_LEVEL", "info");
+
+        #[derive(Clone, Default)]
+        struct Counter(Arc<Mutex<usize>>);
+        impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for Counter {
+            fn on_event(
+                &self,
+                _ev: &tracing::Event<'_>,
+                _ctx: tracing_subscriber::layer::Context<'_, S>,
+            ) {
+                *self.0.lock().unwrap() += 1;
+            }
+        }
+
+        let counter = Counter::default();
+        let (subscriber, guard) = build_subscriber(
+            &cfg(tmp.path(), "aegis-filter.log"),
+            vec![Box::new(counter.clone())],
+        )
+        .expect("build_subscriber succeeds");
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::debug!("should be filtered out");
+            tracing::info!("should pass");
+        });
+        drop(guard);
+        assert_eq!(
+            *counter.0.lock().unwrap(),
+            1,
+            "an extra layer must be gated by AEGIS_LOG_LEVEL too"
+        );
     }
 }

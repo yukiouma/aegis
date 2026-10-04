@@ -101,3 +101,53 @@ cargo clippy -p logging-utils --all-targets --all-features -- -D warnings
 cargo doc   -p logging-utils --no-deps
 cargo check --workspace
 ```
+
+## Log submitter (aegis-desktop only)
+
+The client-side counterpart to `LogIngestor`: a bounded buffer, a
+batching worker on its own thread, and a pending directory for
+batches the server would not take.
+
+```rust
+use logging_utils::{LogSubmitter, LogSubmitterConfig, init_tracing, submit_layer};
+
+// The sender is whatever can reach the server. In the desktop app
+// that is `HttpLogSender`, which wraps the existing `HttpClient` so
+// submissions inherit its 401 auto-refresh.
+let submitter = LogSubmitter::new(
+    LogSubmitterConfig::builder()
+        .device_id("k3nQ7Rt9".into())
+        .sender(sender)
+        .pending_dir(app_data_dir.join("pending-logs"))
+        .build(),
+)?;
+
+// `submit_layer` formats entries with the same `fmt::Layer`
+// configuration as the file layer, so a shipped entry is
+// byte-identical to the local log line.
+init_tracing(
+    &LoggingConfig { log_dir, file_name_prefix: "aegis-desktop.log".into() },
+    vec![Box::new(submit_layer(submitter.handle()))],
+)?;
+
+submitter.shutdown()?;  // drains + joins; also runs in Drop
+```
+
+Batches flush at `batch_size` (200) or after `interval` (60 s) of
+buffer inactivity. A failed batch is written to
+`{pending_dir}/{batch_id}`; later cycles retry newest-first and
+delete on success. `batch_id` is `{device_id}-{ULID}`, which is
+what makes "newest first" a plain reverse sort of the directory.
+
+Two behaviors worth knowing before debugging one:
+
+- **The drain stops at the first failure.** A single batch the
+  server will never accept blocks every older pending file and
+  every future batch behind it. A batch the server reports as
+  already ingested is the exception: `LogSender::is_already_ingested`
+  lets the sender say so, and the file is deleted instead. Without
+  it, a batch whose response was lost in transit would retry as a
+  permanent `409` and wedge the queue forever.
+- **A full buffer drops the entry** and increments
+  `LogSubmitter::dropped()`. The layer runs in a logging write
+  path, where blocking the emitting thread is not an option.
