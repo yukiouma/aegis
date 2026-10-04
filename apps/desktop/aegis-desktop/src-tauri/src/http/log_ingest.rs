@@ -76,16 +76,31 @@ impl LogSender for HttpLogSender {
         Ok(())
     }
 
-    /// A batch the server already holds is not a failure — it is
-    /// this batch, already ingested. The submitter's drain stops at
-    /// its first failure, so without this a single lost response
-    /// would park that batch at the head of the queue forever and
-    /// block every older batch and every future one behind it.
-    fn is_already_ingested(&self, err: &SubmitterError) -> bool {
+    /// A batch the server already holds is not a failure — it is this
+    /// batch, already ingested. The submitter's drain stops at its
+    /// first failure, so without this a single lost response would
+    /// park that batch at the head of the queue forever and block
+    /// every older batch and every future one behind it.
+    ///
+    /// The same reasoning covers every other 4xx the server will keep
+    /// refusing — most importantly `400 validation_failed` for a batch
+    /// over its 10 000-entry cap, which is permanent in exactly the
+    /// same way a 409 is. 401 (the user has not logged in yet), 408
+    /// and 429 clear on their own, so they keep the drain blocked.
+    fn is_permanent(&self, err: &SubmitterError) -> bool {
         match err {
-            SubmitterError::Send { source, .. } => source.downcast_ref::<ApiError>().is_some_and(
-                |e| matches!(e, ApiError::Http { code, .. } if code == DUPLICATE_BATCH_ID),
-            ),
+            SubmitterError::Send { source, .. } => {
+                source.downcast_ref::<ApiError>().is_some_and(|e| match e {
+                    ApiError::Http { code, .. } if code == DUPLICATE_BATCH_ID => true,
+                    ApiError::Http { status, .. } => {
+                        (400..500).contains(status)
+                            && *status != 401
+                            && *status != 408
+                            && *status != 429
+                    }
+                    _ => false,
+                })
+            }
             _ => false,
         }
     }
@@ -175,6 +190,76 @@ mod tests {
         assert!(matches!(err, SubmitterError::Send { .. }), "got {err:?}");
     }
 
+    /// End-to-end: a real 409 response, through `send`, classified.
+    /// The hand-built variant below cannot catch a change to how
+    /// `SubmitterError::Send` boxes its source, which would silently
+    /// stop the wedge fix from working.
+    #[tokio::test]
+    async fn a_real_409_is_classified_as_permanent() {
+        let server = MockServer::start().await;
+        server
+            .register(
+                Mock::given(method("POST"))
+                    .and(path("/api/log-ingest/submit"))
+                    .respond_with(ResponseTemplate::new(409).set_body_json(
+                        serde_json::json!({"code": "duplicate_batch_id", "message": "already"}),
+                    )),
+            )
+            .await;
+        let s = HttpLogSender::new(Arc::new(HttpClient::new(
+            server.uri(),
+            Arc::new(MemoryStore::default()),
+        )));
+        let err = s.send("dev-1", entries()).await.unwrap_err();
+        assert!(
+            s.is_permanent(&err),
+            "a real 409 must be permanent: {err:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_real_400_validation_failure_is_classified_as_permanent() {
+        let server = MockServer::start().await;
+        server
+            .register(
+                Mock::given(method("POST"))
+                    .and(path("/api/log-ingest/submit"))
+                    .respond_with(ResponseTemplate::new(400).set_body_json(
+                        serde_json::json!({"code": "validation_failed", "message": "too many"}),
+                    )),
+            )
+            .await;
+        let s = HttpLogSender::new(Arc::new(HttpClient::new(
+            server.uri(),
+            Arc::new(MemoryStore::default()),
+        )));
+        let err = s.send("dev-1", entries()).await.unwrap_err();
+        assert!(
+            s.is_permanent(&err),
+            "an over-cap batch is permanent: {err:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_401_is_not_permanent_so_the_drain_recovers_after_login() {
+        let server = MockServer::start().await;
+        server
+            .register(
+                Mock::given(method("POST"))
+                    .and(path("/api/log-ingest/submit"))
+                    .respond_with(ResponseTemplate::new(401).set_body_json(
+                        serde_json::json!({"code": "token_verification_failed", "message": "no"}),
+                    )),
+            )
+            .await;
+        let s = HttpLogSender::new(Arc::new(HttpClient::new(
+            server.uri(),
+            Arc::new(MemoryStore::default()),
+        )));
+        let err = s.send("dev-1", entries()).await.unwrap_err();
+        assert!(!s.is_permanent(&err), "401 clears once logged in: {err:?}");
+    }
+
     #[test]
     fn recognizes_a_duplicate_batch_id_as_already_ingested() {
         let s = HttpLogSender::new(Arc::new(HttpClient::new(
@@ -197,8 +282,8 @@ mod tests {
                 message: "boom".into(),
             }),
         };
-        assert!(s.is_already_ingested(&duplicate));
-        assert!(!s.is_already_ingested(&other));
-        assert!(!s.is_already_ingested(&SubmitterError::ChannelClosed));
+        assert!(s.is_permanent(&duplicate));
+        assert!(!s.is_permanent(&other));
+        assert!(!s.is_permanent(&SubmitterError::ChannelClosed));
     }
 }

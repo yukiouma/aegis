@@ -52,19 +52,32 @@ pub trait LogSender: Debug + Send + Sync {
     /// say so rather than accepting it twice.
     async fn send(&self, batch_id: &str, log_entries: Vec<String>) -> Result<(), SubmitterError>;
 
-    /// Classify `err` as "the sink already has this batch".
+    /// Classify `err` as "this batch will never be accepted".
     ///
-    /// This exists because the server dedups on `batch_id`: if a
-    /// batch is ingested but the response is lost in transit, the
-    /// submitter persists it and the retry is answered `409
-    /// duplicate_batch_id` forever. Treating that as success deletes
-    /// the pending file and lets the drain continue; treating it as
-    /// a failure would wedge the queue permanently, because the
-    /// drain stops at the first failure.
+    /// The submitter's drain stops at its first failure, so anything
+    /// the sink will reject identically on every retry has to be
+    /// recognised here and *deleted* instead — otherwise one such
+    /// batch sits at the head of the queue forever and every older
+    /// batch and every future one is blocked behind it.
     ///
-    /// Defaults to `false`, which is correct for sinks without
-    /// server-side dedup.
-    fn is_already_ingested(&self, _err: &SubmitterError) -> bool {
+    /// Two shapes matter against `aegis-server`:
+    ///
+    /// * `409 duplicate_batch_id` — the sink already ingested the
+    ///   batch and the response was lost in transit, so the entries
+    ///   are safe; the file is just stale. (The server's dedup cache
+    ///   has a TTL, so after it expires a retry would re-ingest
+    ///   rather than 409 — benign, since the entries are identical.)
+    /// * Any other 4xx the server will keep refusing — an over-cap
+    ///   or malformed batch answers `400 validation_failed` on every
+    ///   attempt, and that is just as permanent as a 409.
+    ///
+    /// Transient failures (network, 5xx, 401 before the user has
+    /// logged in, 408, 429) must return `false`: they clear on their
+    /// own, and stopping the drain for them is correct.
+    ///
+    /// Defaults to `false`, which is correct for sinks that accept
+    /// everything they are given.
+    fn is_permanent(&self, _err: &SubmitterError) -> bool {
         false
     }
 }
@@ -88,10 +101,10 @@ mod tests {
     }
 
     #[test]
-    fn is_already_ingested_defaults_to_false() {
+    fn is_permanent_defaults_to_false() {
         let s = Silent;
         let err = SubmitterError::ChannelClosed;
-        assert!(!s.is_already_ingested(&err));
+        assert!(!s.is_permanent(&err));
     }
 
     #[test]

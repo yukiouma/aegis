@@ -172,6 +172,12 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                         client.clone(),
                     ))))
                     .pending_dir(app_data_dir.join("pending-logs"))
+                    // Must outlast a single submit: `HttpClient` has a
+                    // 15s request timeout, so a shorter deadline
+                    // detaches the worker mid-send on every shutdown
+                    // that happens while the server is slow or down —
+                    // exactly when draining matters most.
+                    .shutdown_deadline(std::time::Duration::from_secs(20))
                     .build(),
             )
             .map_err(|e| format!("log submitter init: {e}"))?;
@@ -199,10 +205,13 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             );
             app.manage(log_guard);
 
-            // The submitter must outlive the log guard: managed after
-            // it, so it is dropped last. The layer holds only a
-            // `SubmitHandle`, so it does not keep the worker alive
-            // on its own.
+            // Managed so the submitter is dropped when the app's
+            // state is torn down. Note that Tauri stores managed
+            // state in a `HashMap`, so drop order is hash order, not
+            // insertion order — if the submitter is dropped first,
+            // the lines the log guard then flushes find the worker
+            // gone and are discarded. They are still in the local
+            // file, which is the durable copy.
             app.manage(submitter);
             app.manage(client);
             Ok(())

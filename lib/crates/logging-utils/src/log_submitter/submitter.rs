@@ -54,7 +54,19 @@ pub(crate) struct WorkerCtx {
     pub(crate) interval: Duration,
     pub(crate) pending: PendingStore,
     pub(crate) sender: Arc<dyn LogSender>,
+    /// Shared with the `SubmitHandle` so trims and channel-full drops
+    /// land in one counter an operator can read.
+    pub(crate) dropped: Arc<std::sync::atomic::AtomicU64>,
 }
+
+/// The server refuses a request carrying more than this many entries
+/// (`MAX_ENTRIES_PER_REQUEST` in `aegis-server`), answering
+/// `400 validation_failed`. An in-memory batch that grows past it
+/// while the drain is blocked can therefore never be submitted, so
+/// the worker trims instead. Trimming is counted in
+/// `dropped()` — this is the only thing that makes an over-cap batch
+/// visible rather than a silent loss.
+pub(crate) const MAX_BATCH_ENTRIES: usize = 10_000;
 
 /// Body of the worker task. Runs on the submitter's own
 /// current-thread runtime.
@@ -72,16 +84,51 @@ pub(crate) async fn run_worker(rx: Receiver<String>, ctx: WorkerCtx, done_tx: Se
                 batch.push(entry);
                 if batch.len() >= ctx.batch_size {
                     flush(&ctx, &mut batch).await;
+                    trim_to_max(&ctx, &mut batch);
                 }
             }
-            Err(RecvTimeoutError::Timeout) => flush(&ctx, &mut batch).await,
+            Err(RecvTimeoutError::Timeout) => {
+                flush(&ctx, &mut batch).await;
+                trim_to_max(&ctx, &mut batch);
+            }
             Err(RecvTimeoutError::Disconnected) => {
                 flush(&ctx, &mut batch).await;
+                // A drain blocked by a transient failure leaves the
+                // batch unsent. Persist it rather than dropping it:
+                // the next launch retries it, which is strictly
+                // better than losing the tail of this session.
+                if !batch.is_empty() {
+                    let batch_id = mint_batch_id(&ctx.device_id);
+                    let entries = std::mem::take(&mut batch);
+                    if let Err(err) = ctx.pending.persist(&batch_id, &entries) {
+                        tracing::warn!(
+                            batch_id = %batch_id,
+                            error = %err,
+                            "could not persist buffered log entries at shutdown; dropping them"
+                        );
+                    }
+                }
                 break;
             }
         }
     }
     let _ = done_tx.send(());
+}
+
+/// Keep the in-memory batch at or below the server's per-request cap.
+///
+/// Only bites while the drain is blocked — when a flush succeeds the
+/// batch is emptied anyway. The alternative is growing without bound
+/// for the length of an outage and then persisting a file the server
+/// can never accept, which would wedge the queue permanently.
+fn trim_to_max(ctx: &WorkerCtx, batch: &mut Vec<String>) {
+    if batch.len() <= MAX_BATCH_ENTRIES {
+        return;
+    }
+    let overflow = batch.len() - MAX_BATCH_ENTRIES;
+    batch.drain(..overflow);
+    ctx.dropped
+        .fetch_add(overflow as u64, std::sync::atomic::Ordering::Relaxed);
 }
 
 /// Drain the pending directory newest-first, then submit `batch`.
@@ -102,10 +149,11 @@ async fn flush(ctx: &WorkerCtx, batch: &mut Vec<String>) {
         match ctx.sender.send(&batch_id, entries).await {
             Ok(()) => ctx.pending.remove(&batch_id),
             Err(err) => {
-                if ctx.sender.is_already_ingested(&err) {
-                    // The sink already holds this batch, so the
-                    // entries are not lost — the file is just
-                    // stale. Delete it and keep draining.
+                if ctx.sender.is_permanent(&err) {
+                    // The sink will refuse this batch on every
+                    // retry, so keeping the file would block the
+                    // entire queue behind it forever. Delete it and
+                    // keep draining.
                     ctx.pending.remove(&batch_id);
                     continue;
                 }
@@ -120,7 +168,15 @@ async fn flush(ctx: &WorkerCtx, batch: &mut Vec<String>) {
     let batch_id = mint_batch_id(&ctx.device_id);
     let entries = std::mem::take(batch);
     if let Err(err) = ctx.sender.send(&batch_id, entries.clone()).await {
-        if ctx.sender.is_already_ingested(&err) {
+        if ctx.sender.is_permanent(&err) {
+            // Permanently refused: a freshly-minted id can only be
+            // refused for the batch's *content*, so retrying is
+            // pointless. Loud, because the entries are lost.
+            tracing::warn!(
+                batch_id = %batch_id,
+                error = %err,
+                "log batch was permanently rejected; dropping it"
+            );
             return;
         }
         if let Err(persist_err) = ctx.pending.persist(&batch_id, &entries) {
@@ -152,6 +208,7 @@ pub(crate) mod tests_support {
         accepted: Mutex<Vec<(String, Vec<String>)>>,
         fail_ids: Mutex<Vec<String>>,
         fail_all: AtomicBool,
+        permanent: AtomicBool,
     }
 
     impl RecordingSender {
@@ -166,6 +223,12 @@ pub(crate) mod tests_support {
         }
         pub(crate) fn fail_everything(&self) {
             self.fail_all.store(true, Ordering::Release);
+        }
+        /// Fail every batch AND report the failure as permanent —
+        /// the shape of a 4xx the server will never accept.
+        pub(crate) fn fail_permanently(&self) {
+            self.fail_everything();
+            self.permanent.store(true, Ordering::Release);
         }
     }
 
@@ -190,6 +253,10 @@ pub(crate) mod tests_support {
                 .push((batch_id.to_string(), log_entries));
             Ok(())
         }
+
+        fn is_permanent(&self, _err: &SubmitterError) -> bool {
+            self.permanent.load(Ordering::Acquire)
+        }
     }
 
     /// Fails every batch as "already ingested" — the shape a server
@@ -213,7 +280,7 @@ pub(crate) mod tests_support {
             })
         }
 
-        fn is_already_ingested(&self, _err: &SubmitterError) -> bool {
+        fn is_permanent(&self, _err: &SubmitterError) -> bool {
             true
         }
     }
@@ -260,6 +327,7 @@ mod tests {
             interval: Duration::from_millis(50),
             pending: pending.clone_store(),
             sender,
+            dropped: Arc::new(std::sync::atomic::AtomicU64::new(0)),
         }
     }
 
@@ -335,6 +403,19 @@ mod tests {
         assert_eq!(accepted[0].1, entries(3));
     }
 
+    /// Hold the channel open past several intervals, so the worker
+    /// actually takes the `RecvTimeoutError::Timeout` branch, then
+    /// let it disconnect. Dropping `tx` up front exercises
+    /// `Disconnected` instead, which is a different path entirely.
+    fn hold_open_for_intervals(
+        tx: crossbeam_channel::Sender<String>,
+    ) -> std::thread::JoinHandle<()> {
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(200));
+            drop(tx);
+        })
+    }
+
     #[tokio::test]
     async fn interval_flushes_a_partial_batch() {
         let sender = RecordingSender::shared();
@@ -342,8 +423,9 @@ mod tests {
         let c = ctx(sender.clone(), &store, 100);
         let (tx, rx) = crossbeam_channel::bounded(8);
         tx.send("only-one".to_string()).unwrap();
-        drop(tx);
+        let dropper = hold_open_for_intervals(tx);
         drive(rx, c).await;
+        dropper.join().unwrap();
         assert_eq!(sender.accepted().len(), 1);
     }
 
@@ -353,12 +435,80 @@ mod tests {
         let (_tmp, store) = temp_pending(4);
         let c = ctx(sender.clone(), &store, 100);
         let (tx, rx) = crossbeam_channel::bounded(8);
-        drop(tx);
+        let dropper = hold_open_for_intervals(tx);
         drive(rx, c).await;
+        dropper.join().unwrap();
         assert!(
             sender.accepted().is_empty(),
             "an empty batch would earn a 400 and wedge the drain: {:?}",
             sender.accepted()
+        );
+    }
+
+    /// The server caps a request at 10 000 entries and answers
+    /// anything larger with a permanent 400. A batch that grows past
+    /// that while the drain is blocked would therefore become a file
+    /// the server can never accept, wedging the queue forever. The
+    /// in-memory batch must be trimmed instead, and the loss counted.
+    #[tokio::test]
+    async fn an_over_cap_batch_is_trimmed_and_counted() {
+        let sender = RecordingSender::shared();
+        sender.fail_everything(); // transient: the drain stays blocked
+        let dir = tempfile::tempdir().unwrap();
+        let store = PendingStore::new(dir.path().to_path_buf(), 100);
+        store.create_dir().unwrap();
+        // A pending file that keeps failing blocks every flush, which
+        // is how the batch is left to grow in the first place.
+        store
+            .persist("dev-A01HQ", &["blocker".to_string()])
+            .unwrap();
+
+        let c = ctx(sender.clone(), &store, 1);
+        // Unbounded, so every entry reaches the worker. A bounded
+        // channel would drop most of them before the worker ever
+        // drained them and the batch would never reach the cap.
+        let (tx, rx) = crossbeam_channel::unbounded::<String>();
+        for i in 0..12_000 {
+            tx.send(format!("e-{i}")).unwrap();
+        }
+        let dropped = Arc::clone(&c.dropped);
+        drop(tx);
+        drive(rx, c).await;
+
+        assert!(
+            dropped.load(std::sync::atomic::Ordering::Relaxed) > 0,
+            "a batch past the server's 10k cap must be trimmed, not grown"
+        );
+    }
+
+    /// A batch the server will never accept must be dropped, not left
+    /// at the head of the queue. This is the general form of the
+    /// duplicate-batch-id case: a permanent 4xx (over-cap, malformed)
+    /// wedges the drain forever just as a 409 does.
+    #[tokio::test]
+    async fn a_permanent_failure_does_not_wedge_the_drain() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = PendingStore::new(dir.path().to_path_buf(), 10);
+        store.create_dir().unwrap();
+        store.persist("dev-A01HQ", &["older".to_string()]).unwrap();
+        store
+            .persist("dev-A09HQ", &["newer-too-big".to_string()])
+            .unwrap();
+
+        let sender = RecordingSender::shared();
+        sender.fail_permanently();
+        let c = ctx(sender.clone(), &store, 1);
+        let (tx, rx) = crossbeam_channel::bounded(8);
+        tx.send("fresh".to_string()).unwrap();
+        drop(tx);
+        drive(rx, c).await;
+
+        // Every pending file was tried — the permanent failure did not
+        // stop the walk.
+        assert!(
+            store.list_newest_first().is_empty(),
+            "permanently-rejected batches must be deleted, not retried forever: {:?}",
+            store.list_newest_first()
         );
     }
 
@@ -405,7 +555,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn drain_stops_at_the_first_failure_and_holds_the_fresh_batch() {
+    async fn drain_stops_at_the_first_failure_and_persists_the_fresh_batch() {
         let dir = tempfile::tempdir().unwrap();
         let store = PendingStore::new(dir.path().to_path_buf(), 10);
         store.create_dir().unwrap();
@@ -426,10 +576,17 @@ mod tests {
             sender.accepted()
         );
         let left = store.list_newest_first();
+        assert!(
+            left.contains(&"dev-A09HQ".to_string()) && left.contains(&"dev-A01HQ".to_string()),
+            "the older pending file must not be touched: {left:?}"
+        );
+        // The fresh batch could not be sent, and shutdown is now its
+        // last chance — it is persisted rather than dropped, so the
+        // next launch retries it.
         assert_eq!(
-            left,
-            vec!["dev-A09HQ".to_string(), "dev-A01HQ".to_string()],
-            "the older pending file must not be touched"
+            left.len(),
+            3,
+            "the held fresh batch should be persisted on shutdown, got {left:?}"
         );
     }
 
@@ -585,7 +742,9 @@ struct Inner {
     /// the worker blocked in `recv_timeout` until its full interval
     /// elapsed, turning every shutdown into a timeout.
     tx: std::sync::Mutex<Option<crossbeam_channel::Sender<String>>>,
-    dropped: std::sync::atomic::AtomicU64,
+    /// Shared with the worker, which trims over-cap batches and
+    /// counts the same losses a full buffer produces.
+    dropped: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl std::fmt::Debug for SubmitHandle {
@@ -655,12 +814,17 @@ impl LogSubmitter {
 
         let (tx, rx) = crossbeam_channel::bounded::<String>(config.buffer_capacity);
         let (done_tx, done_rx) = crossbeam_channel::bounded::<()>(1);
+        // One counter for both kinds of loss: entries trimmed off an
+        // over-cap batch in the worker, and entries the layer could
+        // not hand over because the buffer was full.
+        let dropped = Arc::new(std::sync::atomic::AtomicU64::new(0));
         let ctx = WorkerCtx {
             device_id: config.device_id.clone(),
             batch_size: config.batch_size,
             interval: config.interval,
             pending,
             sender: config.sender,
+            dropped: Arc::clone(&dropped),
         };
 
         // A current-thread runtime with `enable_all` cannot fail in
@@ -679,7 +843,7 @@ impl LogSubmitter {
         let handle = SubmitHandle {
             inner: Arc::new(Inner {
                 tx: std::sync::Mutex::new(Some(tx)),
-                dropped: std::sync::atomic::AtomicU64::new(0),
+                dropped,
             }),
         };
 
