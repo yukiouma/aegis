@@ -61,6 +61,18 @@ impl TraceIdGenerator {
         self.build(Side::Server)
     }
 
+    /// The device prefix this generator was built with, or `None`
+    /// when constructed without one.
+    ///
+    /// Callers that need a stable per-install identifier outside of
+    /// trace ids — the log submitter's `device_id`, which becomes
+    /// the first segment of every batch id — read it from here
+    /// rather than re-reading the prefix file, so a batch id and a
+    /// trace id from the same install always share that segment.
+    pub fn device_prefix(&self) -> Option<&str> {
+        self.device_prefix.as_deref()
+    }
+
     fn build(&self, side: Side) -> String {
         let prefix = match side {
             Side::Client => "C",
@@ -138,5 +150,24 @@ mod tests {
     #[test]
     fn side_enum_variants_are_distinct() {
         assert_ne!(Side::Client, Side::Server);
+    }
+
+    #[test]
+    fn device_prefix_returns_the_supplied_prefix() {
+        let g = TraceIdGenerator::new(Some("desktop-abc".to_string()));
+        assert_eq!(g.device_prefix(), Some("desktop-abc"));
+    }
+
+    #[test]
+    fn device_prefix_is_none_when_constructed_without_one() {
+        let g = TraceIdGenerator::new(None);
+        assert_eq!(g.device_prefix(), None);
+    }
+
+    #[test]
+    fn device_prefix_survives_clone() {
+        let g = TraceIdGenerator::new(Some("fixed".to_string()));
+        let cloned = g.clone();
+        assert_eq!(cloned.device_prefix(), Some("fixed"));
     }
 }
