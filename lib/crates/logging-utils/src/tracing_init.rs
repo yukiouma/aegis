@@ -34,6 +34,17 @@ pub fn build_filter() -> EnvFilter {
     EnvFilter::new(level)
 }
 
+/// A layer that does nothing.
+///
+/// Present only to keep the caller-supplied layer stack non-empty —
+/// see the `register_callsite` note in [`build_subscriber`]. Its
+/// default impl returns `Interest::always()`, which is what an empty
+/// `Vec` fails to do.
+#[derive(Debug)]
+struct NoopLayer;
+
+impl<S: tracing::Subscriber> Layer<S> for NoopLayer {}
+
 /// Build the subscriber without installing it.
 ///
 /// Split out from [`init_tracing`] so the composition can be tested
@@ -57,6 +68,19 @@ fn build_subscriber(
         .with_current_span(true)
         .with_span_list(false)
         .with_writer(non_blocking);
+    // NEVER hand an empty `Vec` to `tracing_subscriber`'s blanket
+    // `Layer` impl for `Vec<L>`: its `register_callsite` starts from
+    // `Interest::never()` and only raises it per element, so an
+    // empty vec reports "this callsite can never fire" and `tracing`
+    // silently discards every event — the log file is created and
+    // stays empty. `aegis-server` passes no layers at all, so this
+    // is the common path, not an edge case. The default
+    // `register_callsite` on a real layer returns `always()`, so one
+    // no-op layer makes an otherwise-empty stack behave correctly.
+    let mut stack = layers;
+    if stack.is_empty() {
+        stack.push(Box::new(NoopLayer));
+    }
     // Layer order matters twice over here.
     //
     // The boxed layers are `Layer<Registry>`, so they have to attach
@@ -68,7 +92,7 @@ fn build_subscriber(
     // submit layer would ship DEBUG events while the process runs
     // at `info`.
     let subscriber = tracing_subscriber::registry()
-        .with(layers)
+        .with(stack)
         .with(fmt_layer)
         .with(build_filter());
     Ok((subscriber, LogGuard(guard)))
@@ -215,6 +239,56 @@ mod tests {
         let _lvl = set_env("AEGIS_LOG_LEVEL", "debug");
         let filter = build_filter();
         assert_eq!(filter.to_string(), "debug");
+    }
+
+    /// The pre-existing test only asserted a file *exists*, which a
+    /// stack that silently discards every event satisfies. These two
+    /// assert content actually lands in it — for an empty layer
+    /// stack and a non-empty one.
+    #[test]
+    fn init_tracing_writes_event_content_with_an_empty_layer_stack() {
+        assert_layer_stack_writes_content(Vec::new(), "empty-stack");
+    }
+
+    #[test]
+    fn init_tracing_writes_event_content_with_a_populated_layer_stack() {
+        #[derive(Debug)]
+        struct Noop;
+        impl<S: tracing::Subscriber> tracing_subscriber::Layer<S> for Noop {}
+        let layers: Vec<Box<dyn Layer<Registry> + Send + Sync>> = vec![Box::new(Noop)];
+        assert_layer_stack_writes_content(layers, "populated-stack");
+    }
+
+    fn assert_layer_stack_writes_content(
+        layers: Vec<Box<dyn Layer<Registry> + Send + Sync>>,
+        label: &str,
+    ) {
+        let tmp = tempfile::tempdir().unwrap();
+        let _g = lock_env();
+        let _lvl = set_env("AEGIS_LOG_LEVEL", "info");
+        let (subscriber, guard) = build_subscriber(
+            &LoggingConfig {
+                log_dir: tmp.path().to_path_buf(),
+                file_name_prefix: "content-check.log".into(),
+            },
+            layers,
+        )
+        .expect("build_subscriber succeeds");
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::info!("CANARY-{}", label);
+        });
+        drop(guard);
+
+        let contents: String = std::fs::read_dir(tmp.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| std::fs::read_to_string(e.path()).unwrap_or_default())
+            .collect();
+        assert!(
+            contents.contains(&format!("CANARY-{label}")),
+            "[{label}] nothing reached the log file — an empty layer stack \
+             must not suppress every event"
+        );
     }
 
     #[test]
