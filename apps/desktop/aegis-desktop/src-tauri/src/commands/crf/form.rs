@@ -1,7 +1,5 @@
 //! Tauri command shims for `http::crf::form`.
 
-use logging_utils::TraceIdGenerator;
-use tauri::State;
 use tracing::Instrument;
 
 use crate::http::client::{HttpClient, TRACE_ID};
@@ -11,24 +9,36 @@ use crate::http::crf::form::{
 };
 use crate::http::dto::ApiError;
 use crate::http::mission::{self, IssueState};
+use crate::state::{Caller, RequestContext, SharedAppState};
 
 #[tauri::command]
 pub async fn list_crf_forms_by_version(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     version_id: i64,
 ) -> Result<CrfFormListResponse, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    list_crf_forms_by_version_impl(app_state.inner(), &req_ctx, version_id).await
+}
+
+pub async fn list_crf_forms_by_version_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    version_id: i64,
+) -> Result<CrfFormListResponse, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "list_crf_forms_by_version"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
-                form::list_by_version(&client, version_id).await
+            .scope(req_ctx.trace_id.clone(), async {
+                form::list_by_version(&app_state.http_client(), version_id).await
             })
             .await;
         match &result {
@@ -43,22 +53,34 @@ pub async fn list_crf_forms_by_version(
 
 #[tauri::command]
 pub async fn create_crf_form(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     version_id: i64,
     body: CreateCrfFormRequest,
 ) -> Result<CrfFormViewResponse, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    create_crf_form_impl(app_state.inner(), &req_ctx, version_id, body).await
+}
+
+pub async fn create_crf_form_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    version_id: i64,
+    body: CreateCrfFormRequest,
+) -> Result<CrfFormViewResponse, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "create_crf_form"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
-                form::create(&client, version_id, body).await
+            .scope(req_ctx.trace_id.clone(), async {
+                form::create(&app_state.http_client(), version_id, body).await
             })
             .await;
         match &result {
@@ -73,21 +95,35 @@ pub async fn create_crf_form(
 
 #[tauri::command]
 pub async fn update_crf_form(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     id: i64,
     body: UpdateCrfFormRequest,
 ) -> Result<CrfFormViewResponse, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    update_crf_form_impl(app_state.inner(), &req_ctx, id, body).await
+}
+
+pub async fn update_crf_form_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    id: i64,
+    body: UpdateCrfFormRequest,
+) -> Result<CrfFormViewResponse, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "update_crf_form"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async { form::update(&client, id, body).await })
+            .scope(req_ctx.trace_id.clone(), async {
+                form::update(&app_state.http_client(), id, body).await
+            })
             .await;
         match &result {
             Ok(_) => tracing::info!("success"),
@@ -101,20 +137,33 @@ pub async fn update_crf_form(
 
 #[tauri::command]
 pub async fn delete_crf_form(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     id: i64,
 ) -> Result<(), ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    delete_crf_form_impl(app_state.inner(), &req_ctx, id).await
+}
+
+pub async fn delete_crf_form_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    id: i64,
+) -> Result<(), ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "delete_crf_form"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async { form::delete(&client, id).await })
+            .scope(req_ctx.trace_id.clone(), async {
+                form::delete(&app_state.http_client(), id).await
+            })
             .await;
         match &result {
             Ok(_) => tracing::info!("success"),
@@ -128,20 +177,33 @@ pub async fn delete_crf_form(
 
 #[tauri::command]
 pub async fn get_crf_form_by_id(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     id: i64,
 ) -> Result<CrfFormViewResponse, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    get_crf_form_by_id_impl(app_state.inner(), &req_ctx, id).await
+}
+
+pub async fn get_crf_form_by_id_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    id: i64,
+) -> Result<CrfFormViewResponse, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "get_crf_form_by_id"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async { form::get_by_id(&client, id).await })
+            .scope(req_ctx.trace_id.clone(), async {
+                form::get_by_id(&app_state.http_client(), id).await
+            })
             .await;
         match &result {
             Ok(_) => tracing::info!("success"),
@@ -155,20 +217,33 @@ pub async fn get_crf_form_by_id(
 
 #[tauri::command]
 pub async fn get_crf_form_details(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     id: i64,
 ) -> Result<CrfFormDetailResponse, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    get_crf_form_details_impl(app_state.inner(), &req_ctx, id).await
+}
+
+pub async fn get_crf_form_details_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    id: i64,
+) -> Result<CrfFormDetailResponse, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "get_crf_form_details"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async { form::details(&client, id).await })
+            .scope(req_ctx.trace_id.clone(), async {
+                form::details(&app_state.http_client(), id).await
+            })
             .await;
         match &result {
             Ok(_) => tracing::info!("success"),
@@ -182,22 +257,34 @@ pub async fn get_crf_form_details(
 
 #[tauri::command]
 pub async fn search_crf_forms_by_version(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     version_id: i64,
     fragment: String,
 ) -> Result<CrfFormListResponse, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    search_crf_forms_by_version_impl(app_state.inner(), &req_ctx, version_id, fragment).await
+}
+
+pub async fn search_crf_forms_by_version_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    version_id: i64,
+    fragment: String,
+) -> Result<CrfFormListResponse, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "search_crf_forms_by_version"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
-                form::search_by_version(&client, version_id, fragment).await
+            .scope(req_ctx.trace_id.clone(), async {
+                form::search_by_version(&app_state.http_client(), version_id, fragment).await
             })
             .await;
         match &result {
@@ -221,23 +308,36 @@ pub async fn search_crf_forms_by_version(
 /// entirely — un-approving has no gate.
 #[tauri::command]
 pub async fn set_crf_form_approved(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     id: i64,
     approved: bool,
     mission_id: i64,
 ) -> Result<CrfFormViewResponse, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    set_crf_form_approved_impl(app_state.inner(), &req_ctx, id, approved, mission_id).await
+}
+
+pub async fn set_crf_form_approved_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    id: i64,
+    approved: bool,
+    mission_id: i64,
+) -> Result<CrfFormViewResponse, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "set_crf_form_approved"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
-                set_approved_impl(&client, id, approved, mission_id).await
+            .scope(req_ctx.trace_id.clone(), async {
+                set_approved_impl(&app_state.http_client(), id, approved, mission_id).await
             })
             .await;
         match &result {
@@ -250,12 +350,13 @@ pub async fn set_crf_form_approved(
     .await
 }
 
-/// Gate + proxy implementation. `#[tauri::command]` shims over
-/// `tauri::State`, which is hard to construct in tests; the real
-/// logic lives here so tests can drive it directly with a real
-/// `HttpClient` against `wiremock`. Mirrors the codebase's
-/// convention in
-/// `commands::user::current_user_resolves_sub_to_user_view`.
+/// Inner gate + proxy. Kept separate from `set_crf_form_approved_impl`
+/// so it can be exercised directly with a bare `&HttpClient` against a
+/// `wiremock` server — the existing test surface relied on this
+/// pre-split (before `&SharedAppState` made every shim uniformly
+/// testable). The wrapper above will replace these direct calls in a
+/// follow-up that re-derives the test through the new `_impl` entry
+/// point.
 pub async fn set_approved_impl(
     client: &HttpClient,
     id: i64,
