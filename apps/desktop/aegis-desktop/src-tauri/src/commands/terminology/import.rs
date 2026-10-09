@@ -4,35 +4,46 @@
 //! per-resource HTTP wrappers to create the version, its code lists,
 //! and the items of each code list.
 
-use logging_utils::TraceIdGenerator;
-use tauri::State;
 use tracing::Instrument;
 
-use crate::http::client::{HttpClient, TRACE_ID};
+use crate::http::client::TRACE_ID;
 use crate::http::dto::{ApiError, TerminologyKind};
 use crate::http::terminology::code_item::{self, BatchCodeItemEntry, BatchCreateCodeItemsRequest};
 use crate::http::terminology::code_list::{self, CreateCodeListRequest};
 use crate::http::terminology::version::{
     self, CreateTerminologyVersionRequest, TerminologyVersionViewResponse,
 };
+use crate::state::{Caller, RequestContext, SharedAppState};
 
 #[tauri::command]
 pub async fn import_terminology(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     kind: TerminologyKind,
     filepath: String,
 ) -> Result<TerminologyVersionViewResponse, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    import_terminology_impl(app_state.inner(), &req_ctx, kind, filepath).await
+}
+
+pub async fn import_terminology_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    kind: TerminologyKind,
+    filepath: String,
+) -> Result<TerminologyVersionViewResponse, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "import_terminology"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
+            .scope(req_ctx.trace_id.clone(), async {
                 // 1. Parse the workbook off-thread (calamine is sync / CPU-bound).
                 let parsed = tokio::task::spawn_blocking(move || terminology::from_path(&filepath))
                     .await
@@ -45,7 +56,7 @@ pub async fn import_terminology(
 
                 // 2. Create the version.
                 let version_view = version::create(
-                    &client,
+                    &app_state.http_client(),
                     CreateTerminologyVersionRequest {
                         kind,
                         name: parsed.name,
@@ -56,7 +67,7 @@ pub async fn import_terminology(
                 // 3. For each code list, create the list and batch-create its items.
                 for cl in parsed.codelist {
                     let cl_view = code_list::create(
-                        &client,
+                        &app_state.http_client(),
                         CreateCodeListRequest {
                             version_id: version_view.id,
                             code: cl.code,
@@ -75,7 +86,7 @@ pub async fn import_terminology(
                     }
 
                     code_item::batch_create(
-                        &client,
+                        &app_state.http_client(),
                         BatchCreateCodeItemsRequest {
                             codelist_id: cl_view.id,
                             version_id: version_view.id,
