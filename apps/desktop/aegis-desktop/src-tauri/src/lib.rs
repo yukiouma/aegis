@@ -8,6 +8,7 @@ use tauri_plugin_store::StoreExt;
 mod commands;
 mod http;
 mod system;
+mod state;
 mod trace_id_setup;
 
 #[tauri::command]
