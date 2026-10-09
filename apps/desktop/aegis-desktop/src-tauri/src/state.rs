@@ -81,6 +81,9 @@ mod tests {
     fn serializes_snake_case() {
         assert_eq!(serde_json::to_string(&Caller::User).unwrap(), "\"user\"");
         assert_eq!(serde_json::to_string(&Caller::Agent).unwrap(), "\"agent\"");
-        assert_eq!(serde_json::to_string(&Caller::System).unwrap(), "\"system\"");
+        assert_eq!(
+            serde_json::to_string(&Caller::System).unwrap(),
+            "\"system\""
+        );
     }
 }

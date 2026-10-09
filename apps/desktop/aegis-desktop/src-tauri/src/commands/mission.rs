@@ -1,12 +1,11 @@
-use logging_utils::TraceIdGenerator;
-use tauri::State;
 use tracing::Instrument;
 
-use crate::http::client::{HttpClient, TRACE_ID};
+use crate::http::client::TRACE_ID;
 use crate::http::dto::ApiError;
 use crate::http::mission::{
     self, AssigneeDataArg, AssigneeViewResponse, CreateMissionRequest, MissionViewResponse,
 };
+use crate::state::{Caller, RequestContext, SharedAppState};
 
 // Tauri command argument conventions:
 // Every other command in this crate (see commands/crf/form.rs,
@@ -44,26 +43,38 @@ fn parse_issue_state(s: &str) -> Result<crate::http::mission::IssueState, ApiErr
 
 #[tauri::command]
 pub async fn list_missions_by_project(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     project_code: String,
     kind: Option<String>,
 ) -> Result<Vec<MissionViewResponse>, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    list_missions_by_project_impl(app_state.inner(), &req_ctx, project_code, kind).await
+}
+
+pub async fn list_missions_by_project_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    project_code: String,
+    kind: Option<String>,
+) -> Result<Vec<MissionViewResponse>, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "list_missions_by_project"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
+            .scope(req_ctx.trace_id.clone(), async {
                 let kind = match kind.as_deref() {
                     Some(s) => Some(parse_kind(s)?),
                     None => None,
                 };
-                mission::list_by_project(&client, &project_code, kind).await
+                mission::list_by_project(&app_state.http_client(), &project_code, kind).await
             })
             .await;
         match &result {
@@ -78,18 +89,34 @@ pub async fn list_missions_by_project(
 
 #[tauri::command]
 pub async fn add_assignee(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     mission_id: i64,
     body: AssigneeDataArg,
 ) -> Result<AssigneeViewResponse, ApiError> {
-    let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "add_assignee");
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    add_assignee_impl(app_state.inner(), &req_ctx, mission_id, body).await
+}
+
+pub async fn add_assignee_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    mission_id: i64,
+    body: AssigneeDataArg,
+) -> Result<AssigneeViewResponse, ApiError> {
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
+        command = "add_assignee"
+    );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
-                mission::add_assignee(&client, mission_id, body).await
+            .scope(req_ctx.trace_id.clone(), async {
+                mission::add_assignee(&app_state.http_client(), mission_id, body).await
             })
             .await;
         match &result {
@@ -104,18 +131,34 @@ pub async fn add_assignee(
 
 #[tauri::command]
 pub async fn remove_assignee(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     mission_id: i64,
     assignee_id: i64,
 ) -> Result<(), ApiError> {
-    let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "remove_assignee");
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    remove_assignee_impl(app_state.inner(), &req_ctx, mission_id, assignee_id).await
+}
+
+pub async fn remove_assignee_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    mission_id: i64,
+    assignee_id: i64,
+) -> Result<(), ApiError> {
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
+        command = "remove_assignee"
+    );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
-                mission::remove_assignee(&client, mission_id, assignee_id).await
+            .scope(req_ctx.trace_id.clone(), async {
+                mission::remove_assignee(&app_state.http_client(), mission_id, assignee_id).await
             })
             .await;
         match &result {
@@ -130,19 +173,45 @@ pub async fn remove_assignee(
 
 #[tauri::command]
 pub async fn create_mission(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     project_code: String,
     mission_kind: String,
     mission_code: String,
     assignees: Vec<CreateMissionAssigneeArg>,
 ) -> Result<MissionViewResponse, ApiError> {
-    let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "create_mission");
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    create_mission_impl(
+        app_state.inner(),
+        &req_ctx,
+        project_code,
+        mission_kind,
+        mission_code,
+        assignees,
+    )
+    .await
+}
+
+pub async fn create_mission_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    project_code: String,
+    mission_kind: String,
+    mission_code: String,
+    assignees: Vec<CreateMissionAssigneeArg>,
+) -> Result<MissionViewResponse, ApiError> {
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
+        command = "create_mission"
+    );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
+            .scope(req_ctx.trace_id.clone(), async {
                 let assignees = assignees
                     .into_iter()
                     .map(|a| -> Result<AssigneeDataArg, ApiError> {
@@ -153,7 +222,7 @@ pub async fn create_mission(
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 mission::create_mission(
-                    &client,
+                    &app_state.http_client(),
                     CreateMissionRequest {
                         project_code,
                         mission_kind: parse_kind(&mission_kind)?,
@@ -176,26 +245,38 @@ pub async fn create_mission(
 
 #[tauri::command]
 pub async fn list_issues_by_mission(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     mission_id: i64,
     state: Option<String>,
 ) -> Result<Vec<mission::IssueViewResponse>, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    list_issues_by_mission_impl(app_state.inner(), &req_ctx, mission_id, state).await
+}
+
+pub async fn list_issues_by_mission_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    mission_id: i64,
+    state: Option<String>,
+) -> Result<Vec<mission::IssueViewResponse>, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "list_issues_by_mission"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
+            .scope(req_ctx.trace_id.clone(), async {
                 let parsed = match state.as_deref() {
                     Some(s) => Some(parse_issue_state(s)?),
                     None => None,
                 };
-                mission::list_issues_by_mission(&client, mission_id, parsed).await
+                mission::list_issues_by_mission(&app_state.http_client(), mission_id, parsed).await
             })
             .await;
         match &result {
@@ -210,18 +291,34 @@ pub async fn list_issues_by_mission(
 
 #[tauri::command]
 pub async fn create_issue(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     mission_id: i64,
     body: mission::CreateIssueRequest,
 ) -> Result<mission::IssueViewResponse, ApiError> {
-    let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "create_issue");
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    create_issue_impl(app_state.inner(), &req_ctx, mission_id, body).await
+}
+
+pub async fn create_issue_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    mission_id: i64,
+    body: mission::CreateIssueRequest,
+) -> Result<mission::IssueViewResponse, ApiError> {
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
+        command = "create_issue"
+    );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
-                mission::create_issue(&client, mission_id, body).await
+            .scope(req_ctx.trace_id.clone(), async {
+                mission::create_issue(&app_state.http_client(), mission_id, body).await
             })
             .await;
         match &result {
@@ -236,18 +333,39 @@ pub async fn create_issue(
 
 #[tauri::command]
 pub async fn patch_issue_state(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     issue_id: i64,
     state: String,
 ) -> Result<mission::IssueViewResponse, ApiError> {
-    let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "patch_issue_state");
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    patch_issue_state_impl(app_state.inner(), &req_ctx, issue_id, state).await
+}
+
+pub async fn patch_issue_state_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    issue_id: i64,
+    state: String,
+) -> Result<mission::IssueViewResponse, ApiError> {
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
+        command = "patch_issue_state"
+    );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
-                mission::patch_issue_state(&client, issue_id, parse_issue_state(&state)?).await
+            .scope(req_ctx.trace_id.clone(), async {
+                mission::patch_issue_state(
+                    &app_state.http_client(),
+                    issue_id,
+                    parse_issue_state(&state)?,
+                )
+                .await
             })
             .await;
         match &result {
@@ -262,22 +380,34 @@ pub async fn patch_issue_state(
 
 #[tauri::command]
 pub async fn update_issue_description(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     issue_id: i64,
     body: mission::UpdateIssueDescriptionRequest,
 ) -> Result<mission::IssueViewResponse, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    update_issue_description_impl(app_state.inner(), &req_ctx, issue_id, body).await
+}
+
+pub async fn update_issue_description_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    issue_id: i64,
+    body: mission::UpdateIssueDescriptionRequest,
+) -> Result<mission::IssueViewResponse, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "update_issue_description"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
-                mission::update_issue_description(&client, issue_id, body).await
+            .scope(req_ctx.trace_id.clone(), async {
+                mission::update_issue_description(&app_state.http_client(), issue_id, body).await
             })
             .await;
         match &result {
@@ -292,18 +422,34 @@ pub async fn update_issue_description(
 
 #[tauri::command]
 pub async fn append_comment(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     issue_id: i64,
     body: mission::AppendCommentRequest,
 ) -> Result<mission::IssueViewResponse, ApiError> {
-    let trace_id = generator.client_side();
-    let span = tracing::info_span!("command", trace_id = %trace_id, command = "append_comment");
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    append_comment_impl(app_state.inner(), &req_ctx, issue_id, body).await
+}
+
+pub async fn append_comment_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    issue_id: i64,
+    body: mission::AppendCommentRequest,
+) -> Result<mission::IssueViewResponse, ApiError> {
+    let span = tracing::info_span!(
+        "command",
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
+        command = "append_comment"
+    );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
-                mission::append_comment(&client, issue_id, body).await
+            .scope(req_ctx.trace_id.clone(), async {
+                mission::append_comment(&app_state.http_client(), issue_id, body).await
             })
             .await;
         match &result {

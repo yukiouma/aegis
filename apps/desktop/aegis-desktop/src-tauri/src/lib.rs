@@ -7,8 +7,8 @@ use tauri_plugin_store::StoreExt;
 
 mod commands;
 mod http;
-mod system;
 mod state;
+mod system;
 mod trace_id_setup;
 
 #[tauri::command]
@@ -229,7 +229,7 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             // own Drop, which Tauri invokes when the runtime tears
             // managed state down).
             let shared = state::SharedAppState::new(
-                client.clone(),  // HttpClient is Clone (Arc<reqwest::Client>)
+                client.clone(), // HttpClient is Clone (Arc<reqwest::Client>)
                 generator.clone(),
                 submitter,
                 log_guard,
