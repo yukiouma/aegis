@@ -263,7 +263,8 @@ pub async fn list_code_items_by_version_and_code_impl(
         tracing::info!("enter");
         let result = TRACE_ID
             .scope(req_ctx.trace_id.clone(), async {
-                code_item::list_by_version_and_code(&app_state.http_client(), version_id, &code).await
+                code_item::list_by_version_and_code(&app_state.http_client(), version_id, &code)
+                    .await
             })
             .await;
         match &result {
