@@ -1,33 +1,43 @@
 //! Tauri command shims for the SDTM domain-model version HTTP layer.
 
-use logging_utils::TraceIdGenerator;
-use tauri::State;
 use tracing::Instrument;
 
-use crate::http::client::{HttpClient, TRACE_ID};
+use crate::http::client::TRACE_ID;
 use crate::http::domain_model::version::{
     self, CreateSdtmVersionRequest, SdtmVersionListResponse, SdtmVersionViewResponse,
     UpdateSdtmVersionRequest,
 };
 use crate::http::dto::ApiError;
+use crate::state::{Caller, RequestContext, SharedAppState};
 
 #[tauri::command]
 pub async fn create_sdtm_version(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     name: String,
 ) -> Result<SdtmVersionViewResponse, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    create_sdtm_version_impl(app_state.inner(), &req_ctx, name).await
+}
+
+pub async fn create_sdtm_version_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    name: String,
+) -> Result<SdtmVersionViewResponse, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "create_sdtm_version"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async {
-                version::create(&client, CreateSdtmVersionRequest { name }).await
+            .scope(req_ctx.trace_id.clone(), async {
+                version::create(&app_state.http_client(), CreateSdtmVersionRequest { name }).await
             })
             .await;
         match &result {
@@ -42,19 +52,31 @@ pub async fn create_sdtm_version(
 
 #[tauri::command]
 pub async fn list_sdtm_versions(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
 ) -> Result<SdtmVersionListResponse, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    list_sdtm_versions_impl(app_state.inner(), &req_ctx).await
+}
+
+pub async fn list_sdtm_versions_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+) -> Result<SdtmVersionListResponse, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "list_sdtm_versions"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async { version::list(&client).await })
+            .scope(req_ctx.trace_id.clone(), async {
+                version::list(&app_state.http_client()).await
+            })
             .await;
         match &result {
             Ok(_) => tracing::info!("success"),
@@ -68,20 +90,33 @@ pub async fn list_sdtm_versions(
 
 #[tauri::command]
 pub async fn get_sdtm_version_by_id(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     id: i64,
 ) -> Result<SdtmVersionViewResponse, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    get_sdtm_version_by_id_impl(app_state.inner(), &req_ctx, id).await
+}
+
+pub async fn get_sdtm_version_by_id_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    id: i64,
+) -> Result<SdtmVersionViewResponse, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "get_sdtm_version_by_id"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async { version::get_by_id(&client, id).await })
+            .scope(req_ctx.trace_id.clone(), async {
+                version::get_by_id(&app_state.http_client(), id).await
+            })
             .await;
         match &result {
             Ok(_) => tracing::info!("success"),
@@ -95,21 +130,35 @@ pub async fn get_sdtm_version_by_id(
 
 #[tauri::command]
 pub async fn update_sdtm_version(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     id: i64,
     body: UpdateSdtmVersionRequest,
 ) -> Result<SdtmVersionViewResponse, ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    update_sdtm_version_impl(app_state.inner(), &req_ctx, id, body).await
+}
+
+pub async fn update_sdtm_version_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    id: i64,
+    body: UpdateSdtmVersionRequest,
+) -> Result<SdtmVersionViewResponse, ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "update_sdtm_version"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async { version::update(&client, id, body).await })
+            .scope(req_ctx.trace_id.clone(), async {
+                version::update(&app_state.http_client(), id, body).await
+            })
             .await;
         match &result {
             Ok(_) => tracing::info!("success"),
@@ -123,20 +172,33 @@ pub async fn update_sdtm_version(
 
 #[tauri::command]
 pub async fn delete_sdtm_version(
-    client: State<'_, HttpClient>,
-    generator: State<'_, TraceIdGenerator>,
+    app_state: tauri::State<'_, SharedAppState>,
     id: i64,
 ) -> Result<(), ApiError> {
-    let trace_id = generator.client_side();
+    let req_ctx = RequestContext {
+        trace_id: app_state.trace_id_generator().client_side(),
+        caller: Caller::User,
+    };
+    delete_sdtm_version_impl(app_state.inner(), &req_ctx, id).await
+}
+
+pub async fn delete_sdtm_version_impl(
+    app_state: &SharedAppState,
+    req_ctx: &RequestContext,
+    id: i64,
+) -> Result<(), ApiError> {
     let span = tracing::info_span!(
         "command",
-        trace_id = %trace_id,
+        trace_id = %req_ctx.trace_id,
+        caller = %req_ctx.caller,
         command = "delete_sdtm_version"
     );
     async move {
         tracing::info!("enter");
         let result = TRACE_ID
-            .scope(trace_id, async { version::delete(&client, id).await })
+            .scope(req_ctx.trace_id.clone(), async {
+                version::delete(&app_state.http_client(), id).await
+            })
             .await;
         match &result {
             Ok(_) => tracing::info!("success"),
