@@ -158,9 +158,14 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             );
             // Read the prefix before the generator is moved into
             // managed state, so a batch id and a trace id from this
-            // install always share the same middle segment.
+            // install always share the same middle segment. We clone
+            // here so the legacy `app.manage(generator)` below continues
+            // to back State<'_, TraceIdGenerator> lookups from
+            // commands/auth.rs (and other legacy shims), and a second
+            // copy of the generator — sharing the same device prefix —
+            // also lives inside SharedAppState.
             let device_id = generator.device_prefix().unwrap_or("desktop").to_string();
-            app.manage(generator);
+            app.manage(generator.clone());
 
             // Batched submission of this process's own logs to the
             // server. A failed batch is persisted under
@@ -204,16 +209,37 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 log_dir = %log_dir.display(),
                 "aegis-desktop tracing initialised"
             );
-            app.manage(log_guard);
 
-            // Managed so the submitter is dropped when the app's
-            // state is torn down. Note that Tauri stores managed
-            // state in a `HashMap`, so drop order is hash order, not
-            // insertion order — if the submitter is dropped first,
-            // the lines the log guard then flushes find the worker
-            // gone and are discarded. They are still in the local
-            // file, which is the durable copy.
-            app.manage(submitter);
+            // Single aggregation point. The four legacy `app.manage(...)`
+            // calls above continue to back the State<'_, HttpClient>
+            // and State<'_, TraceIdGenerator> lookups from
+            // commands/auth.rs, commands/user.rs,
+            // commands/user_credential.rs, commands/identity.rs, and
+            // commands/healthz.rs (those shims are still on the
+            // pre-split shape). This is the fifth managed state entry
+            // — the refactored shims in commands/{crf,domain_model,
+            // mission,project,terminology}/* and a future LLM-agent
+            // caller resolve against it.
+            //
+            // LogSubmitter and LogGuard are not Clone; they are MOVED
+            // into SharedAppState here, which is why the lines
+            // `app.manage(submitter);` and `app.manage(log_guard);`
+            // that used to live above have been removed — their Drop
+            // lifecycle is now identical (driven by SharedAppState's
+            // own Drop, which Tauri invokes when the runtime tears
+            // managed state down).
+            let shared = state::SharedAppState::new(
+                client.clone(),  // HttpClient is Clone (Arc<reqwest::Client>)
+                generator.clone(),
+                submitter,
+                log_guard,
+            );
+            app.manage(shared);
+
+            // Legacy keep-alive for HttpClient so the out-of-scope
+            // command shims keep resolving. Same lifetime guarantee
+            // as before — managed for the Tauri runtime, dropped at
+            // shutdown.
             app.manage(client);
             Ok(())
         })
