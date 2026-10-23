@@ -27,3 +27,11 @@ pub use domain::{
     SdtmProjectVersionUpdate, SdtmRole, SdtmVariableCore, SdtmVariableDescription,
     SdtmVariableDescriptionDetail, SdtmVariableType,
 };
+pub use usecase::{
+    CreateSdtmProjectDomain, CreateSdtmProjectDomainOverride, CreateSdtmProjectVariable,
+    CreateSdtmProjectVariableOverride, CreateSdtmProjectVersion, SdtmProjectDomainOverrideView,
+    SdtmProjectDomainView, SdtmProjectUsecase, SdtmProjectUsecaseConfig,
+    SdtmProjectVariableOverrideView, SdtmProjectVariableView, SdtmProjectVersionView,
+    UpdateSdtmProjectDomain, UpdateSdtmProjectDomainOverride, UpdateSdtmProjectVariable,
+    UpdateSdtmProjectVariableOverride, UpdateSdtmProjectVersion, UsecaseError,
+};
