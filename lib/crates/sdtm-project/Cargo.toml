@@ -1,0 +1,25 @@
+[package]
+name = "sdtm-project"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+sqlx = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+# `chrono` provides the `DateTime<Utc>` carried on every aggregate's
+# `created_at` / `updated_at` columns.
+chrono = { workspace = true }
+# `serde` + `serde_json` are required for the JSONB round-trip of
+# `Vec<String>` (key_variables) and the `Vec<…Description>` columns.
+serde = { workspace = true }
+serde_json = { workspace = true }
+# `apis` provides the outbound `SdtmProjectService` port the facade
+# implements. Path-dep because both crates share the workspace.
+apis = { path = "../apis" }
+
+[dev-dependencies]
+dotenvy = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
