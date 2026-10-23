@@ -74,7 +74,7 @@ impl SdtmProjectDomainOverrideRepository for SdtmProjectDomainOverrideRepoPg {
         .bind(descriptions_json)
         .fetch_one(&self.pool)
         .await
-        .map_err(map_domain_override_err)?;
+        .map_err(|e| map_domain_override_err(e, input.domain_id))?;
         row.into_override()
     }
 
@@ -90,7 +90,7 @@ impl SdtmProjectDomainOverrideRepository for SdtmProjectDomainOverrideRepoPg {
         .bind(domain_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(map_domain_override_err)?
+        .map_err(|e| map_domain_override_err(e, 0))?
         .ok_or(DomainError::SdtmProjectDomainOverrideNotFound(domain_id))?;
         row.into_override()
     }
@@ -121,7 +121,7 @@ impl SdtmProjectDomainOverrideRepository for SdtmProjectDomainOverrideRepoPg {
         .bind(descriptions_json)
         .fetch_optional(&self.pool)
         .await
-        .map_err(map_domain_override_err)?
+        .map_err(|e| map_domain_override_err(e, 0))?
         .ok_or(DomainError::SdtmProjectDomainOverrideNotFound(
             input.domain_id,
         ))?;
@@ -133,7 +133,7 @@ impl SdtmProjectDomainOverrideRepository for SdtmProjectDomainOverrideRepoPg {
             .bind(domain_id)
             .execute(&self.pool)
             .await
-            .map_err(map_domain_override_err)?;
+            .map_err(|e| map_domain_override_err(e, 0))?;
         if res.rows_affected() == 0 {
             return Err(DomainError::SdtmProjectDomainOverrideNotFound(domain_id));
         }
@@ -141,7 +141,12 @@ impl SdtmProjectDomainOverrideRepository for SdtmProjectDomainOverrideRepoPg {
     }
 }
 
-fn map_domain_override_err(err: sqlx::Error) -> DomainError {
+/// Map a driver error to a domain error.
+///
+/// `parent_id` is the parent the statement referenced. A foreign-key
+/// violation can only arise from an INSERT, so the read and update paths
+/// pass 0; the create path passes the id the caller actually used.
+fn map_domain_override_err(err: sqlx::Error, parent_id: i64) -> DomainError {
     use sqlx::Error as E;
     match &err {
         E::Database(db) => {
@@ -152,7 +157,7 @@ fn map_domain_override_err(err: sqlx::Error) -> DomainError {
             }
             if db.code().as_deref() == Some("23503") {
                 // FK violation: the parent domain is gone.
-                return DomainError::FkSdtmProjectDomainNotFound(0);
+                return DomainError::FkSdtmProjectDomainNotFound(parent_id);
             }
             DomainError::Repository(err.to_string())
         }

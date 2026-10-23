@@ -120,7 +120,7 @@ impl SdtmProjectVariableRepository for SdtmProjectVariableRepoPg {
         .bind(input.variable_sequence)
         .fetch_one(&self.pool)
         .await
-        .map_err(map_variable_err)?;
+        .map_err(|e| map_variable_err(e, input.domain_id))?;
         row.into_variable()
     }
 
@@ -142,7 +142,7 @@ impl SdtmProjectVariableRepository for SdtmProjectVariableRepoPg {
         .bind(id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(map_variable_err)?
+        .map_err(|e| map_variable_err(e, 0))?
         .ok_or(DomainError::SdtmProjectVariableNotFound(id))?;
         row.into_variable()
     }
@@ -169,7 +169,7 @@ impl SdtmProjectVariableRepository for SdtmProjectVariableRepoPg {
         .bind(domain_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(map_variable_err)?;
+        .map_err(|e| map_variable_err(e, 0))?;
         rows.into_iter()
             .map(SdtmProjectVariableRow::into_variable)
             .collect()
@@ -205,7 +205,7 @@ impl SdtmProjectVariableRepository for SdtmProjectVariableRepoPg {
         .bind(input.variable_sequence)
         .fetch_optional(&self.pool)
         .await
-        .map_err(map_variable_err)?
+        .map_err(|e| map_variable_err(e, 0))?
         .ok_or(DomainError::SdtmProjectVariableNotFound(input.id))?;
         row.into_variable()
     }
@@ -216,7 +216,7 @@ impl SdtmProjectVariableRepository for SdtmProjectVariableRepoPg {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(map_variable_err)?;
+            .map_err(|e| map_variable_err(e, 0))?;
         if res.rows_affected() == 0 {
             return Err(DomainError::SdtmProjectVariableNotFound(id));
         }
@@ -224,7 +224,13 @@ impl SdtmProjectVariableRepository for SdtmProjectVariableRepoPg {
     }
 }
 
-fn map_variable_err(err: sqlx::Error) -> DomainError {
+/// Map a driver error to a domain error.
+///
+/// `parent_domain_id` is the domain the statement referenced. A
+/// foreign-key violation can only arise from an INSERT, so the read
+/// and update paths pass 0; the create path passes the id the caller
+/// actually used.
+fn map_variable_err(err: sqlx::Error, parent_domain_id: i64) -> DomainError {
     use sqlx::Error as E;
     match &err {
         E::Database(db) => {
@@ -240,7 +246,7 @@ fn map_variable_err(err: sqlx::Error) -> DomainError {
                 // FK violation: the parent domain is gone. This is
                 // the backstop for the race where the domain is
                 // deleted between the usecase's check and the insert.
-                return DomainError::FkSdtmProjectDomainNotFound(0);
+                return DomainError::FkSdtmProjectDomainNotFound(parent_domain_id);
             }
             DomainError::Repository(err.to_string())
         }

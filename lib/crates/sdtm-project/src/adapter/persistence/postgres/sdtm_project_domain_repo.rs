@@ -111,7 +111,7 @@ impl SdtmProjectDomainRepository for SdtmProjectDomainRepoPg {
         .bind(key_variables_json)
         .fetch_one(&self.pool)
         .await
-        .map_err(map_domain_err)?;
+        .map_err(|e| map_domain_err(e, input.version_id))?;
         row.into_domain()
     }
 
@@ -131,7 +131,7 @@ impl SdtmProjectDomainRepository for SdtmProjectDomainRepoPg {
         .bind(id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(map_domain_err)?
+        .map_err(|e| map_domain_err(e, 0))?
         .ok_or(DomainError::SdtmProjectDomainNotFound(id))?;
         row.into_domain()
     }
@@ -156,7 +156,7 @@ impl SdtmProjectDomainRepository for SdtmProjectDomainRepoPg {
         .bind(version_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(map_domain_err)?;
+        .map_err(|e| map_domain_err(e, 0))?;
         rows.into_iter()
             .map(SdtmProjectDomainRow::into_domain)
             .collect()
@@ -198,7 +198,7 @@ impl SdtmProjectDomainRepository for SdtmProjectDomainRepoPg {
         .bind(key_variables_json)
         .fetch_optional(&self.pool)
         .await
-        .map_err(map_domain_err)?
+        .map_err(|e| map_domain_err(e, 0))?
         .ok_or(DomainError::SdtmProjectDomainNotFound(input.id))?;
         row.into_domain()
     }
@@ -210,7 +210,7 @@ impl SdtmProjectDomainRepository for SdtmProjectDomainRepoPg {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(map_domain_err)?;
+            .map_err(|e| map_domain_err(e, 0))?;
         if res.rows_affected() == 0 {
             return Err(DomainError::SdtmProjectDomainNotFound(id));
         }
@@ -218,7 +218,14 @@ impl SdtmProjectDomainRepository for SdtmProjectDomainRepoPg {
     }
 }
 
-fn map_domain_err(err: sqlx::Error) -> DomainError {
+/// Map a driver error to a domain error.
+///
+/// `parent_version_id` is the version the statement referenced. A
+/// foreign-key violation can only arise from an INSERT, so the read
+/// and update paths — which cannot violate the FK — pass 0; the
+/// create path passes the id the caller actually used, so the error
+/// names the version that was missing.
+fn map_domain_err(err: sqlx::Error, parent_version_id: i64) -> DomainError {
     use sqlx::Error as E;
     match &err {
         E::Database(db) => {
@@ -234,7 +241,7 @@ fn map_domain_err(err: sqlx::Error) -> DomainError {
                 // FK violation: the parent version is gone. This is
                 // the backstop for the race where the version is
                 // deleted between the usecase's check and the insert.
-                return DomainError::FkSdtmProjectVersionNotFound(0);
+                return DomainError::FkSdtmProjectVersionNotFound(parent_version_id);
             }
             DomainError::Repository(err.to_string())
         }

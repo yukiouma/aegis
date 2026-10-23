@@ -90,7 +90,7 @@ impl SdtmProjectVariableOverrideRepository for SdtmProjectVariableOverrideRepoPg
             .bind(descriptions_json)
             .fetch_one(&self.pool)
             .await
-            .map_err(map_variable_override_err)?;
+            .map_err(|e| map_variable_override_err(e, input.variable_id))?;
         row.into_override()
     }
 
@@ -108,7 +108,7 @@ impl SdtmProjectVariableOverrideRepository for SdtmProjectVariableOverrideRepoPg
             .bind(variable_id)
             .fetch_optional(&self.pool)
             .await
-            .map_err(map_variable_override_err)?
+            .map_err(|e| map_variable_override_err(e, 0))?
             .ok_or(DomainError::SdtmProjectVariableOverrideNotFound(
                 variable_id,
             ))?;
@@ -168,7 +168,7 @@ impl SdtmProjectVariableOverrideRepository for SdtmProjectVariableOverrideRepoPg
                 .bind(descriptions_json)
                 .fetch_optional(&self.pool)
                 .await
-                .map_err(map_variable_override_err)?
+                .map_err(|e| map_variable_override_err(e, 0))?
                 .ok_or(DomainError::SdtmProjectVariableOverrideNotFound(
                     input.variable_id,
                 ))?;
@@ -180,7 +180,7 @@ impl SdtmProjectVariableOverrideRepository for SdtmProjectVariableOverrideRepoPg
             .bind(variable_id)
             .execute(&self.pool)
             .await
-            .map_err(map_variable_override_err)?;
+            .map_err(|e| map_variable_override_err(e, 0))?;
         if res.rows_affected() == 0 {
             return Err(DomainError::SdtmProjectVariableOverrideNotFound(
                 variable_id,
@@ -190,7 +190,12 @@ impl SdtmProjectVariableOverrideRepository for SdtmProjectVariableOverrideRepoPg
     }
 }
 
-fn map_variable_override_err(err: sqlx::Error) -> DomainError {
+/// Map a driver error to a domain error.
+///
+/// `parent_id` is the parent the statement referenced. A foreign-key
+/// violation can only arise from an INSERT, so the read and update paths
+/// pass 0; the create path passes the id the caller actually used.
+fn map_variable_override_err(err: sqlx::Error, parent_id: i64) -> DomainError {
     use sqlx::Error as E;
     match &err {
         E::Database(db) => {
@@ -201,7 +206,7 @@ fn map_variable_override_err(err: sqlx::Error) -> DomainError {
             }
             if db.code().as_deref() == Some("23503") {
                 // FK violation: the parent variable is gone.
-                return DomainError::FkSdtmProjectVariableNotFound(0);
+                return DomainError::FkSdtmProjectVariableNotFound(parent_id);
             }
             DomainError::Repository(err.to_string())
         }
