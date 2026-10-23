@@ -15,6 +15,7 @@ pub mod adapter;
 pub mod domain;
 pub mod usecase;
 
+pub use adapter::facade::SdtmProjectServiceImpl;
 pub use adapter::persistence::postgres::{
     sdtm_project_domain_override_repo::SdtmProjectDomainOverrideRepoPg,
     sdtm_project_domain_repo::SdtmProjectDomainRepoPg,
@@ -22,6 +23,7 @@ pub use adapter::persistence::postgres::{
     sdtm_project_variable_repo::SdtmProjectVariableRepoPg,
     sdtm_project_version_repo::SdtmProjectVersionRepoPg,
 };
+pub use adapter::service::project::ProjectLookupImpl;
 pub use domain::{
     DomainCategory, DomainError, ProjectLookup, SdtmDomainDescription, SdtmDomainDescriptionDetail,
     SdtmProjectDomain, SdtmProjectDomainNew, SdtmProjectDomainOverride,
