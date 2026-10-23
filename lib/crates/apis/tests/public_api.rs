@@ -274,3 +274,203 @@ fn auth_service_is_send_sync() {
     assert_send_sync::<Box<dyn AuthService>>();
     assert_send_sync::<&FakeAuthService>();
 }
+
+// ---- sdtm_project --------------------------------------------------------
+
+use apis::sdtm_project::{
+    CreateSdtmProjectDomainOverrideRequest, CreateSdtmProjectDomainRequest,
+    CreateSdtmProjectVariableOverrideRequest, CreateSdtmProjectVariableRequest,
+    CreateSdtmProjectVersionRequest, DomainCategory, SdtmDomainDescription,
+    SdtmDomainDescriptionDetail, SdtmProjectApiError, SdtmProjectDomainList,
+    SdtmProjectDomainOverrideView, SdtmProjectDomainView, SdtmProjectService,
+    SdtmProjectVariableList, SdtmProjectVariableOverrideView, SdtmProjectVariableView,
+    SdtmProjectVersionList, SdtmProjectVersionView, SdtmRole, SdtmVariableCore,
+    SdtmVariableDescription, SdtmVariableDescriptionDetail, SdtmVariableType,
+    UpdateSdtmProjectDomainOverrideRequest, UpdateSdtmProjectDomainRequest,
+    UpdateSdtmProjectVariableOverrideRequest, UpdateSdtmProjectVariableRequest,
+    UpdateSdtmProjectVersionRequest,
+};
+
+/// Every public type in `apis::sdtm_project` is nameable from the test.
+#[test]
+fn sdtm_project_public_types_are_nameable() {
+    fn assert_category(_: DomainCategory) {}
+    fn assert_var_type(_: SdtmVariableType) {}
+    fn assert_var_core(_: SdtmVariableCore) {}
+    fn assert_role(_: SdtmRole) {}
+    fn assert_domain_desc(_: SdtmDomainDescription) {}
+    fn assert_domain_desc_detail(_: SdtmDomainDescriptionDetail) {}
+    fn assert_var_desc(_: SdtmVariableDescription) {}
+    fn assert_var_desc_detail(_: SdtmVariableDescriptionDetail) {}
+    fn assert_version_view(_: SdtmProjectVersionView) {}
+    fn assert_domain_view(_: SdtmProjectDomainView) {}
+    fn assert_domain_override_view(_: SdtmProjectDomainOverrideView) {}
+    fn assert_variable_view(_: SdtmProjectVariableView) {}
+    fn assert_variable_override_view(_: SdtmProjectVariableOverrideView) {}
+    fn assert_version_list(_: SdtmProjectVersionList) {}
+    fn assert_domain_list(_: SdtmProjectDomainList) {}
+    fn assert_variable_list(_: SdtmProjectVariableList) {}
+    fn assert_err(_: SdtmProjectApiError) {}
+    fn assert_create_version(_: CreateSdtmProjectVersionRequest) {}
+    fn assert_update_version(_: UpdateSdtmProjectVersionRequest) {}
+    fn assert_create_domain(_: CreateSdtmProjectDomainRequest) {}
+    fn assert_update_domain(_: UpdateSdtmProjectDomainRequest) {}
+    fn assert_create_domain_override(_: CreateSdtmProjectDomainOverrideRequest) {}
+    fn assert_update_domain_override(_: UpdateSdtmProjectDomainOverrideRequest) {}
+    fn assert_create_variable(_: CreateSdtmProjectVariableRequest) {}
+    fn assert_update_variable(_: UpdateSdtmProjectVariableRequest) {}
+    fn assert_create_variable_override(_: CreateSdtmProjectVariableOverrideRequest) {}
+    fn assert_update_variable_override(_: UpdateSdtmProjectVariableOverrideRequest) {}
+
+    assert_category(DomainCategory::Events);
+    assert_var_type(SdtmVariableType::Character);
+    assert_var_core(SdtmVariableCore::Req);
+    assert_role(SdtmRole::Topic);
+    assert_domain_desc(SdtmDomainDescription {
+        lang: "en".into(),
+        details: SdtmDomainDescriptionDetail {
+            description: "Adverse events".into(),
+            structure: "One record per AE".into(),
+        },
+    });
+    assert_domain_desc_detail(SdtmDomainDescriptionDetail {
+        description: "Adverse events".into(),
+        structure: "One record per AE".into(),
+    });
+    assert_var_desc(SdtmVariableDescription {
+        lang: "en".into(),
+        details: SdtmVariableDescriptionDetail {
+            label: "Adverse Event Term".into(),
+        },
+    });
+    assert_var_desc_detail(SdtmVariableDescriptionDetail {
+        label: "Adverse Event Term".into(),
+    });
+
+    let ts = chrono::DateTime::from_timestamp(0, 0).unwrap();
+    assert_version_view(SdtmProjectVersionView {
+        id: 1,
+        project_code: "P1".into(),
+        version_name: "2024-09-27".into(),
+        created_at: ts,
+        updated_at: ts,
+    });
+    assert_domain_view(SdtmProjectDomainView {
+        id: 2,
+        version_id: 1,
+        domain_code: "AE".into(),
+        key_variables: vec!["AETERM".into()],
+        r#override: None,
+        created_at: ts,
+        updated_at: ts,
+    });
+    assert_domain_override_view(SdtmProjectDomainOverrideView {
+        id: 3,
+        domain_id: 2,
+        category: DomainCategory::Events,
+        descriptions: Vec::new(),
+        created_at: ts,
+        updated_at: ts,
+    });
+    assert_variable_view(SdtmProjectVariableView {
+        id: 4,
+        domain_id: 2,
+        variable_code: "AETERM".into(),
+        variable_sequence: 11,
+        r#override: None,
+        created_at: ts,
+        updated_at: ts,
+    });
+    assert_variable_override_view(SdtmProjectVariableOverrideView {
+        id: 5,
+        variable_id: 4,
+        variable_type: SdtmVariableType::Character,
+        variable_core: SdtmVariableCore::Req,
+        variable_role: Some(SdtmRole::Topic),
+        descriptions: Vec::new(),
+        created_at: ts,
+        updated_at: ts,
+    });
+    assert_version_list(SdtmProjectVersionList {
+        versions: Vec::new(),
+    });
+    assert_domain_list(SdtmProjectDomainList {
+        domains: Vec::new(),
+    });
+    assert_variable_list(SdtmProjectVariableList {
+        variables: Vec::new(),
+    });
+
+    assert_create_version(CreateSdtmProjectVersionRequest {
+        project_code: "P1".into(),
+        version_name: "2024-09-27".into(),
+    });
+    assert_update_version(UpdateSdtmProjectVersionRequest {
+        id: 1,
+        version_name: None,
+    });
+    assert_create_domain(CreateSdtmProjectDomainRequest {
+        version_id: 1,
+        domain_code: "AE".into(),
+        key_variables: vec!["AETERM".into()],
+    });
+    assert_update_domain(UpdateSdtmProjectDomainRequest {
+        id: 1,
+        domain_code: None,
+        key_variables: None,
+    });
+    assert_create_domain_override(CreateSdtmProjectDomainOverrideRequest {
+        domain_id: 1,
+        category: DomainCategory::Events,
+        descriptions: Vec::new(),
+    });
+    assert_update_domain_override(UpdateSdtmProjectDomainOverrideRequest {
+        domain_id: 1,
+        category: None,
+        descriptions: None,
+    });
+    assert_create_variable(CreateSdtmProjectVariableRequest {
+        domain_id: 1,
+        variable_code: "AETERM".into(),
+        variable_sequence: 11,
+    });
+    assert_update_variable(UpdateSdtmProjectVariableRequest {
+        id: 1,
+        variable_code: None,
+        variable_sequence: None,
+    });
+    assert_create_variable_override(CreateSdtmProjectVariableOverrideRequest {
+        variable_id: 1,
+        variable_type: SdtmVariableType::Character,
+        variable_core: SdtmVariableCore::Req,
+        variable_role: Some(SdtmRole::Topic),
+        descriptions: Vec::new(),
+    });
+    assert_update_variable_override(UpdateSdtmProjectVariableOverrideRequest {
+        variable_id: 1,
+        variable_type: None,
+        variable_core: None,
+        variable_role: None,
+        descriptions: None,
+    });
+
+    // Touch the error type to keep it from being dead-code-eliminated
+    // by the test build's analysis.
+    assert_err(SdtmProjectApiError::NotFound);
+}
+
+/// `SdtmProjectService` is object-safe: it can be held behind a
+/// `Box<dyn …>`.
+#[test]
+fn sdtm_project_service_is_object_safe() {
+    let _boxed: Option<Box<dyn SdtmProjectService>> = None;
+}
+
+/// `SdtmProjectService` requires `Send + Sync`, so a
+/// `Box<dyn SdtmProjectService>` is itself `Send + Sync` and can be
+/// shared state in an async server.
+#[test]
+fn sdtm_project_service_is_send_sync() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<Box<dyn SdtmProjectService>>();
+}
