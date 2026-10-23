@@ -3,3 +3,6 @@
 .claude
 .vscode
 **/.env
+# Scratch space for the superpowers plan-execution tooling (ledgers,
+# task briefs, review packages). The record of record is git history.
+.superpowers/
