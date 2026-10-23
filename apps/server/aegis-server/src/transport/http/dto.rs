@@ -2607,6 +2607,24 @@ impl From<SdtmProjectVariableDescription> for apis::sdtm_project::SdtmVariableDe
 
 // -- requests --------------------------------------------------------------
 
+/// Deserialise a nullable field into `Option<Option<T>>` so all three
+/// states stay distinguishable over the wire:
+///
+/// - a missing key is `None` — "leave the column alone"
+/// - an explicit `null` is `Some(None)` — "clear the column"
+/// - a value is `Some(Some(v))` — "replace the column"
+///
+/// A plain `Option<Option<T>>` derive collapses the first two: serde
+/// maps `null` to `None`, so "clear" would be unreachable from a
+/// client.
+fn double_option<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSdtmProjectVersionRequest {
@@ -2678,6 +2696,9 @@ pub struct CreateSdtmProjectVariableOverrideRequest {
 pub struct UpdateSdtmProjectVariableOverrideRequest {
     pub variable_type: Option<SdtmProjectVariableType>,
     pub variable_core: Option<SdtmProjectVariableCore>,
+    /// Three-state: absent = unchanged, `null` = clear, value =
+    /// replace. See [`double_option`].
+    #[serde(default, deserialize_with = "double_option")]
     pub variable_role: Option<Option<SdtmProjectRole>>,
     pub descriptions: Option<Vec<SdtmProjectVariableDescription>>,
 }
@@ -2848,6 +2869,37 @@ impl From<apis::sdtm_project::SdtmProjectVariableOverrideView>
 
 #[cfg(test)]
 mod tests {
+    /// The nullable `variableRole` update field must distinguish all
+    /// three states over the wire: a missing key means "leave it
+    /// alone", an explicit `null` means "clear it", and a value means
+    /// "replace it". A plain `Option<Option<T>>` derive collapses
+    /// `null` and "missing" into the same value, which makes the
+    /// clear state unreachable from a client.
+    #[test]
+    fn sdtm_project_variable_override_update_distinguishes_absent_null_and_value() {
+        let absent: UpdateSdtmProjectVariableOverrideRequest = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            absent.variable_role, None,
+            "missing key must mean 'unchanged'"
+        );
+
+        let null: UpdateSdtmProjectVariableOverrideRequest =
+            serde_json::from_str(r#"{"variableRole":null}"#).unwrap();
+        assert_eq!(
+            null.variable_role,
+            Some(None),
+            "explicit null must mean 'clear the role'"
+        );
+
+        let value: UpdateSdtmProjectVariableOverrideRequest =
+            serde_json::from_str(r#"{"variableRole":"Topic"}"#).unwrap();
+        assert_eq!(
+            value.variable_role,
+            Some(Some(SdtmProjectRole::Topic)),
+            "a value must mean 'replace the role'"
+        );
+    }
+
     /// The `override` key is a Rust keyword, so the wire DTO spells the
     /// field `override_` and renames it on the wire. The nested
     /// override must appear as `"override"`, and the key variables

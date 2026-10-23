@@ -332,13 +332,13 @@ pub async fn delete_domain(
 pub async fn create_domain_override(
     State(state): State<AppState>,
     _claims: AuthClaims,
-    Path(dto::PathId { id }): Path<dto::PathId>,
+    Path(domain_id): Path<i64>,
     Json(req): Json<dto::CreateSdtmProjectDomainOverrideRequest>,
 ) -> Result<(StatusCode, Json<dto::SdtmProjectDomainOverrideViewResponse>), ApiError> {
     let view = state
         .sdtm_project
         .create_domain_override(apis::sdtm_project::CreateSdtmProjectDomainOverrideRequest {
-            domain_id: id,
+            domain_id,
             category: req.category.into(),
             descriptions: req.descriptions.into_iter().map(Into::into).collect(),
         })
@@ -364,9 +364,9 @@ pub async fn create_domain_override(
 pub async fn get_domain_override(
     State(state): State<AppState>,
     _claims: AuthClaims,
-    Path(dto::PathId { id }): Path<dto::PathId>,
+    Path(domain_id): Path<i64>,
 ) -> Result<Json<dto::SdtmProjectDomainOverrideViewResponse>, ApiError> {
-    let view = state.sdtm_project.get_domain_override(id).await?;
+    let view = state.sdtm_project.get_domain_override(domain_id).await?;
     Ok(Json(view.into()))
 }
 
@@ -390,13 +390,13 @@ pub async fn get_domain_override(
 pub async fn update_domain_override(
     State(state): State<AppState>,
     _claims: AuthClaims,
-    Path(dto::PathId { id }): Path<dto::PathId>,
+    Path(domain_id): Path<i64>,
     Json(req): Json<dto::UpdateSdtmProjectDomainOverrideRequest>,
 ) -> Result<Json<dto::SdtmProjectDomainOverrideViewResponse>, ApiError> {
     let view = state
         .sdtm_project
         .update_domain_override(apis::sdtm_project::UpdateSdtmProjectDomainOverrideRequest {
-            domain_id: id,
+            domain_id,
             category: req.category.map(Into::into),
             descriptions: req
                 .descriptions
@@ -424,9 +424,9 @@ pub async fn update_domain_override(
 pub async fn delete_domain_override(
     State(state): State<AppState>,
     _claims: AuthClaims,
-    Path(dto::PathId { id }): Path<dto::PathId>,
+    Path(domain_id): Path<i64>,
 ) -> Result<StatusCode, ApiError> {
-    state.sdtm_project.delete_domain_override(id).await?;
+    state.sdtm_project.delete_domain_override(domain_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -596,7 +596,7 @@ pub async fn delete_variable(
 pub async fn create_variable_override(
     State(state): State<AppState>,
     _claims: AuthClaims,
-    Path(dto::PathId { id }): Path<dto::PathId>,
+    Path(variable_id): Path<i64>,
     Json(req): Json<dto::CreateSdtmProjectVariableOverrideRequest>,
 ) -> Result<
     (
@@ -609,7 +609,7 @@ pub async fn create_variable_override(
         .sdtm_project
         .create_variable_override(
             apis::sdtm_project::CreateSdtmProjectVariableOverrideRequest {
-                variable_id: id,
+                variable_id,
                 variable_type: req.variable_type.into(),
                 variable_core: req.variable_core.into(),
                 variable_role: req.variable_role.map(Into::into),
@@ -638,9 +638,12 @@ pub async fn create_variable_override(
 pub async fn get_variable_override(
     State(state): State<AppState>,
     _claims: AuthClaims,
-    Path(dto::PathId { id }): Path<dto::PathId>,
+    Path(variable_id): Path<i64>,
 ) -> Result<Json<dto::SdtmProjectVariableOverrideViewResponse>, ApiError> {
-    let view = state.sdtm_project.get_variable_override(id).await?;
+    let view = state
+        .sdtm_project
+        .get_variable_override(variable_id)
+        .await?;
     Ok(Json(view.into()))
 }
 
@@ -664,14 +667,14 @@ pub async fn get_variable_override(
 pub async fn update_variable_override(
     State(state): State<AppState>,
     _claims: AuthClaims,
-    Path(dto::PathId { id }): Path<dto::PathId>,
+    Path(variable_id): Path<i64>,
     Json(req): Json<dto::UpdateSdtmProjectVariableOverrideRequest>,
 ) -> Result<Json<dto::SdtmProjectVariableOverrideViewResponse>, ApiError> {
     let view = state
         .sdtm_project
         .update_variable_override(
             apis::sdtm_project::UpdateSdtmProjectVariableOverrideRequest {
-                variable_id: id,
+                variable_id,
                 variable_type: req.variable_type.map(Into::into),
                 variable_core: req.variable_core.map(Into::into),
                 variable_role: req.variable_role.map(|inner| inner.map(Into::into)),
@@ -702,9 +705,12 @@ pub async fn update_variable_override(
 pub async fn delete_variable_override(
     State(state): State<AppState>,
     _claims: AuthClaims,
-    Path(dto::PathId { id }): Path<dto::PathId>,
+    Path(variable_id): Path<i64>,
 ) -> Result<StatusCode, ApiError> {
-    state.sdtm_project.delete_variable_override(id).await?;
+    state
+        .sdtm_project
+        .delete_variable_override(variable_id)
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -712,17 +718,22 @@ pub async fn delete_variable_override(
 mod tests {
     //! Handler tests for `/api/sdtm-project`.
     //!
-    //! `MockSdtmProjectService` implements the two methods the tests
-    //! exercise and `unimplemented!()`s the rest. `MockAuth` accepts
-    //! any bearer token so the handlers' auth extractor is satisfied
-    //! without minting a real JWT.
+    //! `MockSdtmProjectService` answers every service method
+    //! successfully and `MockAuth` accepts any bearer token, so the
+    //! tests exercise routing and extraction rather than behaviour.
+    //!
+    //! `all_routes_dispatch_to_their_handler` drives **every** route
+    //! with a concrete path and asserts the status the handler
+    //! returns. That is the test that catches a route whose path
+    //! label does not match the extractor's field name — a mismatch
+    //! that leaves the OpenAPI document (built from the
+    //! `#[utoipa::path]` annotations) looking perfectly correct.
 
     use super::*;
     use async_trait::async_trait;
     use axum::Router;
     use axum::body::Body;
     use axum::http::{Request, StatusCode as AxStatus};
-    use axum::routing::{get, post};
     use std::sync::Arc;
     use tower::ServiceExt;
 
@@ -812,6 +823,9 @@ mod tests {
     }
 
     // ---- mock sdtm-project service ------------------------------------
+    //
+    // Every method answers successfully, so a failing route can only
+    // be a routing or extraction failure.
 
     #[derive(Clone, Default)]
     pub struct MockSdtmProjectService {
@@ -825,152 +839,208 @@ mod tests {
             .with_timezone(&chrono::Utc)
     }
 
+    fn version_view() -> apis::sdtm_project::SdtmProjectVersionView {
+        apis::sdtm_project::SdtmProjectVersionView {
+            id: 1,
+            project_code: "P1".into(),
+            version_name: "2024-09-27".into(),
+            created_at: ts(),
+            updated_at: ts(),
+        }
+    }
+
+    fn domain_view() -> apis::sdtm_project::SdtmProjectDomainView {
+        apis::sdtm_project::SdtmProjectDomainView {
+            id: 2,
+            version_id: 1,
+            domain_code: "AE".into(),
+            key_variables: vec!["AETERM".into()],
+            r#override: None,
+            created_at: ts(),
+            updated_at: ts(),
+        }
+    }
+
+    fn domain_override_view() -> apis::sdtm_project::SdtmProjectDomainOverrideView {
+        apis::sdtm_project::SdtmProjectDomainOverrideView {
+            id: 3,
+            domain_id: 2,
+            category: apis::sdtm_project::DomainCategory::Events,
+            descriptions: Vec::new(),
+            created_at: ts(),
+            updated_at: ts(),
+        }
+    }
+
+    fn variable_view() -> apis::sdtm_project::SdtmProjectVariableView {
+        apis::sdtm_project::SdtmProjectVariableView {
+            id: 4,
+            domain_id: 2,
+            variable_code: "AETERM".into(),
+            variable_sequence: 11,
+            r#override: None,
+            created_at: ts(),
+            updated_at: ts(),
+        }
+    }
+
+    fn variable_override_view() -> apis::sdtm_project::SdtmProjectVariableOverrideView {
+        apis::sdtm_project::SdtmProjectVariableOverrideView {
+            id: 5,
+            variable_id: 4,
+            variable_type: apis::sdtm_project::SdtmVariableType::Character,
+            variable_core: apis::sdtm_project::SdtmVariableCore::Req,
+            variable_role: Some(apis::sdtm_project::SdtmRole::Topic),
+            descriptions: Vec::new(),
+            created_at: ts(),
+            updated_at: ts(),
+        }
+    }
+
     #[async_trait]
     impl SdtmProjectService for MockSdtmProjectService {
-        async fn create_domain(
-            &self,
-            req: CreateSdtmProjectDomainRequest,
-        ) -> Result<apis::sdtm_project::SdtmProjectDomainView, SdtmProjectApiError> {
-            *self.created_domain.lock().unwrap() = Some(req);
-            Ok(apis::sdtm_project::SdtmProjectDomainView {
-                id: 42,
-                version_id: 1,
-                domain_code: "AE".into(),
-                key_variables: vec!["AETERM".into()],
-                r#override: None,
-                created_at: ts(),
-                updated_at: ts(),
-            })
-        }
-
-        async fn list_versions_by_project(
-            &self,
-            _project_code: &str,
-        ) -> Result<apis::sdtm_project::SdtmProjectVersionList, SdtmProjectApiError> {
-            Ok(apis::sdtm_project::SdtmProjectVersionList {
-                versions: Vec::new(),
-            })
-        }
-
         async fn create_version(
             &self,
             _req: CreateSdtmProjectVersionRequest,
         ) -> Result<apis::sdtm_project::SdtmProjectVersionView, SdtmProjectApiError> {
-            unimplemented!()
+            Ok(version_view())
         }
         async fn get_version_by_id(
             &self,
             _id: i64,
         ) -> Result<apis::sdtm_project::SdtmProjectVersionView, SdtmProjectApiError> {
-            unimplemented!()
+            Ok(version_view())
+        }
+        async fn list_versions_by_project(
+            &self,
+            _project_code: &str,
+        ) -> Result<apis::sdtm_project::SdtmProjectVersionList, SdtmProjectApiError> {
+            Ok(apis::sdtm_project::SdtmProjectVersionList {
+                versions: vec![version_view()],
+            })
         }
         async fn update_version(
             &self,
             _req: UpdateSdtmProjectVersionRequest,
         ) -> Result<apis::sdtm_project::SdtmProjectVersionView, SdtmProjectApiError> {
-            unimplemented!()
+            Ok(version_view())
         }
         async fn delete_version(&self, _id: i64) -> Result<(), SdtmProjectApiError> {
-            unimplemented!()
+            Ok(())
+        }
+
+        async fn create_domain(
+            &self,
+            req: CreateSdtmProjectDomainRequest,
+        ) -> Result<apis::sdtm_project::SdtmProjectDomainView, SdtmProjectApiError> {
+            *self.created_domain.lock().unwrap() = Some(req);
+            Ok(domain_view())
         }
         async fn get_domain_by_id(
             &self,
             _id: i64,
         ) -> Result<apis::sdtm_project::SdtmProjectDomainView, SdtmProjectApiError> {
-            unimplemented!()
+            Ok(domain_view())
         }
         async fn list_domains_by_version(
             &self,
             _version_id: i64,
         ) -> Result<apis::sdtm_project::SdtmProjectDomainList, SdtmProjectApiError> {
-            unimplemented!()
+            Ok(apis::sdtm_project::SdtmProjectDomainList {
+                domains: vec![domain_view()],
+            })
         }
         async fn update_domain(
             &self,
             _req: UpdateSdtmProjectDomainRequest,
         ) -> Result<apis::sdtm_project::SdtmProjectDomainView, SdtmProjectApiError> {
-            unimplemented!()
+            Ok(domain_view())
         }
         async fn delete_domain(&self, _id: i64) -> Result<(), SdtmProjectApiError> {
-            unimplemented!()
+            Ok(())
         }
+
         async fn create_domain_override(
             &self,
             _req: CreateSdtmProjectDomainOverrideRequest,
         ) -> Result<apis::sdtm_project::SdtmProjectDomainOverrideView, SdtmProjectApiError>
         {
-            unimplemented!()
+            Ok(domain_override_view())
         }
         async fn get_domain_override(
             &self,
             _domain_id: i64,
         ) -> Result<apis::sdtm_project::SdtmProjectDomainOverrideView, SdtmProjectApiError>
         {
-            unimplemented!()
+            Ok(domain_override_view())
         }
         async fn update_domain_override(
             &self,
             _req: UpdateSdtmProjectDomainOverrideRequest,
         ) -> Result<apis::sdtm_project::SdtmProjectDomainOverrideView, SdtmProjectApiError>
         {
-            unimplemented!()
+            Ok(domain_override_view())
         }
         async fn delete_domain_override(&self, _domain_id: i64) -> Result<(), SdtmProjectApiError> {
-            unimplemented!()
+            Ok(())
         }
+
         async fn create_variable(
             &self,
             _req: CreateSdtmProjectVariableRequest,
         ) -> Result<apis::sdtm_project::SdtmProjectVariableView, SdtmProjectApiError> {
-            unimplemented!()
+            Ok(variable_view())
         }
         async fn get_variable_by_id(
             &self,
             _id: i64,
         ) -> Result<apis::sdtm_project::SdtmProjectVariableView, SdtmProjectApiError> {
-            unimplemented!()
+            Ok(variable_view())
         }
         async fn list_variables_by_domain(
             &self,
             _domain_id: i64,
         ) -> Result<apis::sdtm_project::SdtmProjectVariableList, SdtmProjectApiError> {
-            unimplemented!()
+            Ok(apis::sdtm_project::SdtmProjectVariableList {
+                variables: vec![variable_view()],
+            })
         }
         async fn update_variable(
             &self,
             _req: UpdateSdtmProjectVariableRequest,
         ) -> Result<apis::sdtm_project::SdtmProjectVariableView, SdtmProjectApiError> {
-            unimplemented!()
+            Ok(variable_view())
         }
         async fn delete_variable(&self, _id: i64) -> Result<(), SdtmProjectApiError> {
-            unimplemented!()
+            Ok(())
         }
+
         async fn create_variable_override(
             &self,
             _req: CreateSdtmProjectVariableOverrideRequest,
         ) -> Result<apis::sdtm_project::SdtmProjectVariableOverrideView, SdtmProjectApiError>
         {
-            unimplemented!()
+            Ok(variable_override_view())
         }
         async fn get_variable_override(
             &self,
             _variable_id: i64,
         ) -> Result<apis::sdtm_project::SdtmProjectVariableOverrideView, SdtmProjectApiError>
         {
-            unimplemented!()
+            Ok(variable_override_view())
         }
         async fn update_variable_override(
             &self,
             _req: UpdateSdtmProjectVariableOverrideRequest,
         ) -> Result<apis::sdtm_project::SdtmProjectVariableOverrideView, SdtmProjectApiError>
         {
-            unimplemented!()
+            Ok(variable_override_view())
         }
         async fn delete_variable_override(
             &self,
             _variable_id: i64,
         ) -> Result<(), SdtmProjectApiError> {
-            unimplemented!()
+            Ok(())
         }
     }
 
@@ -994,11 +1064,11 @@ mod tests {
         }
     }
 
+    /// The **real** top-level router, so the `/api/sdtm-project` mount
+    /// and every path parameter are exercised exactly as a client
+    /// would meet them.
     pub fn app(state: AppState) -> Router {
-        Router::new()
-            .route("/api/sdtm-project/versions", get(list_versions_by_project))
-            .route("/api/sdtm-project/domains", post(create_domain))
-            .with_state(state)
+        crate::transport::http::router::router(state)
     }
 
     pub async fn read_json(response: axum::response::Response) -> (AxStatus, serde_json::Value) {
@@ -1027,7 +1097,166 @@ mod tests {
             .unwrap()
     }
 
-    // ---- tests --------------------------------------------------------
+    // ---- the dispatch test --------------------------------------------
+
+    /// Every route must dispatch to its handler.
+    ///
+    /// axum matches a path segment's label to the extractor's field
+    /// name, so a route declared as `{domain_id}` cannot be extracted
+    /// with a struct whose only field is `id` — the request is
+    /// rejected with `400 Invalid URL: missing field 'id'` before the
+    /// handler ever runs, while the OpenAPI document (built from the
+    /// `#[utoipa::path]` annotations) still looks correct. This test
+    /// is the guard against that class of defect.
+    #[tokio::test]
+    async fn all_routes_dispatch_to_their_handler() {
+        // (method, uri, request body, expected status)
+        let cases: Vec<(&str, &str, Option<&str>, AxStatus)> = vec![
+            (
+                "POST",
+                "/api/sdtm-project/versions",
+                Some(r#"{"projectCode":"P1","versionName":"2024-09-27"}"#),
+                AxStatus::CREATED,
+            ),
+            (
+                "GET",
+                "/api/sdtm-project/versions?projectCode=P1",
+                None,
+                AxStatus::OK,
+            ),
+            ("GET", "/api/sdtm-project/versions/1", None, AxStatus::OK),
+            (
+                "PUT",
+                "/api/sdtm-project/versions/1",
+                Some(r#"{"versionName":"2024-09-27"}"#),
+                AxStatus::OK,
+            ),
+            (
+                "DELETE",
+                "/api/sdtm-project/versions/1",
+                None,
+                AxStatus::NO_CONTENT,
+            ),
+            (
+                "POST",
+                "/api/sdtm-project/domains",
+                Some(r#"{"versionId":1,"domainCode":"AE","keyVariables":["AETERM"]}"#),
+                AxStatus::CREATED,
+            ),
+            ("GET", "/api/sdtm-project/domains/2", None, AxStatus::OK),
+            (
+                "GET",
+                "/api/sdtm-project/versions/1/domains",
+                None,
+                AxStatus::OK,
+            ),
+            (
+                "PUT",
+                "/api/sdtm-project/domains/2",
+                Some(r#"{"domainCode":"AE"}"#),
+                AxStatus::OK,
+            ),
+            (
+                "DELETE",
+                "/api/sdtm-project/domains/2",
+                None,
+                AxStatus::NO_CONTENT,
+            ),
+            (
+                "POST",
+                "/api/sdtm-project/domains/2/override",
+                Some(r#"{"category":"Events","descriptions":[]}"#),
+                AxStatus::CREATED,
+            ),
+            (
+                "GET",
+                "/api/sdtm-project/domains/2/override",
+                None,
+                AxStatus::OK,
+            ),
+            (
+                "PUT",
+                "/api/sdtm-project/domains/2/override",
+                Some(r#"{"category":"Findings"}"#),
+                AxStatus::OK,
+            ),
+            (
+                "DELETE",
+                "/api/sdtm-project/domains/2/override",
+                None,
+                AxStatus::NO_CONTENT,
+            ),
+            (
+                "POST",
+                "/api/sdtm-project/variables",
+                Some(r#"{"domainId":2,"variableCode":"AETERM","variableSequence":11}"#),
+                AxStatus::CREATED,
+            ),
+            ("GET", "/api/sdtm-project/variables/4", None, AxStatus::OK),
+            (
+                "GET",
+                "/api/sdtm-project/domains/2/variables",
+                None,
+                AxStatus::OK,
+            ),
+            (
+                "PUT",
+                "/api/sdtm-project/variables/4",
+                Some(r#"{"variableCode":"AETERM"}"#),
+                AxStatus::OK,
+            ),
+            (
+                "DELETE",
+                "/api/sdtm-project/variables/4",
+                None,
+                AxStatus::NO_CONTENT,
+            ),
+            (
+                "POST",
+                "/api/sdtm-project/variables/4/override",
+                Some(r#"{"variableType":"Character","variableCore":"Req","descriptions":[]}"#),
+                AxStatus::CREATED,
+            ),
+            (
+                "GET",
+                "/api/sdtm-project/variables/4/override",
+                None,
+                AxStatus::OK,
+            ),
+            (
+                "PUT",
+                "/api/sdtm-project/variables/4/override",
+                Some(r#"{"variableType":"Character"}"#),
+                AxStatus::OK,
+            ),
+            (
+                "DELETE",
+                "/api/sdtm-project/variables/4/override",
+                None,
+                AxStatus::NO_CONTENT,
+            ),
+        ];
+
+        for (method, uri, body, expected) in cases {
+            let state = test_state(MockSdtmProjectService::default());
+            let response = app(state)
+                .oneshot(build_request(
+                    method,
+                    uri,
+                    body.map(str::to_string),
+                    Some("Bearer good"),
+                ))
+                .await
+                .unwrap();
+            let status = response.status();
+            assert_eq!(
+                status, expected,
+                "{method} {uri} returned {status}, expected {expected}"
+            );
+        }
+    }
+
+    // ---- focused behaviour --------------------------------------------
 
     /// `GET /api/sdtm-project/versions` needs a `projectCode` query
     /// parameter. Without it the request is rejected with 400.
@@ -1046,28 +1275,8 @@ mod tests {
         assert_eq!(response.status(), AxStatus::BAD_REQUEST);
     }
 
-    /// `GET /api/sdtm-project/versions?projectCode=P1` is accepted and
-    /// reaches the service.
-    #[tokio::test]
-    async fn list_versions_with_project_code_is_accepted() {
-        let state = test_state(MockSdtmProjectService::default());
-        let response = app(state)
-            .oneshot(build_request(
-                "GET",
-                "/api/sdtm-project/versions?projectCode=P1",
-                None,
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        assert_eq!(response.status(), AxStatus::OK);
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::OK);
-        assert_eq!(body["versions"], serde_json::json!([]));
-    }
-
     /// `POST /api/sdtm-project/domains` returns 201 and the created
-    /// domain, and the key variables keep the caller's order.
+    /// domain.
     #[tokio::test]
     async fn create_domain_returns_created() {
         let service = MockSdtmProjectService::default();
@@ -1088,9 +1297,8 @@ mod tests {
         assert_eq!(status, AxStatus::CREATED);
         assert_eq!(body["domainCode"], serde_json::json!("AE"));
         assert_eq!(body["versionId"], serde_json::json!(1));
-        assert_eq!(body["keyVariables"], serde_json::json!(["AETERM"]));
-        // The nested override is absent, not null-ish: the key is
-        // `override`, and the field is `None` here.
+        // The nested override is absent: the key is `override`, and
+        // the field is `None` here.
         assert!(body["override"].is_null());
 
         // The request reached the service with the caller's order.
