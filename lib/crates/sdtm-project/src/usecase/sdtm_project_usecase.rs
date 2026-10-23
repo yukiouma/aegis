@@ -219,15 +219,20 @@ where
         Ok(o.into())
     }
 
+    /// The domain's override, or `None` when it has none.
     pub async fn get_domain_override(
         &self,
         domain_id: i64,
-    ) -> Result<SdtmProjectDomainOverrideView, UsecaseError> {
-        let o = self
-            .domain_override_repo
-            .find_by_domain_id(domain_id)
-            .await?;
-        Ok(o.into())
+    ) -> Result<Option<SdtmProjectDomainOverrideView>, UsecaseError> {
+        match self.domain_override_repo.find_by_domain_id(domain_id).await {
+            Ok(o) => Ok(Some(o.into())),
+            // The override is optional: a domain without one is a
+            // normal state, not a failure. The repository still
+            // reports a missing row as `SdtmProjectDomainOverrideNotFound`; the usecase is
+            // where that becomes "no override".
+            Err(DomainError::SdtmProjectDomainOverrideNotFound(_)) => Ok(None),
+            Err(e) => Err(UsecaseError::Repository(e)),
+        }
     }
 
     pub async fn update_domain_override(
@@ -326,15 +331,24 @@ where
         Ok(o.into())
     }
 
+    /// The variable's override, or `None` when it has none.
     pub async fn get_variable_override(
         &self,
         variable_id: i64,
-    ) -> Result<SdtmProjectVariableOverrideView, UsecaseError> {
-        let o = self
+    ) -> Result<Option<SdtmProjectVariableOverrideView>, UsecaseError> {
+        match self
             .variable_override_repo
             .find_by_variable_id(variable_id)
-            .await?;
-        Ok(o.into())
+            .await
+        {
+            Ok(o) => Ok(Some(o.into())),
+            // The override is optional: a variable without one is a
+            // normal state, not a failure. The repository still
+            // reports a missing row as `SdtmProjectVariableOverrideNotFound`; the usecase is
+            // where that becomes "no override".
+            Err(DomainError::SdtmProjectVariableOverrideNotFound(_)) => Ok(None),
+            Err(e) => Err(UsecaseError::Repository(e)),
+        }
     }
 
     pub async fn update_variable_override(

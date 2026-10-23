@@ -137,7 +137,7 @@ pub(crate) mod test_support {
             &self,
             _domain_id: i64,
         ) -> Result<
-            apis::sdtm_project::SdtmProjectDomainOverrideView,
+            Option<apis::sdtm_project::SdtmProjectDomainOverrideView>,
             apis::sdtm_project::SdtmProjectApiError,
         > {
             unimplemented!()
@@ -212,7 +212,7 @@ pub(crate) mod test_support {
             &self,
             _variable_id: i64,
         ) -> Result<
-            apis::sdtm_project::SdtmProjectVariableOverrideView,
+            Option<apis::sdtm_project::SdtmProjectVariableOverrideView>,
             apis::sdtm_project::SdtmProjectApiError,
         > {
             unimplemented!()

@@ -347,6 +347,9 @@ pub async fn create_domain_override(
 }
 
 /// `GET /api/sdtm-project/domains/{domain_id}/override` — fetch the domain's override.
+///
+/// The override is optional, so a domain without one is **not** an
+/// error: the response is `200` with a `null` body.
 #[utoipa::path(
     get, path = "/domains/{domain_id}/override", tag = "sdtm-project",
     operation_id = "sdtm_project_get_domain_override",
@@ -354,9 +357,8 @@ pub async fn create_domain_override(
         ("domain_id" = i64, Path, description = "Sdtm project domain id"),
     ),
     responses(
-        (status = 200, description = "Override found", body = dto::SdtmProjectDomainOverrideViewResponse),
+        (status = 200, description = "The domain's override, or null when it has none", body = Option<dto::SdtmProjectDomainOverrideViewResponse>),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "Override not found", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
     security(("BearerAuth" = [])),
@@ -365,9 +367,9 @@ pub async fn get_domain_override(
     State(state): State<AppState>,
     _claims: AuthClaims,
     Path(domain_id): Path<i64>,
-) -> Result<Json<dto::SdtmProjectDomainOverrideViewResponse>, ApiError> {
+) -> Result<Json<Option<dto::SdtmProjectDomainOverrideViewResponse>>, ApiError> {
     let view = state.sdtm_project.get_domain_override(domain_id).await?;
-    Ok(Json(view.into()))
+    Ok(Json(view.map(Into::into)))
 }
 
 /// `PUT /api/sdtm-project/domains/{domain_id}/override` — update the domain's override.
@@ -621,6 +623,9 @@ pub async fn create_variable_override(
 }
 
 /// `GET /api/sdtm-project/variables/{variable_id}/override` — fetch the variable's override.
+///
+/// The override is optional, so a variable without one is **not** an
+/// error: the response is `200` with a `null` body.
 #[utoipa::path(
     get, path = "/variables/{variable_id}/override", tag = "sdtm-project",
     operation_id = "sdtm_project_get_variable_override",
@@ -628,9 +633,8 @@ pub async fn create_variable_override(
         ("variable_id" = i64, Path, description = "Sdtm project variable id"),
     ),
     responses(
-        (status = 200, description = "Override found", body = dto::SdtmProjectVariableOverrideViewResponse),
+        (status = 200, description = "The variable's override, or null when it has none", body = Option<dto::SdtmProjectVariableOverrideViewResponse>),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "Override not found", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
     security(("BearerAuth" = [])),
@@ -639,12 +643,12 @@ pub async fn get_variable_override(
     State(state): State<AppState>,
     _claims: AuthClaims,
     Path(variable_id): Path<i64>,
-) -> Result<Json<dto::SdtmProjectVariableOverrideViewResponse>, ApiError> {
+) -> Result<Json<Option<dto::SdtmProjectVariableOverrideViewResponse>>, ApiError> {
     let view = state
         .sdtm_project
         .get_variable_override(variable_id)
         .await?;
-    Ok(Json(view.into()))
+    Ok(Json(view.map(Into::into)))
 }
 
 /// `PUT /api/sdtm-project/variables/{variable_id}/override` — update the variable's override.
@@ -831,6 +835,9 @@ mod tests {
     pub struct MockSdtmProjectService {
         /// The last domain the handler asked to create.
         pub created_domain: Arc<std::sync::Mutex<Option<CreateSdtmProjectDomainRequest>>>,
+        /// When true, the override getters answer `None` — the state a
+        /// domain or variable that has never been overridden is in.
+        pub override_absent: bool,
     }
 
     fn ts() -> chrono::DateTime<chrono::Utc> {
@@ -970,9 +977,13 @@ mod tests {
         async fn get_domain_override(
             &self,
             _domain_id: i64,
-        ) -> Result<apis::sdtm_project::SdtmProjectDomainOverrideView, SdtmProjectApiError>
+        ) -> Result<Option<apis::sdtm_project::SdtmProjectDomainOverrideView>, SdtmProjectApiError>
         {
-            Ok(domain_override_view())
+            Ok(if self.override_absent {
+                None
+            } else {
+                Some(domain_override_view())
+            })
         }
         async fn update_domain_override(
             &self,
@@ -1025,9 +1036,13 @@ mod tests {
         async fn get_variable_override(
             &self,
             _variable_id: i64,
-        ) -> Result<apis::sdtm_project::SdtmProjectVariableOverrideView, SdtmProjectApiError>
+        ) -> Result<Option<apis::sdtm_project::SdtmProjectVariableOverrideView>, SdtmProjectApiError>
         {
-            Ok(variable_override_view())
+            Ok(if self.override_absent {
+                None
+            } else {
+                Some(variable_override_view())
+            })
         }
         async fn update_variable_override(
             &self,
@@ -1323,5 +1338,51 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), AxStatus::UNAUTHORIZED);
+    }
+
+    /// An override is optional. A domain that has never been
+    /// overridden is a normal state, so reading its override is `200`
+    /// with a `null` body — not `404`.
+    #[tokio::test]
+    async fn get_domain_override_without_an_override_returns_null() {
+        let service = MockSdtmProjectService {
+            override_absent: true,
+            ..Default::default()
+        };
+        let state = test_state(service);
+        let response = app(state)
+            .oneshot(build_request(
+                "GET",
+                "/api/sdtm-project/domains/2/override",
+                None,
+                Some("Bearer good"),
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::OK);
+        assert!(body.is_null(), "expected a null body, got {body}");
+    }
+
+    /// Same for a variable: no override is `200` with a `null` body.
+    #[tokio::test]
+    async fn get_variable_override_without_an_override_returns_null() {
+        let service = MockSdtmProjectService {
+            override_absent: true,
+            ..Default::default()
+        };
+        let state = test_state(service);
+        let response = app(state)
+            .oneshot(build_request(
+                "GET",
+                "/api/sdtm-project/variables/4/override",
+                None,
+                Some("Bearer good"),
+            ))
+            .await
+            .unwrap();
+        let (status, body) = read_json(response).await;
+        assert_eq!(status, AxStatus::OK);
+        assert!(body.is_null(), "expected a null body, got {body}");
     }
 }

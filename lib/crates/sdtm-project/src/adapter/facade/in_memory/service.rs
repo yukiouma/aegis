@@ -512,9 +512,9 @@ where
     async fn get_domain_override(
         &self,
         domain_id: i64,
-    ) -> Result<SdtmProjectDomainOverrideView, SdtmProjectApiError> {
+    ) -> Result<Option<SdtmProjectDomainOverrideView>, SdtmProjectApiError> {
         let view = self.usecase.get_domain_override(domain_id).await?;
-        Ok(domain_override_view_from_internal(view))
+        Ok(view.map(domain_override_view_from_internal))
     }
 
     async fn update_domain_override(
@@ -606,9 +606,9 @@ where
     async fn get_variable_override(
         &self,
         variable_id: i64,
-    ) -> Result<SdtmProjectVariableOverrideView, SdtmProjectApiError> {
+    ) -> Result<Option<SdtmProjectVariableOverrideView>, SdtmProjectApiError> {
         let view = self.usecase.get_variable_override(variable_id).await?;
-        Ok(variable_override_view_from_internal(view))
+        Ok(view.map(variable_override_view_from_internal))
     }
 
     async fn update_variable_override(

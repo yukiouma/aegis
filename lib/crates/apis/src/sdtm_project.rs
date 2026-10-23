@@ -445,12 +445,15 @@ pub trait SdtmProjectService: Send + Sync {
         req: CreateSdtmProjectDomainOverrideRequest,
     ) -> Result<SdtmProjectDomainOverrideView, SdtmProjectApiError>;
 
-    /// Fetch the domain's override. Returns
-    /// `SdtmProjectDomainOverrideNotFound` if the domain has none.
+    /// Fetch the domain's override.
+    ///
+    /// The override is **optional**: a domain without one is a normal
+    /// state, not a failure, so a missing override is `None` rather
+    /// than an error.
     async fn get_domain_override(
         &self,
         domain_id: i64,
-    ) -> Result<SdtmProjectDomainOverrideView, SdtmProjectApiError>;
+    ) -> Result<Option<SdtmProjectDomainOverrideView>, SdtmProjectApiError>;
 
     /// Apply the optional fields on `req` to the override of the
     /// domain identified by `req.domain_id`.
@@ -507,12 +510,15 @@ pub trait SdtmProjectService: Send + Sync {
         req: CreateSdtmProjectVariableOverrideRequest,
     ) -> Result<SdtmProjectVariableOverrideView, SdtmProjectApiError>;
 
-    /// Fetch the variable's override. Returns
-    /// `SdtmProjectVariableOverrideNotFound` if the variable has none.
+    /// Fetch the variable's override.
+    ///
+    /// The override is **optional**: a variable without one is a
+    /// normal state, not a failure, so a missing override is `None`
+    /// rather than an error.
     async fn get_variable_override(
         &self,
         variable_id: i64,
-    ) -> Result<SdtmProjectVariableOverrideView, SdtmProjectApiError>;
+    ) -> Result<Option<SdtmProjectVariableOverrideView>, SdtmProjectApiError>;
 
     /// Apply the optional fields on `req` to the override of the
     /// variable identified by `req.variable_id`.

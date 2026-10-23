@@ -124,6 +124,19 @@ let service = SdtmProjectServiceImpl::new(usecase);
 service the server already builds — so the project-existence check reuses the
 canonical `projects` table.
 
+## Optional overrides
+
+An override is **optional**: a domain or variable that has never been
+overridden is a normal state, not a broken one. So `get_domain_override` and
+`get_variable_override` return `Result<Option<…>, _>` — the repository still
+reports a missing row as `SdtmProject{Domain,Variable}OverrideNotFound`, but
+the usecase turns exactly that variant into `Ok(None)`.
+
+On the wire, `GET …/override` on a domain or variable with no override is
+**200 with a `null` body**, not 404. `update_*_override` and
+`delete_*_override` keep their 404: asking to change or remove something that
+does not exist is still a client error.
+
 ## Conventions
 
 This crate follows

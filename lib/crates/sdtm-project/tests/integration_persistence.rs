@@ -566,6 +566,43 @@ async fn domain_override_delete_of_missing_row_is_not_found() {
     .await
 }
 
+/// A domain that has never been overridden reports
+/// `SdtmProjectDomainOverrideNotFound` — the exact variant the
+/// usecase turns into `Ok(None)`. The repository must keep reporting
+/// it as a not-found rather than some other error, or the usecase's
+/// "no override" arm would never fire.
+#[tokio::test]
+#[ignore = "requires AEGIS_SDTM_PROJECT_DATABASE_URL"]
+async fn domain_override_read_of_a_domain_without_one_is_not_found() {
+    with_pool(|pool| async move {
+        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
+        let domains = SdtmProjectDomainRepoPg::new(pool.clone());
+        let overrides = SdtmProjectDomainOverrideRepoPg::new(pool);
+        let v = versions
+            .create(SdtmProjectVersionNew {
+                project_code: unique("p"),
+                version_name: unique("v"),
+            })
+            .await
+            .unwrap();
+        let d = domains
+            .create(SdtmProjectDomainNew {
+                version_id: v.id,
+                domain_code: "AE".into(),
+                key_variables: Vec::new(),
+            })
+            .await
+            .unwrap();
+
+        let err = overrides.find_by_domain_id(d.id).await.unwrap_err();
+        assert!(matches!(
+            err,
+            DomainError::SdtmProjectDomainOverrideNotFound(id) if id == d.id
+        ));
+    })
+    .await
+}
+
 #[tokio::test]
 #[ignore = "requires AEGIS_SDTM_PROJECT_DATABASE_URL"]
 async fn domain_read_carries_the_override() {
@@ -1106,6 +1143,49 @@ async fn variable_override_delete_of_missing_row_is_not_found() {
         assert!(matches!(
             err,
             DomainError::SdtmProjectVariableOverrideNotFound(999_999)
+        ));
+    })
+    .await
+}
+
+/// The variable-side twin of
+/// `domain_override_read_of_a_domain_without_one_is_not_found`.
+#[tokio::test]
+#[ignore = "requires AEGIS_SDTM_PROJECT_DATABASE_URL"]
+async fn variable_override_read_of_a_variable_without_one_is_not_found() {
+    with_pool(|pool| async move {
+        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
+        let domains = SdtmProjectDomainRepoPg::new(pool.clone());
+        let variables = SdtmProjectVariableRepoPg::new(pool.clone());
+        let overrides = SdtmProjectVariableOverrideRepoPg::new(pool);
+        let v = versions
+            .create(SdtmProjectVersionNew {
+                project_code: unique("p"),
+                version_name: unique("v"),
+            })
+            .await
+            .unwrap();
+        let d = domains
+            .create(SdtmProjectDomainNew {
+                version_id: v.id,
+                domain_code: "AE".into(),
+                key_variables: Vec::new(),
+            })
+            .await
+            .unwrap();
+        let var = variables
+            .create(SdtmProjectVariableNew {
+                domain_id: d.id,
+                variable_code: "AETERM".into(),
+                variable_sequence: 11,
+            })
+            .await
+            .unwrap();
+
+        let err = overrides.find_by_variable_id(var.id).await.unwrap_err();
+        assert!(matches!(
+            err,
+            DomainError::SdtmProjectVariableOverrideNotFound(id) if id == var.id
         ));
     })
     .await

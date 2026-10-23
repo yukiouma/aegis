@@ -400,7 +400,7 @@ EOF
     async fn delete_domain(&self, id: i64) -> Result<(), UsecaseError>
 
     async fn create_domain_override(&self, cmd: CreateSdtmProjectDomainOverride) -> Result<SdtmProjectDomainOverrideView, UsecaseError>
-    async fn get_domain_override(&self, domain_id: i64) -> Result<SdtmProjectDomainOverrideView, UsecaseError>
+    async fn get_domain_override(&self, domain_id: i64) -> Result<Option<SdtmProjectDomainOverrideView>, UsecaseError>
     async fn update_domain_override(&self, cmd: UpdateSdtmProjectDomainOverride) -> Result<SdtmProjectDomainOverrideView, UsecaseError>
     async fn delete_domain_override(&self, domain_id: i64) -> Result<(), UsecaseError>
 
@@ -411,7 +411,7 @@ EOF
     async fn delete_variable(&self, id: i64) -> Result<(), UsecaseError>
 
     async fn create_variable_override(&self, cmd: CreateSdtmProjectVariableOverride) -> Result<SdtmProjectVariableOverrideView, UsecaseError>
-    async fn get_variable_override(&self, variable_id: i64) -> Result<SdtmProjectVariableOverrideView, UsecaseError>
+    async fn get_variable_override(&self, variable_id: i64) -> Result<Option<SdtmProjectVariableOverrideView>, UsecaseError>
     async fn update_variable_override(&self, cmd: UpdateSdtmProjectVariableOverride) -> Result<SdtmProjectVariableOverrideView, UsecaseError>
     async fn delete_variable_override(&self, variable_id: i64) -> Result<(), UsecaseError>
     ```
@@ -454,7 +454,7 @@ Tests (names are load-bearing):
 
 `domain_update_keeps_the_override` — after the override exists, `update_domain` (changing only `domain_code`) still returns a domain whose `r#override` is `Some`.
 
-`domain_override_crud_round_trips` — create → `get_domain_override(domain_id)` returns it → `update_domain_override` with a new `category` returns the new category → `delete_domain_override` → `get_domain_override` is `UsecaseError::Repository(DomainError::SdtmProjectDomainOverrideNotFound(domain_id))`.
+`domain_override_crud_round_trips` — create → `get_domain_override(domain_id)` returns `Some(the override)` → `update_domain_override` with a new `category` returns the new category → `delete_domain_override` → `get_domain_override` is `Ok(None)`. The override is optional, so a missing one is `None`, not an error.
 
 `domain_override_create_rejects_missing_domain` — creating an override on domain id `999` is `UsecaseError::Repository(DomainError::FkSdtmProjectDomainNotFound(999))`.
 
@@ -545,13 +545,13 @@ Method bodies, in order:
 - `update_domain` — validate `domain_code` when present; `self.domain_repo.update(SdtmProjectDomainUpdate { id: cmd.id, domain_code: cmd.domain_code, key_variables: cmd.key_variables.map(|k| SdtmProjectDomain::normalize_key_variables(&k)).transpose().map_err(UsecaseError::Validation)? }).await?`.
 - `delete_domain` — delegate.
 - `create_domain_override` — **check the parent first**: `domain_repo.find_by_id(cmd.domain_id)`; a missing domain becomes `UsecaseError::Repository(DomainError::FkSdtmProjectDomainNotFound(cmd.domain_id))`; then `self.domain_override_repo.create(SdtmProjectDomainOverrideNew { domain_id: cmd.domain_id, category: cmd.category, descriptions: cmd.descriptions }).await?`.
-- `get_domain_override` — `self.domain_override_repo.find_by_domain_id(domain_id).await?`.
+- `get_domain_override` — the override is **optional**: match on the repository result and turn `DomainError::SdtmProjectDomainOverrideNotFound(_)` into `Ok(None)`; every other error is `Err(UsecaseError::Repository(e))`.
 - `update_domain_override` — `self.domain_override_repo.update(SdtmProjectDomainOverrideUpdate { domain_id: cmd.domain_id, category: cmd.category, descriptions: cmd.descriptions }).await?`.
 - `delete_domain_override` — `self.domain_override_repo.delete(domain_id).await?`.
 - `create_variable` — validate `variable_code` non-blank → `Validation(EmptyVariableCode)`; **check the parent first** via `domain_repo.find_by_id(cmd.domain_id)`, mapping a missing domain to `UsecaseError::Repository(DomainError::FkSdtmProjectDomainNotFound(cmd.domain_id))`; then `self.variable_repo.create(SdtmProjectVariableNew { domain_id: cmd.domain_id, variable_code: cmd.variable_code, variable_sequence: cmd.variable_sequence }).await?`.
 - `get_variable_by_id` / `list_variables_by_domain` / `update_variable` / `delete_variable` — mirror the domain ones. `update_variable` validates `variable_code` when present.
 - `create_variable_override` — **check the parent first** via `variable_repo.find_by_id(cmd.variable_id)`, mapping a missing variable to `UsecaseError::Repository(DomainError::FkSdtmProjectVariableNotFound(cmd.variable_id))`; then `self.variable_override_repo.create(SdtmProjectVariableOverrideNew { variable_id: cmd.variable_id, variable_type: cmd.variable_type, variable_core: cmd.variable_core, variable_role: cmd.variable_role, descriptions: cmd.descriptions }).await?`.
-- `get_variable_override` / `update_variable_override` / `delete_variable_override` — mirror the domain-override ones. `update_variable_override` passes `variable_role` straight through — it is already `Option<Option<SdtmRole>>` and the repository implements the three-state semantics.
+- `get_variable_override` / `update_variable_override` / `delete_variable_override` — mirror the domain-override ones; `get_variable_override` returns `Ok(None)` for a missing override, like its domain counterpart. `update_variable_override` passes `variable_role` straight through — it is already `Option<Option<SdtmRole>>` and the repository implements the three-state semantics.
 
 - [ ] **Step 7: Wire up the module and re-exports**
 
@@ -1262,7 +1262,7 @@ EOF
     async fn delete_domain(&self, id: i64) -> Result<(), SdtmProjectApiError>
 
     async fn create_domain_override(&self, req: CreateSdtmProjectDomainOverrideRequest) -> Result<SdtmProjectDomainOverrideView, SdtmProjectApiError>
-    async fn get_domain_override(&self, domain_id: i64) -> Result<SdtmProjectDomainOverrideView, SdtmProjectApiError>
+    async fn get_domain_override(&self, domain_id: i64) -> Result<Option<SdtmProjectDomainOverrideView>, SdtmProjectApiError>
     async fn update_domain_override(&self, req: UpdateSdtmProjectDomainOverrideRequest) -> Result<SdtmProjectDomainOverrideView, SdtmProjectApiError>
     async fn delete_domain_override(&self, domain_id: i64) -> Result<(), SdtmProjectApiError>
 
@@ -1273,7 +1273,7 @@ EOF
     async fn delete_variable(&self, id: i64) -> Result<(), SdtmProjectApiError>
 
     async fn create_variable_override(&self, req: CreateSdtmProjectVariableOverrideRequest) -> Result<SdtmProjectVariableOverrideView, SdtmProjectApiError>
-    async fn get_variable_override(&self, variable_id: i64) -> Result<SdtmProjectVariableOverrideView, SdtmProjectApiError>
+    async fn get_variable_override(&self, variable_id: i64) -> Result<Option<SdtmProjectVariableOverrideView>, SdtmProjectApiError>
     async fn update_variable_override(&self, req: UpdateSdtmProjectVariableOverrideRequest) -> Result<SdtmProjectVariableOverrideView, SdtmProjectApiError>
     async fn delete_variable_override(&self, variable_id: i64) -> Result<(), SdtmProjectApiError>
     ```
@@ -1945,7 +1945,7 @@ Create `apps/server/aegis-server/src/transport/http/sdtm_project/handlers.rs` wi
 | `update_domain` | `PUT /domains/{id}` | 200 |
 | `delete_domain` | `DELETE /domains/{id}` | 204 |
 | `create_domain_override` | `POST /domains/{domain_id}/override` | 201 |
-| `get_domain_override` | `GET /domains/{domain_id}/override` | 200 |
+| `get_domain_override` | `GET /domains/{domain_id}/override` | 200 (`null` body when there is no override) |
 | `update_domain_override` | `PUT /domains/{domain_id}/override` | 200 |
 | `delete_domain_override` | `DELETE /domains/{domain_id}/override` | 204 |
 | `create_variable` | `POST /variables` | 201 |
@@ -1954,7 +1954,7 @@ Create `apps/server/aegis-server/src/transport/http/sdtm_project/handlers.rs` wi
 | `update_variable` | `PUT /variables/{id}` | 200 |
 | `delete_variable` | `DELETE /variables/{id}` | 204 |
 | `create_variable_override` | `POST /variables/{variable_id}/override` | 201 |
-| `get_variable_override` | `GET /variables/{variable_id}/override` | 200 |
+| `get_variable_override` | `GET /variables/{variable_id}/override` | 200 (`null` body when there is no override) |
 | `update_variable_override` | `PUT /variables/{variable_id}/override` | 200 |
 | `delete_variable_override` | `DELETE /variables/{variable_id}/override` | 204 |
 

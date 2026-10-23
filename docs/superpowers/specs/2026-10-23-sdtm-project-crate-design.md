@@ -560,7 +560,7 @@ async fn delete_domain(&self, id: i64) -> Result<(), UsecaseError>;
 
 // ---- SdtmProjectDomainOverride ----
 async fn create_domain_override(&self, cmd: CreateSdtmProjectDomainOverride) -> Result<SdtmProjectDomainOverrideView, UsecaseError>;
-async fn get_domain_override(&self, domain_id: i64) -> Result<SdtmProjectDomainOverrideView, UsecaseError>;
+async fn get_domain_override(&self, domain_id: i64) -> Result<Option<SdtmProjectDomainOverrideView>, UsecaseError>;
 async fn update_domain_override(&self, cmd: UpdateSdtmProjectDomainOverride) -> Result<SdtmProjectDomainOverrideView, UsecaseError>;
 async fn delete_domain_override(&self, domain_id: i64) -> Result<(), UsecaseError>;
 
@@ -573,7 +573,7 @@ async fn delete_variable(&self, id: i64) -> Result<(), UsecaseError>;
 
 // ---- SdtmProjectVariableOverride ----
 async fn create_variable_override(&self, cmd: CreateSdtmProjectVariableOverride) -> Result<SdtmProjectVariableOverrideView, UsecaseError>;
-async fn get_variable_override(&self, variable_id: i64) -> Result<SdtmProjectVariableOverrideView, UsecaseError>;
+async fn get_variable_override(&self, variable_id: i64) -> Result<Option<SdtmProjectVariableOverrideView>, UsecaseError>;
 async fn update_variable_override(&self, cmd: UpdateSdtmProjectVariableOverride) -> Result<SdtmProjectVariableOverrideView, UsecaseError>;
 async fn delete_variable_override(&self, variable_id: i64) -> Result<(), UsecaseError>;
 ```
@@ -613,6 +613,22 @@ needs.
 `Option<Option<SdtmRole>>` convention already used by `domain-model`: outer
 `None` = leave unchanged, `Some(None)` = clear to `NULL`, `Some(Some(role))`
 = replace.
+
+### Reading an override is not an error when there is none
+
+An override is **optional**: a domain or variable that has never been
+overridden is a normal state, not a broken one. So `get_domain_override` and
+`get_variable_override` return `Result<Option<…>, _>` — the repository
+still reports a missing row as `SdtmProject{Domain,Variable}OverrideNotFound`,
+but the usecase turns exactly that variant into `Ok(None)`. Every other
+repository error still propagates.
+
+On the wire, `GET …/override` on a domain or variable with no override is
+**200 with a `null` body**, not 404. The 404 arms are gone from those two
+routes' OpenAPI responses.
+
+`update_*_override` and `delete_*_override` keep their 404: asking to
+change or remove something that does not exist is still a client error.
 
 ### Views
 
@@ -789,6 +805,10 @@ The router is nested under `/api/sdtm-project` in `transport/http/router.rs`.
 already exists. `PUT` updates an existing override and returns **404** if
 there is none. There is no `PUT` upsert — create and update are distinct,
 matching the "CRUD methods for models" requirement.
+
+`GET` on an override path returns **200** with the override, or **200 with a
+`null` body** when the domain or variable has no override — the override is
+optional, so a missing one is not a failure.
 
 `GET /versions` takes a **required** `projectCode` query parameter; a
 request without it is rejected by axum's query extractor with 400. An
@@ -1058,6 +1078,9 @@ cargo test -p sdtm-project -- --ignored --test-threads=1   # when AEGIS_SDTM_PRO
    FK violation decide the status code.
 5. **`key_variables` ordering** — the caller's order is authoritative and is
    preserved through the domain, the JSONB column and the wire.
+6. **Reading a missing override** — not an error. The override is optional,
+   so `get_*_override` returns `Option` and the HTTP route answers **200
+   with a `null` body** rather than 404.
 
 ## Decisions made by the implementer
 

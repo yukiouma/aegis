@@ -784,7 +784,11 @@ async fn domain_override_crud_round_trips() {
         .unwrap();
     assert_eq!(created.category, DomainCategory::Events);
 
-    let got = uc.get_domain_override(domain_id).await.unwrap();
+    let got = uc
+        .get_domain_override(domain_id)
+        .await
+        .unwrap()
+        .expect("the override exists");
     assert_eq!(got.id, created.id);
 
     let updated = uc
@@ -798,11 +802,9 @@ async fn domain_override_crud_round_trips() {
     assert_eq!(updated.category, DomainCategory::Findings);
 
     uc.delete_domain_override(domain_id).await.unwrap();
-    let err = uc.get_domain_override(domain_id).await.unwrap_err();
-    assert!(matches!(
-        err,
-        UsecaseError::Repository(DomainError::SdtmProjectDomainOverrideNotFound(id)) if id == domain_id
-    ));
+    // The override is optional: once it is gone, fetching it yields
+    // `None` rather than an error.
+    assert!(uc.get_domain_override(domain_id).await.unwrap().is_none());
 }
 
 #[tokio::test]
@@ -908,7 +910,11 @@ async fn variable_override_crud_round_trips() {
     assert_eq!(created.variable_type, SdtmVariableType::Character);
     assert_eq!(created.variable_role, Some(SdtmRole::Topic));
 
-    let got = uc.get_variable_override(variable_id).await.unwrap();
+    let got = uc
+        .get_variable_override(variable_id)
+        .await
+        .unwrap()
+        .expect("the override exists");
     assert_eq!(got.id, created.id);
 
     let updated = uc
@@ -925,11 +931,14 @@ async fn variable_override_crud_round_trips() {
     assert_eq!(updated.variable_role, Some(SdtmRole::Topic));
 
     uc.delete_variable_override(variable_id).await.unwrap();
-    let err = uc.get_variable_override(variable_id).await.unwrap_err();
-    assert!(matches!(
-        err,
-        UsecaseError::Repository(DomainError::SdtmProjectVariableOverrideNotFound(id)) if id == variable_id
-    ));
+    // The override is optional: once it is gone, fetching it yields
+    // `None` rather than an error.
+    assert!(
+        uc.get_variable_override(variable_id)
+            .await
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[tokio::test]

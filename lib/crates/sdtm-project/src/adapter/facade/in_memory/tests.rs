@@ -716,7 +716,11 @@ async fn domain_category_round_trips() {
         .unwrap();
     assert_eq!(ov.category, ApiCategory::TrialDesign);
 
-    let got = svc.get_domain_override(domain.id).await.unwrap();
+    let got = svc
+        .get_domain_override(domain.id)
+        .await
+        .unwrap()
+        .expect("the override exists");
     assert_eq!(got.category, ApiCategory::TrialDesign);
 }
 
@@ -754,11 +758,57 @@ async fn domain_override_round_trips_through_api() {
     assert_eq!(updated.category, ApiCategory::Findings);
 
     svc.delete_domain_override(domain.id).await.unwrap();
-    let err = svc.get_domain_override(domain.id).await.unwrap_err();
-    assert!(matches!(
-        err,
-        SdtmProjectApiError::SdtmProjectDomainOverrideNotFound(id) if id == domain.id
-    ));
+    // The override is optional: once it is gone, fetching it yields
+    // `None` rather than an error.
+    assert!(svc.get_domain_override(domain.id).await.unwrap().is_none());
+}
+
+/// A domain that has never been overridden is the common case, and
+/// reading its override is `None` — not a not-found error.
+#[tokio::test]
+async fn a_domain_without_an_override_reads_as_none() {
+    let svc = make_service();
+    let version_id = seed_version(&svc).await;
+    let domain = svc
+        .create_domain(CreateSdtmProjectDomainRequest {
+            version_id,
+            domain_code: "AE".into(),
+            key_variables: Vec::new(),
+        })
+        .await
+        .unwrap();
+
+    assert!(svc.get_domain_override(domain.id).await.unwrap().is_none());
+}
+
+/// The variable-side twin of `a_domain_without_an_override_reads_as_none`.
+#[tokio::test]
+async fn a_variable_without_an_override_reads_as_none() {
+    let svc = make_service();
+    let version_id = seed_version(&svc).await;
+    let domain = svc
+        .create_domain(CreateSdtmProjectDomainRequest {
+            version_id,
+            domain_code: "AE".into(),
+            key_variables: Vec::new(),
+        })
+        .await
+        .unwrap();
+    let variable = svc
+        .create_variable(CreateSdtmProjectVariableRequest {
+            domain_id: domain.id,
+            variable_code: "AETERM".into(),
+            variable_sequence: 11,
+        })
+        .await
+        .unwrap();
+
+    assert!(
+        svc.get_variable_override(variable.id)
+            .await
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[tokio::test]
@@ -870,7 +920,11 @@ async fn variable_role_enum_round_trips() {
     assert_eq!(ov.variable_type, ApiSdtmVariableType::Character);
     assert_eq!(ov.variable_core, ApiSdtmVariableCore::Req);
 
-    let got = svc.get_variable_override(variable.id).await.unwrap();
+    let got = svc
+        .get_variable_override(variable.id)
+        .await
+        .unwrap()
+        .expect("the override exists");
     assert_eq!(got.variable_role, Some(ApiSdtmRole::RecordQualifier));
 }
 
