@@ -12,6 +12,7 @@
 //! - `/api/domain-model/*`               SDTM domain model CRUD
 //! - `/api/crf/*`                        Case Report Form CRUD
 //! - `/api/mission/*`                    Mission CRUD (leader-only writes)
+//! - `/api/sdtm-project/*`               per-project SDTM model tree CRUD
 //! - `/healthz`                         liveness probe
 //! - `/swagger-ui/`                      swagger-ui HTML
 //! - `/swagger-ui/{*rest}`               swagger-ui assets
@@ -35,6 +36,7 @@ use crate::transport::http::log_ingest::router as log_ingest_router;
 use crate::transport::http::mission::router as mission_router;
 use crate::transport::http::openapi::ApiDoc;
 use crate::transport::http::project::router as project_router;
+use crate::transport::http::sdtm_project::router as sdtm_project_router;
 use crate::transport::http::terminology::router as terminology_router;
 use crate::transport::http::trace_id::TraceIdMakeSpan;
 use crate::transport::http::user;
@@ -53,6 +55,7 @@ pub fn router(state: AppState) -> axum::Router {
     let domain_model_routes = domain_model_router::router();
     let crf_routes = crf_router::router();
     let mission_routes = mission_router::router();
+    let sdtm_project_routes = sdtm_project_router::router();
     let api_routers = OpenApiRouter::new()
         .nest("/auth", auth::router())
         .nest("/user", user::router())
@@ -61,6 +64,7 @@ pub fn router(state: AppState) -> axum::Router {
         .nest("/domain-model", domain_model_routes)
         .nest("/crf", crf_routes)
         .nest("/mission", mission_routes)
+        .nest("/sdtm-project", sdtm_project_routes)
         .nest("/log-ingest", log_ingest_router::router());
 
     let (router, api) = OpenApiRouter::with_openapi(ApiDoc::openapi())
@@ -520,6 +524,80 @@ mod tests {
             "expected 2xx or 3xx, got {}",
             response.status(),
         );
+    }
+
+    /// The `/api/sdtm-project` namespace must advertise every route
+    /// with the BearerAuth requirement. No route advertises a 403:
+    /// the namespace has no role gate, so a 403 can never be produced.
+    ///
+    /// This is a separate test from
+    /// `openapi_json_returns_200_with_valid_doc` so that a failure
+    /// here cannot be masked by that test's own pre-existing
+    /// failures.
+    #[tokio::test]
+    async fn openapi_json_advertises_the_sdtm_project_namespace() {
+        let app = router(test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api-docs/openapi.json")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let doc: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        for (method, path) in [
+            ("post", "/api/sdtm-project/versions"),
+            ("get", "/api/sdtm-project/versions"),
+            ("get", "/api/sdtm-project/versions/{id}"),
+            ("put", "/api/sdtm-project/versions/{id}"),
+            ("delete", "/api/sdtm-project/versions/{id}"),
+            ("post", "/api/sdtm-project/domains"),
+            ("get", "/api/sdtm-project/domains/{id}"),
+            ("get", "/api/sdtm-project/versions/{version_id}/domains"),
+            ("put", "/api/sdtm-project/domains/{id}"),
+            ("delete", "/api/sdtm-project/domains/{id}"),
+            ("post", "/api/sdtm-project/domains/{domain_id}/override"),
+            ("get", "/api/sdtm-project/domains/{domain_id}/override"),
+            ("put", "/api/sdtm-project/domains/{domain_id}/override"),
+            ("delete", "/api/sdtm-project/domains/{domain_id}/override"),
+            ("post", "/api/sdtm-project/variables"),
+            ("get", "/api/sdtm-project/variables/{id}"),
+            ("get", "/api/sdtm-project/domains/{domain_id}/variables"),
+            ("put", "/api/sdtm-project/variables/{id}"),
+            ("delete", "/api/sdtm-project/variables/{id}"),
+            ("post", "/api/sdtm-project/variables/{variable_id}/override"),
+            ("get", "/api/sdtm-project/variables/{variable_id}/override"),
+            ("put", "/api/sdtm-project/variables/{variable_id}/override"),
+            (
+                "delete",
+                "/api/sdtm-project/variables/{variable_id}/override",
+            ),
+        ] {
+            let op = &doc["paths"][path][method];
+            assert!(op.is_object(), "missing {method} {path} in openapi");
+            assert_eq!(
+                op["security"][0]["BearerAuth"],
+                serde_json::json!([]),
+                "{method} {path} must require BearerAuth",
+            );
+            let response_keys: Vec<&str> = op["responses"]
+                .as_object()
+                .expect("responses object")
+                .keys()
+                .map(|s| s.as_str())
+                .collect();
+            assert!(
+                !response_keys.contains(&"403"),
+                "{method} {path} must not advertise a 403 (got {response_keys:?})",
+            );
+        }
     }
 
     #[tokio::test]
