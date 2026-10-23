@@ -58,6 +58,9 @@ pub enum ApiError {
     Mission(#[from] apis::mission::MissionApiError),
 
     #[error("{0}")]
+    SdtmProject(#[from] apis::sdtm_project::SdtmProjectApiError),
+
+    #[error("{0}")]
     LogIngest(#[from] logging_utils::IngestorError),
 
     #[error("validation failed: {0}")]
@@ -77,6 +80,7 @@ impl ApiError {
             Self::Terminology(e) => terminology_status(e),
             Self::DomainModel(e) => domain_model_status(e),
             Self::Crf(e) => crf_status(e),
+            Self::SdtmProject(e) => sdtm_project_status(e),
             Self::Mission(e) => mission_status(e),
             Self::LogIngest(e) => log_ingest_status(e),
             Self::Validation(_) => StatusCode::BAD_REQUEST,
@@ -93,6 +97,7 @@ impl ApiError {
             Self::Terminology(e) => terminology_code(e),
             Self::DomainModel(e) => domain_model_code(e),
             Self::Crf(e) => crf_code(e),
+            Self::SdtmProject(e) => sdtm_project_code(e),
             Self::Mission(e) => mission_code(e),
             Self::LogIngest(e) => log_ingest_code(e),
             Self::Validation(_) => "validation_failed",
@@ -227,6 +232,66 @@ fn domain_model_code(e: &apis::domain_model::DomainModelApiError) -> &'static st
         DomainModelApiError::FkSdtmVersionNotFound(_) => "fk_sdtm_version_not_found",
         DomainModelApiError::FkSdtmDomainNotFound(_) => "fk_sdtm_domain_not_found",
         DomainModelApiError::Repository(_) => "repository_error",
+    }
+}
+
+fn sdtm_project_status(e: &apis::sdtm_project::SdtmProjectApiError) -> StatusCode {
+    use apis::sdtm_project::SdtmProjectApiError;
+    match e {
+        SdtmProjectApiError::Validation(_) => StatusCode::BAD_REQUEST,
+        // A missing parent is a 404, not a 400: the client named a
+        // resource that is not there.
+        SdtmProjectApiError::NotFound
+        | SdtmProjectApiError::ProjectNotFound(_)
+        | SdtmProjectApiError::SdtmProjectVersionNotFound(_)
+        | SdtmProjectApiError::SdtmProjectDomainNotFound(_)
+        | SdtmProjectApiError::SdtmProjectDomainOverrideNotFound(_)
+        | SdtmProjectApiError::SdtmProjectVariableNotFound(_)
+        | SdtmProjectApiError::SdtmProjectVariableOverrideNotFound(_)
+        | SdtmProjectApiError::FkSdtmProjectVersionNotFound(_)
+        | SdtmProjectApiError::FkSdtmProjectDomainNotFound(_)
+        | SdtmProjectApiError::FkSdtmProjectVariableNotFound(_) => StatusCode::NOT_FOUND,
+        SdtmProjectApiError::DuplicateSdtmProjectVersion { .. }
+        | SdtmProjectApiError::DuplicateSdtmProjectDomain { .. }
+        | SdtmProjectApiError::DuplicateSdtmProjectDomainOverride { .. }
+        | SdtmProjectApiError::DuplicateSdtmProjectVariable { .. }
+        | SdtmProjectApiError::DuplicateSdtmProjectVariableOverride { .. } => StatusCode::CONFLICT,
+        SdtmProjectApiError::Repository(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn sdtm_project_code(e: &apis::sdtm_project::SdtmProjectApiError) -> &'static str {
+    use apis::sdtm_project::SdtmProjectApiError;
+    match e {
+        SdtmProjectApiError::Validation(_) => "validation_failed",
+        SdtmProjectApiError::NotFound => "not_found",
+        SdtmProjectApiError::ProjectNotFound(_) => "project_not_found",
+        SdtmProjectApiError::SdtmProjectVersionNotFound(_) => "sdtm_project_version_not_found",
+        SdtmProjectApiError::SdtmProjectDomainNotFound(_) => "sdtm_project_domain_not_found",
+        SdtmProjectApiError::SdtmProjectDomainOverrideNotFound(_) => {
+            "sdtm_project_domain_override_not_found"
+        }
+        SdtmProjectApiError::SdtmProjectVariableNotFound(_) => "sdtm_project_variable_not_found",
+        SdtmProjectApiError::SdtmProjectVariableOverrideNotFound(_) => {
+            "sdtm_project_variable_override_not_found"
+        }
+        SdtmProjectApiError::DuplicateSdtmProjectVersion { .. } => "duplicate_sdtm_project_version",
+        SdtmProjectApiError::DuplicateSdtmProjectDomain { .. } => "duplicate_sdtm_project_domain",
+        SdtmProjectApiError::DuplicateSdtmProjectDomainOverride { .. } => {
+            "duplicate_sdtm_project_domain_override"
+        }
+        SdtmProjectApiError::DuplicateSdtmProjectVariable { .. } => {
+            "duplicate_sdtm_project_variable"
+        }
+        SdtmProjectApiError::DuplicateSdtmProjectVariableOverride { .. } => {
+            "duplicate_sdtm_project_variable_override"
+        }
+        SdtmProjectApiError::FkSdtmProjectVersionNotFound(_) => "fk_sdtm_project_version_not_found",
+        SdtmProjectApiError::FkSdtmProjectDomainNotFound(_) => "fk_sdtm_project_domain_not_found",
+        SdtmProjectApiError::FkSdtmProjectVariableNotFound(_) => {
+            "fk_sdtm_project_variable_not_found"
+        }
+        SdtmProjectApiError::Repository(_) => "repository_error",
     }
 }
 
@@ -778,6 +843,77 @@ mod tests {
     }
 
     // ---- CrfApiError mapping -----
+
+    /// Drive `IntoResponse::into_response` for a
+    /// `SdtmProjectApiError` and recover the status + JSON body so
+    /// each variant can be asserted directly.
+    async fn render_sdtm_project(
+        err: apis::sdtm_project::SdtmProjectApiError,
+    ) -> (StatusCode, ErrorBody) {
+        let api = ApiError::from(err);
+        let response = api.into_response();
+        let status = response.status();
+        let body = axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap();
+        let parsed: ErrorBody = serde_json::from_slice(&body).unwrap();
+        (status, parsed)
+    }
+
+    #[tokio::test]
+    async fn sdtm_project_validation_maps_to_400() {
+        let (status, body) = render_sdtm_project(
+            apis::sdtm_project::SdtmProjectApiError::Validation("bad".into()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body.code, "validation_failed");
+    }
+
+    #[tokio::test]
+    async fn sdtm_project_missing_version_maps_to_404() {
+        let (status, body) = render_sdtm_project(
+            apis::sdtm_project::SdtmProjectApiError::SdtmProjectVersionNotFound(7),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "sdtm_project_version_not_found");
+    }
+
+    #[tokio::test]
+    async fn sdtm_project_missing_parent_maps_to_404() {
+        // A missing parent is a 404: the client named a resource that
+        // is not there.
+        let (status, body) = render_sdtm_project(
+            apis::sdtm_project::SdtmProjectApiError::FkSdtmProjectVersionNotFound(7),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(body.code, "fk_sdtm_project_version_not_found");
+    }
+
+    #[tokio::test]
+    async fn sdtm_project_duplicate_maps_to_409() {
+        let (status, body) = render_sdtm_project(
+            apis::sdtm_project::SdtmProjectApiError::DuplicateSdtmProjectDomain {
+                version_id: 1,
+                domain_code: "AE".into(),
+            },
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(body.code, "duplicate_sdtm_project_domain");
+    }
+
+    #[tokio::test]
+    async fn sdtm_project_repository_maps_to_500() {
+        let (status, body) = render_sdtm_project(
+            apis::sdtm_project::SdtmProjectApiError::Repository("boom".into()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(body.code, "repository_error");
+    }
 
     async fn render_crf(err: apis::crf::CrfApiError) -> (StatusCode, ErrorBody) {
         let api = ApiError::from(err);

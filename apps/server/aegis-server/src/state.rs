@@ -15,6 +15,7 @@ pub struct AppState {
     pub domain_model: Arc<dyn apis::domain_model::DomainModelService>,
     pub mission: Arc<dyn apis::mission::MissionService>,
     pub crf: Arc<dyn apis::crf::CrfService>,
+    pub sdtm_project: Arc<dyn apis::sdtm_project::SdtmProjectService>,
     pub log_ingestor: Arc<logging_utils::LogIngestor>,
 }
 
@@ -30,6 +31,208 @@ pub(crate) mod test_support {
     use std::sync::Arc;
 
     use async_trait::async_trait;
+
+    /// A `SdtmProjectService` for tests that need an `AppState` but
+    /// never touch the sdtm-project endpoints. Every method is
+    /// `unimplemented!()`, like the other null doubles in this module.
+    #[derive(Clone)]
+    pub(crate) struct NullSdtmProjectService;
+
+    #[async_trait]
+    impl apis::sdtm_project::SdtmProjectService for NullSdtmProjectService {
+        async fn create_version(
+            &self,
+            _req: apis::sdtm_project::CreateSdtmProjectVersionRequest,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectVersionView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn get_version_by_id(
+            &self,
+            _id: i64,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectVersionView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn list_versions_by_project(
+            &self,
+            _project_code: &str,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectVersionList,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn update_version(
+            &self,
+            _req: apis::sdtm_project::UpdateSdtmProjectVersionRequest,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectVersionView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn delete_version(
+            &self,
+            _id: i64,
+        ) -> Result<(), apis::sdtm_project::SdtmProjectApiError> {
+            unimplemented!()
+        }
+        async fn create_domain(
+            &self,
+            _req: apis::sdtm_project::CreateSdtmProjectDomainRequest,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectDomainView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn get_domain_by_id(
+            &self,
+            _id: i64,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectDomainView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn list_domains_by_version(
+            &self,
+            _version_id: i64,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectDomainList,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn update_domain(
+            &self,
+            _req: apis::sdtm_project::UpdateSdtmProjectDomainRequest,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectDomainView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn delete_domain(
+            &self,
+            _id: i64,
+        ) -> Result<(), apis::sdtm_project::SdtmProjectApiError> {
+            unimplemented!()
+        }
+        async fn create_domain_override(
+            &self,
+            _req: apis::sdtm_project::CreateSdtmProjectDomainOverrideRequest,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectDomainOverrideView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn get_domain_override(
+            &self,
+            _domain_id: i64,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectDomainOverrideView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn update_domain_override(
+            &self,
+            _req: apis::sdtm_project::UpdateSdtmProjectDomainOverrideRequest,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectDomainOverrideView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn delete_domain_override(
+            &self,
+            _domain_id: i64,
+        ) -> Result<(), apis::sdtm_project::SdtmProjectApiError> {
+            unimplemented!()
+        }
+        async fn create_variable(
+            &self,
+            _req: apis::sdtm_project::CreateSdtmProjectVariableRequest,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectVariableView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn get_variable_by_id(
+            &self,
+            _id: i64,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectVariableView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn list_variables_by_domain(
+            &self,
+            _domain_id: i64,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectVariableList,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn update_variable(
+            &self,
+            _req: apis::sdtm_project::UpdateSdtmProjectVariableRequest,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectVariableView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn delete_variable(
+            &self,
+            _id: i64,
+        ) -> Result<(), apis::sdtm_project::SdtmProjectApiError> {
+            unimplemented!()
+        }
+        async fn create_variable_override(
+            &self,
+            _req: apis::sdtm_project::CreateSdtmProjectVariableOverrideRequest,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectVariableOverrideView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn get_variable_override(
+            &self,
+            _variable_id: i64,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectVariableOverrideView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn update_variable_override(
+            &self,
+            _req: apis::sdtm_project::UpdateSdtmProjectVariableOverrideRequest,
+        ) -> Result<
+            apis::sdtm_project::SdtmProjectVariableOverrideView,
+            apis::sdtm_project::SdtmProjectApiError,
+        > {
+            unimplemented!()
+        }
+        async fn delete_variable_override(
+            &self,
+            _variable_id: i64,
+        ) -> Result<(), apis::sdtm_project::SdtmProjectApiError> {
+            unimplemented!()
+        }
+    }
 
     /// A `LogIngestor` for tests that need an `AppState` but never
     /// touch the `log_ingest` endpoint. The internal tempdir is

@@ -212,6 +212,8 @@ fn build_app(pool: PgPool) -> Router {
             as Arc<dyn apis::domain_model::DomainModelService>,
         mission: Arc::new(NullMissionService) as Arc<dyn apis::mission::MissionService>,
         crf: Arc::new(NullCrfService) as Arc<dyn apis::crf::CrfService>,
+        sdtm_project: Arc::new(NullSdtmProjectService)
+            as Arc<dyn apis::sdtm_project::SdtmProjectService>,
         log_ingestor: build_unused_log_ingestor(),
     };
 
@@ -1260,6 +1262,180 @@ impl apis::mission::MissionService for NullMissionService {
         _issue_id: i64,
         _req: apis::mission::AppendCommentRequest,
     ) -> Result<apis::mission::IssueView, apis::mission::MissionApiError> {
+        unimplemented!()
+    }
+}
+
+/// A `SdtmProjectService` double for the integration test. The
+/// `state::test_support` module is crate-private, so this file
+/// carries its own copy — same shape as the other null doubles here.
+struct NullSdtmProjectService;
+
+#[async_trait::async_trait]
+impl apis::sdtm_project::SdtmProjectService for NullSdtmProjectService {
+    async fn create_version(
+        &self,
+        _req: apis::sdtm_project::CreateSdtmProjectVersionRequest,
+    ) -> Result<apis::sdtm_project::SdtmProjectVersionView, apis::sdtm_project::SdtmProjectApiError>
+    {
+        unimplemented!()
+    }
+    async fn get_version_by_id(
+        &self,
+        _id: i64,
+    ) -> Result<apis::sdtm_project::SdtmProjectVersionView, apis::sdtm_project::SdtmProjectApiError>
+    {
+        unimplemented!()
+    }
+    async fn list_versions_by_project(
+        &self,
+        _project_code: &str,
+    ) -> Result<apis::sdtm_project::SdtmProjectVersionList, apis::sdtm_project::SdtmProjectApiError>
+    {
+        unimplemented!()
+    }
+    async fn update_version(
+        &self,
+        _req: apis::sdtm_project::UpdateSdtmProjectVersionRequest,
+    ) -> Result<apis::sdtm_project::SdtmProjectVersionView, apis::sdtm_project::SdtmProjectApiError>
+    {
+        unimplemented!()
+    }
+    async fn delete_version(
+        &self,
+        _id: i64,
+    ) -> Result<(), apis::sdtm_project::SdtmProjectApiError> {
+        unimplemented!()
+    }
+    async fn create_domain(
+        &self,
+        _req: apis::sdtm_project::CreateSdtmProjectDomainRequest,
+    ) -> Result<apis::sdtm_project::SdtmProjectDomainView, apis::sdtm_project::SdtmProjectApiError>
+    {
+        unimplemented!()
+    }
+    async fn get_domain_by_id(
+        &self,
+        _id: i64,
+    ) -> Result<apis::sdtm_project::SdtmProjectDomainView, apis::sdtm_project::SdtmProjectApiError>
+    {
+        unimplemented!()
+    }
+    async fn list_domains_by_version(
+        &self,
+        _version_id: i64,
+    ) -> Result<apis::sdtm_project::SdtmProjectDomainList, apis::sdtm_project::SdtmProjectApiError>
+    {
+        unimplemented!()
+    }
+    async fn update_domain(
+        &self,
+        _req: apis::sdtm_project::UpdateSdtmProjectDomainRequest,
+    ) -> Result<apis::sdtm_project::SdtmProjectDomainView, apis::sdtm_project::SdtmProjectApiError>
+    {
+        unimplemented!()
+    }
+    async fn delete_domain(&self, _id: i64) -> Result<(), apis::sdtm_project::SdtmProjectApiError> {
+        unimplemented!()
+    }
+    async fn create_domain_override(
+        &self,
+        _req: apis::sdtm_project::CreateSdtmProjectDomainOverrideRequest,
+    ) -> Result<
+        apis::sdtm_project::SdtmProjectDomainOverrideView,
+        apis::sdtm_project::SdtmProjectApiError,
+    > {
+        unimplemented!()
+    }
+    async fn get_domain_override(
+        &self,
+        _domain_id: i64,
+    ) -> Result<
+        apis::sdtm_project::SdtmProjectDomainOverrideView,
+        apis::sdtm_project::SdtmProjectApiError,
+    > {
+        unimplemented!()
+    }
+    async fn update_domain_override(
+        &self,
+        _req: apis::sdtm_project::UpdateSdtmProjectDomainOverrideRequest,
+    ) -> Result<
+        apis::sdtm_project::SdtmProjectDomainOverrideView,
+        apis::sdtm_project::SdtmProjectApiError,
+    > {
+        unimplemented!()
+    }
+    async fn delete_domain_override(
+        &self,
+        _domain_id: i64,
+    ) -> Result<(), apis::sdtm_project::SdtmProjectApiError> {
+        unimplemented!()
+    }
+    async fn create_variable(
+        &self,
+        _req: apis::sdtm_project::CreateSdtmProjectVariableRequest,
+    ) -> Result<apis::sdtm_project::SdtmProjectVariableView, apis::sdtm_project::SdtmProjectApiError>
+    {
+        unimplemented!()
+    }
+    async fn get_variable_by_id(
+        &self,
+        _id: i64,
+    ) -> Result<apis::sdtm_project::SdtmProjectVariableView, apis::sdtm_project::SdtmProjectApiError>
+    {
+        unimplemented!()
+    }
+    async fn list_variables_by_domain(
+        &self,
+        _domain_id: i64,
+    ) -> Result<apis::sdtm_project::SdtmProjectVariableList, apis::sdtm_project::SdtmProjectApiError>
+    {
+        unimplemented!()
+    }
+    async fn update_variable(
+        &self,
+        _req: apis::sdtm_project::UpdateSdtmProjectVariableRequest,
+    ) -> Result<apis::sdtm_project::SdtmProjectVariableView, apis::sdtm_project::SdtmProjectApiError>
+    {
+        unimplemented!()
+    }
+    async fn delete_variable(
+        &self,
+        _id: i64,
+    ) -> Result<(), apis::sdtm_project::SdtmProjectApiError> {
+        unimplemented!()
+    }
+    async fn create_variable_override(
+        &self,
+        _req: apis::sdtm_project::CreateSdtmProjectVariableOverrideRequest,
+    ) -> Result<
+        apis::sdtm_project::SdtmProjectVariableOverrideView,
+        apis::sdtm_project::SdtmProjectApiError,
+    > {
+        unimplemented!()
+    }
+    async fn get_variable_override(
+        &self,
+        _variable_id: i64,
+    ) -> Result<
+        apis::sdtm_project::SdtmProjectVariableOverrideView,
+        apis::sdtm_project::SdtmProjectApiError,
+    > {
+        unimplemented!()
+    }
+    async fn update_variable_override(
+        &self,
+        _req: apis::sdtm_project::UpdateSdtmProjectVariableOverrideRequest,
+    ) -> Result<
+        apis::sdtm_project::SdtmProjectVariableOverrideView,
+        apis::sdtm_project::SdtmProjectApiError,
+    > {
+        unimplemented!()
+    }
+    async fn delete_variable_override(
+        &self,
+        _variable_id: i64,
+    ) -> Result<(), apis::sdtm_project::SdtmProjectApiError> {
         unimplemented!()
     }
 }

@@ -91,6 +91,8 @@ mod tests {
             mission: Arc::new(test_support::NullMissionService)
                 as Arc<dyn apis::mission::MissionService>,
             crf: Arc::new(test_support::NullCrfService) as Arc<dyn apis::crf::CrfService>,
+            sdtm_project: Arc::new(test_support::NullSdtmProjectService)
+                as Arc<dyn apis::sdtm_project::SdtmProjectService>,
             log_ingestor,
         }
     }
@@ -281,6 +283,8 @@ mod tests {
             mission: Arc::new(test_support::NullMissionService)
                 as Arc<dyn apis::mission::MissionService>,
             crf: Arc::new(test_support::NullCrfService) as Arc<dyn apis::crf::CrfService>,
+            sdtm_project: Arc::new(test_support::NullSdtmProjectService)
+                as Arc<dyn apis::sdtm_project::SdtmProjectService>,
             log_ingestor: log_ingestor.clone(),
         };
 

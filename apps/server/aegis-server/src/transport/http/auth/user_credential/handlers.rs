@@ -119,7 +119,8 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::state::test_support::{
-        NullCrfService, NullDomainModelService, NullMissionService, NullTerminologyService,
+        NullCrfService, NullDomainModelService, NullMissionService, NullSdtmProjectService,
+        NullTerminologyService,
     };
     use tower::ServiceExt;
 
@@ -313,6 +314,8 @@ mod tests {
             terminology: Arc::new(NullTerminologyService)
                 as Arc<dyn apis::terminology::TerminologyService>,
             crf: Arc::new(NullCrfService) as Arc<dyn apis::crf::CrfService>,
+            sdtm_project: Arc::new(NullSdtmProjectService)
+                as Arc<dyn apis::sdtm_project::SdtmProjectService>,
             domain_model: Arc::new(NullDomainModelService)
                 as Arc<dyn apis::domain_model::DomainModelService>,
             mission: Arc::new(NullMissionService) as Arc<dyn apis::mission::MissionService>,
