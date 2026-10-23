@@ -51,10 +51,6 @@ impl SdtmProjectDomainOverride {
 
     /// Bypasses validation. Reserved for the adapter layer when
     /// materialising rows from persistence.
-    // Reserved for the adapter layer. The postgres adapters that
-    // call this land with the persistence task; until then the only
-    // caller is the in-memory test fakes, which are cfg(test)-only.
-    #[allow(dead_code)]
     pub(crate) fn for_repository(
         id: i64,
         domain_id: i64,

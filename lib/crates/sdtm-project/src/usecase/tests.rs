@@ -738,6 +738,9 @@ async fn domain_list_carries_the_override() {
     let ov = list[0].r#override.as_ref().expect("override hydrated");
     assert_eq!(ov.category, DomainCategory::Events);
     assert_eq!(ov.descriptions.len(), 1);
+    // The override's parent is the domain, not the version.
+    assert_eq!(ov.domain_id, list[0].id);
+    assert_ne!(ov.domain_id, version_id);
 }
 
 #[tokio::test]
