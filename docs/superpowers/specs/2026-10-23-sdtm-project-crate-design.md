@@ -624,8 +624,24 @@ but the usecase turns exactly that variant into `Ok(None)`. Every other
 repository error still propagates.
 
 On the wire, `GET …/override` on a domain or variable with no override is
-**200 with a `null` body**, not 404. The 404 arms are gone from those two
-routes' OpenAPI responses.
+**200 with `{"override": null}`**, not 404. The 404 arms are gone from
+those two routes' OpenAPI responses.
+
+The response is always an *envelope* with an `override` key, never a bare
+nullable override:
+
+```jsonc
+// no override
+{ "override": null }
+// with an override
+{ "override": { "id": 3, "domainId": 2, "category": "Events", … } }
+```
+
+The key is present either way, so a client reads `body.override` without
+first checking whether the body itself is null. The two envelope DTOs are
+`SdtmProjectDomainOverrideResponse` and `SdtmProjectVariableOverrideResponse`
+in the server's `dto.rs`; both name their field `override_` in Rust (it is
+a keyword) and rename it on the wire.
 
 `update_*_override` and `delete_*_override` keep their 404: asking to
 change or remove something that does not exist is still a client error.
@@ -669,7 +685,7 @@ pub trait SdtmProjectService: Send + Sync {
     async fn delete_domain(&self, id: i64) -> Result<(), SdtmProjectApiError>;
 
     async fn create_domain_override(&self, req: CreateSdtmProjectDomainOverrideRequest) -> Result<SdtmProjectDomainOverrideView, SdtmProjectApiError>;
-    async fn get_domain_override(&self, domain_id: i64) -> Result<SdtmProjectDomainOverrideView, SdtmProjectApiError>;
+    async fn get_domain_override(&self, domain_id: i64) -> Result<Option<SdtmProjectDomainOverrideView>, SdtmProjectApiError>;
     async fn update_domain_override(&self, req: UpdateSdtmProjectDomainOverrideRequest) -> Result<SdtmProjectDomainOverrideView, SdtmProjectApiError>;
     async fn delete_domain_override(&self, domain_id: i64) -> Result<(), SdtmProjectApiError>;
 
@@ -680,7 +696,7 @@ pub trait SdtmProjectService: Send + Sync {
     async fn delete_variable(&self, id: i64) -> Result<(), SdtmProjectApiError>;
 
     async fn create_variable_override(&self, req: CreateSdtmProjectVariableOverrideRequest) -> Result<SdtmProjectVariableOverrideView, SdtmProjectApiError>;
-    async fn get_variable_override(&self, variable_id: i64) -> Result<SdtmProjectVariableOverrideView, SdtmProjectApiError>;
+    async fn get_variable_override(&self, variable_id: i64) -> Result<Option<SdtmProjectVariableOverrideView>, SdtmProjectApiError>;
     async fn update_variable_override(&self, req: UpdateSdtmProjectVariableOverrideRequest) -> Result<SdtmProjectVariableOverrideView, SdtmProjectApiError>;
     async fn delete_variable_override(&self, variable_id: i64) -> Result<(), SdtmProjectApiError>;
 }
@@ -788,7 +804,7 @@ The router is nested under `/api/sdtm-project` in `transport/http/router.rs`.
 | PUT | `/api/sdtm-project/domains/{id}` | `update_domain` | 200 |
 | DELETE | `/api/sdtm-project/domains/{id}` | `delete_domain` | 204 |
 | POST | `/api/sdtm-project/domains/{domain_id}/override` | `create_domain_override` | 201 |
-| GET | `/api/sdtm-project/domains/{domain_id}/override` | `get_domain_override` | 200 |
+| GET | `/api/sdtm-project/domains/{domain_id}/override` | `get_domain_override` | 200 (`{"override": …}`) |
 | PUT | `/api/sdtm-project/domains/{domain_id}/override` | `update_domain_override` | 200 |
 | DELETE | `/api/sdtm-project/domains/{domain_id}/override` | `delete_domain_override` | 204 |
 | POST | `/api/sdtm-project/variables` | `create_variable` | 201 |
@@ -797,7 +813,7 @@ The router is nested under `/api/sdtm-project` in `transport/http/router.rs`.
 | PUT | `/api/sdtm-project/variables/{id}` | `update_variable` | 200 |
 | DELETE | `/api/sdtm-project/variables/{id}` | `delete_variable` | 204 |
 | POST | `/api/sdtm-project/variables/{variable_id}/override` | `create_variable_override` | 201 |
-| GET | `/api/sdtm-project/variables/{variable_id}/override` | `get_variable_override` | 200 |
+| GET | `/api/sdtm-project/variables/{variable_id}/override` | `get_variable_override` | 200 (`{"override": …}`) |
 | PUT | `/api/sdtm-project/variables/{variable_id}/override` | `update_variable_override` | 200 |
 | DELETE | `/api/sdtm-project/variables/{variable_id}/override` | `delete_variable_override` | 204 |
 
@@ -826,6 +842,8 @@ unknown project code is **not** an error — it returns `200` with an empty
   `SdtmProjectVariableOverrideViewResponse`
 - `SdtmProjectVersionListResponse`, `SdtmProjectDomainListResponse`,
   `SdtmProjectVariableListResponse`
+- `SdtmProjectDomainOverrideResponse`, `SdtmProjectVariableOverrideResponse` —
+  the `GET …/override` envelopes; each carries a single `override` key
 - `CreateSdtmProjectVersionRequest`, `UpdateSdtmProjectVersionRequest`, … for
   all five aggregates
 - `SdtmProjectVersionListQuery { project_code: String }` — the only list
@@ -1080,7 +1098,7 @@ cargo test -p sdtm-project -- --ignored --test-threads=1   # when AEGIS_SDTM_PRO
    preserved through the domain, the JSONB column and the wire.
 6. **Reading a missing override** — not an error. The override is optional,
    so `get_*_override` returns `Option` and the HTTP route answers **200
-   with a `null` body** rather than 404.
+   with `{"override": null}`** rather than 404.
 
 ## Decisions made by the implementer
 

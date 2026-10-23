@@ -133,9 +133,13 @@ reports a missing row as `SdtmProject{Domain,Variable}OverrideNotFound`, but
 the usecase turns exactly that variant into `Ok(None)`.
 
 On the wire, `GET …/override` on a domain or variable with no override is
-**200 with a `null` body**, not 404. `update_*_override` and
-`delete_*_override` keep their 404: asking to change or remove something that
-does not exist is still a client error.
+**200 with `{"override": null}`**, not 404. The response is always an
+envelope with an `override` key — `null` when there is no override, the
+override itself when there is one — so a client reads `body.override`
+without first null-checking the body.
+
+`update_*_override` and `delete_*_override` keep their 404: asking to change
+or remove something that does not exist is still a client error.
 
 ## Conventions
 

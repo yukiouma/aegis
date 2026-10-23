@@ -1945,7 +1945,7 @@ Create `apps/server/aegis-server/src/transport/http/sdtm_project/handlers.rs` wi
 | `update_domain` | `PUT /domains/{id}` | 200 |
 | `delete_domain` | `DELETE /domains/{id}` | 204 |
 | `create_domain_override` | `POST /domains/{domain_id}/override` | 201 |
-| `get_domain_override` | `GET /domains/{domain_id}/override` | 200 (`null` body when there is no override) |
+| `get_domain_override` | `GET /domains/{domain_id}/override` | 200 (`{"override": null}` when there is no override) |
 | `update_domain_override` | `PUT /domains/{domain_id}/override` | 200 |
 | `delete_domain_override` | `DELETE /domains/{domain_id}/override` | 204 |
 | `create_variable` | `POST /variables` | 201 |
@@ -1954,7 +1954,7 @@ Create `apps/server/aegis-server/src/transport/http/sdtm_project/handlers.rs` wi
 | `update_variable` | `PUT /variables/{id}` | 200 |
 | `delete_variable` | `DELETE /variables/{id}` | 204 |
 | `create_variable_override` | `POST /variables/{variable_id}/override` | 201 |
-| `get_variable_override` | `GET /variables/{variable_id}/override` | 200 (`null` body when there is no override) |
+| `get_variable_override` | `GET /variables/{variable_id}/override` | 200 (`{"override": null}` when there is no override) |
 | `update_variable_override` | `PUT /variables/{variable_id}/override` | 200 |
 | `delete_variable_override` | `DELETE /variables/{variable_id}/override` | 204 |
 

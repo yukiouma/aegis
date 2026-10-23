@@ -2751,6 +2751,29 @@ pub struct SdtmProjectDomainOverrideViewResponse {
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
 
+/// The body of `GET /domains/{domain_id}/override`.
+///
+/// The override is optional, so the response is always an object with
+/// an `override` key: `null` when the domain has no override, the
+/// override itself when it has one. The key is present either way, so
+/// a client can read `body.override` without a null check on the
+/// envelope.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectDomainOverrideResponse {
+    #[serde(rename = "override")]
+    pub override_: Option<SdtmProjectDomainOverrideViewResponse>,
+}
+
+/// The body of `GET /variables/{variable_id}/override` — the variable
+/// twin of [`SdtmProjectDomainOverrideResponse`].
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectVariableOverrideResponse {
+    #[serde(rename = "override")]
+    pub override_: Option<SdtmProjectVariableOverrideViewResponse>,
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SdtmProjectVariableViewResponse {
@@ -2938,6 +2961,41 @@ mod tests {
         assert_eq!(json["override"]["domainId"], serde_json::json!(7));
         // The caller's order survives the wire.
         assert_eq!(json["keyVariables"], serde_json::json!(["AESEV", "AETERM"]));
+    }
+
+    /// The `GET …/override` envelope always carries an `override` key:
+    /// `null` when there is no override, the override when there is
+    /// one. It is never a bare `null` body.
+    #[test]
+    fn sdtm_project_override_response_wraps_the_override_in_an_override_key() {
+        let absent = SdtmProjectDomainOverrideResponse { override_: None };
+        let json = serde_json::to_value(&absent).unwrap();
+        assert_eq!(json, serde_json::json!({ "override": null }));
+
+        let ts = chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let present = SdtmProjectDomainOverrideResponse {
+            override_: Some(SdtmProjectDomainOverrideViewResponse {
+                id: 1,
+                domain_id: 7,
+                category: SdtmProjectDomainCategory::Events,
+                descriptions: Vec::new(),
+                created_at: ts,
+                updated_at: ts,
+            }),
+        };
+        let json = serde_json::to_value(&present).unwrap();
+        assert_eq!(json["override"]["category"], serde_json::json!("Events"));
+        assert_eq!(json["override"]["domainId"], serde_json::json!(7));
+        assert!(
+            json.get("override_").is_none(),
+            "leaked `override_` key: {json}"
+        );
+
+        let absent = SdtmProjectVariableOverrideResponse { override_: None };
+        let json = serde_json::to_value(&absent).unwrap();
+        assert_eq!(json, serde_json::json!({ "override": null }));
     }
 
     use super::*;
