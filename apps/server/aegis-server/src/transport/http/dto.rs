@@ -2367,8 +2367,637 @@ pub struct LogIngestResponse {
     pub accepted: usize,
 }
 
+// -- sdtm-project ---------------------------------------------------------
+//
+// The wire types for the per-project SDTM model tree. They mirror
+// `apis::sdtm_project` and deliberately do NOT reuse the
+// `domain-model` section's enums above: the CDISC standard and a
+// project's overlay are separate features and are allowed to diverge.
+
+// Wire enum mirroring [`apis::sdtm_project::DomainCategory`]. The
+// apis contract pins the JSON spelling per variant (e.g. `"Special
+// Purpose"` with a space).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum SdtmProjectDomainCategory {
+    #[serde(rename = "Special Purpose")]
+    SpecialPurpose,
+    #[serde(rename = "Interventions")]
+    Interventions,
+    #[serde(rename = "Events")]
+    Events,
+    #[serde(rename = "Findings")]
+    Findings,
+    #[serde(rename = "Trial Design")]
+    TrialDesign,
+    #[serde(rename = "Relationships")]
+    Relationships,
+    #[serde(rename = "Study Reference")]
+    StudyReference,
+}
+
+/// Wire enum mirroring [`apis::sdtm_project::SdtmVariableType`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "PascalCase")]
+pub enum SdtmProjectVariableType {
+    Numeric,
+    Character,
+}
+
+/// Wire enum mirroring [`apis::sdtm_project::SdtmVariableCore`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "PascalCase")]
+pub enum SdtmProjectVariableCore {
+    Req,
+    Exp,
+    Perm,
+    Supp,
+}
+
+/// Wire enum mirroring [`apis::sdtm_project::SdtmRole`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub enum SdtmProjectRole {
+    Identifier,
+    #[serde(rename = "Topic")]
+    Topic,
+    #[serde(rename = "Timing")]
+    Timing,
+    #[serde(rename = "Record Qualifier")]
+    RecordQualifier,
+    #[serde(rename = "Synonym Qualifier")]
+    SynonymQualifier,
+    #[serde(rename = "Variable Qualifier")]
+    VariableQualifier,
+    #[serde(rename = "Grouping Qualifier")]
+    GroupingQualifier,
+    Rule,
+}
+
+impl From<apis::sdtm_project::DomainCategory> for SdtmProjectDomainCategory {
+    fn from(c: apis::sdtm_project::DomainCategory) -> Self {
+        match c {
+            apis::sdtm_project::DomainCategory::SpecialPurpose => Self::SpecialPurpose,
+            apis::sdtm_project::DomainCategory::Interventions => Self::Interventions,
+            apis::sdtm_project::DomainCategory::Events => Self::Events,
+            apis::sdtm_project::DomainCategory::Findings => Self::Findings,
+            apis::sdtm_project::DomainCategory::TrialDesign => Self::TrialDesign,
+            apis::sdtm_project::DomainCategory::Relationships => Self::Relationships,
+            apis::sdtm_project::DomainCategory::StudyReference => Self::StudyReference,
+        }
+    }
+}
+
+impl From<SdtmProjectDomainCategory> for apis::sdtm_project::DomainCategory {
+    fn from(c: SdtmProjectDomainCategory) -> Self {
+        match c {
+            SdtmProjectDomainCategory::SpecialPurpose => Self::SpecialPurpose,
+            SdtmProjectDomainCategory::Interventions => Self::Interventions,
+            SdtmProjectDomainCategory::Events => Self::Events,
+            SdtmProjectDomainCategory::Findings => Self::Findings,
+            SdtmProjectDomainCategory::TrialDesign => Self::TrialDesign,
+            SdtmProjectDomainCategory::Relationships => Self::Relationships,
+            SdtmProjectDomainCategory::StudyReference => Self::StudyReference,
+        }
+    }
+}
+
+impl From<apis::sdtm_project::SdtmVariableType> for SdtmProjectVariableType {
+    fn from(t: apis::sdtm_project::SdtmVariableType) -> Self {
+        match t {
+            apis::sdtm_project::SdtmVariableType::Numeric => Self::Numeric,
+            apis::sdtm_project::SdtmVariableType::Character => Self::Character,
+        }
+    }
+}
+
+impl From<SdtmProjectVariableType> for apis::sdtm_project::SdtmVariableType {
+    fn from(t: SdtmProjectVariableType) -> Self {
+        match t {
+            SdtmProjectVariableType::Numeric => Self::Numeric,
+            SdtmProjectVariableType::Character => Self::Character,
+        }
+    }
+}
+
+impl From<apis::sdtm_project::SdtmVariableCore> for SdtmProjectVariableCore {
+    fn from(c: apis::sdtm_project::SdtmVariableCore) -> Self {
+        match c {
+            apis::sdtm_project::SdtmVariableCore::Req => Self::Req,
+            apis::sdtm_project::SdtmVariableCore::Exp => Self::Exp,
+            apis::sdtm_project::SdtmVariableCore::Perm => Self::Perm,
+            apis::sdtm_project::SdtmVariableCore::Supp => Self::Supp,
+        }
+    }
+}
+
+impl From<SdtmProjectVariableCore> for apis::sdtm_project::SdtmVariableCore {
+    fn from(c: SdtmProjectVariableCore) -> Self {
+        match c {
+            SdtmProjectVariableCore::Req => Self::Req,
+            SdtmProjectVariableCore::Exp => Self::Exp,
+            SdtmProjectVariableCore::Perm => Self::Perm,
+            SdtmProjectVariableCore::Supp => Self::Supp,
+        }
+    }
+}
+
+impl From<apis::sdtm_project::SdtmRole> for SdtmProjectRole {
+    fn from(r: apis::sdtm_project::SdtmRole) -> Self {
+        match r {
+            apis::sdtm_project::SdtmRole::Identifier => Self::Identifier,
+            apis::sdtm_project::SdtmRole::Topic => Self::Topic,
+            apis::sdtm_project::SdtmRole::Timing => Self::Timing,
+            apis::sdtm_project::SdtmRole::RecordQualifier => Self::RecordQualifier,
+            apis::sdtm_project::SdtmRole::SynonymQualifier => Self::SynonymQualifier,
+            apis::sdtm_project::SdtmRole::VariableQualifier => Self::VariableQualifier,
+            apis::sdtm_project::SdtmRole::GroupingQualifier => Self::GroupingQualifier,
+            apis::sdtm_project::SdtmRole::Rule => Self::Rule,
+        }
+    }
+}
+
+impl From<SdtmProjectRole> for apis::sdtm_project::SdtmRole {
+    fn from(r: SdtmProjectRole) -> Self {
+        match r {
+            SdtmProjectRole::Identifier => Self::Identifier,
+            SdtmProjectRole::Topic => Self::Topic,
+            SdtmProjectRole::Timing => Self::Timing,
+            SdtmProjectRole::RecordQualifier => Self::RecordQualifier,
+            SdtmProjectRole::SynonymQualifier => Self::SynonymQualifier,
+            SdtmProjectRole::VariableQualifier => Self::VariableQualifier,
+            SdtmProjectRole::GroupingQualifier => Self::GroupingQualifier,
+            SdtmProjectRole::Rule => Self::Rule,
+        }
+    }
+}
+
+// -- description DTOs ------------------------------------------------------
+
+/// Wire mirror of `apis::sdtm_project::SdtmDomainDescription`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SdtmProjectDomainDescription {
+    pub lang: String,
+    pub details: SdtmProjectDomainDescriptionDetail,
+}
+
+/// Wire mirror of `apis::sdtm_project::SdtmDomainDescriptionDetail`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SdtmProjectDomainDescriptionDetail {
+    pub description: String,
+    pub structure: String,
+}
+
+/// Wire mirror of `apis::sdtm_project::SdtmVariableDescription`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SdtmProjectVariableDescription {
+    pub lang: String,
+    pub details: SdtmProjectVariableDescriptionDetail,
+}
+
+/// Wire mirror of `apis::sdtm_project::SdtmVariableDescriptionDetail`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SdtmProjectVariableDescriptionDetail {
+    pub label: String,
+}
+
+impl From<apis::sdtm_project::SdtmDomainDescription> for SdtmProjectDomainDescription {
+    fn from(d: apis::sdtm_project::SdtmDomainDescription) -> Self {
+        Self {
+            lang: d.lang,
+            details: SdtmProjectDomainDescriptionDetail {
+                description: d.details.description,
+                structure: d.details.structure,
+            },
+        }
+    }
+}
+
+impl From<SdtmProjectDomainDescription> for apis::sdtm_project::SdtmDomainDescription {
+    fn from(d: SdtmProjectDomainDescription) -> Self {
+        Self {
+            lang: d.lang,
+            details: apis::sdtm_project::SdtmDomainDescriptionDetail {
+                description: d.details.description,
+                structure: d.details.structure,
+            },
+        }
+    }
+}
+
+impl From<apis::sdtm_project::SdtmVariableDescription> for SdtmProjectVariableDescription {
+    fn from(d: apis::sdtm_project::SdtmVariableDescription) -> Self {
+        Self {
+            lang: d.lang,
+            details: SdtmProjectVariableDescriptionDetail {
+                label: d.details.label,
+            },
+        }
+    }
+}
+
+impl From<SdtmProjectVariableDescription> for apis::sdtm_project::SdtmVariableDescription {
+    fn from(d: SdtmProjectVariableDescription) -> Self {
+        Self {
+            lang: d.lang,
+            details: apis::sdtm_project::SdtmVariableDescriptionDetail {
+                label: d.details.label,
+            },
+        }
+    }
+}
+
+// -- requests --------------------------------------------------------------
+
+/// Deserialise a nullable field into `Option<Option<T>>` so all three
+/// states stay distinguishable over the wire:
+///
+/// - a missing key is `None` — "leave the column alone"
+/// - an explicit `null` is `Some(None)` — "clear the column"
+/// - a value is `Some(Some(v))` — "replace the column"
+///
+/// A plain `Option<Option<T>>` derive collapses the first two: serde
+/// maps `null` to `None`, so "clear" would be unreachable from a
+/// client.
+fn double_option<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSdtmProjectVersionRequest {
+    pub project_code: String,
+    pub version_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSdtmProjectVersionRequest {
+    pub version_name: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSdtmProjectDomainRequest {
+    pub version_id: i64,
+    pub domain_code: String,
+    pub key_variables: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSdtmProjectDomainRequest {
+    pub domain_code: Option<String>,
+    pub key_variables: Option<Vec<String>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSdtmProjectDomainOverrideRequest {
+    pub category: SdtmProjectDomainCategory,
+    pub descriptions: Vec<SdtmProjectDomainDescription>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSdtmProjectDomainOverrideRequest {
+    pub category: Option<SdtmProjectDomainCategory>,
+    pub descriptions: Option<Vec<SdtmProjectDomainDescription>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSdtmProjectVariableRequest {
+    pub domain_id: i64,
+    pub variable_code: String,
+    pub variable_sequence: i64,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSdtmProjectVariableRequest {
+    pub variable_code: Option<String>,
+    pub variable_sequence: Option<i64>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateSdtmProjectVariableOverrideRequest {
+    pub variable_type: SdtmProjectVariableType,
+    pub variable_core: SdtmProjectVariableCore,
+    pub variable_role: Option<SdtmProjectRole>,
+    pub descriptions: Vec<SdtmProjectVariableDescription>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateSdtmProjectVariableOverrideRequest {
+    pub variable_type: Option<SdtmProjectVariableType>,
+    pub variable_core: Option<SdtmProjectVariableCore>,
+    /// Three-state: absent = unchanged, `null` = clear, value =
+    /// replace. See [`double_option`].
+    #[serde(default, deserialize_with = "double_option")]
+    pub variable_role: Option<Option<SdtmProjectRole>>,
+    pub descriptions: Option<Vec<SdtmProjectVariableDescription>>,
+}
+
+/// Query for `GET /api/sdtm-project/versions`. The parameter is
+/// required: versions are always scoped to a project.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectVersionListQuery {
+    pub project_code: String,
+}
+
+// -- responses -------------------------------------------------------------
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectVersionViewResponse {
+    pub id: i64,
+    pub project_code: String,
+    pub version_name: String,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectDomainViewResponse {
+    pub id: i64,
+    pub version_id: i64,
+    pub domain_code: String,
+    /// The variable codes, in the order the caller supplied them.
+    pub key_variables: Vec<String>,
+    /// The domain's one override, when it has one. `override` is a
+    /// Rust keyword, so the field is spelled `override_` and renamed
+    /// on the wire.
+    #[serde(rename = "override")]
+    pub override_: Option<SdtmProjectDomainOverrideViewResponse>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectDomainOverrideViewResponse {
+    pub id: i64,
+    pub domain_id: i64,
+    pub category: SdtmProjectDomainCategory,
+    pub descriptions: Vec<SdtmProjectDomainDescription>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// The body of `GET /domains/{domain_id}/override`.
+///
+/// The override is optional, so the response is always an object with
+/// an `override` key: `null` when the domain has no override, the
+/// override itself when it has one. The key is present either way, so
+/// a client can read `body.override` without a null check on the
+/// envelope.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectDomainOverrideResponse {
+    #[serde(rename = "override")]
+    pub override_: Option<SdtmProjectDomainOverrideViewResponse>,
+}
+
+/// The body of `GET /variables/{variable_id}/override` — the variable
+/// twin of [`SdtmProjectDomainOverrideResponse`].
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectVariableOverrideResponse {
+    #[serde(rename = "override")]
+    pub override_: Option<SdtmProjectVariableOverrideViewResponse>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectVariableViewResponse {
+    pub id: i64,
+    pub domain_id: i64,
+    pub variable_code: String,
+    pub variable_sequence: i64,
+    #[serde(rename = "override")]
+    pub override_: Option<SdtmProjectVariableOverrideViewResponse>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectVariableOverrideViewResponse {
+    pub id: i64,
+    pub variable_id: i64,
+    pub variable_type: SdtmProjectVariableType,
+    pub variable_core: SdtmProjectVariableCore,
+    pub variable_role: Option<SdtmProjectRole>,
+    pub descriptions: Vec<SdtmProjectVariableDescription>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectVersionListResponse {
+    pub versions: Vec<SdtmProjectVersionViewResponse>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectDomainListResponse {
+    pub domains: Vec<SdtmProjectDomainViewResponse>,
+}
+
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectVariableListResponse {
+    pub variables: Vec<SdtmProjectVariableViewResponse>,
+}
+
+impl From<apis::sdtm_project::SdtmProjectVersionView> for SdtmProjectVersionViewResponse {
+    fn from(v: apis::sdtm_project::SdtmProjectVersionView) -> Self {
+        Self {
+            id: v.id,
+            project_code: v.project_code,
+            version_name: v.version_name,
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+impl From<apis::sdtm_project::SdtmProjectDomainView> for SdtmProjectDomainViewResponse {
+    fn from(v: apis::sdtm_project::SdtmProjectDomainView) -> Self {
+        Self {
+            id: v.id,
+            version_id: v.version_id,
+            domain_code: v.domain_code,
+            key_variables: v.key_variables,
+            override_: v.r#override.map(Into::into),
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+impl From<apis::sdtm_project::SdtmProjectDomainOverrideView>
+    for SdtmProjectDomainOverrideViewResponse
+{
+    fn from(v: apis::sdtm_project::SdtmProjectDomainOverrideView) -> Self {
+        Self {
+            id: v.id,
+            domain_id: v.domain_id,
+            category: v.category.into(),
+            descriptions: v.descriptions.into_iter().map(Into::into).collect(),
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+impl From<apis::sdtm_project::SdtmProjectVariableView> for SdtmProjectVariableViewResponse {
+    fn from(v: apis::sdtm_project::SdtmProjectVariableView) -> Self {
+        Self {
+            id: v.id,
+            domain_id: v.domain_id,
+            variable_code: v.variable_code,
+            variable_sequence: v.variable_sequence,
+            override_: v.r#override.map(Into::into),
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
+impl From<apis::sdtm_project::SdtmProjectVariableOverrideView>
+    for SdtmProjectVariableOverrideViewResponse
+{
+    fn from(v: apis::sdtm_project::SdtmProjectVariableOverrideView) -> Self {
+        Self {
+            id: v.id,
+            variable_id: v.variable_id,
+            variable_type: v.variable_type.into(),
+            variable_core: v.variable_core.into(),
+            variable_role: v.variable_role.map(Into::into),
+            descriptions: v.descriptions.into_iter().map(Into::into).collect(),
+            created_at: v.created_at,
+            updated_at: v.updated_at,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    /// The nullable `variableRole` update field must distinguish all
+    /// three states over the wire: a missing key means "leave it
+    /// alone", an explicit `null` means "clear it", and a value means
+    /// "replace it". A plain `Option<Option<T>>` derive collapses
+    /// `null` and "missing" into the same value, which makes the
+    /// clear state unreachable from a client.
+    #[test]
+    fn sdtm_project_variable_override_update_distinguishes_absent_null_and_value() {
+        let absent: UpdateSdtmProjectVariableOverrideRequest = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            absent.variable_role, None,
+            "missing key must mean 'unchanged'"
+        );
+
+        let null: UpdateSdtmProjectVariableOverrideRequest =
+            serde_json::from_str(r#"{"variableRole":null}"#).unwrap();
+        assert_eq!(
+            null.variable_role,
+            Some(None),
+            "explicit null must mean 'clear the role'"
+        );
+
+        let value: UpdateSdtmProjectVariableOverrideRequest =
+            serde_json::from_str(r#"{"variableRole":"Topic"}"#).unwrap();
+        assert_eq!(
+            value.variable_role,
+            Some(Some(SdtmProjectRole::Topic)),
+            "a value must mean 'replace the role'"
+        );
+    }
+
+    /// The `override` key is a Rust keyword, so the wire DTO spells the
+    /// field `override_` and renames it on the wire. The nested
+    /// override must appear as `"override"`, and the key variables
+    /// must keep the caller's order.
+    #[test]
+    fn sdtm_project_domain_view_serialises_the_override_and_key_order() {
+        let ts = chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let view = SdtmProjectDomainViewResponse {
+            id: 7,
+            version_id: 3,
+            domain_code: "AE".into(),
+            key_variables: vec!["AESEV".into(), "AETERM".into()],
+            override_: Some(SdtmProjectDomainOverrideViewResponse {
+                id: 1,
+                domain_id: 7,
+                category: SdtmProjectDomainCategory::Events,
+                descriptions: Vec::new(),
+                created_at: ts,
+                updated_at: ts,
+            }),
+            created_at: ts,
+            updated_at: ts,
+        };
+        let json = serde_json::to_value(&view).unwrap();
+        assert!(
+            json.get("override").is_some(),
+            "missing `override` key: {json}"
+        );
+        assert!(
+            json.get("override_").is_none(),
+            "leaked `override_` key: {json}"
+        );
+        assert_eq!(json["override"]["category"], serde_json::json!("Events"));
+        assert_eq!(json["override"]["domainId"], serde_json::json!(7));
+        // The caller's order survives the wire.
+        assert_eq!(json["keyVariables"], serde_json::json!(["AESEV", "AETERM"]));
+    }
+
+    /// The `GET …/override` envelope always carries an `override` key:
+    /// `null` when there is no override, the override when there is
+    /// one. It is never a bare `null` body.
+    #[test]
+    fn sdtm_project_override_response_wraps_the_override_in_an_override_key() {
+        let absent = SdtmProjectDomainOverrideResponse { override_: None };
+        let json = serde_json::to_value(&absent).unwrap();
+        assert_eq!(json, serde_json::json!({ "override": null }));
+
+        let ts = chrono::DateTime::parse_from_rfc3339("2026-01-02T03:04:05Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        let present = SdtmProjectDomainOverrideResponse {
+            override_: Some(SdtmProjectDomainOverrideViewResponse {
+                id: 1,
+                domain_id: 7,
+                category: SdtmProjectDomainCategory::Events,
+                descriptions: Vec::new(),
+                created_at: ts,
+                updated_at: ts,
+            }),
+        };
+        let json = serde_json::to_value(&present).unwrap();
+        assert_eq!(json["override"]["category"], serde_json::json!("Events"));
+        assert_eq!(json["override"]["domainId"], serde_json::json!(7));
+        assert!(
+            json.get("override_").is_none(),
+            "leaked `override_` key: {json}"
+        );
+
+        let absent = SdtmProjectVariableOverrideResponse { override_: None };
+        let json = serde_json::to_value(&absent).unwrap();
+        assert_eq!(json, serde_json::json!({ "override": null }));
+    }
+
     use super::*;
 
     #[test]

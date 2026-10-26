@@ -86,6 +86,12 @@ mission = { path = "../../../lib/crates/mission" }
 # CrfUsecase, and the apis::crf::CrfService adapter that the HTTP
 # layer consumes through AppState.
 crf = { path = "../../../lib/crates/crf" }
+# sdtm-project provides the per-project SDTM model tree Postgres
+# repositories, the SdtmProjectUsecase, and the
+# apis::sdtm_project::SdtmProjectService adapter that the HTTP layer
+# consumes through AppState. Project existence is checked through the
+# apis::project::ProjectService port.
+sdtm-project = { path = "../../../lib/crates/sdtm-project" }
 
 [dev-dependencies]
 # `argon2` is used by `tests/integration_auth.rs` to seed a real

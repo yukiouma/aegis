@@ -14,6 +14,7 @@ use apis::auth::AuthService;
 use apis::crf::CrfService;
 use apis::domain_model::DomainModelService;
 use apis::mission::MissionService;
+use apis::sdtm_project::SdtmProjectService;
 use apis::terminology::TerminologyService;
 use apis::user::UserService;
 use auth::{
@@ -32,6 +33,11 @@ use domain_model::{
 use mission::{
     AssigneeRepo, IssueRepo, MissionRepo, MissionServiceImpl,
     ProjectLookupImpl as MissionProjectLookupImpl, UserLookupImpl as MissionUserLookupImpl,
+};
+use sdtm_project::{
+    ProjectLookupImpl as SdtmProjectLookupImpl, SdtmProjectDomainOverrideRepoPg,
+    SdtmProjectDomainRepoPg, SdtmProjectServiceImpl, SdtmProjectUsecase, SdtmProjectUsecaseConfig,
+    SdtmProjectVariableOverrideRepoPg, SdtmProjectVariableRepoPg, SdtmProjectVersionRepoPg,
 };
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
@@ -74,6 +80,7 @@ pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send 
     let terminology = build_terminology_service(pool.clone());
     let domain_model = build_domain_model_service(pool.clone());
     let mission = build_mission_service(pool.clone(), project.clone(), user.clone());
+    let sdtm_project = build_sdtm_project_service(pool.clone(), project.clone());
     let crf = build_crf_service(pool, project.clone());
 
     // Build the client-log ingestor. Reuses the same `log_dir` as the
@@ -98,6 +105,7 @@ pub async fn run(config: Config) -> Result<(), Box<dyn std::error::Error + Send 
         domain_model,
         mission,
         crf,
+        sdtm_project,
         log_ingestor,
     };
     let app = transport::http::router(state);
@@ -264,6 +272,32 @@ fn build_crf_service(
         projects,
         Arc::new(bulk_form_repo),
     ))
+}
+
+/// Wire the sdtm-project crate's adapters into the apis
+/// `SdtmProjectService` trait object. The five Postgres repos share
+/// the same pool as the rest of the server; the project lookup is
+/// bridged off the shared `ProjectService` so the
+/// project-existence check reuses the canonical project table.
+fn build_sdtm_project_service(
+    pool: PgPool,
+    project: Arc<dyn apis::project::ProjectService>,
+) -> Arc<dyn SdtmProjectService> {
+    let version_repo = SdtmProjectVersionRepoPg::new(pool.clone());
+    let domain_repo = SdtmProjectDomainRepoPg::new(pool.clone());
+    let domain_override_repo = SdtmProjectDomainOverrideRepoPg::new(pool.clone());
+    let variable_repo = SdtmProjectVariableRepoPg::new(pool.clone());
+    let variable_override_repo = SdtmProjectVariableOverrideRepoPg::new(pool);
+    let projects = Arc::new(SdtmProjectLookupImpl::new(project));
+    let usecase = SdtmProjectUsecase::new(SdtmProjectUsecaseConfig {
+        version_repo,
+        domain_repo,
+        domain_override_repo,
+        variable_repo,
+        variable_override_repo,
+        projects,
+    });
+    Arc::new(SdtmProjectServiceImpl::new(usecase))
 }
 
 /// Wire the mission crate's adapters into the apis `MissionService`
