@@ -57,9 +57,11 @@ These are pre-existing MUI v9 migration debt and incomplete Tauri mocks. They ar
 | `lib/packages/ui/src/i18n/locales/zhCN.ts` | **Modified.** Adds the same three keys in Simplified Chinese. |
 | `lib/packages/ui/src/i18n/registry.test.ts` | **Modified.** Asserts the three new keys resolve in both locales. |
 | `apps/desktop/aegis-desktop/src/features/project-workspace/components/CrfStatusPieCard.tsx` | **New.** One CRF version's status card: fetches its forms, derives the counts, renders the pie and the legend. |
+| `apps/desktop/aegis-desktop/src/features/project-workspace/components/ContrastArcLabel.tsx` | **New.** A `pieArcLabel` slot that colours the on-arc percentage against its own fill, plus the `pickContrastText` helper it uses. |
 | `apps/desktop/aegis-desktop/src/features/project-workspace/pages/ProjectDashboardPage.tsx` | **Modified.** Fetches the CRF versions and renders the grid of cards. |
 | `apps/desktop/aegis-desktop/src/features/project-workspace/index.ts` | **Modified.** Exports `CrfStatusPieCard` from the feature barrel. |
 | `apps/desktop/aegis-desktop/src/test/features/project-workspace/crf-status-pie-card.test.tsx` | **New.** Unit tests for the card. |
+| `apps/desktop/aegis-desktop/src/test/features/project-workspace/contrast-arc-label.test.tsx` | **New.** Unit tests for `pickContrastText` against the theme's status fills. |
 | `apps/desktop/aegis-desktop/src/test/features/project-workspace/project-dashboard-page.test.tsx` | **New.** Route-level tests for the dashboard grid. |
 | `apps/desktop/aegis-desktop/src/test/features/project-workspace/project-workspace-route.test.tsx` | **Modified.** Its `mockCommands` must now also handle `list_crf_versions`. |
 
@@ -294,8 +296,10 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 **Files:**
 - Create: `apps/desktop/aegis-desktop/src/features/project-workspace/components/CrfStatusPieCard.tsx`
+- Create: `apps/desktop/aegis-desktop/src/features/project-workspace/components/ContrastArcLabel.tsx`
 - Modify: `apps/desktop/aegis-desktop/src/features/project-workspace/index.ts`
 - Test: `apps/desktop/aegis-desktop/src/test/features/project-workspace/crf-status-pie-card.test.tsx`
+- Test: `apps/desktop/aegis-desktop/src/test/features/project-workspace/contrast-arc-label.test.tsx`
 
 **Interfaces:**
 - Consumes: `useListCrfForms(versionId: number | null): UseQueryResult<CrfForm[], ApiError>` from `../../crf/data`; `PieChart` from `@aegis/ui/charts` (Task 1); `errorMessage(e: unknown): string` from `../../../shared/api/error`; the type `CrfVersion` from `../../../shared/api`; the translation keys from Task 2.
@@ -303,7 +307,12 @@ Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 - [ ] **Step 1: Invoke the `dataviz` skill before writing chart code**
 
-Invoke the `dataviz` skill via the Skill tool. Apply its guidance to the chart's colours, legend construction, and typography. Where its general recommendations conflict with the Global Constraints above (two slices only; theme-derived colours; custom legend with swatch + label + count + percentage), the constraints win and you keep the approved design.
+Invoke the `dataviz` skill via the Skill tool and follow its procedure. Its findings for this chart, measured with `scripts/validate_palette.js`:
+
+- The theme's `success` green (`#2e7d32`) and `warning` orange (`#ed6c02`) are **close under protanopia** — ΔE 5.7 light / 5.9 dark, against a target of ΔE 8. Normal vision is fine (ΔE 28.3 / 20.3).
+- `dataviz` names this form twice: `choosing-a-form.md` maps "a single ratio against a limit" to a *meter*, not "a pie of 2 slices", and `anti-patterns.md` lists a 2-slice pie as bad with a stat tile as the good alternative.
+
+Keep the pie — it is the approved form, and the measures below remove the dependency on hue — but apply every non-conflicting rule. The three colour-vision measures the implementation must carry are in the Step 4 code: on-arc percentage labels, a status icon on every legend row, and a surface-coloured gap between the arcs.
 
 - [ ] **Step 2: Write the failing test**
 
@@ -413,6 +422,17 @@ describe("CrfStatusPieCard", () => {
     expect(screen.queryByTestId("crf-status-count-approved")).not.toBeInTheDocument();
   });
 
+  it("gives every status row an icon as well as its label", async () => {
+    mockCommands({
+      list_crf_forms_by_version: () => ({ forms: [form({ approved: true })] }),
+    });
+    renderCard();
+    expect(
+      await screen.findByTestId("crf-status-icon-approved"),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("crf-status-icon-pending")).toBeInTheDocument();
+  });
+
   it("shows an error inside the card when the forms query fails", async () => {
     mockCommands({
       list_crf_forms_by_version: () => {
@@ -422,6 +442,40 @@ describe("CrfStatusPieCard", () => {
     renderCard();
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("internal_error: boom");
+  });
+});
+```
+
+Also create `apps/desktop/aegis-desktop/src/test/features/project-workspace/contrast-arc-label.test.tsx`:
+
+```tsx
+import { describe, expect, it } from "vitest";
+import { createTheme } from "@aegis/ui/mui";
+
+import { pickContrastText } from "../../../features/project-workspace/components/ContrastArcLabel";
+
+describe("pickContrastText", () => {
+  const light = createTheme({ palette: { mode: "light" } });
+  const dark = createTheme({ palette: { mode: "dark" } });
+
+  it("returns white on the light theme's success green", () => {
+    expect(pickContrastText(light.palette.success.main, light)).toBe("#fff");
+  });
+
+  it("returns black on the light theme's warning orange", () => {
+    expect(pickContrastText(light.palette.warning.main, light)).toBe("#000");
+  });
+
+  it("keeps every theme status fill legible", () => {
+    for (const theme of [light, dark]) {
+      for (const fill of [
+        theme.palette.success.main,
+        theme.palette.warning.main,
+      ]) {
+        const text = pickContrastText(fill, theme);
+        expect(["#fff", "#000"]).toContain(text);
+      }
+    }
   });
 });
 ```
@@ -436,7 +490,53 @@ Expected: FAIL — the module `features/project-workspace/components/CrfStatusPi
 
 - [ ] **Step 4: Implement the component**
 
-Create `apps/desktop/aegis-desktop/src/features/project-workspace/components/CrfStatusPieCard.tsx`:
+First create `apps/desktop/aegis-desktop/src/features/project-workspace/components/ContrastArcLabel.tsx`:
+
+```tsx
+import { getContrastRatio, useTheme, type Theme } from "@aegis/ui/mui";
+import { PieArcLabel, type PieArcLabelProps } from "@aegis/ui/charts";
+
+/**
+ * Pick the text colour with the higher WCAG contrast against
+ * `background`, choosing between pure white and pure black.
+ *
+ * `theme.palette.getContrastText` is deliberately not used here: it
+ * compares against `palette.text.primary`, which is 87% opaque black,
+ * so the alpha is dropped when the ratio is computed and the colour it
+ * returns can fall below 3:1 once it is actually composited over the
+ * fill. Pure black and pure white avoid that.
+ */
+export function pickContrastText(background: string, theme: Theme): string {
+  const { white, black } = theme.palette.common;
+  return getContrastRatio(background, white) >=
+    getContrastRatio(background, black)
+    ? white
+    : black;
+}
+
+/**
+ * A `pieArcLabel` slot that colours the label to contrast with the arc
+ * it sits on.
+ *
+ * The library's default label colour is `palette.text.primary`, which
+ * is unreadable on a saturated fill — on MUI's `success.main` green it
+ * lands at roughly 3:1. Every arc in this chart carries a percentage,
+ * so the label has to be legible against its own fill.
+ */
+export function ContrastArcLabel(props: PieArcLabelProps) {
+  const theme = useTheme();
+  const { color, ...rest } = props;
+  return (
+    <PieArcLabel
+      {...rest}
+      color={color}
+      style={{ fill: pickContrastText(color, theme) }}
+    />
+  );
+}
+```
+
+Then create `apps/desktop/aegis-desktop/src/features/project-workspace/components/CrfStatusPieCard.tsx`:
 
 ```tsx
 import {
@@ -450,14 +550,33 @@ import {
   useTheme,
 } from "@aegis/ui/mui";
 import { PieChart } from "@aegis/ui/charts";
+import {
+  PendingActions as PendingActionsIcon,
+  Verified as VerifiedIcon,
+} from "@aegis/ui/icons";
 import { useI18n } from "@aegis/ui/i18n";
 
 import { useListCrfForms } from "../../crf/data";
 import { errorMessage } from "../../../shared/api/error";
 import type { CrfVersion } from "../../../shared/api";
+import { ContrastArcLabel } from "./ContrastArcLabel";
 
 /** Height of the pie's SVG drawing area, in px. */
 const CHART_HEIGHT = 220;
+
+/**
+ * Gap between the two arcs, in degrees. At the radii this card uses
+ * (roughly 90–110 px) 2° is a ~3 px gap in the surface colour, which
+ * is what keeps the two fills from reading as a single shape.
+ */
+const ARC_PADDING_ANGLE = 2;
+
+/**
+ * Below this arc angle the on-arc percentage is dropped — a sliver has
+ * no room for it, and a label that overflows its arc is worse than no
+ * label at all. The legend carries the value either way.
+ */
+const ARC_LABEL_MIN_ANGLE = 25;
 
 interface CrfStatusPieCardProps {
   /** The CRF version whose forms this card summarises. */
@@ -475,8 +594,10 @@ interface CrfStatusPieCardProps {
  *
  * The colours come from the MUI theme (`success` / `warning`) so the
  * card matches the `CrfStatusChip` on the CRF list page and follows the
- * active theme pack. The chart's own legend is suppressed in favour of
- * a legend row that also carries the exact counts.
+ * active theme pack. Because those two fills are close under
+ * protanopia, identity is carried by text rather than by hue: every
+ * arc states its own percentage, and every legend row carries a status
+ * icon as well as its label.
  */
 export function CrfStatusPieCard({ version }: CrfStatusPieCardProps) {
   const { t } = useI18n();
@@ -494,12 +615,14 @@ export function CrfStatusPieCard({ version }: CrfStatusPieCardProps) {
       label: t("crf.toolbar.statusApproved"),
       count: approved,
       color: theme.palette.success.main,
+      icon: <VerifiedIcon fontSize="small" />,
     },
     {
       key: "pending",
       label: t("crf.toolbar.statusPending"),
       count: pending,
       color: theme.palette.warning.main,
+      icon: <PendingActionsIcon fontSize="small" />,
     },
   ];
 
@@ -529,6 +652,7 @@ export function CrfStatusPieCard({ version }: CrfStatusPieCardProps) {
             <PieChart
               height={CHART_HEIGHT}
               hideLegend
+              slots={{ pieArcLabel: ContrastArcLabel }}
               series={[
                 {
                   data: rows.map((row) => ({
@@ -537,6 +661,10 @@ export function CrfStatusPieCard({ version }: CrfStatusPieCardProps) {
                     label: row.label,
                     color: row.color,
                   })),
+                  paddingAngle: ARC_PADDING_ANGLE,
+                  arcLabel: (item) =>
+                    `${Math.round((item.value / total) * 100)}%`,
+                  arcLabelMinAngle: ARC_LABEL_MIN_ANGLE,
                 },
               ]}
             />
@@ -547,16 +675,16 @@ export function CrfStatusPieCard({ version }: CrfStatusPieCardProps) {
                   sx={{ display: "flex", alignItems: "center", gap: 1 }}
                 >
                   <Box
-                    data-testid={`crf-status-swatch-${row.key}`}
-                    sx={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: "50%",
-                      backgroundColor: row.color,
-                      flexShrink: 0,
-                    }}
-                  />
-                  <Typography variant="body2" sx={{ flexGrow: 1 }}>
+                    data-testid={`crf-status-icon-${row.key}`}
+                    sx={{ color: row.color, display: "flex" }}
+                  >
+                    {row.icon}
+                  </Box>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ flexGrow: 1 }}
+                  >
                     {row.label}
                   </Typography>
                   <Typography
@@ -587,11 +715,13 @@ export { CrfStatusPieCard } from "./components/CrfStatusPieCard";
 
 - [ ] **Step 6: Run the test to verify it passes**
 
+Note: `pnpm --filter aegis-desktop test -- <path>` does **not** filter — the extra `--` reaches vitest as a positional pattern and the whole suite runs. Use `exec` to pass the path through:
+
 ```bash
-pnpm --filter aegis-desktop test -- src/test/features/project-workspace/crf-status-pie-card.test.tsx
+pnpm --filter aegis-desktop exec vitest run src/test/features/project-workspace/crf-status-pie-card.test.tsx src/test/features/project-workspace/contrast-arc-label.test.tsx
 ```
 
-Expected: PASS — 5 tests.
+Expected: PASS — 9 tests (6 card + 3 contrast).
 
 If the test fails with `getBBox is not a function`, stop and report it: that would mean the installed `@mui/x-charts` behaves differently from the 9.16.0 that was inspected, and the fix is to pin the version rather than to add a jsdom shim.
 
@@ -606,13 +736,21 @@ Expected: PASS with no errors.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add apps/desktop/aegis-desktop/src/features/project-workspace apps/desktop/aegis-desktop/src/test/features/project-workspace/crf-status-pie-card.test.tsx
+git add apps/desktop/aegis-desktop/src/features/project-workspace apps/desktop/aegis-desktop/src/test/features/project-workspace
 git commit -m "feat(desktop): add the CRF status pie card
 
 Renders one CRF version's form-approval status as a pie chart with a
 legend row carrying the exact counts. The slices are derived from
 CrfForm.approved alone and coloured from the MUI theme, so the card
 matches the existing CrfStatusChip on the CRF list page.
+
+The chart is hardened for colour-vision deficiency. The theme's
+success/warning pair is close under protanopia, so identity is carried
+by text rather than by hue: every arc states its own percentage, every
+legend row carries a status icon as well as its label, and the two
+arcs are separated by a surface-coloured gap. The arc label colour is
+picked against its own fill, because the library's default
+palette.text.primary lands near 3:1 on the success green.
 
 Co-Authored-By: Claude Code <noreply@anthropic.com>"
 ```
@@ -860,7 +998,7 @@ mockCommands({
 - [ ] **Step 5: Run the dashboard tests to verify they pass**
 
 ```bash
-pnpm --filter aegis-desktop test -- src/test/features/project-workspace/project-dashboard-page.test.tsx
+pnpm --filter aegis-desktop exec vitest run src/test/features/project-workspace/project-dashboard-page.test.tsx
 ```
 
 Expected: PASS — 4 tests.
@@ -868,7 +1006,7 @@ Expected: PASS — 4 tests.
 - [ ] **Step 6: Run the whole project-workspace test folder**
 
 ```bash
-pnpm --filter aegis-desktop test -- src/test/features/project-workspace
+pnpm --filter aegis-desktop exec vitest run src/test/features/project-workspace
 ```
 
 Expected: every project-workspace test passes **except one pre-existing failure**: `project-workspace-route.test.tsx > /project/DEMO-001/configuration — authenticated > renders the Configuration heading with the project code`. That test fails on `main` before this change (its `mockCommands` never stubs `current_user`, so the Configuration page renders its error alert instead of its heading). It is recorded here so it is not mistaken for a regression — any *other* failure is one.

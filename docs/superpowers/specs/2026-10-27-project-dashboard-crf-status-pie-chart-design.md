@@ -70,7 +70,9 @@ The root-barrel re-export (rather than `@mui/x-charts/PieChart`) gives the futur
 ```
 apps/desktop/aegis-desktop/src/features/project-workspace/
   components/
-    CrfStatusPieCard.tsx     ← NEW
+    CrfStatusPieCard.tsx      ← NEW: the card, the pie, the legend row
+    ContrastArcLabel.tsx      ← NEW: a `pieArcLabel` slot that colours the
+                                 on-arc percentage against its own fill
   pages/
     ProjectDashboardPage.tsx  ← MODIFIED
 ```
@@ -105,17 +107,22 @@ Responsibilities, in order:
 
 ```tsx
 const theme = useTheme();
-const approvedLabel = t("crf.toolbar.statusApproved");
-const pendingLabel = t("crf.toolbar.statusPending");
 
 <PieChart
   height={220}
+  hideLegend
+  slots={{ pieArcLabel: ContrastArcLabel }}
   series={[
     {
-      data: [
-        { id: 0, value: approved, label: approvedLabel, color: theme.palette.success.main },
-        { id: 1, value: pending,  label: pendingLabel,  color: theme.palette.warning.main },
-      ],
+      data: rows.map((row) => ({
+        id: row.key,
+        value: row.count,
+        label: row.label,
+        color: row.color,
+      })),
+      paddingAngle: 2,
+      arcLabel: (item) => `${Math.round((item.value / total) * 100)}%`,
+      arcLabelMinAngle: 25,
     },
   ]}
 />
@@ -123,7 +130,21 @@ const pendingLabel = t("crf.toolbar.statusPending");
 
 - **Colours** are taken from the active MUI theme (`success.main` / `warning.main`), not hard-coded hex values, so the tile follows the app's theme mode and the theme pack. This is the same pairing `CrfStatusChip` uses, which keeps the dashboard tile and the CRF list page consistent.
 - **Labels** reuse the existing `crf.toolbar.statusApproved` / `crf.toolbar.statusPending` translation keys rather than introducing dashboard-scoped duplicates that could drift.
-- **The library's built-in legend is not used.** A custom legend row is rendered below the pie instead: a colour swatch, the label, the count, and the percentage (percentage = `Math.round((count / total) * 100)`; the two slices therefore sum to 100% except for rounding on a non-zero total). Exact counts carry more information than percentages alone on a status tile, the row remains readable without relying on colour, and it gives the tests a DOM target that does not depend on SVG arc geometry.
+- **The library's built-in legend is not used.** A custom legend row is rendered below the pie instead: a status icon, the label, the count, and the percentage (percentage = `Math.round((count / total) * 100)`; the two slices therefore sum to 100% except for rounding on a non-zero total). Exact counts carry more information than percentages alone on a status tile, the row remains readable without relying on colour, and it gives the tests a DOM target that does not depend on SVG arc geometry.
+
+#### Colour-vision hardening
+
+The `dataviz` procedure was run over this chart and its findings shaped the implementation. The theme's `success` green and `warning` orange are **close under protanopia** — measured ΔE 5.7 in light mode and 5.9 in dark mode, both below the ΔE 8 target — while normal vision is fine (ΔE 28.3 / 20.3). Two fills that a protanope cannot reliably separate are only acceptable if **identity never rests on hue**, so three measures are taken:
+
+1. **Every arc states its own percentage.** `arcLabel` renders the slice's share directly on the fill, so the reader matches a legend row to its arc by *number*, not by colour. `arcLabelMinAngle` is 25° — a sliver has no room for a label, and a label overflowing its arc is worse than none; the legend carries the value either way.
+2. **Every legend row carries a status icon** as well as its label. The icons are the same `Verified` / `PendingActions` pair `CrfStatusChip` uses, so shape distinguishes the two rows without colour. `dataviz`'s status rule is "always icon + label".
+3. **A surface-coloured gap separates the arcs.** `paddingAngle: 2` (degrees, per x-charts' API) is roughly a 3 px gap at this card's radius, which stops the two fills reading as one shape.
+
+The arc label's own colour is picked against its fill by `ContrastArcLabel`, a `pieArcLabel` slot that chooses between pure white and pure black by WCAG contrast. The library's default label colour is `palette.text.primary`, which lands near 3:1 on the success green.
+
+> `theme.palette.getContrastText` is deliberately **not** used for this: it compares against `palette.text.primary`, which is 87% opaque black, so the alpha is dropped when the ratio is computed and the colour it returns can fall below 3:1 once composited over the fill.
+
+**Form.** `dataviz` names this chart twice — `choosing-a-form.md` maps "a single ratio against a limit" to a *meter*, not "a pie of 2 slices", and `anti-patterns.md` lists "a 2-slice pie" as bad with "a stat tile" as the good alternative. A meter (or a stat tile + meter) would have no colour-vision problem at all. The pie was kept because it is the form that was asked for and approved, and because the measures above remove the dependency on hue; the alternative remains available as a drop-in replacement for this tile if the dashboard is revisited.
 
 ### `ProjectDashboardPage`
 
@@ -175,6 +196,11 @@ Cases covered:
 5. A failing `list_crf_forms_by_version` surfaces an error in that card only; the sibling card still renders its chart.
 
 Assertions target the custom legend DOM, not SVG paths.
+
+Two further test files accompany the chart:
+
+- `crf-status-pie-card.test.tsx` — the card in isolation: the version title, the Approved/Pending split, that `notSubmitted` is ignored, that each row carries its icon, the empty state, and the per-card error.
+- `contrast-arc-label.test.tsx` — `pickContrastText` against the theme's own status fills, so a theme change cannot silently make the on-arc label unreadable.
 
 ### Known risk: `getBBox` in jsdom — investigated, no action needed
 
