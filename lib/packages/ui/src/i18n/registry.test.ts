@@ -113,3 +113,21 @@ describe('bootstrap, login, and register catalogs', () => {
     ).toContain('boom');
   });
 });
+
+describe('project dashboard catalog', () => {
+  const keys = [
+    'workspace.dashboard.crfStatusTitle',
+    'workspace.dashboard.noCrfVersions',
+    'workspace.dashboard.noCrfForms',
+  ] as const;
+
+  it.each(keys)(
+    'has a non-empty en and zh-CN message for %s',
+    (key) => {
+      expect(translate('en', key)).not.toBe(key);
+      expect(translate('en', key).length).toBeGreaterThan(0);
+      expect(translate('zh-CN', key)).not.toBe(key);
+      expect(translate('zh-CN', key).length).toBeGreaterThan(0);
+    },
+  );
+});
