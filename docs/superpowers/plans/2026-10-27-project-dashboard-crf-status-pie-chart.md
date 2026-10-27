@@ -26,6 +26,25 @@ These apply to every task. They encode decisions that have already been approved
 - Cross-feature imports go through a sibling feature's `data` barrel (`../../crf/data`), never a nested path into a sibling feature's files.
 - Frontend only. No Rust, no server, no change to `apps/desktop/aegis-desktop/src/shared/api/types.ts`.
 - The `dataviz` skill must be invoked before writing the chart rendering code in Task 3. Where its general advice conflicts with the constraints above, the constraints win — they encode decisions that have already been approved.
+- The `aegis-desktop` test suite has **14 pre-existing failures on `main`**, recorded below. They are out of scope. The failure count must not rise above 14, and no new failing file may appear.
+
+## Baseline
+
+Measured on `feat/desktop_project-dashboard` at `49082f6`, which has **zero code changes relative to `main`** (only the two docs commits). `pnpm --filter @aegis/ui test` is fully green: 100/100 passing.
+
+`pnpm --filter aegis-desktop test` reports **14 failed / 669 passed across 7 files**:
+
+| Count | File | Root cause |
+|---|---|---|
+| 3 | `src/test/features/project-list/project-filter-bar.test.tsx` | `getByLabelText(/search/i)` fails — the component renders a `placeholder`, not a `label` (MUI v9 upgrade regression) |
+| 6 | `src/test/features/project-list/project-list-page.test.tsx` | Same `/search/i` label regression |
+| 1 | `src/test/features/crf/crf-form-list-page.test.tsx` | `getByRole("heading", { name: /CRF Form List/i })` not found |
+| 1 | `src/test/features/crf/crf-form-table.test.tsx` | QC chip `variant=outlined` border assertion |
+| 1 | `src/test/features/metadata/metadata-page.test.tsx` | `aria-disabled="true"` expected, `null` received (MUI v9) |
+| 1 | `src/test/features/project-list/project-drawer.test.tsx` | Test timed out after 5000 ms |
+| 1 | `src/test/features/project-workspace/project-workspace-route.test.tsx` | `unexpected tauri command: current_user` — the file's `mockCommands` never stubs `current_user`, so the Configuration page renders its error alert instead of its heading |
+
+These are pre-existing MUI v9 migration debt and incomplete Tauri mocks. They are **not** part of this feature's scope. Note that `project-workspace-route.test.tsx` is one of the files this plan edits (Task 4), so its pre-existing configuration failure will still be present after the change — it must not be mistaken for a regression.
 
 ## File Structure
 
@@ -842,7 +861,7 @@ Expected: PASS — 4 tests.
 pnpm --filter aegis-desktop test -- src/test/features/project-workspace
 ```
 
-Expected: PASS — all project-workspace tests, including the pre-existing route, layout, and configuration-page tests.
+Expected: every project-workspace test passes **except one pre-existing failure**: `project-workspace-route.test.tsx > /project/DEMO-001/configuration — authenticated > renders the Configuration heading with the project code`. That test fails on `main` before this change (its `mockCommands` never stubs `current_user`, so the Configuration page renders its error alert instead of its heading). It is recorded here so it is not mistaken for a regression — any *other* failure is one.
 
 - [ ] **Step 7: Run the full desktop test suite and typecheck**
 
@@ -851,7 +870,7 @@ pnpm --filter aegis-desktop test
 pnpm --filter aegis-desktop typecheck
 ```
 
-Expected: PASS with no failures and no type errors.
+Expected: typecheck passes with no errors. The test suite reports the **same 14 pre-existing failures** recorded in the baseline (9 in `project-filter-bar` / `project-list-page`, 3 in `crf-form-list-page` / `crf-form-table` / `metadata-page`, 1 in `project-drawer`, 1 in `project-workspace-route`) — all of which fail on `main` before this change. The failure count must not rise above 14, and no new failing file may appear.
 
 - [ ] **Step 8: Run the full verification gate**
 
