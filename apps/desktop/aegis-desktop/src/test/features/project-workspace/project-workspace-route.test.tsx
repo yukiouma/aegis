@@ -39,7 +39,10 @@ function renderRoot(initialEntries: string[]) {
 
 describe("/project/DEMO-001/dashboard — authenticated", () => {
   beforeEach(() => {
-    mockCommands({ is_logged_in: () => true });
+    mockCommands({
+      is_logged_in: () => true,
+      list_crf_versions: () => ({ versions: [] }),
+    });
   });
 
   it("renders the sidebar with the project code as title", async () => {
@@ -67,7 +70,10 @@ describe("/project/DEMO-001/dashboard — authenticated", () => {
 
 describe("/project/DEMO-001/configuration — authenticated", () => {
   beforeEach(() => {
-    mockCommands({ is_logged_in: () => true });
+    mockCommands({
+      is_logged_in: () => true,
+      list_crf_versions: () => ({ versions: [] }),
+    });
   });
 
   it("renders the Configuration heading with the project code", async () => {
@@ -82,7 +88,10 @@ describe("/project/DEMO-001/configuration — authenticated", () => {
 
 describe("/project/DEMO-001 — authenticated redirect", () => {
   beforeEach(() => {
-    mockCommands({ is_logged_in: () => true });
+    mockCommands({
+      is_logged_in: () => true,
+      list_crf_versions: () => ({ versions: [] }),
+    });
   });
 
   it("redirects bare /project/<code> to /project/<code>/dashboard", async () => {
