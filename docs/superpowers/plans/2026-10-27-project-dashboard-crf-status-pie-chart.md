@@ -161,15 +161,25 @@ Expected: PASS with no errors.
 
 - [ ] **Step 8: Verify there is only one MUI instance**
 
+The lockfile has two sections — `packages:` (one entry per version) and `snapshots:` (one entry per resolved peer-context instance). A duplicated MUI instance shows up as a **second snapshot**, so the count must be scoped to the `snapshots:` section:
+
 ```bash
-grep -c "^  '@mui/material@" pnpm-lock.yaml
-grep -c "^  '@mui/system@" pnpm-lock.yaml
-grep -n "^  '@mui/x-charts@" pnpm-lock.yaml
+awk '/^snapshots:$/{f=1} f' pnpm-lock.yaml > /tmp/snap.txt
+for p in '@mui/material@' '@mui/system@' '@mui/x-charts@'; do
+  echo "$p -> $(grep -c "^  '$p" /tmp/snap.txt)"
+done
 ```
 
-Expected: the first two commands each print `1`, and the third prints exactly one line for `@mui/x-charts@9.16.0`.
+Expected: each of the three prints `1`.
 
-If either count is greater than `1`, pnpm resolved a second MUI copy. Stop, revert the lockfile change (`git checkout -- pnpm-lock.yaml`), and re-run Step 1 with an explicit `--config.auto-install-peers=true` so the peers resolve to the versions already in the tree.
+Also confirm the desktop app still has no MUI of its own — MUI must remain owned by `@aegis/ui`:
+
+```bash
+ls apps/desktop/aegis-desktop/node_modules/@mui   # must report "No such file or directory"
+ls lib/packages/ui/node_modules/@mui             # must list icons-material@, material@, x-charts@
+```
+
+If any snapshot count is greater than `1`, pnpm resolved a second MUI copy. Stop, revert the lockfile change (`git checkout -- pnpm-lock.yaml`), and re-run Step 1 with an explicit `--config.auto-install-peers=true` so the peers resolve to the versions already in the tree.
 
 - [ ] **Step 9: Commit**
 
