@@ -1020,6 +1020,8 @@ pnpm --filter aegis-desktop typecheck
 
 Expected: typecheck passes with no errors. The test suite reports the **same 14 pre-existing failures** recorded in the baseline (9 in `project-filter-bar` / `project-list-page`, 3 in `crf-form-list-page` / `crf-form-table` / `metadata-page`, 1 in `project-drawer`, 1 in `project-workspace-route`) — all of which fail on `main` before this change. The failure count must not rise above 14, and no new failing file may appear.
 
+**Measured result:** 13 failed / 683 passed across 78 files (baseline: 14 failed / 669 passed across 75 files). The three new test files add 13 tests, all green. The count is one *lower* than the baseline because `project-drawer`'s 5000 ms timeout is flaky and did not reproduce on this run; every remaining failure is a baseline failure, and **no new failing file appeared**.
+
 - [ ] **Step 8: Run the full verification gate**
 
 ```bash
