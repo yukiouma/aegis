@@ -176,11 +176,13 @@ Cases covered:
 
 Assertions target the custom legend DOM, not SVG paths.
 
-### Known risk: `getBBox` in jsdom
+### Known risk: `getBBox` in jsdom — investigated, no action needed
 
-MUI X charts measure text with `SVGElement.getBBox`, which jsdom does not implement; the chart commonly throws `getBBox is not a function` during render. The mitigation is a `getBBox` shim on `SVGElement.prototype` returning a zero-sized `DOMRect`, added to `apps/desktop/aegis-desktop/src/test/helpers/Setup.ts` next to the existing `ResizeObserver` / `IntersectionObserver` / `PointerEvent` shims.
+MUI X charts measure text with `SVGElement.getBBox`, which jsdom does not implement, and the chart is widely reported to throw `getBBox is not a function` during render.
 
-This symptom is to be confirmed against the installed library rather than assumed: if the chart renders cleanly in jsdom without the shim, the shim is not added. Either way the assertions are written against our own legend markup, so they hold regardless of whether arcs render.
+**This was investigated against the installed `@mui/x-charts@9.16.0` and the risk does not materialise.** The library guards the call: `internals/domUtils.js` wraps `element.getBBox()` in a try/catch that falls back to `element.getBoundingClientRect()` (which jsdom implements, returning zeros), and `getStringSize` wraps the whole measurement in an outer try/catch that returns `{ width: 0, height: 0 }` on failure. The library is additionally test-aware (`process.env.NODE_ENV === 'test'` clears the measurement container after each measurement).
+
+No `getBBox` shim is therefore added to `apps/desktop/aegis-desktop/src/test/helpers/Setup.ts` — the existing `ResizeObserver` / `IntersectionObserver` / `PointerEvent` shims are sufficient. The assertions are written against our own legend markup, so they hold regardless of whether the arcs render (in jsdom the chart's width resolves to 0, so no arcs are drawn).
 
 ## Out of scope
 
