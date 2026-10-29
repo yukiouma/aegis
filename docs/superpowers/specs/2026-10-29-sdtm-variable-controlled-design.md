@@ -295,9 +295,20 @@ is a crash rather than a type mismatch:
   no `Json` extractor rejection handler, so a body whose
   `variableControlled` is a string is refused by axum with its default
   `422 Unprocessable Entity` and a plain-text body — not the typed
-  `ErrorBody { code, message }` the desktop's error mapper expects. The
-  desktop's error handling for this case is untested territory in the
-  follow-up.
+  `ErrorBody { code, message }` the desktop's error mapper expects.
+
+  This is **server-side debt, not desktop-side**. `CLAUDE.md` states the
+  invariant plainly — "Errors are always rendered as a typed
+  `ErrorBody { code, message }` so the desktop client can dispatch on
+  the stable `code`" — and the server does not honour it for extractor
+  rejections on any endpoint. The desktop cannot fix this from its
+  side: it cannot parse an error body that is not the documented shape.
+  The fix is a `Json` rejection handler mapping `JsonRejection` to
+  `ErrorBody` with a stable code, and it belongs in a change of its
+  own — it is a server-wide error-contract change, not a detail of
+  this type migration. Until then, a client that sends the legacy
+  string sees a plain-text 422 and cannot distinguish "your body is
+  malformed" from "the server is broken".
 
 This skew is intentional and temporary: the desktop is updated in the
 follow-up change that adopts the new wire contract. The follow-up

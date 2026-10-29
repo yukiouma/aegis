@@ -1415,9 +1415,17 @@ pub struct CreateSdtmVariableRequest {
     pub descriptions: Vec<SdtmVariableDescription>,
 }
 
-/// `PUT /api/domain-model/variables/{id}` body. Nullable fields use
-/// `Option<Option<T>>` so the caller can distinguish "absent" from
-/// "present and null" — see the spec's three-state semantics.
+/// `PUT /api/domain-model/variables/{id}` body.
+///
+/// The nullable fields are typed `Option<Option<T>>` so the *Rust*
+/// value distinguishes three states, but a plain derive collapses
+/// two of them on the wire: serde maps an explicit `null` to the
+/// outer `None`. So over HTTP both an absent key and an explicit
+/// `null` mean "don't change", and "clear the field" is currently
+/// unreachable from a client. The repo's `double_option` deserializer
+/// (used by the sdtm-project DTOs) is the remedy; adopting it here
+/// would also change `variable_role` on this DTO, so it is a
+/// deliberate follow-up rather than a detail of this type change.
 #[derive(Debug, Default, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSdtmVariableRequest {
