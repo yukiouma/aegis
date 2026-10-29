@@ -1206,6 +1206,34 @@ impl From<SdtmVariableDescription> for apis::domain_model::SdtmVariableDescripti
     }
 }
 
+/// Wire projection of [`apis::domain_model::SdtmVariableControlled`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmVariableControlled {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<Vec<String>>,
+}
+
+impl From<apis::domain_model::SdtmVariableControlled> for SdtmVariableControlled {
+    fn from(v: apis::domain_model::SdtmVariableControlled) -> Self {
+        Self {
+            code: v.code,
+            format: v.format,
+        }
+    }
+}
+
+impl From<SdtmVariableControlled> for apis::domain_model::SdtmVariableControlled {
+    fn from(v: SdtmVariableControlled) -> Self {
+        Self {
+            code: v.code,
+            format: v.format,
+        }
+    }
+}
+
 /// Wire projection of [`apis::domain_model::SdtmVersionView`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -1261,7 +1289,7 @@ pub struct SdtmVariableViewResponse {
     pub id: i64,
     pub domain_id: i64,
     pub name: String,
-    pub variable_controlled: Option<String>,
+    pub variable_controlled: Option<SdtmVariableControlled>,
     pub variable_type: SdtmVariableType,
     pub variable_core: SdtmVariableCore,
     pub variable_role: Option<SdtmRole>,
@@ -1277,7 +1305,7 @@ impl From<apis::domain_model::SdtmVariableView> for SdtmVariableViewResponse {
             id: v.id,
             domain_id: v.domain_id,
             name: v.name,
-            variable_controlled: v.variable_controlled,
+            variable_controlled: v.variable_controlled.map(Into::into),
             variable_type: v.variable_type.into(),
             variable_core: v.variable_core.into(),
             variable_role: v.variable_role.map(Into::into),
@@ -1379,7 +1407,7 @@ pub struct UpdateSdtmDomainRequest {
 pub struct CreateSdtmVariableRequest {
     pub domain_id: i64,
     pub name: String,
-    pub variable_controlled: Option<String>,
+    pub variable_controlled: Option<SdtmVariableControlled>,
     pub variable_type: SdtmVariableType,
     pub variable_core: SdtmVariableCore,
     pub variable_role: Option<SdtmRole>,
@@ -1394,7 +1422,7 @@ pub struct CreateSdtmVariableRequest {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSdtmVariableRequest {
     pub name: Option<String>,
-    pub variable_controlled: Option<Option<String>>,
+    pub variable_controlled: Option<Option<SdtmVariableControlled>>,
     pub variable_type: Option<SdtmVariableType>,
     pub variable_core: Option<SdtmVariableCore>,
     pub variable_role: Option<Option<SdtmRole>>,
@@ -1430,7 +1458,7 @@ impl From<CreateSdtmVariableRequest> for apis::domain_model::CreateSdtmVariableR
         Self {
             domain_id: r.domain_id,
             name: r.name,
-            variable_controlled: r.variable_controlled,
+            variable_controlled: r.variable_controlled.map(Into::into),
             variable_type: r.variable_type.into(),
             variable_core: r.variable_core.into(),
             variable_role: r.variable_role.map(Into::into),
@@ -3919,5 +3947,53 @@ mod tests {
         let r: IssueListResponse = serde_json::from_str(json).unwrap();
         assert!(r.issues.is_empty());
         assert_eq!(serde_json::to_string(&r).unwrap(), json);
+    }
+
+    /// The server accepts only the structured shape for
+    /// `variableControlled`. The retired string shape must be a
+    /// deserialization error rather than a silently coerced value.
+    #[test]
+    fn sdtm_variable_controlled_rejects_the_legacy_string_shape() {
+        let legacy = r#"{"domainId":1,"name":"AESEV","variableControlled":"C66731","variableType":"Character","variableCore":"Req","variableSequence":1,"descriptions":[]}"#;
+        let err = serde_json::from_str::<CreateSdtmVariableRequest>(legacy);
+        assert!(
+            err.is_err(),
+            "the legacy string shape must not deserialize into the object type"
+        );
+    }
+
+    /// The structured shape deserializes, and both lists are optional.
+    #[test]
+    fn sdtm_variable_controlled_accepts_the_object_shape() {
+        let body = r#"{"domainId":1,"name":"AESEV","variableControlled":{"code":["C66731"]},"variableType":"Character","variableCore":"Req","variableSequence":1,"descriptions":[]}"#;
+        let req: CreateSdtmVariableRequest = serde_json::from_str(body).unwrap();
+        assert_eq!(
+            req.variable_controlled,
+            Some(SdtmVariableControlled {
+                code: Some(vec!["C66731".into()]),
+                format: None,
+            })
+        );
+    }
+
+    /// Over HTTP, an explicit `null` on the update field means "leave
+    /// the column alone", not "clear it". A plain `Option<Option<T>>`
+    /// derive maps `null` to the outer `None`, so the "clear" state is
+    /// unreachable from a client. This is pre-existing behaviour that
+    /// this change preserves — the repo's `double_option` helper is the
+    /// remedy, and adopting it here would be a separate decision
+    /// (it would change behaviour rather than preserve it, and would
+    /// raise the same question for `variable_role` on this DTO).
+    #[test]
+    fn sdtm_variable_update_null_means_unchanged_not_cleared() {
+        let null: UpdateSdtmVariableRequest =
+            serde_json::from_str(r#"{"variableControlled":null}"#).unwrap();
+        assert_eq!(
+            null.variable_controlled, None,
+            "an explicit null must mean 'unchanged', as it does today"
+        );
+
+        let absent: UpdateSdtmVariableRequest = serde_json::from_str("{}").unwrap();
+        assert_eq!(absent.variable_controlled, None);
     }
 }

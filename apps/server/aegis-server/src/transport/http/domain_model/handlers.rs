@@ -376,7 +376,7 @@ pub async fn update_variable(
         .update_variable(apis::domain_model::UpdateSdtmVariableRequest {
             id,
             name: req.name,
-            variable_controlled: req.variable_controlled,
+            variable_controlled: req.variable_controlled.map(|inner| inner.map(Into::into)),
             variable_type: req.variable_type.map(Into::into),
             variable_core: req.variable_core.map(Into::into),
             variable_role: req.variable_role.map(|inner| inner.map(Into::into)),
