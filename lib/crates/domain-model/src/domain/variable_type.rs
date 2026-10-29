@@ -119,3 +119,17 @@ impl TryFrom<&str> for SdtmRole {
         }
     }
 }
+
+/// Controlled-terminology metadata attached to an SDTM variable.
+///
+/// Carried on the `SdtmVariable` aggregate and persisted as a single
+/// JSONB column on `sdtm_variables`. Both lists are optional and are
+/// omitted from the JSON when unset, so the stored shape is e.g.
+/// `{"code": ["C66731"]}`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SdtmVariableControlled {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<Vec<String>>,
+}

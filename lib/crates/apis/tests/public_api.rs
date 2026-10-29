@@ -474,3 +474,63 @@ fn sdtm_project_service_is_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<Box<dyn SdtmProjectService>>();
 }
+
+// ---- domain_model --------------------------------------------------------
+
+use apis::domain_model::{
+    CreateSdtmVariableRequest, SdtmVariableControlled, SdtmVariableView, UpdateSdtmVariableRequest,
+};
+
+/// Every public type in `apis::domain_model` is nameable from the test.
+#[test]
+fn domain_model_public_types_are_nameable() {
+    fn assert_controlled(_: SdtmVariableControlled) {}
+    fn assert_view(_: SdtmVariableView) {}
+    fn assert_create(_: CreateSdtmVariableRequest) {}
+    fn assert_update(_: UpdateSdtmVariableRequest) {}
+
+    assert_controlled(SdtmVariableControlled {
+        code: Some(vec!["C66731".into()]),
+        format: None,
+    });
+    assert_view(SdtmVariableView {
+        id: 1,
+        domain_id: 2,
+        name: "AESEV".into(),
+        variable_controlled: Some(SdtmVariableControlled {
+            code: Some(vec!["C66731".into()]),
+            format: Some(vec!["Codelist".into()]),
+        }),
+        variable_type: apis::domain_model::SdtmVariableType::Character,
+        variable_core: apis::domain_model::SdtmVariableCore::Req,
+        variable_role: Some(apis::domain_model::SdtmRole::Topic),
+        variable_sequence: 11,
+        descriptions: vec![],
+        created_at: chrono::DateTime::from_timestamp(0, 0).unwrap(),
+        updated_at: chrono::DateTime::from_timestamp(0, 0).unwrap(),
+    });
+    assert_create(CreateSdtmVariableRequest {
+        domain_id: 2,
+        name: "AESEV".into(),
+        variable_controlled: None,
+        variable_type: apis::domain_model::SdtmVariableType::Character,
+        variable_core: apis::domain_model::SdtmVariableCore::Req,
+        variable_role: None,
+        variable_sequence: 11,
+        descriptions: vec![],
+    });
+    assert_update(UpdateSdtmVariableRequest::default());
+}
+
+/// The wire shape of the controlled-terminology value omits the lists
+/// that are not set, so a client sees `{"code": [...]}` rather than
+/// `{"code": [...], "format": null}`.
+#[test]
+fn domain_model_variable_controlled_serialises_only_the_lists_that_are_set() {
+    let vc = SdtmVariableControlled {
+        code: Some(vec!["C66731".into()]),
+        format: None,
+    };
+    let json = serde_json::to_value(&vc).unwrap();
+    assert_eq!(json, serde_json::json!({ "code": ["C66731"] }));
+}

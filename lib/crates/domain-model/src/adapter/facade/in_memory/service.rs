@@ -15,8 +15,8 @@ use apis::domain_model::{
     DomainCategory as ApiCategory, DomainModelApiError, DomainModelService,
     SdtmDomainDescription as ApiSdtmDomainDescription,
     SdtmDomainDescriptionDetail as ApiSdtmDomainDescriptionDetail, SdtmDomainList, SdtmDomainView,
-    SdtmRole as ApiSdtmRole, SdtmVariableCore as ApiSdtmVariableCore,
-    SdtmVariableDescription as ApiSdtmVariableDescription,
+    SdtmRole as ApiSdtmRole, SdtmVariableControlled as ApiSdtmVariableControlled,
+    SdtmVariableCore as ApiSdtmVariableCore, SdtmVariableDescription as ApiSdtmVariableDescription,
     SdtmVariableDescriptionDetail as ApiSdtmVariableDescriptionDetail, SdtmVariableList,
     SdtmVariableType as ApiSdtmVariableType, SdtmVariableView, SdtmVersionList, SdtmVersionView,
     UpdateSdtmDomainRequest, UpdateSdtmVariableRequest, UpdateSdtmVersionRequest,
@@ -24,8 +24,9 @@ use apis::domain_model::{
 
 use crate::domain::{
     DomainCategory, DomainError, SdtmDomainDescription, SdtmDomainDescriptionDetail,
-    SdtmDomainRepository, SdtmRole, SdtmVariableCore, SdtmVariableDescription,
-    SdtmVariableDescriptionDetail, SdtmVariableRepository, SdtmVariableType, SdtmVersionRepository,
+    SdtmDomainRepository, SdtmRole, SdtmVariableControlled, SdtmVariableCore,
+    SdtmVariableDescription, SdtmVariableDescriptionDetail, SdtmVariableRepository,
+    SdtmVariableType, SdtmVersionRepository,
 };
 use crate::usecase::{
     CreateSdtmDomain, CreateSdtmVariable, CreateSdtmVersion, DomainModelUsecase,
@@ -213,6 +214,20 @@ fn variable_descriptions_to_api(
         .collect()
 }
 
+fn variable_controlled_from_api(v: ApiSdtmVariableControlled) -> SdtmVariableControlled {
+    SdtmVariableControlled {
+        code: v.code,
+        format: v.format,
+    }
+}
+
+fn variable_controlled_to_api(v: SdtmVariableControlled) -> ApiSdtmVariableControlled {
+    ApiSdtmVariableControlled {
+        code: v.code,
+        format: v.format,
+    }
+}
+
 // ---- view mappers ----
 
 fn version_view_from_internal(view: InternalSdtmVersionView) -> SdtmVersionView {
@@ -241,7 +256,7 @@ fn variable_view_from_internal(view: InternalSdtmVariableView) -> SdtmVariableVi
         id: view.id,
         domain_id: view.domain_id,
         name: view.name,
-        variable_controlled: view.variable_controlled,
+        variable_controlled: view.variable_controlled.map(variable_controlled_to_api),
         variable_type: from_internal_variable_type(view.variable_type),
         variable_core: from_internal_variable_core(view.variable_core),
         variable_role: view.variable_role.map(from_internal_role),
@@ -403,7 +418,7 @@ where
         let cmd = CreateSdtmVariable {
             domain_id: req.domain_id,
             name: req.name,
-            variable_controlled: req.variable_controlled,
+            variable_controlled: req.variable_controlled.map(variable_controlled_from_api),
             variable_type: to_internal_variable_type(req.variable_type),
             variable_core: to_internal_variable_core(req.variable_core),
             variable_role: req.variable_role.map(to_internal_role),
@@ -436,7 +451,9 @@ where
         let cmd = UpdateSdtmVariable {
             id: req.id,
             name: req.name,
-            variable_controlled: req.variable_controlled,
+            variable_controlled: req
+                .variable_controlled
+                .map(|inner| inner.map(variable_controlled_from_api)),
             variable_type: req.variable_type.map(to_internal_variable_type),
             variable_core: req.variable_core.map(to_internal_variable_core),
             variable_role: req.variable_role.map(|opt| opt.map(to_internal_role)),

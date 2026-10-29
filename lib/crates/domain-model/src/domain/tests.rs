@@ -1,6 +1,6 @@
 use super::{
     DomainCategory, DomainError, SdtmDomain, SdtmDomainDescription, SdtmDomainDescriptionDetail,
-    SdtmRole, SdtmVariable, SdtmVariableCore, SdtmVariableDescription,
+    SdtmRole, SdtmVariable, SdtmVariableControlled, SdtmVariableCore, SdtmVariableDescription,
     SdtmVariableDescriptionDetail, SdtmVariableType, SdtmVersion,
 };
 
@@ -163,4 +163,59 @@ fn sdtm_variable_new_accepts_valid_input() {
     .unwrap();
     assert_eq!(v.name, "AETERM");
     assert_eq!(v.variable_sequence, 11);
+}
+
+// ---- SdtmVariableControlled -----------------------------------------------
+
+#[test]
+fn variable_controlled_serializes_only_the_lists_that_are_set() {
+    let vc = SdtmVariableControlled {
+        code: Some(vec!["C66731".into()]),
+        format: None,
+    };
+    let json = serde_json::to_value(&vc).unwrap();
+    assert_eq!(json, serde_json::json!({ "code": ["C66731"] }));
+}
+
+#[test]
+fn variable_controlled_reads_absent_lists_as_none() {
+    let vc: SdtmVariableControlled = serde_json::from_value(serde_json::json!({})).unwrap();
+    assert_eq!(vc.code, None);
+    assert_eq!(vc.format, None);
+}
+
+#[test]
+fn variable_controlled_reads_explicit_null_lists_as_none() {
+    let vc: SdtmVariableControlled =
+        serde_json::from_value(serde_json::json!({ "code": null })).unwrap();
+    assert_eq!(vc.code, None);
+    assert_eq!(vc.format, None);
+}
+
+#[test]
+fn variable_controlled_round_trips_both_lists() {
+    let vc = SdtmVariableControlled {
+        code: Some(vec!["C66731".into()]),
+        format: Some(vec!["Codelist".into()]),
+    };
+    let json = serde_json::to_value(&vc).unwrap();
+    assert_eq!(
+        json,
+        serde_json::json!({ "code": ["C66731"], "format": ["Codelist"] })
+    );
+    let back: SdtmVariableControlled = serde_json::from_value(json).unwrap();
+    assert_eq!(back, vc);
+}
+
+#[test]
+fn variable_controlled_keeps_present_but_empty_lists() {
+    let vc = SdtmVariableControlled {
+        code: Some(vec![]),
+        format: None,
+    };
+    let json = serde_json::to_value(&vc).unwrap();
+    assert_eq!(json, serde_json::json!({ "code": [] }));
+    let back: SdtmVariableControlled = serde_json::from_value(json).unwrap();
+    assert_eq!(back.code, Some(vec![]));
+    assert_eq!(back.format, None);
 }

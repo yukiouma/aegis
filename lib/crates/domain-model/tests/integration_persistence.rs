@@ -17,10 +17,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use domain_model::{
     DomainCategory, DomainError, DomainModelUsecase, DomainModelUsecaseConfig, SdtmDomain,
     SdtmDomainDescription, SdtmDomainDescriptionDetail, SdtmDomainNew, SdtmDomainRepoPg,
-    SdtmDomainRepository, SdtmDomainUpdate, SdtmRole, SdtmVariableCore, SdtmVariableDescription,
-    SdtmVariableDescriptionDetail, SdtmVariableNew, SdtmVariableRepoPg, SdtmVariableRepository,
-    SdtmVariableType, SdtmVariableUpdate, SdtmVersion, SdtmVersionNew, SdtmVersionRepoPg,
-    SdtmVersionRepository, SdtmVersionUpdate,
+    SdtmDomainRepository, SdtmDomainUpdate, SdtmRole, SdtmVariableControlled, SdtmVariableCore,
+    SdtmVariableDescription, SdtmVariableDescriptionDetail, SdtmVariableNew, SdtmVariableRepoPg,
+    SdtmVariableRepository, SdtmVariableType, SdtmVariableUpdate, SdtmVersion, SdtmVersionNew,
+    SdtmVersionRepoPg, SdtmVersionRepository, SdtmVersionUpdate,
 };
 use sqlx::PgPool;
 
@@ -375,6 +375,67 @@ async fn domain_delete_cascades_to_variables() {
 
 // ---- SdtmVariable ------------------------------------------------------
 
+/// A list that is present but empty must survive the JSONB round-trip
+/// as *present* — `Some(vec![])` and "absent" are different values,
+/// and the column must not collapse one into the other.
+#[tokio::test]
+#[ignore = "requires AEGIS_DOMAIN_MODEL_DATABASE_URL"]
+async fn variable_with_present_but_empty_code_list_round_trips_as_present() {
+    with_pool(|pool| async move {
+        let v_repo = SdtmVersionRepoPg::new(pool.clone());
+        let d_repo = SdtmDomainRepoPg::new(pool.clone());
+        let va_repo = SdtmVariableRepoPg::new(pool);
+
+        let v = v_repo
+            .create(SdtmVersionNew { name: unique("v") })
+            .await
+            .unwrap();
+        let d = d_repo
+            .create(SdtmDomainNew {
+                version_id: v.id,
+                name: unique("AE"),
+                category: DomainCategory::Events,
+                descriptions: vec![],
+            })
+            .await
+            .unwrap();
+
+        let var = va_repo
+            .create(SdtmVariableNew {
+                domain_id: d.id,
+                name: unique("AETERM"),
+                variable_controlled: Some(SdtmVariableControlled {
+                    code: Some(vec![]),
+                    format: None,
+                }),
+                variable_type: SdtmVariableType::Character,
+                variable_core: SdtmVariableCore::Req,
+                variable_role: Some(SdtmRole::Topic),
+                variable_sequence: 1,
+                descriptions: vec![],
+            })
+            .await
+            .expect("variable create");
+        assert_eq!(
+            var.variable_controlled,
+            Some(SdtmVariableControlled {
+                code: Some(vec![]),
+                format: None,
+            })
+        );
+
+        let fetched = va_repo.find_by_id(var.id).await.unwrap();
+        assert_eq!(
+            fetched.variable_controlled,
+            Some(SdtmVariableControlled {
+                code: Some(vec![]),
+                format: None,
+            })
+        );
+    })
+    .await
+}
+
 #[tokio::test]
 #[ignore = "requires AEGIS_DOMAIN_MODEL_DATABASE_URL"]
 async fn variable_create_then_list_round_trips_with_descriptions() {
@@ -408,7 +469,10 @@ async fn variable_create_then_list_round_trips_with_descriptions() {
             .create(SdtmVariableNew {
                 domain_id: d.id,
                 name: unique("AETERM"),
-                variable_controlled: Some("AETERM".into()),
+                variable_controlled: Some(SdtmVariableControlled {
+                    code: Some(vec!["AETERM".into()]),
+                    format: None,
+                }),
                 variable_type: SdtmVariableType::Character,
                 variable_core: SdtmVariableCore::Req,
                 variable_role: Some(SdtmRole::Topic),
@@ -417,7 +481,13 @@ async fn variable_create_then_list_round_trips_with_descriptions() {
             })
             .await
             .expect("variable create");
-        assert_eq!(var.variable_controlled.as_deref(), Some("AETERM"));
+        assert_eq!(
+            var.variable_controlled,
+            Some(SdtmVariableControlled {
+                code: Some(vec!["AETERM".into()]),
+                format: None,
+            })
+        );
         assert_eq!(var.descriptions.len(), 1);
         assert_eq!(var.descriptions[0].details.label, "Reported Term");
 
@@ -453,7 +523,10 @@ async fn variable_three_state_update_does_not_change_when_outer_none() {
             .create(SdtmVariableNew {
                 domain_id: d.id,
                 name: unique("AETERM"),
-                variable_controlled: Some("AETERM".into()),
+                variable_controlled: Some(SdtmVariableControlled {
+                    code: Some(vec!["AETERM".into()]),
+                    format: None,
+                }),
                 variable_type: SdtmVariableType::Character,
                 variable_core: SdtmVariableCore::Req,
                 variable_role: Some(SdtmRole::Topic),
@@ -476,7 +549,13 @@ async fn variable_three_state_update_does_not_change_when_outer_none() {
             })
             .await
             .expect("noop update");
-        assert_eq!(updated.variable_controlled.as_deref(), Some("AETERM"));
+        assert_eq!(
+            updated.variable_controlled,
+            Some(SdtmVariableControlled {
+                code: Some(vec!["AETERM".into()]),
+                format: None,
+            })
+        );
         assert_eq!(updated.variable_role, Some(SdtmRole::Topic));
     })
     .await
@@ -507,7 +586,10 @@ async fn variable_three_state_update_replaces_when_outer_some_inner_some() {
             .create(SdtmVariableNew {
                 domain_id: d.id,
                 name: unique("AETERM"),
-                variable_controlled: Some("AETERM".into()),
+                variable_controlled: Some(SdtmVariableControlled {
+                    code: Some(vec!["AETERM".into()]),
+                    format: None,
+                }),
                 variable_type: SdtmVariableType::Character,
                 variable_core: SdtmVariableCore::Req,
                 variable_role: Some(SdtmRole::Topic),
@@ -521,7 +603,10 @@ async fn variable_three_state_update_replaces_when_outer_some_inner_some() {
             .update(SdtmVariableUpdate {
                 id: var.id,
                 name: None,
-                variable_controlled: Some(Some("AETERMCD".into())),
+                variable_controlled: Some(Some(SdtmVariableControlled {
+                    code: Some(vec!["AETERMCD".into()]),
+                    format: None,
+                })),
                 variable_type: None,
                 variable_core: None,
                 variable_role: Some(Some(SdtmRole::Identifier)),
@@ -530,7 +615,13 @@ async fn variable_three_state_update_replaces_when_outer_some_inner_some() {
             })
             .await
             .expect("replace update");
-        assert_eq!(updated.variable_controlled.as_deref(), Some("AETERMCD"));
+        assert_eq!(
+            updated.variable_controlled,
+            Some(SdtmVariableControlled {
+                code: Some(vec!["AETERMCD".into()]),
+                format: None,
+            })
+        );
         assert_eq!(updated.variable_role, Some(SdtmRole::Identifier));
     })
     .await
@@ -561,7 +652,10 @@ async fn variable_three_state_update_clears_when_outer_some_inner_none() {
             .create(SdtmVariableNew {
                 domain_id: d.id,
                 name: unique("AETERM"),
-                variable_controlled: Some("AETERM".into()),
+                variable_controlled: Some(SdtmVariableControlled {
+                    code: Some(vec!["AETERM".into()]),
+                    format: None,
+                }),
                 variable_type: SdtmVariableType::Character,
                 variable_core: SdtmVariableCore::Req,
                 variable_role: Some(SdtmRole::Topic),

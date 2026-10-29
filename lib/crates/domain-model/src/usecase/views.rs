@@ -1,8 +1,9 @@
 use chrono::{DateTime, Utc};
 
 use crate::domain::{
-    DomainCategory, SdtmDomain, SdtmDomainDescription, SdtmRole, SdtmVariable, SdtmVariableCore,
-    SdtmVariableDescription, SdtmVariableType, SdtmVersion,
+    DomainCategory, SdtmDomain, SdtmDomainDescription, SdtmRole, SdtmVariable,
+    SdtmVariableControlled, SdtmVariableCore, SdtmVariableDescription, SdtmVariableType,
+    SdtmVersion,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,7 +55,7 @@ pub struct SdtmVariableView {
     pub id: i64,
     pub domain_id: i64,
     pub name: String,
-    pub variable_controlled: Option<String>,
+    pub variable_controlled: Option<SdtmVariableControlled>,
     pub variable_type: SdtmVariableType,
     pub variable_core: SdtmVariableCore,
     pub variable_role: Option<SdtmRole>,

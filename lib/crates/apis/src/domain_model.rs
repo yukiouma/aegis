@@ -150,6 +150,19 @@ pub struct SdtmVariableDescriptionDetail {
     pub label: String,
 }
 
+/// Controlled-terminology metadata attached to an SDTM variable.
+///
+/// Mirrors `domain_model::SdtmVariableControlled`. The two structs
+/// are kept in sync layer by layer — the in-memory facade in
+/// `domain-model` converts between them field by field.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SdtmVariableControlled {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<Vec<String>>,
+}
+
 // ---- view projections ----
 
 /// Safe projection of an `SdtmVersion` aggregate — exactly what
@@ -180,7 +193,7 @@ pub struct SdtmVariableView {
     pub id: i64,
     pub domain_id: i64,
     pub name: String,
-    pub variable_controlled: Option<String>,
+    pub variable_controlled: Option<SdtmVariableControlled>,
     pub variable_type: SdtmVariableType,
     pub variable_core: SdtmVariableCore,
     pub variable_role: Option<SdtmRole>,
@@ -256,7 +269,7 @@ pub struct UpdateSdtmDomainRequest {
 pub struct CreateSdtmVariableRequest {
     pub domain_id: i64,
     pub name: String,
-    pub variable_controlled: Option<String>,
+    pub variable_controlled: Option<SdtmVariableControlled>,
     pub variable_type: SdtmVariableType,
     pub variable_core: SdtmVariableCore,
     pub variable_role: Option<SdtmRole>,
@@ -276,7 +289,7 @@ pub struct CreateSdtmVariableRequest {
 pub struct UpdateSdtmVariableRequest {
     pub id: i64,
     pub name: Option<String>,
-    pub variable_controlled: Option<Option<String>>,
+    pub variable_controlled: Option<Option<SdtmVariableControlled>>,
     pub variable_type: Option<SdtmVariableType>,
     pub variable_core: Option<SdtmVariableCore>,
     pub variable_role: Option<Option<SdtmRole>>,

@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::error::DomainError;
-use super::variable_type::{SdtmRole, SdtmVariableCore, SdtmVariableType};
+use super::variable_type::{SdtmRole, SdtmVariableControlled, SdtmVariableCore, SdtmVariableType};
 
 /// Localised description of an SDTM variable. Carried on the
 /// `SdtmVariable` aggregate and persisted as a single JSONB
@@ -27,7 +27,7 @@ pub struct SdtmVariable {
     pub id: i64,
     pub domain_id: i64,
     pub name: String,
-    pub variable_controlled: Option<String>,
+    pub variable_controlled: Option<SdtmVariableControlled>,
     pub variable_type: SdtmVariableType,
     pub variable_core: SdtmVariableCore,
     pub variable_role: Option<SdtmRole>,
@@ -62,7 +62,7 @@ impl SdtmVariable {
     pub fn new(
         domain_id: i64,
         name: String,
-        variable_controlled: Option<String>,
+        variable_controlled: Option<SdtmVariableControlled>,
         variable_type: SdtmVariableType,
         variable_core: SdtmVariableCore,
         variable_role: Option<SdtmRole>,
@@ -94,7 +94,7 @@ impl SdtmVariable {
         id: i64,
         domain_id: i64,
         name: String,
-        variable_controlled: Option<String>,
+        variable_controlled: Option<SdtmVariableControlled>,
         variable_type: SdtmVariableType,
         variable_core: SdtmVariableCore,
         variable_role: Option<SdtmRole>,
@@ -124,7 +124,7 @@ impl SdtmVariable {
 pub struct SdtmVariableNew {
     pub domain_id: i64,
     pub name: String,
-    pub variable_controlled: Option<String>,
+    pub variable_controlled: Option<SdtmVariableControlled>,
     pub variable_type: SdtmVariableType,
     pub variable_core: SdtmVariableCore,
     pub variable_role: Option<SdtmRole>,
@@ -143,7 +143,7 @@ pub struct SdtmVariableNew {
 pub struct SdtmVariableUpdate {
     pub id: i64,
     pub name: Option<String>,
-    pub variable_controlled: Option<Option<String>>,
+    pub variable_controlled: Option<Option<SdtmVariableControlled>>,
     pub variable_type: Option<SdtmVariableType>,
     pub variable_core: Option<SdtmVariableCore>,
     pub variable_role: Option<Option<SdtmRole>>,

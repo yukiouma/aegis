@@ -15,7 +15,8 @@ usecase
 └── DomainModelUsecase<V, D, Va>
     └── commands / views / UsecaseError
 domain
-└── DomainCategory, SdtmVariableType, SdtmVariableCore, SdtmRole
+└── DomainCategory, SdtmVariableType, SdtmVariableCore, SdtmRole,
+    SdtmVariableControlled
     └── SdtmVersion, SdtmDomain, SdtmVariable
     └── SdtmVersionRepository, SdtmDomainRepository,
         SdtmVariableRepository
@@ -33,11 +34,17 @@ adapts `DomainModelUsecase` to the
 | -------------- | --------------------------------------------------------------------- |
 | `SdtmVersion`  | `id`, `name` (unique), `created_at`, `updated_at`                     |
 | `SdtmDomain`   | `id`, `version_id` (FK CASCADE), `name`, `category`, `descriptions` (JSONB), `created_at`, `updated_at` |
-| `SdtmVariable` | `id`, `domain_id` (FK CASCADE), `name`, `variable_controlled`, `variable_type`, `variable_core`, `variable_role`, `variable_sequence`, `descriptions` (JSONB), `created_at`, `updated_at` |
+| `SdtmVariable` | `id`, `domain_id` (FK CASCADE), `name`, `variable_controlled` (JSONB), `variable_type`, `variable_core`, `variable_role`, `variable_sequence`, `descriptions` (JSONB), `created_at`, `updated_at` |
 
 `descriptions` carries `Vec<SdtmDomainDescription>` /
 `Vec<SdtmVariableDescription>` as a single JSONB column
 (`NOT NULL DEFAULT '[]'::jsonb`).
+
+`variable_controlled` carries an `SdtmVariableControlled` as a single
+nullable JSONB column: `{"code": ["C66731"], "format": ["Codelist"]}`.
+Both lists are optional, and a list that is not set is omitted from
+the JSON rather than written as `null` — so the stored shape is
+`{"code": ["C66731"]}` when only `code` is set.
 
 ## HTTP surface
 
