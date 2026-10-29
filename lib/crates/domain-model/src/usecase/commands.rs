@@ -1,6 +1,6 @@
 use crate::domain::{
-    DomainCategory, SdtmDomainDescription, SdtmRole, SdtmVariableCore, SdtmVariableDescription,
-    SdtmVariableType,
+    DomainCategory, SdtmDomainDescription, SdtmRole, SdtmVariableControlled, SdtmVariableCore,
+    SdtmVariableDescription, SdtmVariableType,
 };
 
 // SdtmVersion
@@ -37,7 +37,7 @@ pub struct UpdateSdtmDomain {
 pub struct CreateSdtmVariable {
     pub domain_id: i64,
     pub name: String,
-    pub variable_controlled: Option<String>,
+    pub variable_controlled: Option<SdtmVariableControlled>,
     pub variable_type: SdtmVariableType,
     pub variable_core: SdtmVariableCore,
     pub variable_role: Option<SdtmRole>,
@@ -50,7 +50,7 @@ pub struct UpdateSdtmVariable {
     pub id: i64,
     pub name: Option<String>,
     /// `None` = don't change. `Some(None)` = clear the field.
-    pub variable_controlled: Option<Option<String>>,
+    pub variable_controlled: Option<Option<SdtmVariableControlled>>,
     pub variable_type: Option<SdtmVariableType>,
     pub variable_core: Option<SdtmVariableCore>,
     /// `None` = don't change. `Some(None)` = clear the field.

@@ -5,9 +5,10 @@ use async_trait::async_trait;
 
 use crate::domain::{
     DomainCategory, DomainError, SdtmDomain, SdtmDomainDescription, SdtmDomainNew,
-    SdtmDomainRepository, SdtmDomainUpdate, SdtmRole, SdtmVariable, SdtmVariableCore,
-    SdtmVariableDescription, SdtmVariableNew, SdtmVariableRepository, SdtmVariableType,
-    SdtmVariableUpdate, SdtmVersion, SdtmVersionNew, SdtmVersionRepository, SdtmVersionUpdate,
+    SdtmDomainRepository, SdtmDomainUpdate, SdtmRole, SdtmVariable, SdtmVariableControlled,
+    SdtmVariableCore, SdtmVariableDescription, SdtmVariableNew, SdtmVariableRepository,
+    SdtmVariableType, SdtmVariableUpdate, SdtmVersion, SdtmVersionNew, SdtmVersionRepository,
+    SdtmVersionUpdate,
 };
 use crate::usecase::commands::{
     CreateSdtmDomain, CreateSdtmVariable, CreateSdtmVersion, UpdateSdtmDomain, UpdateSdtmVariable,
@@ -413,4 +414,95 @@ async fn variable_crud_round_trips() {
 
     uc.delete_variable(var.id).await.unwrap();
     assert!(uc.list_variables_by_domain(d.id).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn variable_controlled_three_state_update_is_honoured() {
+    let uc = build_usecase();
+    let v = uc
+        .create_version(CreateSdtmVersion {
+            name: "2024-09-27".into(),
+        })
+        .await
+        .unwrap();
+    let d = uc
+        .create_domain(CreateSdtmDomain {
+            version_id: v.id,
+            name: "AE".into(),
+            category: DomainCategory::Events,
+            descriptions: vec![],
+        })
+        .await
+        .unwrap();
+
+    let controlled = SdtmVariableControlled {
+        code: Some(vec!["C66731".into()]),
+        format: Some(vec!["Codelist".into()]),
+    };
+    let var = uc
+        .create_variable(CreateSdtmVariable {
+            domain_id: d.id,
+            name: "AESEV".into(),
+            variable_controlled: Some(controlled.clone()),
+            variable_type: SdtmVariableType::Character,
+            variable_core: SdtmVariableCore::Req,
+            variable_role: Some(SdtmRole::Topic),
+            variable_sequence: 1,
+            descriptions: vec![],
+        })
+        .await
+        .unwrap();
+    assert_eq!(var.variable_controlled, Some(controlled.clone()));
+
+    // Outer None: leave the field alone.
+    let unchanged = uc
+        .update_variable(UpdateSdtmVariable {
+            id: var.id,
+            name: None,
+            variable_controlled: None,
+            variable_type: None,
+            variable_core: None,
+            variable_role: None,
+            variable_sequence: None,
+            descriptions: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(unchanged.variable_controlled, Some(controlled.clone()));
+
+    // Outer Some(inner Some): replace the field.
+    let replacement = SdtmVariableControlled {
+        code: Some(vec!["C66988".into()]),
+        format: None,
+    };
+    let replaced = uc
+        .update_variable(UpdateSdtmVariable {
+            id: var.id,
+            name: None,
+            variable_controlled: Some(Some(replacement.clone())),
+            variable_type: None,
+            variable_core: None,
+            variable_role: None,
+            variable_sequence: None,
+            descriptions: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(replaced.variable_controlled, Some(replacement));
+
+    // Outer Some(inner None): clear the field.
+    let cleared = uc
+        .update_variable(UpdateSdtmVariable {
+            id: var.id,
+            name: None,
+            variable_controlled: Some(None),
+            variable_type: None,
+            variable_core: None,
+            variable_role: None,
+            variable_sequence: None,
+            descriptions: None,
+        })
+        .await
+        .unwrap();
+    assert_eq!(cleared.variable_controlled, None);
 }

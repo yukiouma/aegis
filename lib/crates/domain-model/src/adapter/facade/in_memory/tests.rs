@@ -17,7 +17,8 @@ use apis::domain_model::{
     DomainCategory as ApiCategory, DomainModelApiError, DomainModelService,
     SdtmDomainDescription as ApiSdtmDomainDescription,
     SdtmDomainDescriptionDetail as ApiSdtmDomainDescriptionDetail, SdtmRole as ApiSdtmRole,
-    SdtmVariableCore as ApiSdtmVariableCore, SdtmVariableDescription as ApiSdtmVariableDescription,
+    SdtmVariableControlled as ApiSdtmVariableControlled, SdtmVariableCore as ApiSdtmVariableCore,
+    SdtmVariableDescription as ApiSdtmVariableDescription,
     SdtmVariableDescriptionDetail as ApiSdtmVariableDescriptionDetail,
     SdtmVariableType as ApiSdtmVariableType, UpdateSdtmDomainRequest, UpdateSdtmVariableRequest,
     UpdateSdtmVersionRequest,
@@ -569,7 +570,10 @@ async fn variable_crud_round_trips_through_api_with_descriptions() {
         .create_variable(CreateSdtmVariableRequest {
             domain_id: d.id,
             name: "AETERM".to_string(),
-            variable_controlled: Some("AETERM".to_string()),
+            variable_controlled: Some(ApiSdtmVariableControlled {
+                code: Some(vec!["AETERM".to_string()]),
+                format: None,
+            }),
             variable_type: ApiSdtmVariableType::Character,
             variable_core: ApiSdtmVariableCore::Req,
             variable_role: Some(ApiSdtmRole::Topic),
@@ -582,7 +586,13 @@ async fn variable_crud_round_trips_through_api_with_descriptions() {
     assert_eq!(created.variable_type, ApiSdtmVariableType::Character);
     assert_eq!(created.variable_core, ApiSdtmVariableCore::Req);
     assert_eq!(created.variable_role, Some(ApiSdtmRole::Topic));
-    assert_eq!(created.variable_controlled.as_deref(), Some("AETERM"));
+    assert_eq!(
+        created.variable_controlled,
+        Some(ApiSdtmVariableControlled {
+            code: Some(vec!["AETERM".to_string()]),
+            format: None,
+        })
+    );
     assert_eq!(created.descriptions.len(), 1);
 
     let fetched = svc.get_variable_by_id(created.id).await.unwrap();
@@ -674,7 +684,10 @@ async fn variable_three_state_outer_none_leaves_field_unchanged() {
         .create_variable(CreateSdtmVariableRequest {
             domain_id: d.id,
             name: "AETERM".to_string(),
-            variable_controlled: Some("AETERM".to_string()),
+            variable_controlled: Some(ApiSdtmVariableControlled {
+                code: Some(vec!["AETERM".to_string()]),
+                format: None,
+            }),
             variable_type: ApiSdtmVariableType::Character,
             variable_core: ApiSdtmVariableCore::Req,
             variable_role: Some(ApiSdtmRole::Topic),
@@ -697,7 +710,13 @@ async fn variable_three_state_outer_none_leaves_field_unchanged() {
         })
         .await
         .unwrap();
-    assert_eq!(updated.variable_controlled.as_deref(), Some("AETERM"));
+    assert_eq!(
+        updated.variable_controlled,
+        Some(ApiSdtmVariableControlled {
+            code: Some(vec!["AETERM".to_string()]),
+            format: None,
+        })
+    );
     assert_eq!(updated.variable_role, Some(ApiSdtmRole::Topic));
 }
 
@@ -723,7 +742,10 @@ async fn variable_three_state_some_some_replaces_field() {
         .create_variable(CreateSdtmVariableRequest {
             domain_id: d.id,
             name: "AETERM".to_string(),
-            variable_controlled: Some("AETERM".to_string()),
+            variable_controlled: Some(ApiSdtmVariableControlled {
+                code: Some(vec!["AETERM".to_string()]),
+                format: None,
+            }),
             variable_type: ApiSdtmVariableType::Character,
             variable_core: ApiSdtmVariableCore::Req,
             variable_role: Some(ApiSdtmRole::Topic),
@@ -737,7 +759,10 @@ async fn variable_three_state_some_some_replaces_field() {
         .update_variable(UpdateSdtmVariableRequest {
             id: var.id,
             name: None,
-            variable_controlled: Some(Some("AETERMCD".to_string())),
+            variable_controlled: Some(Some(ApiSdtmVariableControlled {
+                code: Some(vec!["AETERMCD".to_string()]),
+                format: None,
+            })),
             variable_type: None,
             variable_core: None,
             variable_role: Some(Some(ApiSdtmRole::Identifier)),
@@ -746,7 +771,13 @@ async fn variable_three_state_some_some_replaces_field() {
         })
         .await
         .unwrap();
-    assert_eq!(updated.variable_controlled.as_deref(), Some("AETERMCD"));
+    assert_eq!(
+        updated.variable_controlled,
+        Some(ApiSdtmVariableControlled {
+            code: Some(vec!["AETERMCD".to_string()]),
+            format: None,
+        })
+    );
     assert_eq!(updated.variable_role, Some(ApiSdtmRole::Identifier));
 }
 
@@ -772,7 +803,10 @@ async fn variable_three_state_some_none_clears_field() {
         .create_variable(CreateSdtmVariableRequest {
             domain_id: d.id,
             name: "AETERM".to_string(),
-            variable_controlled: Some("AETERM".to_string()),
+            variable_controlled: Some(ApiSdtmVariableControlled {
+                code: Some(vec!["AETERM".to_string()]),
+                format: None,
+            }),
             variable_type: ApiSdtmVariableType::Character,
             variable_core: ApiSdtmVariableCore::Req,
             variable_role: Some(ApiSdtmRole::Topic),

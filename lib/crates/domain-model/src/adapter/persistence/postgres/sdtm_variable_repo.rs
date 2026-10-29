@@ -4,8 +4,9 @@ use serde_json::Value as JsonValue;
 use sqlx::{AssertSqlSafe, FromRow, PgPool};
 
 use crate::domain::{
-    DomainError, SdtmRole, SdtmVariable, SdtmVariableCore, SdtmVariableDescription,
-    SdtmVariableNew, SdtmVariableRepository, SdtmVariableType, SdtmVariableUpdate,
+    DomainError, SdtmRole, SdtmVariable, SdtmVariableControlled, SdtmVariableCore,
+    SdtmVariableDescription, SdtmVariableNew, SdtmVariableRepository, SdtmVariableType,
+    SdtmVariableUpdate,
 };
 
 #[derive(FromRow)]
@@ -13,7 +14,7 @@ struct SdtmVariableRow {
     id: i64,
     domain_id: i64,
     name: String,
-    variable_controlled: Option<String>,
+    variable_controlled: Option<JsonValue>,
     variable_type: String,
     variable_core: String,
     variable_role: Option<String>,
@@ -31,13 +32,23 @@ impl SdtmVariableRow {
             None => None,
             Some(s) => Some(SdtmRole::try_from(s)?),
         };
+        let variable_controlled: Option<SdtmVariableControlled> = match self.variable_controlled {
+            None => None,
+            // A JSON `null` in the column is not a valid
+            // SdtmVariableControlled, but it means "no controlled
+            // terminology" just as SQL NULL does.
+            Some(v) if v.is_null() => None,
+            Some(v) => Some(
+                serde_json::from_value(v).map_err(|e| DomainError::Repository(e.to_string()))?,
+            ),
+        };
         let descriptions: Vec<SdtmVariableDescription> = serde_json::from_value(self.descriptions)
             .map_err(|e| DomainError::Repository(e.to_string()))?;
         Ok(SdtmVariable::for_repository(
             self.id,
             self.domain_id,
             self.name,
-            self.variable_controlled,
+            variable_controlled,
             variable_type,
             variable_core,
             variable_role,
@@ -65,6 +76,12 @@ impl SdtmVariableRepository for SdtmVariableRepoPg {
     async fn create(&self, input: SdtmVariableNew) -> Result<SdtmVariable, DomainError> {
         let descriptions_json = serde_json::to_value(&input.descriptions)
             .map_err(|e| DomainError::Repository(e.to_string()))?;
+        let variable_controlled_json: Option<JsonValue> = match &input.variable_controlled {
+            None => None,
+            Some(v) => {
+                Some(serde_json::to_value(v).map_err(|e| DomainError::Repository(e.to_string()))?)
+            }
+        };
         let type_str = input.variable_type.as_str();
         let core_str = input.variable_core.as_str();
         let role_str = input.variable_role.map(|r| r.as_str());
@@ -81,7 +98,7 @@ impl SdtmVariableRepository for SdtmVariableRepoPg {
         )
         .bind(input.domain_id)
         .bind(&input.name)
-        .bind(&input.variable_controlled)
+        .bind(variable_controlled_json)
         .bind(type_str)
         .bind(core_str)
         .bind(role_str)
@@ -140,10 +157,12 @@ impl SdtmVariableRepository for SdtmVariableRepoPg {
         let variable_core = input.variable_core.map(|c| c.as_str());
         let variable_sequence = input.variable_sequence;
 
-        let variable_controlled_bound: Option<&str> = match &input.variable_controlled {
+        let variable_controlled_bound: Option<JsonValue> = match &input.variable_controlled {
             None => None,
             Some(None) => None,
-            Some(Some(s)) => Some(s.as_str()),
+            Some(Some(v)) => {
+                Some(serde_json::to_value(v).map_err(|e| DomainError::Repository(e.to_string()))?)
+            }
         };
         let clear_controlled = input.variable_controlled.is_some();
 
@@ -241,6 +260,8 @@ fn map_variable_err(err: sqlx::Error) -> DomainError {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn migration_file_is_present_and_idempotent() {
         let sql = include_str!("../../../../migrations/0003_create_sdtm_variables.sql");
@@ -249,5 +270,52 @@ mod tests {
         assert!(sql.contains("sdtm_variables_type_check"));
         assert!(sql.contains("sdtm_variables_core_check"));
         assert!(sql.contains("sdtm_variables_role_check"));
+    }
+
+    #[test]
+    fn variable_controlled_migration_converts_the_column_to_jsonb() {
+        let sql = include_str!(
+            "../../../../migrations/0004_alter_sdtm_variables_variable_controlled_to_jsonb.sql"
+        );
+        assert!(sql.contains("ALTER TABLE sdtm_variables"));
+        assert!(sql.contains("TYPE JSONB"));
+    }
+
+    #[test]
+    fn row_with_json_null_variable_controlled_decodes_as_absent() {
+        let row = SdtmVariableRow {
+            id: 1,
+            domain_id: 1,
+            name: "AESEV".into(),
+            variable_controlled: Some(serde_json::Value::Null),
+            variable_type: "Character".into(),
+            variable_core: "Req".into(),
+            variable_role: Some("Topic".into()),
+            variable_sequence: 1,
+            descriptions: serde_json::json!([]),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+        let var = row.into_var().unwrap();
+        assert_eq!(var.variable_controlled, None);
+    }
+
+    #[test]
+    fn row_with_malformed_variable_controlled_is_a_repository_error() {
+        let row = SdtmVariableRow {
+            id: 1,
+            domain_id: 1,
+            name: "AESEV".into(),
+            variable_controlled: Some(serde_json::json!({ "code": "C66731" })),
+            variable_type: "Character".into(),
+            variable_core: "Req".into(),
+            variable_role: Some("Topic".into()),
+            variable_sequence: 1,
+            descriptions: serde_json::json!([]),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        };
+        let err = row.into_var().unwrap_err();
+        assert!(matches!(err, DomainError::Repository(_)), "got {err:?}");
     }
 }
