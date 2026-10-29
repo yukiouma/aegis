@@ -20,4 +20,4 @@ pub use sdtm_variable::{
     SdtmVariableUpdate,
 };
 pub use sdtm_version::{SdtmVersion, SdtmVersionNew, SdtmVersionUpdate};
-pub use variable_type::{SdtmRole, SdtmVariableCore, SdtmVariableType};
+pub use variable_type::{SdtmRole, SdtmVariableControlled, SdtmVariableCore, SdtmVariableType};
