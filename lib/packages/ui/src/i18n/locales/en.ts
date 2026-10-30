@@ -239,6 +239,10 @@ export const en = {
   'terminology.codeitem.action.create': 'Create',
   'terminology.codeitem.action.save': 'Save',
   'terminology.codeitem.readOnly': 'Read-only',
+  'terminology.codeitem.drawer.title': 'Code items for {code}',
+  'terminology.codeitem.drawer.notFound': 'No code list found for {code}',
+  'terminology.codeitem.drawer.noVersion':
+    'No SDTM terminology version has been imported.',
 
   'terminology.codeitem.codeClick.tooltip':
     'Show this code in other codelists',

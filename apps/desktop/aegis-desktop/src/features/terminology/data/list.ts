@@ -7,6 +7,7 @@ import {
   type InfiniteData,
   type QueryKey,
 } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 import {
   api,
@@ -314,4 +315,50 @@ export function useGetCodeListsByIds(ids: number[]) {
       staleTime: 30_000,
     })),
   });
+}
+
+/**
+ * Id of the most recently imported SDTM terminology version, or `null`
+ * when none exists. The server orders the version list by `id ASC`, so
+ * the highest id is the latest import. ADaM versions are ignored.
+ */
+export function useLatestSdtmTerminologyVersionId(): number | null {
+  const versions = useListTerminologyVersions();
+  const sdtmVersions = (versions.data ?? []).filter((v) => v.kind === "sdtm");
+  return sdtmVersions.reduce<number | null>(
+    (latest, v) => (latest == null || v.id > latest ? v.id : latest),
+    null,
+  );
+}
+
+/**
+ * Find the code list whose `name` equals `name` in a terminology
+ * version. The server search is a full-text match, so several rows can
+ * come back; the exact name match wins, and a case-insensitive match is
+ * accepted as a fallback (the search itself is case-insensitive).
+ *
+ * The lookup asks for the server's maximum page size so a common token
+ * does not push the exact match off the first page. It uses its own
+ * query key — `codeLists` belongs to the 20-per-page infinite query.
+ */
+export function useFindCodeListByName(
+  versionId: number | null,
+  name: string | null,
+) {
+  const query = useQuery<PagedCodeListListResponse, ApiError>({
+    queryKey: queryKeys.terminology.codeListByName(versionId ?? 0, name ?? ""),
+    queryFn: () =>
+      api.listCodeLists(versionId!, { fragment: name!, offset: 0, limit: 500 }),
+    enabled: versionId != null && versionId > 0 && !!name,
+  });
+  const codelist = useMemo(() => {
+    const items = query.data?.items ?? [];
+    if (!name) return null;
+    return (
+      items.find((c) => c.name === name) ??
+      items.find((c) => c.name.toLowerCase() === name.toLowerCase()) ??
+      null
+    );
+  }, [query.data, name]);
+  return { ...query, codelist };
 }
