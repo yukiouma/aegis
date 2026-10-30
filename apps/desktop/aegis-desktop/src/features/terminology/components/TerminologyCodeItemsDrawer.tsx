@@ -41,17 +41,35 @@ export function TerminologyCodeItemsDrawer({
 }: TerminologyCodeItemsDrawerProps) {
   const { t } = useI18n();
   const activeCode = open ? code : null;
-  const versionId = useLatestSdtmTerminologyVersionId();
-  const codelistsQuery = useFindCodeListByName(versionId, activeCode);
+  const versions = useLatestSdtmTerminologyVersionId();
+  const codelistsQuery = useFindCodeListByName(versions.versionId, activeCode);
   const codelist = codelistsQuery.codelist;
 
   const itemsQuery = useListCodeItems(codelist?.id ?? null);
   const rows = itemsQuery.data?.pages.flatMap((p) => p.items) ?? [];
   const hasMore = itemsQuery.hasNextPage ?? false;
 
-  const noVersion = versionId == null;
-  const resolving = codelistsQuery.isLoading;
-  const lookupError = codelistsQuery.error ?? itemsQuery.error;
+  // "No version imported", "still loading" and "the request failed" are
+  // three different states — they must not collapse into one message.
+  const versionsFailed = versions.error != null;
+  const noVersion = versions.versionId == null && !versionsFailed;
+  const resolving = versions.isLoading || codelistsQuery.isLoading;
+  const lookupError = versions.error ?? codelistsQuery.error ?? itemsQuery.error;
+
+  function handleRetry() {
+    // Refetch only the query that failed: the code-item query is
+    // disabled until a code list is resolved, and firing it anyway
+    // would ask the server for an unfiltered page of code items.
+    if (versionsFailed) {
+      versions.refetch();
+      return;
+    }
+    if (codelistsQuery.error) {
+      void codelistsQuery.refetch();
+      return;
+    }
+    void itemsQuery.refetch();
+  }
 
   return (
     <Drawer
@@ -65,32 +83,30 @@ export function TerminologyCodeItemsDrawer({
           {t("terminology.codeitem.drawer.title", { code: code ?? "" })}
         </Typography>
 
-        {noVersion ? (
-          <Alert severity="info">
-            {t("terminology.codeitem.drawer.noVersion")}
-          </Alert>
+        {lookupError ? (
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            <Alert severity="error">
+              {versionsFailed
+                ? t("terminology.codeitem.drawer.versionsLoadFailed", {
+                    message: errorMessage(lookupError),
+                  })
+                : t("terminology.codeitem.drawer.loadFailed", {
+                    code: code ?? "",
+                    message: errorMessage(lookupError),
+                  })}
+            </Alert>
+            <Box>
+              <Button onClick={handleRetry}>{t("common.retry")}</Button>
+            </Box>
+          </Box>
         ) : resolving ? (
           <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
             <CircularProgress />
           </Box>
-        ) : lookupError ? (
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-            <Alert severity="error">
-              {t("terminology.codeitem.loadFailed", {
-                message: errorMessage(lookupError),
-              })}
-            </Alert>
-            <Box>
-              <Button
-                onClick={() => {
-                  void codelistsQuery.refetch();
-                  void itemsQuery.refetch();
-                }}
-              >
-                {t("common.retry")}
-              </Button>
-            </Box>
-          </Box>
+        ) : noVersion ? (
+          <Alert severity="info">
+            {t("terminology.codeitem.drawer.noVersion")}
+          </Alert>
         ) : !codelist ? (
           <Typography color="text.secondary">
             {t("terminology.codeitem.drawer.notFound", { code: code ?? "" })}

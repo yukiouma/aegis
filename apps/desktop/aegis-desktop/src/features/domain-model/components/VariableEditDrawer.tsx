@@ -223,7 +223,7 @@ export function VariableEditDrawer({
             size="small"
             label={t("domainModel.sdtm.variable.field.variableControlledCode")}
             helperText={t(
-              "domainModel.sdtm.variable.field.variableControlledHint",
+              "domainModel.sdtm.variable.field.variableControlledCodeHint",
             )}
             value={controlledCodes}
             onChange={(e) => setControlledCodes(e.target.value)}

@@ -200,7 +200,9 @@ describe("VariableTable", () => {
   it("calls onTerminologyClick with the clicked code", async () => {
     const onTerminologyClick = vi.fn();
     renderTable({ onTerminologyClick });
-    await userEvent.click(screen.getByRole("button", { name: "VSTESTCD" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /view code items VSTESTCD/i }),
+    );
     expect(onTerminologyClick).toHaveBeenCalledWith("VSTESTCD");
   });
 });

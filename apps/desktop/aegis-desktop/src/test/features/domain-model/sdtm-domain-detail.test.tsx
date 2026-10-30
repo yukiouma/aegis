@@ -227,7 +227,9 @@ describe("SdtmDomainDetail", () => {
   it("opens the terminology drawer with the code items of the clicked code", async () => {
     renderPage();
     await screen.findByText("AESEV");
-    await userEvent.click(screen.getByRole("button", { name: "VSTESTCD" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /view code items VSTESTCD/i }),
+    );
     expect(await screen.findByText("PASS")).toBeInTheDocument();
   });
 });

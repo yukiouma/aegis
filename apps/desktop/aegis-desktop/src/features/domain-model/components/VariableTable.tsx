@@ -194,15 +194,20 @@ function DraggableRow({
           "—"
         ) : (
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
-            {codes.map((code) => (
-              <Chip
-                key={code}
-                size="small"
-                variant="outlined"
-                label={code}
-                component="button"
-                onClick={() => onTerminologyClick?.(code)}
-              />
+            {codes.map((code, i) => (
+              <Tooltip
+                key={`${code}-${i}`}
+                title={t("terminology.codeitem.drawer.openTooltip")}
+              >
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={code}
+                  component="button"
+                  aria-label={`${t("terminology.codeitem.drawer.openTooltip")} ${code}`}
+                  onClick={() => onTerminologyClick?.(code)}
+                />
+              </Tooltip>
             ))}
           </Box>
         )}

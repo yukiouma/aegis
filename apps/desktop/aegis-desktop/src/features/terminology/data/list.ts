@@ -318,17 +318,36 @@ export function useGetCodeListsByIds(ids: number[]) {
 }
 
 /**
- * Id of the most recently imported SDTM terminology version, or `null`
- * when none exists. The server orders the version list by `id ASC`, so
- * the highest id is the latest import. ADaM versions are ignored.
+ * The most recently imported SDTM terminology version.
+ *
+ * The server orders the version list by `id ASC`, so the highest id is
+ * the latest import. ADaM versions are ignored. `versionId` is `null`
+ * when no SDTM version exists — but the caller must read `isLoading`
+ * and `error` first: "still loading", "the request failed" and "none
+ * imported" are three different states.
  */
-export function useLatestSdtmTerminologyVersionId(): number | null {
+export interface LatestSdtmTerminologyVersion {
+  versionId: number | null;
+  isLoading: boolean;
+  error: ApiError | null;
+  refetch: () => void;
+}
+
+export function useLatestSdtmTerminologyVersionId(): LatestSdtmTerminologyVersion {
   const versions = useListTerminologyVersions();
   const sdtmVersions = (versions.data ?? []).filter((v) => v.kind === "sdtm");
-  return sdtmVersions.reduce<number | null>(
+  const versionId = sdtmVersions.reduce<number | null>(
     (latest, v) => (latest == null || v.id > latest ? v.id : latest),
     null,
   );
+  return {
+    versionId,
+    isLoading: versions.isLoading,
+    error: versions.error,
+    refetch: () => {
+      void versions.refetch();
+    },
+  };
 }
 
 /**

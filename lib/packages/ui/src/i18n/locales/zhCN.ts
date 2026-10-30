@@ -234,8 +234,13 @@ export const zhCN = {
   'terminology.codeitem.action.save': '保存',
   'terminology.codeitem.readOnly': '只读',
   'terminology.codeitem.drawer.title': '{code} 的代码项',
-  'terminology.codeitem.drawer.notFound': '未找到 {code} 对应的代码列表',
+  'terminology.codeitem.drawer.notFound':
+    '在最新的 SDTM 术语版本中未找到名为 {code} 的代码列表。',
   'terminology.codeitem.drawer.noVersion': '尚未导入 SDTM 术语版本。',
+  'terminology.codeitem.drawer.loadFailed':
+    '{code} 的代码列表加载失败：{message}',
+  'terminology.codeitem.drawer.versionsLoadFailed': '术语版本加载失败：{message}',
+  'terminology.codeitem.drawer.openTooltip': '查看代码项',
 
   'terminology.codeitem.codeClick.tooltip': '在其他术语集中查看该 Code',
   'terminology.codeitem.sameCode.dialogTitle': '同 Code 的条目（{code}）',
@@ -289,6 +294,8 @@ export const zhCN = {
   "domainModel.sdtm.variable.editTitle": "Edit variable",
   "domainModel.sdtm.variable.field.name": "Name",
   "domainModel.sdtm.variable.field.variableControlledCode": "受控术语（代码列表）",
+  "domainModel.sdtm.variable.field.variableControlledCodeHint":
+    "代码列表名称，以逗号分隔（例如 VSTESTCD）",
   "domainModel.sdtm.variable.field.variableControlledFormat": "受控术语（格式）",
   "domainModel.sdtm.variable.field.variableControlledHint": "以逗号分隔的值",
   "domainModel.sdtm.variable.field.variableType": "Type",

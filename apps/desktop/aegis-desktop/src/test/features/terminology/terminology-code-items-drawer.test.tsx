@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
@@ -136,8 +137,76 @@ describe("TerminologyCodeItemsDrawer", () => {
     setupMocks({ codeLists: { items: [decoyCodelist] } });
     renderDrawer();
     expect(
-      await screen.findByText(/no code list found for VSTESTCD/i),
+      await screen.findByText(/no code list named VSTESTCD was found/i),
     ).toBeInTheDocument();
+  });
+
+  it("shows an error state when the terminology version query fails", async () => {
+    mockInvoke.mockReset();
+    mockCommands({
+      list_terminology_versions: () => {
+        throw { kind: "network", message: "server unreachable" };
+      },
+      list_code_lists: () => ({ items: [targetCodelist] }),
+      list_code_items: () => ({ items: [codeItem] }),
+    });
+    renderDrawer();
+    expect(
+      await screen.findByText(/failed to load the terminology versions/i),
+    ).toBeInTheDocument();
+    // A failed request is not the same as "nothing is imported".
+    expect(
+      screen.queryByText(/no sdtm terminology version has been imported/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows a spinner while the terminology version query is in flight", async () => {
+    mockInvoke.mockReset();
+    mockCommands({
+      list_terminology_versions: () => new Promise(() => {}),
+      list_code_lists: () => ({ items: [targetCodelist] }),
+      list_code_items: () => ({ items: [codeItem] }),
+    });
+    renderDrawer();
+    await waitFor(() => {
+      expect(screen.getByRole("progressbar")).toBeInTheDocument();
+    });
+    expect(
+      screen.queryByText(/no sdtm terminology version has been imported/i),
+    ).not.toBeInTheDocument();
+  });
+
+  it("retries only the failing query", async () => {
+    mockInvoke.mockReset();
+    let codeListAttempts = 0;
+    mockCommands({
+      list_terminology_versions: () => [sdtmVersion],
+      list_code_lists: () => {
+        codeListAttempts += 1;
+        if (codeListAttempts === 1) {
+          throw { kind: "http", status: 500, code: "boom", message: "boom" };
+        }
+        return { items: [targetCodelist] };
+      },
+      list_code_items: () => ({ items: [codeItem] }),
+    });
+    renderDrawer();
+    const retry = await screen.findByRole("button", { name: /retry/i });
+    await userEvent.click(retry);
+    await waitFor(() => {
+      expect(codeListAttempts).toBe(2);
+    });
+    // The code-item query must never be fired without a resolved code
+    // list — an unfiltered request would ask the server for an
+    // arbitrary page of code items.
+    const itemCalls = mockInvoke.mock.calls.filter(
+      (c) => c[0] === "list_code_items",
+    );
+    expect(
+      itemCalls.every(
+        (c) => (c[1] as { codelistId: number }).codelistId === 11,
+      ),
+    ).toBe(true);
   });
 
   it("resolves a code list whose name only matches case-insensitively", async () => {
