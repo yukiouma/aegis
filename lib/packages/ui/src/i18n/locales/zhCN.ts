@@ -271,6 +271,7 @@ export const zhCN = {
   "domainModel.sdtm.detail.filter.placeholder": "Filter by name or label",
   "domainModel.sdtm.detail.col.name": "Name",
   "domainModel.sdtm.detail.col.label": "Label",
+  "domainModel.sdtm.detail.col.terminology": "术语",
   "domainModel.sdtm.detail.col.role": "Role",
   "domainModel.sdtm.detail.empty": "No variables in this domain.",
   "domainModel.sdtm.detail.noMatches": "No variables match the current filter.",
