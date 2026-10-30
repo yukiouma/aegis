@@ -47,6 +47,7 @@ const variables = [
     variableCore: "Req",
     variableRole: "Record Qualifier",
     variableSequence: 2,
+    variableControlled: { code: ["VSTESTCD"] },
     descriptions: [{ lang: "en", details: { label: "Severity" } }],
     createdAt: "",
     updatedAt: "",
@@ -76,6 +77,48 @@ function setupMocks() {
     }),
     update_sdtm_variable: () => variables[0],
     delete_sdtm_variable: () => undefined,
+    list_terminology_versions: () => [
+      {
+        id: 5,
+        kind: "sdtm",
+        name: "2024-06-28",
+        createdAt: "",
+        updatedAt: "",
+      },
+    ],
+    list_code_lists: () => ({
+      items: [
+        {
+          id: 11,
+          versionId: 5,
+          code: "C66741",
+          extensible: true,
+          name: "VSTESTCD",
+          submissionValue: "VSTESTCD",
+          synonym: "",
+          definition: "",
+          nciPreferredTerm: "",
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    }),
+    list_code_items: () => ({
+      items: [
+        {
+          id: 21,
+          codelistId: 11,
+          versionId: 5,
+          code: "C174106",
+          submissionValue: "PASS",
+          synonym: "",
+          definition: "",
+          nciPreferredTerm: "",
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+    }),
   });
 }
 
@@ -179,5 +222,12 @@ describe("SdtmDomainDetail", () => {
       (c) => c[0] === "update_sdtm_variable",
     );
     expect(updateCalls.length).toBe(0);
+  });
+
+  it("opens the terminology drawer with the code items of the clicked code", async () => {
+    renderPage();
+    await screen.findByText("AESEV");
+    await userEvent.click(screen.getByRole("button", { name: "VSTESTCD" }));
+    expect(await screen.findByText("PASS")).toBeInTheDocument();
   });
 });

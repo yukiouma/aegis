@@ -5,6 +5,7 @@ import { Alert, Box, CircularProgress } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
 
 import { useCurrentUser } from "../../auth";
+import { TerminologyCodeItemsDrawer } from "../../terminology";
 import { useDebouncedValue } from "../../../shared/hooks/useDebouncedValue";
 import {
   useCreateSdtmVariable,
@@ -109,6 +110,7 @@ export function SdtmDomainDetail() {
   const [confirmDelete, setConfirmDelete] = useState<SdtmVariableView | null>(
     null,
   );
+  const [terminologyCode, setTerminologyCode] = useState<string | null>(null);
   const [reorderFailed, setReorderFailed] = useState<string | null>(null);
 
   const initialSequence = useMemo(() => {
@@ -229,6 +231,7 @@ export function SdtmDomainDetail() {
         onEdit={(row) => setVariableDrawer({ mode: "edit", row })}
         onDelete={(row) => setConfirmDelete(row)}
         onReorder={handleReorder}
+        onTerminologyClick={(code) => setTerminologyCode(code)}
         emptyMessage={
           trimmed
             ? t("domainModel.sdtm.detail.noMatches")
@@ -290,6 +293,12 @@ export function SdtmDomainDetail() {
         }
         pending={deleteVariable.isPending}
         error={deleteVariable.error}
+      />
+
+      <TerminologyCodeItemsDrawer
+        open={terminologyCode !== null}
+        code={terminologyCode}
+        onClose={() => setTerminologyCode(null)}
       />
     </Box>
   );
