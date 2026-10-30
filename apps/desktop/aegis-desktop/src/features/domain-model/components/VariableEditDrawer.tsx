@@ -59,6 +59,22 @@ const VARIABLE_ROLES: (SdtmRole | null)[] = [
 
 const EMPTY_DESCRIPTIONS: SdtmVariableDescription[] = [];
 
+/** Split a comma-separated free-text field into a list of values. */
+export function parseControlledList(text: string): string[] {
+  return text
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part !== "");
+}
+
+/** Order-sensitive element-wise comparison of two value lists. */
+export function controlledListsEqual(
+  a: readonly string[],
+  b: readonly string[],
+): boolean {
+  return a.length === b.length && a.every((value, i) => value === b[i]);
+}
+
 export function VariableEditDrawer({
   open,
   mode,
@@ -75,7 +91,8 @@ export function VariableEditDrawer({
 }: VariableEditDrawerProps) {
   const { t } = useI18n();
   const [name, setName] = useState("");
-  const [variableControlled, setVariableControlled] = useState("");
+  const [controlledCodes, setControlledCodes] = useState("");
+  const [controlledFormats, setControlledFormats] = useState("");
   const [variableType, setVariableType] =
     useState<SdtmVariableType>("Character");
   const [variableCore, setVariableCore] = useState<SdtmVariableCore>("Req");
@@ -88,7 +105,8 @@ export function VariableEditDrawer({
     if (!open) return;
     if (mode === "edit" && row) {
       setName(row.name);
-      setVariableControlled(row.variableControlled ?? "");
+      setControlledCodes((row.variableControlled?.code ?? []).join(", "));
+      setControlledFormats((row.variableControlled?.format ?? []).join(", "));
       setVariableType(row.variableType);
       setVariableCore(row.variableCore);
       setVariableRole(row.variableRole ?? null);
@@ -97,7 +115,8 @@ export function VariableEditDrawer({
       );
     } else if (mode === "create") {
       setName("");
-      setVariableControlled("");
+      setControlledCodes("");
+      setControlledFormats("");
       setVariableType("Character");
       setVariableCore("Req");
       setVariableRole(null);
@@ -127,14 +146,19 @@ export function VariableEditDrawer({
     if (!canMutate) return;
     const trimmedName = name.trim();
     if (trimmedName === "") return;
+    const codes = parseControlledList(controlledCodes);
+    const formats = parseControlledList(controlledFormats);
     if (mode === "create") {
       onCreate({
         domainId,
         name: trimmedName,
         variableControlled:
-          variableControlled.trim() === ""
+          codes.length === 0 && formats.length === 0
             ? undefined
-            : variableControlled,
+            : {
+                code: codes.length > 0 ? codes : undefined,
+                format: formats.length > 0 ? formats : undefined,
+              },
         variableType,
         variableCore,
         variableRole: variableRole ?? undefined,
@@ -149,12 +173,22 @@ export function VariableEditDrawer({
         variableRole,
         descriptions: descriptions.filter((d) => d.lang.trim() !== ""),
       };
-      // Only send variableControlled when it actually changed.
-      const currentControlled = row.variableControlled ?? "";
-      if (variableControlled.trim() === "" && currentControlled !== "") {
-        body.variableControlled = null;
-      } else if (variableControlled !== currentControlled) {
-        body.variableControlled = variableControlled;
+      // Only send variableControlled when it actually changed. Three
+      // states: unchanged sends nothing, emptied sends null (clear),
+      // edited sends the new lists.
+      const currentCodes = row.variableControlled?.code ?? [];
+      const currentFormats = row.variableControlled?.format ?? [];
+      const changed =
+        !controlledListsEqual(codes, currentCodes) ||
+        !controlledListsEqual(formats, currentFormats);
+      if (changed) {
+        body.variableControlled =
+          codes.length === 0 && formats.length === 0
+            ? null
+            : {
+                code: codes.length > 0 ? codes : undefined,
+                format: formats.length > 0 ? formats : undefined,
+              };
       }
       onUpdate(row.id, body);
     }
@@ -187,9 +221,22 @@ export function VariableEditDrawer({
           />
           <TextField
             size="small"
-            label={t("domainModel.sdtm.variable.field.variableControlled")}
-            value={variableControlled}
-            onChange={(e) => setVariableControlled(e.target.value)}
+            label={t("domainModel.sdtm.variable.field.variableControlledCode")}
+            helperText={t(
+              "domainModel.sdtm.variable.field.variableControlledHint",
+            )}
+            value={controlledCodes}
+            onChange={(e) => setControlledCodes(e.target.value)}
+            disabled={!canMutate}
+          />
+          <TextField
+            size="small"
+            label={t("domainModel.sdtm.variable.field.variableControlledFormat")}
+            helperText={t(
+              "domainModel.sdtm.variable.field.variableControlledHint",
+            )}
+            value={controlledFormats}
+            onChange={(e) => setControlledFormats(e.target.value)}
             disabled={!canMutate}
           />
           <FormControl size="small" disabled={!canMutate}>
