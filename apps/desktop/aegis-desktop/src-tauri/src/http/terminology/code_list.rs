@@ -178,7 +178,7 @@ mod tests {
             .and(query_param("offset", "0"))
             .and(query_param("limit", "20"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "codelists": [codelist_json(1, "C1"), codelist_json(2, "C2")],
+                "items": [codelist_json(1, "C1"), codelist_json(2, "C2")],
                 "nextOffset": 20
             })))
             .mount(&server)
@@ -206,7 +206,7 @@ mod tests {
             .and(path("/api/terminology/code-lists"))
             .and(query_param("offset", "40"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "codelists": [codelist_json(41, "C41")]
+                "items": [codelist_json(41, "C41")]
             })))
             .mount(&server)
             .await;
@@ -232,7 +232,7 @@ mod tests {
             .and(path("/api/terminology/code-lists"))
             .and(query_param("fragment", "AE"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "codelists": [codelist_json(1, "AE")]
+                "items": [codelist_json(1, "AE")]
             })))
             .mount(&server)
             .await;
@@ -282,7 +282,7 @@ mod tests {
         Mock::given(method("GET"))
             .and(path("/api/terminology/code-lists"))
             .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
-                "codelists": [],
+                "items": [],
                 "nextOffset": 100
             })))
             .mount(&server)
