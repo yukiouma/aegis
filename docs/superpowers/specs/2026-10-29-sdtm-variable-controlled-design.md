@@ -167,29 +167,31 @@ approach:
 
 Only the bound type changes — from `Option<&str>` to `Option<JsonValue>`.
 
-**The "clear" state is not reachable over HTTP — and that is unchanged
-by this work.** The three states above are the *repository* contract,
-and the domain, usecase, and adapter layers implement all three. At the
-HTTP boundary, `UpdateSdtmVariableRequest.variable_controlled` uses a
-plain `Option<Option<T>>` derive, and serde maps an explicit `null` to
-the **outer** `None`. A client sending `{"variableControlled": null}`
-therefore means "leave the column alone", not "clear it".
+**"Clear" is reachable over HTTP.** The three states above are the
+*repository* contract, and the domain, usecase, and adapter layers
+implement all three. At the HTTP boundary,
+`UpdateSdtmVariableRequest.variable_controlled` uses the repo's
+`double_option` deserializer (the helper at
+`apps/server/aegis-server/src/transport/http/dto.rs`, which the
+sdtm-project DTOs already use) so all three survive deserialization: a
+missing key is "leave the column alone", an explicit `null` is "clear
+the column", and a value is "replace it". A plain `Option<Option<T>>`
+derive would collapse the first two — serde maps `null` to the outer
+`None` — and would leave "clear" unreachable from a client.
 
-This is a pre-existing gap, not something this change introduces or
-fixes: the field's wire type is `Option<Option<String>>` today with the
-same derive. The repo already carries the remedy for it — the
-`double_option` deserializer helper at
-`apps/server/aegis-server/src/transport/http/dto.rs:2620`, which the
-sdtm-project DTOs use so that `null` really clears. Adopting it here
-would *change* today's behaviour rather than preserve it, and would
-raise the same question for `variable_role` on the same DTO — a wider
-change than this spec approves. It is therefore left for a deliberate,
-separate decision, and the current behaviour is pinned by a test so the
-desktop follow-up knows exactly what the contract is.
+This closes a pre-existing gap: before this change the field's wire
+type was `Option<Option<String>>` with the plain derive, so a client
+could not clear it and the desktop's "clear the field" action was a
+silent no-op. The change to the wire's *shape* is what made the gap
+worth closing: a client that now sends `null` to clear a controlled
+value must actually be able to clear it.
 
-The practical consequence for the desktop: there is currently no way to
-clear `variableControlled` over HTTP. The follow-up either sends a
-different value or the backend adopts `double_option` first.
+`variable_role` on the same DTO keeps the plain derive and therefore
+keeps its existing behaviour — for that field both an absent key and an
+explicit `null` mean "don't change". Aligning it is a separate,
+deliberate decision, because it would change a second field's behaviour
+and would make this DTO consistent with the sdtm-project endpoints in a
+way that is not otherwise part of this change.
 
 ### 4. Migration
 
@@ -312,8 +314,9 @@ is a crash rather than a type mismatch:
 
 This skew is intentional and temporary: the desktop is updated in the
 follow-up change that adopts the new wire contract. The follow-up
-should treat "the desktop cannot currently clear `variableControlled`"
-(see the note in §3) as part of its scope, not as a bug it introduces.
+should send `null` to clear `variableControlled` (the server now
+honours that — see the note in §3) and `{"code": [...], "format": [...]}`
+to replace it.
 
 ## What's left to the builder
 

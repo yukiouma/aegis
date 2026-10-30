@@ -1417,19 +1417,22 @@ pub struct CreateSdtmVariableRequest {
 
 /// `PUT /api/domain-model/variables/{id}` body.
 ///
-/// The nullable fields are typed `Option<Option<T>>` so the *Rust*
-/// value distinguishes three states, but a plain derive collapses
-/// two of them on the wire: serde maps an explicit `null` to the
-/// outer `None`. So over HTTP both an absent key and an explicit
-/// `null` mean "don't change", and "clear the field" is currently
-/// unreachable from a client. The repo's `double_option` deserializer
-/// (used by the sdtm-project DTOs) is the remedy; adopting it here
-/// would also change `variable_role` on this DTO, so it is a
-/// deliberate follow-up rather than a detail of this type change.
+/// `variable_controlled` is a three-state field: a missing key means
+/// "leave the column alone", an explicit `null` means "clear the
+/// controlled value", and a value means "replace it". It uses the
+/// `double_option` deserializer so serde does not collapse the first
+/// two — a plain `Option<Option<T>>` derive maps `null` to the outer
+/// `None`, which would make "clear" unreachable from a client.
+///
+/// `variable_role` still uses the plain derive, so for that field both
+/// an absent key and an explicit `null` mean "don't change".
 #[derive(Debug, Default, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSdtmVariableRequest {
     pub name: Option<String>,
+    /// Three-state: absent = unchanged, `null` = clear, value =
+    /// replace. See [`double_option`].
+    #[serde(default, deserialize_with = "double_option")]
     pub variable_controlled: Option<Option<SdtmVariableControlled>>,
     pub variable_type: Option<SdtmVariableType>,
     pub variable_core: Option<SdtmVariableCore>,
@@ -3984,24 +3987,37 @@ mod tests {
         );
     }
 
-    /// Over HTTP, an explicit `null` on the update field means "leave
-    /// the column alone", not "clear it". A plain `Option<Option<T>>`
-    /// derive maps `null` to the outer `None`, so the "clear" state is
-    /// unreachable from a client. This is pre-existing behaviour that
-    /// this change preserves — the repo's `double_option` helper is the
-    /// remedy, and adopting it here would be a separate decision
-    /// (it would change behaviour rather than preserve it, and would
-    /// raise the same question for `variable_role` on this DTO).
+    /// The update field must keep all three states distinguishable over
+    /// the wire: a missing key is "leave the column alone", an explicit
+    /// `null` is "clear the column", and a value is "replace the
+    /// column". A plain `Option<Option<T>>` derive collapses the first
+    /// two — serde maps `null` to the outer `None` — so the field uses
+    /// the `double_option` deserializer.
     #[test]
-    fn sdtm_variable_update_null_means_unchanged_not_cleared() {
+    fn sdtm_variable_update_distinguishes_absent_null_and_value() {
+        let absent: UpdateSdtmVariableRequest = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            absent.variable_controlled, None,
+            "a missing key must mean 'unchanged'"
+        );
+
         let null: UpdateSdtmVariableRequest =
             serde_json::from_str(r#"{"variableControlled":null}"#).unwrap();
         assert_eq!(
-            null.variable_controlled, None,
-            "an explicit null must mean 'unchanged', as it does today"
+            null.variable_controlled,
+            Some(None),
+            "an explicit null must mean 'clear the controlled value'"
         );
 
-        let absent: UpdateSdtmVariableRequest = serde_json::from_str("{}").unwrap();
-        assert_eq!(absent.variable_controlled, None);
+        let value: UpdateSdtmVariableRequest =
+            serde_json::from_str(r#"{"variableControlled":{"code":["C66731"]}}"#).unwrap();
+        assert_eq!(
+            value.variable_controlled,
+            Some(Some(SdtmVariableControlled {
+                code: Some(vec!["C66731".into()]),
+                format: None,
+            })),
+            "a value must mean 'replace the controlled value'"
+        );
     }
 }
