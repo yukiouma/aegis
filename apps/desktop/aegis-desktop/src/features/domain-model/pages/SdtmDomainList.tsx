@@ -34,9 +34,11 @@ export function SdtmDomainList() {
   const routeSearch = useSearch({ strict: false }) as {
     versionId?: number;
     lang?: string;
+    projectCode?: string;
   };
   const urlVersionId = routeSearch.versionId;
   const urlLang = routeSearch.lang;
+  const urlProjectCode = routeSearch.projectCode;
 
   const [searchFragment, setSearchFragment] = useState("");
   const [confirmDelete, setConfirmDelete] = useState<SdtmDomainView | null>(null);
@@ -190,7 +192,10 @@ export function SdtmDomainList() {
               navigate({
                 to: "/domain-model/sdtm/$domainId",
                 params: { domainId: String(row.id) },
-                search: { lang: selectedLang ?? undefined },
+                search: {
+                  lang: selectedLang ?? undefined,
+                  projectCode: urlProjectCode,
+                },
               })
             }
             emptyMessage={

@@ -12,36 +12,43 @@ import { errorMessage } from "../../../shared/api/error";
 import { InfiniteScrollSentinel } from "../../../shared/components/InfiniteScrollSentinel";
 import {
   useFindCodeListByName,
-  useLatestSdtmTerminologyVersionId,
   useListCodeItems,
+  useSdtmTerminologyVersionId,
 } from "../data";
 import { CodeItemTable } from "./CodeItemTable";
 
 export interface TerminologyCodeItemsDrawerProps {
   open: boolean;
   code: string | null;
+  /** Project whose configured SDTM terminology release the code is
+   *  resolved against. When absent, the most recently imported SDTM
+   *  release is used. */
+  projectCode?: string | null;
   onClose: () => void;
 }
 
 /**
  * Lists the code items of the code list a terminology code refers to.
  *
- * Resolution: the latest SDTM terminology version → the code list whose
- * `name` matches the code → that code list's items. The list is read
- * only: no create, edit, or delete affordances, and no "same code in
- * other codelists" dialog.
+ * Resolution: the SDTM terminology version → the code list whose `name`
+ * matches the code → that code list's items. The list is read only: no
+ * create, edit, or delete affordances, and no "same code in other
+ * codelists" dialog.
  *
- * Owns its own queries — the caller controls `open`, `code`, and
- * `onClose` only.
+ * Owns its own queries — the caller controls `open`, `code`,
+ * `projectCode`, and `onClose` only.
  */
 export function TerminologyCodeItemsDrawer({
   open,
   code,
+  projectCode,
   onClose,
 }: TerminologyCodeItemsDrawerProps) {
   const { t } = useI18n();
   const activeCode = open ? code : null;
-  const versions = useLatestSdtmTerminologyVersionId();
+  const versions = useSdtmTerminologyVersionId(
+    open ? (projectCode ?? null) : null,
+  );
   const codelistsQuery = useFindCodeListByName(versions.versionId, activeCode);
   const codelist = codelistsQuery.codelist;
 
@@ -51,16 +58,21 @@ export function TerminologyCodeItemsDrawer({
 
   // "No version imported", "still loading" and "the request failed" are
   // three different states — they must not collapse into one message.
-  const versionsFailed = versions.error != null;
-  const noVersion = versions.versionId == null && !versionsFailed;
+  const versionsFailed = versions.versionsError != null;
+  const projectFailed = versions.projectError != null;
+  const noVersion = versions.versionId == null && !versionsFailed && !projectFailed;
   const resolving = versions.isLoading || codelistsQuery.isLoading;
-  const lookupError = versions.error ?? codelistsQuery.error ?? itemsQuery.error;
+  const lookupError =
+    versions.versionsError ??
+    versions.projectError ??
+    codelistsQuery.error ??
+    itemsQuery.error;
 
   function handleRetry() {
     // Refetch only the query that failed: the code-item query is
     // disabled until a code list is resolved, and firing it anyway
     // would ask the server for an unfiltered page of code items.
-    if (versionsFailed) {
+    if (versionsFailed || projectFailed) {
       versions.refetch();
       return;
     }
@@ -90,10 +102,14 @@ export function TerminologyCodeItemsDrawer({
                 ? t("terminology.codeitem.drawer.versionsLoadFailed", {
                     message: errorMessage(lookupError),
                   })
-                : t("terminology.codeitem.drawer.loadFailed", {
-                    code: code ?? "",
-                    message: errorMessage(lookupError),
-                  })}
+                : projectFailed
+                  ? t("terminology.codeitem.drawer.projectLoadFailed", {
+                      message: errorMessage(lookupError),
+                    })
+                  : t("terminology.codeitem.drawer.loadFailed", {
+                      code: code ?? "",
+                      message: errorMessage(lookupError),
+                    })}
             </Alert>
             <Box>
               <Button onClick={handleRetry}>{t("common.retry")}</Button>

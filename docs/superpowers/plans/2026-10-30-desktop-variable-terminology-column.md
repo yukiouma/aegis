@@ -1335,3 +1335,21 @@ this plan to the code is not left guessing.
    key, which the plan's task text dropped.** The chips now carry it
    as a tooltip and an `aria-label`, so the button is not announced as
    a bare code.
+
+6. **The drawer's version resolution became project-aware (A6).** The
+   plan's Task 4 resolved the version as "the highest id among the
+   SDTM terminology versions". The human partner's requirement was
+   stricter: a project pins the SDTM controlled-terminology release it
+   works against, so that is the release a variable's controlled
+   terminology refers to. The drawer's version therefore comes from
+   `project.configurations.sdtmTerminology` when a project is in scope,
+   falling back to the newest SDTM release when there is none. The
+   project reaches the page through the URL (`?projectCode=…`), because
+   the SDTM domain model page is global and has no project of its own.
+
+   The hook became `useSdtmTerminologyVersionId(projectCode)` in place
+   of `useLatestSdtmTerminologyVersionId()`. It returns the version id
+   only once the project is known — resolving to the fallback first
+   would fire the code-list lookup against the wrong version — and it
+   reports the versions query and the project query errors separately,
+   so the drawer can say which request failed.

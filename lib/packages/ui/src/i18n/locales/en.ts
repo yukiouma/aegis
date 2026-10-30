@@ -248,6 +248,8 @@ export const en = {
     'Failed to load the code list for {code}: {message}',
   'terminology.codeitem.drawer.versionsLoadFailed':
     'Failed to load the terminology versions: {message}',
+  'terminology.codeitem.drawer.projectLoadFailed':
+    'Failed to load the project configuration: {message}',
   'terminology.codeitem.drawer.openTooltip': 'View code items',
 
   'terminology.codeitem.codeClick.tooltip':

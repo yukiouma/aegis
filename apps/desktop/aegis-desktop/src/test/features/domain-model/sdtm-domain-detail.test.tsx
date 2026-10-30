@@ -232,4 +232,58 @@ describe("SdtmDomainDetail", () => {
     );
     expect(await screen.findByText("PASS")).toBeInTheDocument();
   });
+
+  it("resolves the terminology version against the project named in the URL", async () => {
+    mockInvoke.mockReset();
+    mockCommands({
+      is_logged_in: () => true,
+      current_user: () => ({
+        id: 1,
+        code: "alice",
+        name: "Alice",
+        role: "admin",
+        active: true,
+        createdAt: "2026-01-01T00:00:00Z",
+        updatedAt: "2026-01-01T00:00:00Z",
+      }),
+      get_sdtm_domain_by_id: () => domain,
+      list_sdtm_variables_by_domain: () => ({ variables }),
+      list_terminology_versions: () => [
+        {
+          id: 5,
+          kind: "sdtm",
+          name: "2024-06-28",
+          createdAt: "",
+          updatedAt: "",
+        },
+      ],
+      get_project_by_code: () => ({
+        id: 1,
+        code: "DEMO-001",
+        description: "",
+        members: { users: [], groups: [] },
+        configurations: {
+          language: "en",
+          tags: [],
+          sdtmig: null,
+          sdtmTerminology: { versionId: 5, versionName: "2024-06-28" },
+        },
+        active: true,
+        createdAt: "",
+        updatedAt: "",
+      }),
+      list_code_lists: () => ({ items: [] }),
+      list_code_items: () => ({ items: [] }),
+    });
+    renderPage("/domain-model/sdtm/7?lang=en&projectCode=DEMO-001");
+    await screen.findByText("AESEV");
+    await userEvent.click(
+      screen.getByRole("button", { name: /view code items VSTESTCD/i }),
+    );
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith("get_project_by_code", {
+        code: "DEMO-001",
+      });
+    });
+  });
 });

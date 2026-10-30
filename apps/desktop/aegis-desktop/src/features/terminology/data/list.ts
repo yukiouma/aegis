@@ -26,6 +26,7 @@ import {
   type UpdateTerminologyVersionInput,
 } from "../../../shared/api";
 import { queryKeys } from "../../../shared/query";
+import { useProject } from "../../project-list";
 
 /** Page size used by both code-list and code-item tables. */
 export const PAGE_SIZE = 20;
@@ -318,34 +319,72 @@ export function useGetCodeListsByIds(ids: number[]) {
 }
 
 /**
- * The most recently imported SDTM terminology version.
+ * The SDTM terminology version a terminology code should be resolved
+ * against.
  *
- * The server orders the version list by `id ASC`, so the highest id is
- * the latest import. ADaM versions are ignored. `versionId` is `null`
- * when no SDTM version exists — but the caller must read `isLoading`
- * and `error` first: "still loading", "the request failed" and "none
- * imported" are three different states.
+ * Resolution rules:
+ *   1. When a project is in scope and it configures an SDTM
+ *      terminology release, use that release. A stale id whose name
+ *      still matches a known release resolves by name — the drawer is
+ *      read-only, so the stored pointer is not healed.
+ *   2. Otherwise — no project, no configured release, or one that
+ *      matches nothing — use the most recently imported SDTM release
+ *      (the highest id; the server lists versions by id ascending).
+ *
+ * While the project is still loading the version is `null`: resolving
+ * to the fallback first would fire the code-list lookup against the
+ * wrong version.
  */
-export interface LatestSdtmTerminologyVersion {
+export interface SdtmTerminologyVersion {
   versionId: number | null;
   isLoading: boolean;
-  error: ApiError | null;
+  /** Error from the terminology versions query. */
+  versionsError: ApiError | null;
+  /** Error from the project query — only when a project is in scope. */
+  projectError: ApiError | null;
   refetch: () => void;
 }
 
-export function useLatestSdtmTerminologyVersionId(): LatestSdtmTerminologyVersion {
-  const versions = useListTerminologyVersions();
-  const sdtmVersions = (versions.data ?? []).filter((v) => v.kind === "sdtm");
-  const versionId = sdtmVersions.reduce<number | null>(
-    (latest, v) => (latest == null || v.id > latest ? v.id : latest),
-    null,
-  );
+export function useSdtmTerminologyVersionId(
+  projectCode: string | null,
+): SdtmTerminologyVersion {
+  const versionsQuery = useListTerminologyVersions();
+  const projectQuery = useProject(projectCode, {
+    enabled: projectCode != null && projectCode !== "",
+  });
+
+  const versions = versionsQuery.data ?? [];
+  const configured =
+    projectQuery.data?.configurations.sdtmTerminology ?? null;
+  const projectPending = projectCode != null && projectQuery.isLoading;
+
+  const versionId = useMemo(() => {
+    if (projectPending) return null;
+    const sdtmVersions = versions.filter((v) => v.kind === "sdtm");
+    if (configured) {
+      const byId = sdtmVersions.find((v) => v.id === configured.versionId);
+      if (byId) return byId.id;
+      const byName = sdtmVersions.find(
+        (v) => v.name.toLowerCase() === configured.versionName.toLowerCase(),
+      );
+      if (byName) return byName.id;
+    }
+    return sdtmVersions.reduce<number | null>(
+      (latest, v) => (latest == null || v.id > latest ? v.id : latest),
+      null,
+    );
+  }, [versions, configured, projectPending]);
+
   return {
     versionId,
-    isLoading: versions.isLoading,
-    error: versions.error,
+    isLoading:
+      versionsQuery.isLoading ||
+      (projectCode != null && projectQuery.isLoading),
+    versionsError: versionsQuery.error,
+    projectError: projectQuery.error,
     refetch: () => {
-      void versions.refetch();
+      void versionsQuery.refetch();
+      if (projectCode != null) void projectQuery.refetch();
     },
   };
 }

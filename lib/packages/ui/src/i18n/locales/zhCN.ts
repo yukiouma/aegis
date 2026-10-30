@@ -240,6 +240,7 @@ export const zhCN = {
   'terminology.codeitem.drawer.loadFailed':
     '{code} 的代码列表加载失败：{message}',
   'terminology.codeitem.drawer.versionsLoadFailed': '术语版本加载失败：{message}',
+  'terminology.codeitem.drawer.projectLoadFailed': '项目配置加载失败：{message}',
   'terminology.codeitem.drawer.openTooltip': '查看代码项',
 
   'terminology.codeitem.codeClick.tooltip': '在其他术语集中查看该 Code',

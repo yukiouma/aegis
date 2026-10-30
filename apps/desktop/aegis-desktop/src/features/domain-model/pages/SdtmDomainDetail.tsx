@@ -46,6 +46,7 @@ export function SdtmDomainDetail() {
     from: "/_authed/_layout/domain-model/sdtm/$domainId",
   });
   const domainId = Number(params.domainId);
+  const projectCode = routeSearch.projectCode ?? null;
 
   const currentUser = useCurrentUser();
   const role = currentUser.data?.role;
@@ -298,6 +299,7 @@ export function SdtmDomainDetail() {
       <TerminologyCodeItemsDrawer
         open={terminologyCode !== null}
         code={terminologyCode}
+        projectCode={projectCode}
         onClose={() => setTerminologyCode(null)}
       />
     </Box>

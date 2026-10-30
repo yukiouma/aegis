@@ -261,10 +261,9 @@ export interface TerminologyCodeItemsDrawerProps {
 
 It owns its own queries, in this order:
 
-1. **Latest SDTM terminology version.**
-   `useListTerminologyVersions()` → the versions with `kind === "sdtm"`
-   → the highest `id` (the server orders by `id ASC`, so the highest id
-   is the most recently imported version).
+1. **The SDTM terminology version to resolve against.**
+   The project's configured release when a project is in scope, else the
+   most recently imported SDTM release — see A6 for the full rule.
 2. **Resolve the code to a codelist.** A new query hook
    `useFindCodeListByName(versionId, name)` in the terminology data
    layer: `GET /api/terminology/code-lists?versionId=<v>&fragment=<code>`
@@ -413,6 +412,29 @@ a miss.** The server rejects a fragment containing `&`, `|`, `!`, `(`,
 states.** The drawer distinguishes them: no SDTM terminology version
 at all is its own message, and so is a version with no matching code
 list.
+
+**A6. The drawer resolves against the *project's configured* SDTM
+terminology release.** A project pins the SDTM controlled-terminology
+release it works against (`project.configurations.sdtmTerminology`),
+and that is the release whose codelists its variables' controlled
+terminology refers to — not merely the newest one on the server. The
+SDTM domain model page is global, so the project comes from the URL:
+`?projectCode=…` on both the domain list and the domain detail route,
+carried across the list → detail navigation.
+
+Resolution:
+
+1. A project code in the URL → the project's configured
+   `sdtmTerminology.versionId`. A stale id whose `versionName` still
+   matches a known release resolves by name; the drawer never mutates
+   the project, so the stored pointer is not healed.
+2. No project, no configured release, or one that matches nothing →
+   the most recently imported SDTM release (highest id among
+   `kind === "sdtm"`).
+
+While the project is still loading the version is unresolved, so the
+code-list lookup waits rather than firing against the fallback version
+first.
 
 ---
 

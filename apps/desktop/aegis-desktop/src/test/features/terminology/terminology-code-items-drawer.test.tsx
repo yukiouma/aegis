@@ -62,6 +62,24 @@ const codeItem = {
   updatedAt: "",
 };
 
+function projectWithTerminology(versionId: number, versionName: string) {
+  return {
+    id: 1,
+    code: "DEMO-001",
+    description: "",
+    members: { users: [], groups: [] },
+    configurations: {
+      language: "en",
+      tags: [],
+      sdtmig: null,
+      sdtmTerminology: { versionId, versionName },
+    },
+    active: true,
+    createdAt: "",
+    updatedAt: "",
+  };
+}
+
 function setupMocks(overrides?: {
   versions?: unknown[];
   codeLists?: { items: unknown[] };
@@ -77,7 +95,11 @@ function setupMocks(overrides?: {
   });
 }
 
-function renderDrawer(props?: { open?: boolean; code?: string | null }) {
+function renderDrawer(props?: {
+  open?: boolean;
+  code?: string | null;
+  projectCode?: string | null;
+}) {
   return render(
     <AegisThemeProvider>
       <TestQueryProvider>
@@ -85,6 +107,7 @@ function renderDrawer(props?: { open?: boolean; code?: string | null }) {
           <TerminologyCodeItemsDrawer
             open={props?.open ?? true}
             code={props?.code ?? "VSTESTCD"}
+            projectCode={props?.projectCode ?? null}
             onClose={() => {}}
           />
         </AegisI18nProvider>
@@ -266,6 +289,89 @@ describe("TerminologyCodeItemsDrawer", () => {
         (c) => c[0] === "list_code_lists",
       );
       expect(calls.length).toBe(0);
+    });
+  });
+
+  it("resolves against the terminology version the project configures", async () => {
+    mockInvoke.mockReset();
+    mockCommands({
+      list_terminology_versions: () => [
+        sdtmVersion,
+        { ...sdtmVersion, id: 7, name: "2024-09-27" },
+        adamVersion,
+      ],
+      get_project_by_code: () => projectWithTerminology(5, "2024-06-28"),
+      list_code_lists: () => ({ items: [targetCodelist] }),
+      list_code_items: () => ({ items: [codeItem] }),
+    });
+    renderDrawer({ projectCode: "DEMO-001" });
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "list_code_lists",
+        expect.objectContaining({ versionId: 5 }),
+      );
+    });
+    // Not the most recently imported SDTM release (id 7).
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "list_code_lists",
+      expect.objectContaining({ versionId: 7 }),
+    );
+  });
+
+  it("resolves a stale configured version id by name", async () => {
+    mockInvoke.mockReset();
+    mockCommands({
+      list_terminology_versions: () => [
+        sdtmVersion,
+        { ...sdtmVersion, id: 7, name: "2024-09-27" },
+      ],
+      // The stored id no longer exists; the stored name still does.
+      get_project_by_code: () => projectWithTerminology(99, "2024-06-28"),
+      list_code_lists: () => ({ items: [targetCodelist] }),
+      list_code_items: () => ({ items: [codeItem] }),
+    });
+    renderDrawer({ projectCode: "DEMO-001" });
+    await waitFor(() => {
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "list_code_lists",
+        expect.objectContaining({ versionId: 5 }),
+      );
+    });
+    // Not the most recently imported SDTM release (id 7).
+    expect(mockInvoke).not.toHaveBeenCalledWith(
+      "list_code_lists",
+      expect.objectContaining({ versionId: 7 }),
+    );
+  });
+
+  it("falls back to the newest SDTM release when the project configures none", async () => {
+    mockInvoke.mockReset();
+    mockCommands({
+      list_terminology_versions: () => [
+        sdtmVersion,
+        { ...sdtmVersion, id: 7, name: "2024-09-27" },
+        adamVersion,
+      ],
+      get_project_by_code: () => ({
+        ...projectWithTerminology(5, "2024-06-28"),
+        configurations: { language: "en", tags: [], sdtmTerminology: null },
+      }),
+      list_code_lists: () => ({ items: [targetCodelist] }),
+      list_code_items: () => ({ items: [codeItem] }),
+    });
+    renderDrawer({ projectCode: "DEMO-001" });
+    await waitFor(() => {
+      // The project was consulted…
+      expect(mockInvoke).toHaveBeenCalledWith("get_project_by_code", {
+        code: "DEMO-001",
+      });
+    });
+    await waitFor(() => {
+      // …and the newest SDTM release was used.
+      expect(mockInvoke).toHaveBeenCalledWith(
+        "list_code_lists",
+        expect.objectContaining({ versionId: 7 }),
+      );
     });
   });
 });
