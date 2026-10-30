@@ -33,7 +33,7 @@ const targetCodelist = {
   versionId: 5,
   code: "C66741",
   extensible: true,
-  name: "VSTESTCD",
+  name: "Test Code",
   submissionValue: "VSTESTCD",
   synonym: "",
   definition: "",
@@ -42,10 +42,14 @@ const targetCodelist = {
   updatedAt: "",
 };
 
+// A codelist whose *name* is the code and whose definition mentions it —
+// but whose submission value is something else. A full-text hit, and a
+// name match, but not the codelist the code refers to.
 const decoyCodelist = {
   ...targetCodelist,
   id: 12,
-  name: "Other",
+  name: "VSTESTCD",
+  submissionValue: "OTHER",
   definition: "mentions VSTESTCD in its definition",
 };
 
@@ -138,12 +142,13 @@ describe("TerminologyCodeItemsDrawer", () => {
     });
   });
 
-  it("picks the code list whose name matches exactly, not a full-text hit", async () => {
+  it("picks the code list whose submission value matches, not a name or full-text hit", async () => {
     setupMocks();
     renderDrawer();
     expect(await screen.findByText("PASS")).toBeInTheDocument();
-    // The decoy code list (id 12) also mentions the code in its definition;
-    // only the exact name match (id 11) is used.
+    // The decoy code list (id 12) is *named* VSTESTCD and mentions it in
+    // its definition, but its submission value is different — the code
+    // refers to the submission value, so id 11 is the one.
     await waitFor(() => {
       const calls = mockInvoke.mock.calls.filter(
         (c) => c[0] === "list_code_items",
@@ -160,7 +165,9 @@ describe("TerminologyCodeItemsDrawer", () => {
     setupMocks({ codeLists: { items: [decoyCodelist] } });
     renderDrawer();
     expect(
-      await screen.findByText(/no code list named VSTESTCD was found/i),
+      await screen.findByText(
+        /no code list with submission value VSTESTCD was found/i,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -232,12 +239,28 @@ describe("TerminologyCodeItemsDrawer", () => {
     ).toBe(true);
   });
 
-  it("resolves a code list whose name only matches case-insensitively", async () => {
+  it("resolves a code list whose submission value only matches case-insensitively", async () => {
     // The search is case-insensitive, so `vstestcd` still finds the code
     // list; the resolution must accept it rather than reporting a miss.
     setupMocks();
     renderDrawer({ code: "vstestcd" });
     expect(await screen.findByText("PASS")).toBeInTheDocument();
+  });
+
+  it("shows whether the code list is extensible", async () => {
+    setupMocks();
+    renderDrawer();
+    expect(await screen.findByText("PASS")).toBeInTheDocument();
+    expect(screen.getByText("EXT")).toBeInTheDocument();
+  });
+
+  it("does not mark a non-extensible code list as extensible", async () => {
+    setupMocks({
+      codeLists: { items: [{ ...targetCodelist, extensible: false }] },
+    });
+    renderDrawer();
+    await screen.findByText("PASS");
+    expect(screen.queryByText("EXT")).not.toBeInTheDocument();
   });
 
   it("shows an error state when the code list lookup fails", async () => {

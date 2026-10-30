@@ -1353,3 +1353,16 @@ this plan to the code is not left guessing.
    would fire the code-list lookup against the wrong version — and it
    reports the versions query and the project query errors separately,
    so the drawer can say which request failed.
+
+7. **The code list is matched by submission value, and the drawer shows
+   extensibility.** The plan matched the code list's `name`; the human
+   partner corrected it to `submissionValue` — the SDTMIG references a
+   codelist as "Test Code [VSTESTCD]", so the bracketed submission
+   value is what a variable's controlled terminology holds, and a
+   codelist's `name` is its human-readable NCI name. The hook became
+   `useFindCodeListBySubmissionValue` (query key
+   `codeListBySubmissionValue`), the not-found message says "No code
+   list with submission value {code} was found", and the edit drawer's
+   hint says "Code list submission values". The drawer also shows the
+   resolved code list's extensibility as an "EXT" chip — the same
+   marker the code-list table and the code-list detail page use.

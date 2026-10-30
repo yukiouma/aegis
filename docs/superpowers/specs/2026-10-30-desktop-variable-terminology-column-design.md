@@ -265,15 +265,15 @@ It owns its own queries, in this order:
    The project's configured release when a project is in scope, else the
    most recently imported SDTM release — see A6 for the full rule.
 2. **Resolve the code to a codelist.** A new query hook
-   `useFindCodeListByName(versionId, name)` in the terminology data
-   layer: `GET /api/terminology/code-lists?versionId=<v>&fragment=<code>`
+   `useFindCodeListBySubmissionValue(versionId, submissionValue)` in the
+   terminology data layer: `GET /api/terminology/code-lists?versionId=<v>&fragment=<code>`
    (the code as the search fragment, as specified), then pick the row
-   whose `name` equals the code **exactly**. The search is a
+   whose `submissionValue` equals the code **exactly**. The search is a
    full-text match over `name`, `submission_value`, `synonym`,
    `definition` and `nci_preferred_term`, so several rows can come
-   back; only the exact name match is the codelist we want. The
-   request asks for the server's maximum page size so a common token
-   does not push the exact match off the first page.
+   back; only the exact submission-value match is the codelist we want.
+   The request asks for the server's maximum page size so a common
+   token does not push the exact match off the first page.
 3. **List the items.** The existing `useListCodeItems(codelistId)`
    infinite query — the same hook `CodeListDetailPage` uses — pages
    the items 20 at a time.
@@ -281,7 +281,8 @@ It owns its own queries, in this order:
 The drawer renders:
 
 - a title naming the terminology code, and the resolved codelist's
-  name and NCI code when it was found;
+  name and NCI code when it was found, with an "EXT" chip when the
+  codelist is extensible;
 - a spinner while resolving;
 - an `Alert` + **Retry** button when a query fails;
 - "no code list found for {code}" when the resolution comes back
@@ -386,13 +387,21 @@ The desktop therefore mirrors the server's helper: a private
 `UpdateSdtmVariableRequest.variable_controlled`. The three states then
 survive both hops.
 
-**A2. The name match is exact first, case-insensitive second.** The
-full-text search is already case-insensitive (Postgres lowercases the
-`tsvector`), so a stored value of `vstestcd` finds the codelist named
-`VSTESTCD` in the search result but fails a raw string comparison. The
-resolution takes the first row whose `name` equals the code exactly;
-if there is none, it falls back to the first row whose `name` equals
-it case-insensitively.
+**A2. The match is on the code list's *submission value*, exact first
+and case-insensitive second.** The SDTMIG writes a codelist reference
+as "Test Code [VSTESTCD]" — the bracketed part is the codelist's
+submission value, and that is what a variable's controlled terminology
+holds. The codelist's `name` is its human-readable NCI name ("Test
+Code"), so matching on it would pick the wrong row whenever a name
+happens to equal the code. The full-text search is already
+case-insensitive (Postgres lowercases the `tsvector`), so a stored
+value of `vstestcd` finds the codelist in the search result but fails a
+raw string comparison; the resolution takes the first row whose
+`submissionValue` equals the code exactly, then falls back to the first
+row whose `submissionValue` equals it case-insensitively.
+
+The drawer also shows the resolved code list's extensibility, with the
+same "EXT" chip the code-list table uses.
 
 **A3. Known limitation: a code stored as an NCI c-code cannot be
 resolved.** `code_lists.tsv` is generated over the five text columns

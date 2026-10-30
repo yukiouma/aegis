@@ -2,8 +2,10 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Drawer,
+  Tooltip,
   Typography,
 } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
@@ -11,7 +13,7 @@ import { useI18n } from "@aegis/ui/i18n";
 import { errorMessage } from "../../../shared/api/error";
 import { InfiniteScrollSentinel } from "../../../shared/components/InfiniteScrollSentinel";
 import {
-  useFindCodeListByName,
+  useFindCodeListBySubmissionValue,
   useListCodeItems,
   useSdtmTerminologyVersionId,
 } from "../data";
@@ -49,7 +51,10 @@ export function TerminologyCodeItemsDrawer({
   const versions = useSdtmTerminologyVersionId(
     open ? (projectCode ?? null) : null,
   );
-  const codelistsQuery = useFindCodeListByName(versions.versionId, activeCode);
+  const codelistsQuery = useFindCodeListBySubmissionValue(
+    versions.versionId,
+    activeCode,
+  );
   const codelist = codelistsQuery.codelist;
 
   const itemsQuery = useListCodeItems(codelist?.id ?? null);
@@ -129,9 +134,16 @@ export function TerminologyCodeItemsDrawer({
           </Typography>
         ) : (
           <>
-            <Typography variant="body2" color="text.secondary">
-              {`${codelist.name} · ${codelist.code}`}
-            </Typography>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography variant="body2" color="text.secondary">
+                {`${codelist.name} · ${codelist.code}`}
+              </Typography>
+              {codelist.extensible && (
+                <Tooltip title={t("terminology.extensible")}>
+                  <Chip label="EXT" size="small" />
+                </Tooltip>
+              )}
+            </Box>
             <CodeItemTable
               rows={rows}
               loading={itemsQuery.isLoading}

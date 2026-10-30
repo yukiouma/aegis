@@ -241,7 +241,7 @@ export const en = {
   'terminology.codeitem.readOnly': 'Read-only',
   'terminology.codeitem.drawer.title': 'Code items for {code}',
   'terminology.codeitem.drawer.notFound':
-    'No code list named {code} was found in the latest SDTM terminology version.',
+    'No code list with submission value {code} was found in the latest SDTM terminology version.',
   'terminology.codeitem.drawer.noVersion':
     'No SDTM terminology version has been imported.',
   'terminology.codeitem.drawer.loadFailed':
@@ -308,7 +308,7 @@ export const en = {
   "domainModel.sdtm.variable.field.name": "Name",
   "domainModel.sdtm.variable.field.variableControlledCode": "Controlled terminology (code list)",
   "domainModel.sdtm.variable.field.variableControlledCodeHint":
-    "Code list names, comma-separated (e.g. VSTESTCD)",
+    "Code list submission values, comma-separated (e.g. VSTESTCD)",
   "domainModel.sdtm.variable.field.variableControlledFormat": "Controlled terminology (format)",
   "domainModel.sdtm.variable.field.variableControlledHint": "Comma-separated values",
   "domainModel.sdtm.variable.field.variableType": "Type",

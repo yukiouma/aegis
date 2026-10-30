@@ -28,8 +28,8 @@ export const queryKeys = {
     codeLists: (versionId: number, fragment: string) =>
       ["terminology", "codeLists", versionId, fragment] as const,
     codeList: (id: number) => ["terminology", "codeList", id] as const,
-    codeListByName: (versionId: number, name: string) =>
-      ["terminology", "codeListByName", versionId, name] as const,
+    codeListBySubmissionValue: (versionId: number, submissionValue: string) =>
+      ["terminology", "codeListBySubmissionValue", versionId, submissionValue] as const,
     codeItems: (codelistId: number, fragment: string) =>
       ["terminology", "codeItems", codelistId, fragment] as const,
     codeItemsByCode: (versionId: number, code: string) =>

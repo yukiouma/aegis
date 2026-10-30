@@ -390,33 +390,48 @@ export function useSdtmTerminologyVersionId(
 }
 
 /**
- * Find the code list whose `name` equals `name` in a terminology
- * version. The server search is a full-text match, so several rows can
- * come back; the exact name match wins, and a case-insensitive match is
+ * Find the code list whose *submission value* equals `submissionValue`
+ * in a terminology version. A terminology code names a codelist the way
+ * the SDTMIG does — "Test Code [VSTESTCD]" — so the submission value
+ * is the reference, not the codelist's name.
+ *
+ * The server search is a full-text match, so several rows can come back;
+ * the exact submission-value match wins, and a case-insensitive match is
  * accepted as a fallback (the search itself is case-insensitive).
  *
  * The lookup asks for the server's maximum page size so a common token
  * does not push the exact match off the first page. It uses its own
  * query key — `codeLists` belongs to the 20-per-page infinite query.
  */
-export function useFindCodeListByName(
+export function useFindCodeListBySubmissionValue(
   versionId: number | null,
-  name: string | null,
+  submissionValue: string | null,
 ) {
   const query = useQuery<PagedCodeListListResponse, ApiError>({
-    queryKey: queryKeys.terminology.codeListByName(versionId ?? 0, name ?? ""),
+    queryKey: queryKeys.terminology.codeListBySubmissionValue(
+      versionId ?? 0,
+      submissionValue ?? "",
+    ),
     queryFn: () =>
-      api.listCodeLists(versionId!, { fragment: name!, offset: 0, limit: 500 }),
-    enabled: versionId != null && versionId > 0 && !!name,
+      api.listCodeLists(versionId!, {
+        fragment: submissionValue!,
+        offset: 0,
+        limit: 500,
+      }),
+    enabled: versionId != null && versionId > 0 && !!submissionValue,
   });
   const codelist = useMemo(() => {
     const items = query.data?.items ?? [];
-    if (!name) return null;
+    if (!submissionValue) return null;
     return (
-      items.find((c) => c.name === name) ??
-      items.find((c) => c.name.toLowerCase() === name.toLowerCase()) ??
+      items.find((c) => c.submissionValue === submissionValue) ??
+      items.find(
+        (c) =>
+          c.submissionValue.toLowerCase() ===
+          submissionValue.toLowerCase(),
+      ) ??
       null
     );
-  }, [query.data, name]);
+  }, [query.data, submissionValue]);
   return { ...query, codelist };
 }
