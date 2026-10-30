@@ -54,6 +54,38 @@ pub struct SdtmVariableDescription {
     pub details: SdtmVariableDescriptionDetail,
 }
 
+/// Controlled-terminology metadata carried by an SDTM variable.
+///
+/// Mirrors the server's `dto::SdtmVariableControlled`: the same
+/// camelCase rename, and both lists default to `None` when the key is
+/// absent or explicitly `null`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmVariableControlled {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<Vec<String>>,
+}
+
+/// Deserialise a nullable field into `Option<Option<T>>` so all three
+/// states stay distinguishable across the Tauri hop:
+///
+/// - a missing key is `None` — "leave the column alone"
+/// - an explicit `null` is `Some(None)` — "clear the column"
+/// - a value is `Some(Some(v))` — "replace the column"
+///
+/// A plain `Option<Option<T>>` derive collapses the first two: serde
+/// maps `null` to the outer `None`, which `skip_serializing_if` then
+/// drops from the outgoing request.
+fn double_option<'de, T, D>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    T: Deserialize<'de>,
+    D: serde::Deserializer<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SdtmVariableViewResponse {
@@ -61,7 +93,7 @@ pub struct SdtmVariableViewResponse {
     pub domain_id: i64,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub variable_controlled: Option<String>,
+    pub variable_controlled: Option<SdtmVariableControlled>,
     pub variable_type: SdtmVariableType,
     pub variable_core: SdtmVariableCore,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -84,7 +116,7 @@ pub struct CreateSdtmVariableRequest {
     pub domain_id: i64,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub variable_controlled: Option<String>,
+    pub variable_controlled: Option<SdtmVariableControlled>,
     pub variable_type: SdtmVariableType,
     pub variable_core: SdtmVariableCore,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -98,8 +130,18 @@ pub struct CreateSdtmVariableRequest {
 pub struct UpdateSdtmVariableRequest {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub variable_controlled: Option<Option<String>>,
+    /// Three-state: absent = unchanged, `null` = clear, value = replace.
+    ///
+    /// `skip_serializing_if` keeps "unchanged" expressed as an absent
+    /// key; `double_option` keeps an incoming `null` distinguishable
+    /// from an absent key. The two are independent — one governs
+    /// serialization, the other deserialization.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "double_option"
+    )]
+    pub variable_controlled: Option<Option<SdtmVariableControlled>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub variable_type: Option<SdtmVariableType>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -291,5 +333,114 @@ mod tests {
         };
         let j = serde_json::to_string(&body).unwrap();
         assert_eq!(j, r#"{"name":"renamed"}"#);
+    }
+
+    #[test]
+    fn view_decodes_controlled_code_and_format_lists() {
+        let json = serde_json::json!({
+            "id": 1, "domainId": 5, "name": "VSTESTCD",
+            "variableControlled": { "code": ["VSTESTCD"], "format": ["Codelist"] },
+            "variableType": "Character", "variableCore": "Req",
+            "variableSequence": 1, "descriptions": [],
+            "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z"
+        });
+        let v: SdtmVariableViewResponse = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            v.variable_controlled,
+            Some(SdtmVariableControlled {
+                code: Some(vec!["VSTESTCD".into()]),
+                format: Some(vec!["Codelist".into()]),
+            })
+        );
+    }
+
+    #[test]
+    fn view_decodes_null_controlled_as_none() {
+        let json = serde_json::json!({
+            "id": 1, "domainId": 5, "name": "VSTESTCD",
+            "variableControlled": null,
+            "variableType": "Character", "variableCore": "Req",
+            "variableSequence": 1, "descriptions": [],
+            "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z"
+        });
+        let v: SdtmVariableViewResponse = serde_json::from_value(json).unwrap();
+        assert_eq!(v.variable_controlled, None);
+    }
+
+    #[test]
+    fn view_decodes_absent_format_list_as_none() {
+        let json = serde_json::json!({
+            "id": 1, "domainId": 5, "name": "VSTESTCD",
+            "variableControlled": { "code": ["VSTESTCD"] },
+            "variableType": "Character", "variableCore": "Req",
+            "variableSequence": 1, "descriptions": [],
+            "createdAt": "2026-01-01T00:00:00Z", "updatedAt": "2026-01-01T00:00:00Z"
+        });
+        let v: SdtmVariableViewResponse = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            v.variable_controlled,
+            Some(SdtmVariableControlled {
+                code: Some(vec!["VSTESTCD".into()]),
+                format: None,
+            })
+        );
+    }
+
+    #[test]
+    fn update_request_decodes_null_controlled_as_clear() {
+        // The Tauri payload is where the webview's `null` arrives. A plain
+        // `Option<Option<T>>` derive maps it to the outer `None`, the key
+        // is then dropped by `skip_serializing_if`, and the server reads
+        // "unchanged" instead of "clear".
+        let body: UpdateSdtmVariableRequest =
+            serde_json::from_str(r#"{"variableControlled":null}"#).unwrap();
+        assert_eq!(body.variable_controlled, Some(None));
+    }
+
+    #[test]
+    fn update_request_decodes_absent_controlled_as_unchanged() {
+        let body: UpdateSdtmVariableRequest =
+            serde_json::from_str(r#"{"name":"renamed"}"#).unwrap();
+        assert_eq!(body.variable_controlled, None);
+    }
+
+    #[test]
+    fn update_request_decodes_controlled_object_as_replace() {
+        let body: UpdateSdtmVariableRequest =
+            serde_json::from_str(r#"{"variableControlled":{"code":["VSTESTCD"]}}"#).unwrap();
+        assert_eq!(
+            body.variable_controlled,
+            Some(Some(SdtmVariableControlled {
+                code: Some(vec!["VSTESTCD".into()]),
+                format: None,
+            }))
+        );
+    }
+
+    #[test]
+    fn update_request_serializes_controlled_object() {
+        let body = UpdateSdtmVariableRequest {
+            variable_controlled: Some(Some(SdtmVariableControlled {
+                code: Some(vec!["VSTESTCD".into()]),
+                format: None,
+            })),
+            ..Default::default()
+        };
+        assert_eq!(
+            serde_json::to_string(&body).unwrap(),
+            r#"{"variableControlled":{"code":["VSTESTCD"]}}"#
+        );
+    }
+
+    #[test]
+    fn update_request_serializes_controlled_null_as_clear() {
+        let body = UpdateSdtmVariableRequest {
+            variable_controlled: Some(None),
+            ..Default::default()
+        };
+        assert_eq!(
+            serde_json::to_string(&body).unwrap(),
+            r#"{"variableControlled":null}"#
+        );
     }
 }
