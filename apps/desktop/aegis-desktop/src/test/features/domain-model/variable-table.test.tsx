@@ -34,6 +34,7 @@ const variables: SdtmVariableView[] = [
     variableCore: "Req",
     variableRole: "Record Qualifier",
     variableSequence: 2,
+    variableControlled: { code: ["VSTESTCD"] },
     descriptions: [{ lang: "en", details: { label: "Severity" } }],
     createdAt: "",
     updatedAt: "",
@@ -45,6 +46,7 @@ function renderTable(props: {
   onEdit?: (r: SdtmVariableView) => void;
   onDelete?: (r: SdtmVariableView) => void;
   onReorder?: (orderedIds: number[]) => void;
+  onTerminologyClick?: (code: string) => void;
   canMutate?: boolean;
   selectedLang?: string | null;
   rows?: SdtmVariableView[];
@@ -63,6 +65,7 @@ function renderTable(props: {
           onEdit={props.onEdit ?? vi.fn()}
           onDelete={props.onDelete ?? vi.fn()}
           onReorder={props.onReorder ?? vi.fn()}
+          onTerminologyClick={props.onTerminologyClick}
           emptyMessage="empty"
         />
       </AegisI18nProvider>
@@ -87,7 +90,7 @@ describe("VariableTable", () => {
     const row1 = screen.getByText("AETERM").closest("tr")!;
     const cells = within(row1).getAllByRole("cell");
     // cells[0] = drag handle, cells[1] = name, cells[2] = type/core chips,
-    // cells[3] = label, cells[4] = role, cells[5] = actions
+    // cells[3] = label, cells[4] = terminology, cells[5] = role, cells[6] = actions
     expect(cells[1]).toHaveTextContent("AETERM");
     expect(within(cells[1]).queryByText("C")).toBeNull();
     expect(within(cells[1]).queryByText("Required")).toBeNull();
@@ -169,6 +172,38 @@ describe("VariableTable", () => {
     expect(btn).toBeInTheDocument();
     await userEvent.click(btn);
     expect(onCreate).toHaveBeenCalled();
+  });
+
+  it("renders a Terminology column header", () => {
+    renderTable({});
+    expect(
+      screen.getByRole("columnheader", { name: "Terminology" }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the variable's controlled terminology codes in the Terminology column", () => {
+    renderTable({});
+    const row2 = screen.getByText("AESEV").closest("tr")!;
+    const cells = within(row2).getAllByRole("cell");
+    // cells[0] = drag handle, cells[1] = name, cells[2] = type/core chips,
+    // cells[3] = label, cells[4] = terminology, cells[5] = role, cells[6] = actions
+    expect(within(cells[4]).getByText("VSTESTCD")).toBeInTheDocument();
+  });
+
+  it("renders a dash in the Terminology column when the variable has no codes", () => {
+    renderTable({});
+    const row1 = screen.getByText("AETERM").closest("tr")!;
+    const cells = within(row1).getAllByRole("cell");
+    expect(cells[4]).toHaveTextContent("—");
+  });
+
+  it("calls onTerminologyClick with the clicked code", async () => {
+    const onTerminologyClick = vi.fn();
+    renderTable({ onTerminologyClick });
+    await userEvent.click(
+      screen.getByRole("button", { name: /view code items VSTESTCD/i }),
+    );
+    expect(onTerminologyClick).toHaveBeenCalledWith("VSTESTCD");
   });
 });
 

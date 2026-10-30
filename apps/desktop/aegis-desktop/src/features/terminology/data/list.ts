@@ -7,6 +7,7 @@ import {
   type InfiniteData,
   type QueryKey,
 } from "@tanstack/react-query";
+import { useMemo } from "react";
 
 import {
   api,
@@ -25,6 +26,7 @@ import {
   type UpdateTerminologyVersionInput,
 } from "../../../shared/api";
 import { queryKeys } from "../../../shared/query";
+import { useProject } from "../../project-list";
 
 /** Page size used by both code-list and code-item tables. */
 export const PAGE_SIZE = 20;
@@ -314,4 +316,122 @@ export function useGetCodeListsByIds(ids: number[]) {
       staleTime: 30_000,
     })),
   });
+}
+
+/**
+ * The SDTM terminology version a terminology code should be resolved
+ * against.
+ *
+ * Resolution rules:
+ *   1. When a project is in scope and it configures an SDTM
+ *      terminology release, use that release. A stale id whose name
+ *      still matches a known release resolves by name — the drawer is
+ *      read-only, so the stored pointer is not healed.
+ *   2. Otherwise — no project, no configured release, or one that
+ *      matches nothing — use the most recently imported SDTM release
+ *      (the highest id; the server lists versions by id ascending).
+ *
+ * While the project is still loading the version is `null`: resolving
+ * to the fallback first would fire the code-list lookup against the
+ * wrong version.
+ */
+export interface SdtmTerminologyVersion {
+  versionId: number | null;
+  isLoading: boolean;
+  /** Error from the terminology versions query. */
+  versionsError: ApiError | null;
+  /** Error from the project query — only when a project is in scope. */
+  projectError: ApiError | null;
+  refetch: () => void;
+}
+
+export function useSdtmTerminologyVersionId(
+  projectCode: string | null,
+): SdtmTerminologyVersion {
+  const versionsQuery = useListTerminologyVersions();
+  const projectQuery = useProject(projectCode, {
+    enabled: projectCode != null && projectCode !== "",
+  });
+
+  const versions = versionsQuery.data ?? [];
+  const configured =
+    projectQuery.data?.configurations.sdtmTerminology ?? null;
+  const projectPending = projectCode != null && projectQuery.isLoading;
+
+  const versionId = useMemo(() => {
+    if (projectPending) return null;
+    const sdtmVersions = versions.filter((v) => v.kind === "sdtm");
+    if (configured) {
+      const byId = sdtmVersions.find((v) => v.id === configured.versionId);
+      if (byId) return byId.id;
+      const byName = sdtmVersions.find(
+        (v) => v.name.toLowerCase() === configured.versionName.toLowerCase(),
+      );
+      if (byName) return byName.id;
+    }
+    return sdtmVersions.reduce<number | null>(
+      (latest, v) => (latest == null || v.id > latest ? v.id : latest),
+      null,
+    );
+  }, [versions, configured, projectPending]);
+
+  return {
+    versionId,
+    isLoading:
+      versionsQuery.isLoading ||
+      (projectCode != null && projectQuery.isLoading),
+    versionsError: versionsQuery.error,
+    projectError: projectQuery.error,
+    refetch: () => {
+      void versionsQuery.refetch();
+      if (projectCode != null) void projectQuery.refetch();
+    },
+  };
+}
+
+/**
+ * Find the code list whose *submission value* equals `submissionValue`
+ * in a terminology version. A terminology code names a codelist the way
+ * the SDTMIG does — "Test Code [VSTESTCD]" — so the submission value
+ * is the reference, not the codelist's name.
+ *
+ * The server search is a full-text match, so several rows can come back;
+ * the exact submission-value match wins, and a case-insensitive match is
+ * accepted as a fallback (the search itself is case-insensitive).
+ *
+ * The lookup asks for the server's maximum page size so a common token
+ * does not push the exact match off the first page. It uses its own
+ * query key — `codeLists` belongs to the 20-per-page infinite query.
+ */
+export function useFindCodeListBySubmissionValue(
+  versionId: number | null,
+  submissionValue: string | null,
+) {
+  const query = useQuery<PagedCodeListListResponse, ApiError>({
+    queryKey: queryKeys.terminology.codeListBySubmissionValue(
+      versionId ?? 0,
+      submissionValue ?? "",
+    ),
+    queryFn: () =>
+      api.listCodeLists(versionId!, {
+        fragment: submissionValue!,
+        offset: 0,
+        limit: 500,
+      }),
+    enabled: versionId != null && versionId > 0 && !!submissionValue,
+  });
+  const codelist = useMemo(() => {
+    const items = query.data?.items ?? [];
+    if (!submissionValue) return null;
+    return (
+      items.find((c) => c.submissionValue === submissionValue) ??
+      items.find(
+        (c) =>
+          c.submissionValue.toLowerCase() ===
+          submissionValue.toLowerCase(),
+      ) ??
+      null
+    );
+  }, [query.data, submissionValue]);
+  return { ...query, codelist };
 }

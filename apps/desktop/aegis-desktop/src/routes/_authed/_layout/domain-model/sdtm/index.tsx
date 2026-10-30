@@ -6,7 +6,11 @@ import { SdtmDomainList } from "../../../../../features/domain-model";
 // dropdowns keep the user's selection. Mirror the terminology/sdtm.tsx
 // validateSearch pattern.
 export const Route = createFileRoute("/_authed/_layout/domain-model/sdtm/")({
-  validateSearch: (raw): { versionId?: number; lang?: string } => ({
+  validateSearch: (raw): {
+    versionId?: number;
+    lang?: string;
+    projectCode?: string;
+  } => ({
     versionId:
       typeof raw.versionId === "string"
         ? raw.versionId === ""
@@ -17,6 +21,10 @@ export const Route = createFileRoute("/_authed/_layout/domain-model/sdtm/")({
           : undefined,
     lang:
       typeof raw.lang === "string" && raw.lang !== "" ? raw.lang : undefined,
+    projectCode:
+      typeof raw.projectCode === "string" && raw.projectCode !== ""
+        ? raw.projectCode
+        : undefined,
   }),
   component: SdtmDomainList,
 });

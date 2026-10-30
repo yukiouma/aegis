@@ -578,6 +578,7 @@ export type {
   SdtmDomainView,
   SdtmRole,
   SdtmVariableCore,
+  SdtmVariableControlled,
   SdtmVariableDescription,
   SdtmVariableDescriptionDetail,
   SdtmVariableListResponse,

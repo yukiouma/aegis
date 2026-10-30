@@ -384,11 +384,16 @@ export interface SdtmVariableDescription {
   lang: string;
   details: SdtmVariableDescriptionDetail;
 }
+/** Controlled-terminology metadata attached to an SDTM variable. */
+export interface SdtmVariableControlled {
+  code?: string[];
+  format?: string[];
+}
 export interface SdtmVariableView {
   id: number;
   domainId: number;
   name: string;
-  variableControlled?: string;
+  variableControlled?: SdtmVariableControlled;
   variableType: SdtmVariableType;
   variableCore: SdtmVariableCore;
   variableRole?: SdtmRole;
@@ -403,7 +408,7 @@ export interface SdtmVariableListResponse {
 export interface CreateSdtmVariableInput {
   domainId: number;
   name: string;
-  variableControlled?: string;
+  variableControlled?: SdtmVariableControlled;
   variableType: SdtmVariableType;
   variableCore: SdtmVariableCore;
   variableRole?: SdtmRole;
@@ -413,7 +418,7 @@ export interface CreateSdtmVariableInput {
 // Three-state semantics: absent = no change, null = clear, value = replace.
 export interface UpdateSdtmVariableInput {
   name?: string;
-  variableControlled?: string | null;
+  variableControlled?: SdtmVariableControlled | null;
   variableType?: SdtmVariableType;
   variableCore?: SdtmVariableCore;
   variableRole?: SdtmRole | null;

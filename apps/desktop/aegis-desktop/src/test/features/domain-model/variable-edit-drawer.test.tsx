@@ -11,6 +11,10 @@ import type {
   UpdateSdtmVariableInput,
 } from "../../../shared/api";
 import { VariableEditDrawer } from "../../../features/domain-model/components/VariableEditDrawer";
+import {
+  controlledListsEqual,
+  parseControlledList,
+} from "../../../features/domain-model/components/VariableEditDrawer";
 
 const sample: SdtmVariableView = {
   id: 11,
@@ -23,6 +27,11 @@ const sample: SdtmVariableView = {
   descriptions: [{ lang: "en", details: { label: "Severity" } }],
   createdAt: "",
   updatedAt: "",
+};
+
+const controlledRow: SdtmVariableView = {
+  ...sample,
+  variableControlled: { code: ["VSTESTCD", "AESEV"], format: ["Codelist"] },
 };
 
 function renderDrawer(props: {
@@ -234,5 +243,100 @@ describe("VariableEditDrawer", () => {
       { lang: "en", details: { label: "" } },
       { lang: "zh-CN", details: { label: "" } },
     ]);
+  });
+
+  it("seeds the two controlled-terminology fields from the row", () => {
+    renderDrawer({ open: true, mode: "edit", row: controlledRow });
+    expect(
+      (
+        screen.getByRole("textbox", {
+          name: /controlled terminology \(code list\)/i,
+        }) as HTMLInputElement
+      ).value,
+    ).toBe("VSTESTCD, AESEV");
+    expect(
+      (
+        screen.getByRole("textbox", {
+          name: /controlled terminology \(format\)/i,
+        }) as HTMLInputElement
+      ).value,
+    ).toBe("Codelist");
+  });
+
+  it("sends the code list as an array in create mode", async () => {
+    const onCreate = vi.fn();
+    renderDrawer({ open: true, mode: "create", onCreate });
+    await userEvent.type(
+      screen.getByRole("textbox", { name: /^name$/i }),
+      "VSTESTCD",
+    );
+    await userEvent.type(
+      screen.getByRole("textbox", {
+        name: /controlled terminology \(code list\)/i,
+      }),
+      "VSTESTCD",
+    );
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    const input = onCreate.mock.calls[0][0] as CreateSdtmVariableInput;
+    expect(input.variableControlled).toEqual({ code: ["VSTESTCD"] });
+  });
+
+  it("sends null when the user clears a populated field in edit mode", async () => {
+    const onUpdate = vi.fn();
+    renderDrawer({ open: true, mode: "edit", row: controlledRow, onUpdate });
+    await userEvent.clear(
+      screen.getByRole("textbox", {
+        name: /controlled terminology \(code list\)/i,
+      }),
+    );
+    await userEvent.clear(
+      screen.getByRole("textbox", {
+        name: /controlled terminology \(format\)/i,
+      }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    const body = onUpdate.mock.calls[0][1] as UpdateSdtmVariableInput;
+    expect(body.variableControlled).toBeNull();
+  });
+
+  it("sends nothing when the controlled terminology is unchanged in edit mode", async () => {
+    const onUpdate = vi.fn();
+    renderDrawer({ open: true, mode: "edit", row: controlledRow, onUpdate });
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    const body = onUpdate.mock.calls[0][1] as UpdateSdtmVariableInput;
+    expect(body.variableControlled).toBeUndefined();
+  });
+
+  it("sends no variableControlled when a variable without one is saved unchanged", async () => {
+    const onUpdate = vi.fn();
+    renderDrawer({ open: true, mode: "edit", row: sample, onUpdate });
+    await userEvent.click(screen.getByRole("button", { name: /save/i }));
+    const body = onUpdate.mock.calls[0][1] as UpdateSdtmVariableInput;
+    expect(body.variableControlled).toBeUndefined();
+  });
+});
+
+describe("parseControlledList", () => {
+  it("splits a comma-separated list and trims each part", () => {
+    expect(parseControlledList("VSTESTCD, AESEV")).toEqual([
+      "VSTESTCD",
+      "AESEV",
+    ]);
+  });
+
+  it("drops empty parts", () => {
+    expect(parseControlledList("A, , B,")).toEqual(["A", "B"]);
+  });
+
+  it("returns an empty list for blank input", () => {
+    expect(parseControlledList("   ")).toEqual([]);
+  });
+});
+
+describe("controlledListsEqual", () => {
+  it("compares element by element", () => {
+    expect(controlledListsEqual(["A", "B"], ["A", "B"])).toBe(true);
+    expect(controlledListsEqual(["A"], ["A", "B"])).toBe(false);
+    expect(controlledListsEqual([], [])).toBe(true);
   });
 });

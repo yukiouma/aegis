@@ -97,6 +97,10 @@ export interface VariableTableProps {
   onEdit: (row: SdtmVariableView) => void;
   onDelete: (row: SdtmVariableView) => void;
   onReorder: (orderedIds: number[]) => void;
+  /** Raised when a controlled-terminology code in the Terminology
+   *  column is clicked. The table renders the codes but does not fetch
+   *  anything itself. */
+  onTerminologyClick?: (code: string) => void;
   emptyMessage: string;
 }
 
@@ -118,6 +122,7 @@ interface DraggableRowProps {
   selectedLang: string | null;
   onEdit: (r: SdtmVariableView) => void;
   onDelete: (r: SdtmVariableView) => void;
+  onTerminologyClick?: (code: string) => void;
 }
 
 function variableCoreColor(core: SdtmVariableCore): "error" | "warning" | "success" | "info" {
@@ -139,6 +144,7 @@ function DraggableRow({
   selectedLang,
   onEdit,
   onDelete,
+  onTerminologyClick,
 }: DraggableRowProps) {
   const { t } = useI18n();
   const draggable = useDraggable({ id: String(row.id), type: "variable" });
@@ -149,6 +155,7 @@ function DraggableRow({
       : (row.descriptions.find((d) => d.lang === selectedLang)?.details.label ??
         "");
   const role = row.variableRole ?? "—";
+  const codes = row.variableControlled?.code ?? [];
   return (
     <TableRow
       ref={(el: HTMLTableRowElement | null) => {
@@ -181,6 +188,29 @@ function DraggableRow({
       </TableCell>
       <TableCell sx={cellEllipsis} title={label}>
         {label}
+      </TableCell>
+      <TableCell>
+        {codes.length === 0 ? (
+          "—"
+        ) : (
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+            {codes.map((code, i) => (
+              <Tooltip
+                key={`${code}-${i}`}
+                title={t("terminology.codeitem.drawer.openTooltip")}
+              >
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={code}
+                  component="button"
+                  aria-label={`${t("terminology.codeitem.drawer.openTooltip")} ${code}`}
+                  onClick={() => onTerminologyClick?.(code)}
+                />
+              </Tooltip>
+            ))}
+          </Box>
+        )}
       </TableCell>
       <TableCell>{role}</TableCell>
       <TableCell sx={{ whiteSpace: "nowrap" }} align="right">
@@ -225,6 +255,7 @@ export function VariableTable({
   onEdit,
   onDelete,
   onReorder,
+  onTerminologyClick,
   emptyMessage,
 }: VariableTableProps) {
   const { t } = useI18n();
@@ -280,6 +311,9 @@ export function VariableTable({
               <TableCell>{t("domainModel.sdtm.detail.col.name")}</TableCell>
               <TableCell></TableCell>
               <TableCell>{t("domainModel.sdtm.detail.col.label")}</TableCell>
+              <TableCell>
+                {t("domainModel.sdtm.detail.col.terminology")}
+              </TableCell>
               <TableCell>{t("domainModel.sdtm.detail.col.role")}</TableCell>
               <TableCell align="right">
                 {canMutate && (
@@ -303,7 +337,7 @@ export function VariableTable({
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center">
+                <TableCell colSpan={7} align="center">
                   <Typography color="text.secondary">{emptyMessage}</Typography>
                 </TableCell>
               </TableRow>
@@ -319,6 +353,7 @@ export function VariableTable({
                     selectedLang={selectedLang}
                     onEdit={onEdit}
                     onDelete={onDelete}
+                    onTerminologyClick={onTerminologyClick}
                   />
                 );
               })

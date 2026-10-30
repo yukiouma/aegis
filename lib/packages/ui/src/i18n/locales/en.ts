@@ -239,6 +239,18 @@ export const en = {
   'terminology.codeitem.action.create': 'Create',
   'terminology.codeitem.action.save': 'Save',
   'terminology.codeitem.readOnly': 'Read-only',
+  'terminology.codeitem.drawer.title': 'Code items for {code}',
+  'terminology.codeitem.drawer.notFound':
+    'No code list with submission value {code} was found in the latest SDTM terminology version.',
+  'terminology.codeitem.drawer.noVersion':
+    'No SDTM terminology version has been imported.',
+  'terminology.codeitem.drawer.loadFailed':
+    'Failed to load the code list for {code}: {message}',
+  'terminology.codeitem.drawer.versionsLoadFailed':
+    'Failed to load the terminology versions: {message}',
+  'terminology.codeitem.drawer.projectLoadFailed':
+    'Failed to load the project configuration: {message}',
+  'terminology.codeitem.drawer.openTooltip': 'View code items',
 
   'terminology.codeitem.codeClick.tooltip':
     'Show this code in other codelists',
@@ -280,6 +292,7 @@ export const en = {
   "domainModel.sdtm.detail.filter.placeholder": "Filter by name or label",
   "domainModel.sdtm.detail.col.name": "Name",
   "domainModel.sdtm.detail.col.label": "Label",
+  "domainModel.sdtm.detail.col.terminology": "Terminology",
   "domainModel.sdtm.detail.col.role": "Role",
   "domainModel.sdtm.detail.empty": "No variables in this domain.",
   "domainModel.sdtm.detail.noMatches": "No variables match the current filter.",
@@ -293,7 +306,11 @@ export const en = {
   "domainModel.sdtm.variable.create.tooltip": "Create variable",
   "domainModel.sdtm.variable.editTitle": "Edit variable",
   "domainModel.sdtm.variable.field.name": "Name",
-  "domainModel.sdtm.variable.field.variableControlled": "Controlled vocabulary (CCDD)",
+  "domainModel.sdtm.variable.field.variableControlledCode": "Controlled terminology (code list)",
+  "domainModel.sdtm.variable.field.variableControlledCodeHint":
+    "Code list submission values, comma-separated (e.g. VSTESTCD)",
+  "domainModel.sdtm.variable.field.variableControlledFormat": "Controlled terminology (format)",
+  "domainModel.sdtm.variable.field.variableControlledHint": "Comma-separated values",
   "domainModel.sdtm.variable.field.variableType": "Type",
   "domainModel.sdtm.variable.field.variableCore": "Core",
   "domainModel.sdtm.variable.field.variableRole": "Role",
