@@ -1296,3 +1296,42 @@ git commit -m "feat(aegis-desktop): open the terminology drawer from the variabl
 Clicking a terminology code in the variable table opens a read-only
 drawer with the code items of the matching code list."
 ```
+
+---
+
+## Implementation notes (deviations from the plan above)
+
+Recorded after execution and the final review, so a reader comparing
+this plan to the code is not left guessing.
+
+1. **Task 1, Step 3 — the update field needs both serde attributes.**
+   The step showed only `deserialize_with = "double_option"`. The field
+   must also keep `skip_serializing_if = "Option::is_none"`: without it
+   the outer `None` serializes as `null`, so every update would clear
+   the column. The pre-existing test `update_request_skips_none_fields`
+   caught it. The two attributes are independent — one governs
+   serialization, the other deserialization.
+
+2. **Task 4 — `useLatestSdtmTerminologyVersionId` returns an object,
+   not `number | null`.** A bare id collapsed three states into one:
+   "still loading", "the request failed" and "none imported". A failed
+   versions query was reported as "No SDTM terminology version has been
+   imported" — a confidently wrong message with no error and no Retry.
+   The hook now returns `{ versionId, isLoading, error, refetch }` and
+   the drawer renders the three states separately.
+
+3. **Task 4 — Retry refetches only the query that failed.** The code-item
+   query is disabled until a code list resolves, but an explicit
+   `refetch()` bypasses `enabled` — so Retry asked the server for an
+   arbitrary, unfiltered page of code items.
+
+4. **Task 4 — the not-found wording and the edit drawer's hint changed.**
+   The drawer only searches code list *names*; `code_lists.code` is not
+   in the full-text index and no endpoint looks a codelist up by its
+   code. The message and the helper text now say so, instead of
+   claiming the code list does not exist.
+
+5. **Task 3/4 — the spec's `terminology.codeitem.drawer.openTooltip`
+   key, which the plan's task text dropped.** The chips now carry it
+   as a tooltip and an `aria-label`, so the button is not announced as
+   a bare code.
