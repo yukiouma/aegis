@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Alert,
+  Box,
   IconButton,
   Snackbar,
   Switch,
@@ -134,7 +135,7 @@ export function ProjectBranchesSection({
               <TableCell sx={{ width: 72 }} />
               <TableCell>{t("project.branches.name.label")}</TableCell>
               {isLeader && (
-                <TableCell sx={{ width: 96 }}>
+                <TableCell sx={{ width: 96, textAlign: "right" }}>
                   <IconButton
                     aria-label={t("project.branches.create")}
                     data-testid="branch-create"
@@ -164,21 +165,23 @@ export function ProjectBranchesSection({
                 </TableCell>
                 <TableCell>{branch.branch}</TableCell>
                 {isLeader && (
-                  <TableCell>
-                    <IconButton
-                      aria-label={t("project.branches.rename")}
-                      data-testid={`branch-rename-${branch.id}`}
-                      onClick={() => openRename(branch)}
-                    >
-                      <Edit />
-                    </IconButton>
-                    <IconButton
-                      aria-label={t("project.branches.initializeFolder")}
-                      data-testid={`branch-initialize-${branch.id}`}
-                      onClick={() => setInitializeBranch(branch)}
-                    >
-                      <FolderOpen />
-                    </IconButton>
+                  <TableCell sx={{ textAlign: "right" }}>
+                    <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                      <IconButton
+                        aria-label={t("project.branches.rename")}
+                        data-testid={`branch-rename-${branch.id}`}
+                        onClick={() => openRename(branch)}
+                      >
+                        <Edit />
+                      </IconButton>
+                      <IconButton
+                        aria-label={t("project.branches.initializeFolder")}
+                        data-testid={`branch-initialize-${branch.id}`}
+                        onClick={() => setInitializeBranch(branch)}
+                      >
+                        <FolderOpen />
+                      </IconButton>
+                    </Box>
                   </TableCell>
                 )}
               </TableRow>
