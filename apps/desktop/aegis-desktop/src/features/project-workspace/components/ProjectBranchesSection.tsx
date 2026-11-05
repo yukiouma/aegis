@@ -119,6 +119,13 @@ export function ProjectBranchesSection({
       {rows.length === 0 && !branches.isError ? (
         <Typography color="text.secondary">
           {t("project.branches.empty")}
+          <IconButton
+            aria-label={t("project.branches.create")}
+            data-testid="branch-create"
+            onClick={openCreate}
+          >
+            <Add />
+          </IconButton>
         </Typography>
       ) : (
         <Table size="small" data-testid="project-branches-table">
