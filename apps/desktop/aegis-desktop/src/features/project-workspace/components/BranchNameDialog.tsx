@@ -67,6 +67,7 @@ export function BranchNameDialog({
       </DialogTitle>
       <DialogContent>
         <TextField
+          sx={{ mt: 1 }}
           autoFocus
           fullWidth
           size="small"
