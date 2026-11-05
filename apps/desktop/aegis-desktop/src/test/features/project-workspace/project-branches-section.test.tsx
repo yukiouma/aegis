@@ -78,12 +78,7 @@ function mockInvokeWith(
   });
 }
 
-function renderSection(
-  isLeader = true,
-  branches: unknown[] = BRANCHES,
-  handlers: Record<string, () => unknown> = {},
-) {
-  mockInvokeWith(branches, handlers);
+function renderWithProviders(node: ReactNode) {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -97,9 +92,18 @@ function renderSection(
       </AegisI18nProvider>
     </AegisThemeProvider>
   );
-  render(<ProjectBranchesSection projectCode="pr1" isLeader={isLeader} />, {
-    wrapper: Wrapper,
-  });
+  render(node, { wrapper: Wrapper });
+}
+
+function renderSection(
+  isLeader = true,
+  branches: unknown[] = BRANCHES,
+  handlers: Record<string, () => unknown> = {},
+) {
+  mockInvokeWith(branches, handlers);
+  renderWithProviders(
+    <ProjectBranchesSection projectCode="pr1" isLeader={isLeader} />,
+  );
 }
 
 function invokedCommands() {
@@ -169,14 +173,61 @@ describe("ProjectBranchesSection", () => {
 
   it("shows the action column to a leader", async () => {
     renderSection(true);
-    expect(await screen.findByTestId("branch-create")).toBeInTheDocument();
+    // The empty state carries a create button of its own, so wait for
+    // a loaded row before looking for the header's action buttons.
+    await screen.findByText("2026Q1");
+    expect(screen.getByTestId("branch-create")).toBeInTheDocument();
     expect(screen.getByTestId("branch-rename-4")).toBeInTheDocument();
     expect(screen.getByTestId("branch-initialize-4")).toBeInTheDocument();
+  });
+
+  it("groups the row actions into a single cell", async () => {
+    renderSection(true);
+    await screen.findByText("2026Q1");
+    const rename = screen.getByTestId("branch-rename-4");
+    const initialize = screen.getByTestId("branch-initialize-4");
+    // Both actions share one cell, so they line up as a group.
+    expect(rename.closest("td")).not.toBeNull();
+    expect(rename.closest("td")).toBe(initialize.closest("td"));
   });
 
   it("renders an empty state for a project with no branches", async () => {
     renderSection(true, []);
     expect(await screen.findByText("No branches yet")).toBeInTheDocument();
+    expect(screen.getByTestId("branch-create")).toHaveAccessibleName(
+      "Create branch",
+    );
+  });
+
+  it("opens the create dialog from the empty state", async () => {
+    renderSection(true, []);
+    // Wait for the empty state itself: until the query resolves the
+    // table header carries a create button of its own, and that node is
+    // replaced by the empty state once the list comes back empty.
+    await screen.findByText("No branches yet");
+    await userEvent.click(screen.getByTestId("branch-create"));
+    expect(await screen.findByLabelText("Branch name")).toHaveValue("");
+    expect(screen.getByRole("button", { name: /confirm/i })).toBeDisabled();
+  });
+
+  it("hides the empty state's create button from a non-leader", async () => {
+    renderSection(false, []);
+    expect(await screen.findByText("No branches yet")).toBeInTheDocument();
+    expect(screen.queryByTestId("branch-create")).not.toBeInTheDocument();
+  });
+
+  it("does not show the empty state while the branches are loading", async () => {
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "list_project_branches") return new Promise(() => {});
+      if (cmd === "list_structures") return Promise.resolve(TEMPLATES);
+      return Promise.reject(new Error(`unexpected tauri command: ${cmd}`));
+    });
+    renderWithProviders(
+      <ProjectBranchesSection projectCode="pr1" isLeader={true} />,
+    );
+
+    expect(screen.getByTestId("project-branches-table")).toBeInTheDocument();
+    expect(screen.queryByText("No branches yet")).not.toBeInTheDocument();
   });
 
   it("leaves every switch unchecked for a stale active branch", async () => {
@@ -198,7 +249,8 @@ describe("ProjectBranchesSection", () => {
 
   it("disables confirm for a whitespace-only name", async () => {
     renderSection();
-    await userEvent.click(await screen.findByTestId("branch-create"));
+    await screen.findByText("2026Q1");
+    await userEvent.click(screen.getByTestId("branch-create"));
     const input = await screen.findByLabelText("Branch name");
     await userEvent.type(input, "   ");
     expect(screen.getByRole("button", { name: /confirm/i })).toBeDisabled();
@@ -218,7 +270,8 @@ describe("ProjectBranchesSection", () => {
         };
       },
     });
-    await userEvent.click(await screen.findByTestId("branch-create"));
+    await screen.findByText("2026Q1");
+    await userEvent.click(screen.getByTestId("branch-create"));
     await userEvent.type(await screen.findByLabelText("Branch name"), "2026Q1");
     await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
 

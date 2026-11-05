@@ -117,16 +117,18 @@ export function ProjectBranchesSection({
         </Alert>
       )}
 
-      {rows.length === 0 && !branches.isError ? (
+      {rows.length === 0 && !branches.isError && !branches.isPending ? (
         <Typography color="text.secondary">
           {t("project.branches.empty")}
-          <IconButton
-            aria-label={t("project.branches.create")}
-            data-testid="branch-create"
-            onClick={openCreate}
-          >
-            <Add />
-          </IconButton>
+          {isLeader && (
+            <IconButton
+              aria-label={t("project.branches.create")}
+              data-testid="branch-create"
+              onClick={openCreate}
+            >
+              <Add />
+            </IconButton>
+          )}
         </Typography>
       ) : (
         <Table size="small" data-testid="project-branches-table">
