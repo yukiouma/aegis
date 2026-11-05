@@ -18,6 +18,7 @@ import type { SidebarProps, MenuItem } from './types';
 
 export function Sidebar({
   title,
+  titleAdornment,
   menu,
   open,
   onToggle,
@@ -58,10 +59,11 @@ export function Sidebar({
           {open ? <FormatIndentDecrease /> : <FormatIndentIncrease />}
         </IconButton>
         {open && (
-          <Typography variant="h6" sx={{ ml: 1 }} noWrap>
+          <Typography variant="h6" sx={{ ml: 0.5, mr: 0.5 }} noWrap>
             {title}
           </Typography>
         )}
+        {open && titleAdornment}
       </Box>
       <Divider />
       <List>
