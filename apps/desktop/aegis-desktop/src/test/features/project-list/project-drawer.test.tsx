@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
@@ -543,6 +544,53 @@ describe("ProjectDrawer — initialize project folder", () => {
       "create_project",
       expect.objectContaining({ code: "newproj" }),
     );
+  });
+
+  it("keeps the report on screen after the drawer closes", async () => {
+    mockCommands({
+      list_users: () => [userFixture],
+      list_structures: () => TEMPLATES,
+      create_project: () => projectFixture,
+      initialize_project_folder: () => ({
+        root: "D:\\studies",
+        created: ["D:\\studies\\ak001"],
+        skipped: [],
+      }),
+    });
+    // A harness that really closes the drawer, as the projects page does.
+    function Harness() {
+      const [mode, setMode] = useState<"closed" | "create" | "edit">("create");
+      return (
+        <>
+          <span data-testid="mode">{mode}</span>
+          <ProjectDrawer
+            mode={mode}
+            code={null}
+            onClose={() => setMode("closed")}
+          />
+        </>
+      );
+    }
+    await renderInRouter(
+      <AegisThemeProvider>
+        <TestQueryProvider>
+          <AegisI18nProvider>
+            <Harness />
+          </AegisI18nProvider>
+        </TestQueryProvider>
+      </AegisThemeProvider>,
+    );
+    await fillCreateForm("AK001-001");
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await confirmTemplate();
+
+    // The drawer closed when the project was created...
+    await waitFor(() =>
+      expect(screen.getByTestId("mode")).toHaveTextContent("closed"),
+    );
+    // ...and the report is still on screen.
+    expect(screen.getByTestId("initialize-report")).toBeVisible();
+    expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
   });
 
   it("lets the user create without a folder when no templates exist", async () => {
