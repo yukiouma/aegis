@@ -109,7 +109,7 @@ A template is written `{{ … }}` inside an `entry_name`.
 {{ study }}                 -> AK001-001
 {{ product | lowercase }}   -> ak001
 {{ trial | uppercase }}     -> 001
-{{ product }}-{{ trial }}   -> ak001-001
+{{ product }}-{{ trial }}   -> AK001-001
 ```
 
 - The field name is one of `study`, `product`, `trial`, `branch`, `date`.

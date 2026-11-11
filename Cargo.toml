@@ -7,6 +7,7 @@ members = [
     "lib/crates/logging-utils",
     "lib/crates/mission",
     "lib/crates/project",
+    "lib/crates/scaffolding",
     "lib/crates/sdtm-project",
     "lib/crates/structures",
     "lib/crates/terminology",

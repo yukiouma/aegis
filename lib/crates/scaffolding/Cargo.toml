@@ -1,0 +1,14 @@
+[package]
+name = "scaffolding"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# `chrono` supplies `NaiveDate` — the context's `date` field is the
+# desktop machine's current date, formatted `yyyy-mm-dd`.
+chrono = { workspace = true }
+# `serde` derives the report types (`SkipReason`, `SkippedItem`),
+# which cross the Tauri boundary to the frontend.
+serde = { workspace = true }
+# `thiserror` derives `ScaffoldError` and `TemplateError`.
+thiserror = { workspace = true }

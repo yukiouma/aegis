@@ -291,7 +291,7 @@ mod tests {
     fn resolves_several_templates_in_one_name() {
         assert_eq!(
             resolve("{{ product }}-{{ trial }}", &ctx()).unwrap(),
-            "ak001-001"
+            "AK001-001"
         );
     }
 
