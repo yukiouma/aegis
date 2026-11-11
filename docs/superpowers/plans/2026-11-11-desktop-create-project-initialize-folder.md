@@ -51,7 +51,7 @@ These apply to every task below. They are copied verbatim from the spec.
 | `src/features/project-workspace/data/project-branches.ts` | Delete `useInitializeProjectFolder` (moved to `features/scaffold/data/project-folder.ts`). |
 | `src/features/project-list/components/ProjectDrawer.tsx` | The checkbox, the split submit, the `beforeInit` / `onInitError` wiring, the pending snapshot. |
 | `src/features/project-list/pages/ProjectListPage.tsx` | Own the Snackbar; pass `onFolderInitFailed` down. |
-| `lib/packages/ui/src/i18n/locales/en.ts` | Rename 13 `project.branches.initialize.*` keys to `scaffold.initialize.*`; add 5 new keys. |
+| `lib/packages/ui/src/i18n/locales/en.ts` | Rename 13 `project.branches.initialize.*` keys to `scaffold.initialize.*`. |
 | `lib/packages/ui/src/i18n/locales/zhCN.ts:146-159` | The same, with the Chinese strings. |
 
 **Test files:**
@@ -133,19 +133,7 @@ initialize.report.reason.migrationFailed
 
 **`project.branches.initializeFolder` does NOT move** — it is the branch-row button's `aria-label`, not a dialog key, and it stays in `project.branches.*`.
 
-Add a new `scaffold.*` group to both catalogs. In `en.ts`, place it after the `project.*` block (after line 173, `'project.action.save'`); in `zhCN.ts`, after its `project.action.save` line.
-
-The rename above already produces `scaffold.initialize.failed`. Add these **five** further keys to each file:
-
-| Key | en | zh-CN |
-| --- | --- | --- |
-| `scaffold.initialize.listFailed` | `Could not load structure templates: {message}` | `加载结构模板失败：{message}` |
-| `scaffold.initialize.noTemplates` | No structure templates are available. | 没有可用的结构模板。 |
-| `project.field.initializeFolder` | Initialize project folder | 初始化项目文件夹 |
-| `project.field.initializeFolder.hint` | Pick a structure template to create the project folder on this machine | 选择一个结构模板，在本机创建项目文件夹 |
-| `project.folder.failed` | The project was created, but its folder could not be initialized: {message} | 项目已创建，但项目文件夹初始化失败：{message} |
-
-The `project.field.*` and `project.folder.*` keys go in the `project.*` group, not the `scaffold.*` group. The renamed `scaffold.initialize.*` keys carry their existing values unchanged — only the key names move.
+The rename produces the whole `scaffold.initialize.*` group, including `scaffold.initialize.failed`. **This task adds no new keys** — the keys the new behaviour needs (`scaffold.initialize.listFailed`, `scaffold.initialize.noTemplates`, `project.field.initializeFolder`, `project.field.initializeFolder.hint`, `project.folder.failed`) are added by Tasks 3 and 4, alongside the code that reads them. Each key therefore lands in the same commit as its first use.
 
 - [ ] **Step 4: Update the dialog's key references**
 
@@ -484,18 +472,28 @@ The dialog already has `const structures = useListTemplateStructures();`. Add, a
 
 Note the second condition reads `structures.data?.length === 0` — `data` is `undefined` while loading, and `undefined?.length` is `undefined`, which is not `=== 0`, so the empty-state does not flash during loading.
 
-- [ ] **Step 4: Run the tests to verify they pass**
+- [ ] **Step 4: Add the two i18n keys**
+
+Add these to **both** `lib/packages/ui/src/i18n/locales/en.ts` and `zhCN.ts`, in the `scaffold.*` group created by Task 1:
+
+| Key | en | zh-CN |
+| --- | --- | --- |
+| `scaffold.initialize.listFailed` | `Could not load structure templates: {message}` | `加载结构模板失败：{message}` |
+| `scaffold.initialize.noTemplates` | No structure templates are available. | 没有可用的结构模板。 |
+
+- [ ] **Step 5: Run the tests to verify they pass**
 
 Run:
 ```bash
 pnpm --filter aegis-desktop test -- src/test/features/scaffold/initialize-project-folder-dialog.test.tsx
+pnpm --filter @aegis/ui test
 ```
-Expected: PASS.
+Expected: PASS — the dialog tests pass, and the i18n registry test confirms both catalogs still carry the same key set.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add apps/desktop/aegis-desktop/src/features/scaffold apps/desktop/aegis-desktop/src/test/features/scaffold
+git add apps/desktop/aegis-desktop/src/features/scaffold apps/desktop/aegis-desktop/src/test/features/scaffold lib/packages/ui/src/i18n/locales
 git commit -m "feat(scaffold): explain an empty or failed template list
 
 A dead Confirm button with no reason looks like a hang; in the create
@@ -853,7 +851,17 @@ Render the Snackbar as a sibling of the drawer, following the house pattern from
 
 Add `Alert` and `Snackbar` to the `@aegis/ui/mui` import list.
 
-- [ ] **Step 8: Write the failing page test**
+- [ ] **Step 8: Add the three i18n keys**
+
+Add these to **both** `lib/packages/ui/src/i18n/locales/en.ts` and `zhCN.ts`. The two `project.field.*` keys go in the `project.*` group; `project.folder.failed` goes there too:
+
+| Key | en | zh-CN |
+| --- | --- | --- |
+| `project.field.initializeFolder` | Initialize project folder | 初始化项目文件夹 |
+| `project.field.initializeFolder.hint` | Pick a structure template to create the project folder on this machine | 选择一个结构模板，在本机创建项目文件夹 |
+| `project.folder.failed` | The project was created, but its folder could not be initialized: {message} | 项目已创建，但项目文件夹初始化失败：{message} |
+
+- [ ] **Step 9: Write the failing page test**
 
 Add to `src/test/features/project-list/project-list-page.test.tsx`:
 
@@ -887,7 +895,7 @@ it("shows a Snackbar when the folder could not be initialized", async () => {
 
 The page test's `renderPage` helper currently calls `mockCommands` itself — extend it to accept extra handlers, or call `mockCommands` again after `renderPage` in this case. Either way, `create_project` and `initialize_project_folder` must be mocked for this case.
 
-- [ ] **Step 9: Run the tests to verify they fail**
+- [ ] **Step 10: Run the tests to verify they fail**
 
 Run:
 ```bash
@@ -895,7 +903,7 @@ pnpm --filter aegis-desktop test -- src/test/features/project-list/project-drawe
 ```
 Expected: FAIL — the checkbox and the template step do not exist yet.
 
-- [ ] **Step 10: Run the tests to verify they pass**
+- [ ] **Step 11: Run the tests to verify they pass**
 
 Run:
 ```bash
@@ -903,7 +911,7 @@ pnpm --filter aegis-desktop test -- src/test/features/project-list/project-drawe
 ```
 Expected: PASS.
 
-- [ ] **Step 11: Run the full frontend verification gate**
+- [ ] **Step 12: Run the full frontend verification gate**
 
 ```bash
 pnpm --filter aegis-desktop typecheck
@@ -912,10 +920,10 @@ pnpm --filter aegis-desktop build
 ```
 Expected: all clean.
 
-- [ ] **Step 12: Commit**
+- [ ] **Step 13: Commit**
 
 ```bash
-git add apps/desktop/aegis-desktop/src/features/project-list apps/desktop/aegis-desktop/src/test/features/project-list
+git add apps/desktop/aegis-desktop/src/features/project-list apps/desktop/aegis-desktop/src/test/features/project-list lib/packages/ui/src/i18n/locales
 git commit -m "feat(desktop): initialize the project folder when creating a project
 
 The drawer's create mode gains an \"Initialize project folder\" checkbox,
