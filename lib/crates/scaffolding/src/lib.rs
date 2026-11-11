@@ -24,6 +24,6 @@ pub mod template;
 
 pub use context::Context;
 pub use error::ScaffoldError;
-// pub use report::{SkipReason, SkippedItem};
-// pub use scaffold::{Migration, Scaffold, Step, StructureNode, build};
+pub use report::{SkipReason, SkippedItem};
+pub use scaffold::{Migration, Scaffold, Step, StructureNode, build};
 pub use template::{Field, Operation, TemplateError, resolve};

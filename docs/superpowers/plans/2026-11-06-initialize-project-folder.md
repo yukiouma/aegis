@@ -626,6 +626,15 @@ mod tests {
         )
     }
 
+    /// A context with no branch — `{{ branch }}` is then unresolved.
+    fn ctx_without_branch() -> Context {
+        Context::new(
+            "AK001-001",
+            None,
+            NaiveDate::from_ymd_opt(2026, 11, 6).unwrap(),
+        )
+    }
+
     fn dir(entry_name: &str, children: Vec<StructureNode>) -> StructureNode {
         StructureNode {
             entry_name: entry_name.to_string(),
@@ -684,7 +693,7 @@ mod tests {
             "{{ branch }}",
             vec![dir("01_raw", vec![dir("02_clean", vec![])])],
         )];
-        let plan = build("D:\\studies", &tree, &ctx()).unwrap();
+        let plan = build("D:\\studies", &tree, &ctx_without_branch()).unwrap();
         assert!(plan.steps.is_empty());
         assert_eq!(plan.skipped.len(), 1);
         assert_eq!(plan.skipped[0].reason, SkipReason::UnresolvedField);
@@ -800,12 +809,26 @@ mod tests {
 
     #[test]
     fn a_skipped_node_reports_its_parent_path_with_the_raw_name() {
-        let tree = vec![dir("01_raw", vec![file("{{ branch }}.docx", None)])];
-        let plan = build("D:\\studies", &tree, &ctx()).unwrap();
+        let tree = vec![dir(
+            "01_raw",
+            vec![file("{{ branch }}.docx", Some("D:\\sop\\spec.docx"))],
+        )];
+        let plan = build("D:\\studies", &tree, &ctx_without_branch()).unwrap();
+        assert_eq!(plan.skipped.len(), 1);
+        assert_eq!(plan.skipped[0].reason, SkipReason::UnresolvedField);
         assert_eq!(
             plan.skipped[0].path,
             "D:\\studies\\01_raw\\{{ branch }}.docx"
         );
+    }
+
+    #[test]
+    fn a_file_node_with_no_reference_reports_its_resolved_path() {
+        let tree = vec![dir("01_raw", vec![file("spec.docx", None)])];
+        let plan = build("D:\\studies", &tree, &ctx()).unwrap();
+        assert_eq!(plan.skipped.len(), 1);
+        assert_eq!(plan.skipped[0].reason, SkipReason::NoReference);
+        assert_eq!(plan.skipped[0].path, "D:\\studies\\01_raw\\spec.docx");
     }
 }
 ```
