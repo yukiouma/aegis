@@ -11,7 +11,7 @@ import { invoke } from "@tauri-apps/api/core";
 
 import { AegisThemeProvider } from "@aegis/ui/theme";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
-import { InitializeProjectFolderDialog } from "../../../features/project-workspace/components/InitializeProjectFolderDialog";
+import { InitializeProjectFolderDialog } from "../../../features/scaffold/components/InitializeProjectFolderDialog";
 
 const TEMPLATES = [
   {

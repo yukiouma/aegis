@@ -145,23 +145,23 @@ export const en = {
   'project.branches.dialog.rename.title': 'Rename branch',
   'project.branches.dialog.name.label': 'Branch name',
   'project.branches.dialog.name.required': 'Branch name must not be empty',
-  'project.branches.initialize.title': 'Initialize project folder',
-  'project.branches.initialize.structure': 'Structure template',
-  'project.branches.initialize.required': 'Select a structure template',
-  'project.branches.initialize.failed': 'Initialize failed: {message}',
-  'project.branches.initialize.report.created': 'Created {count} item(s)',
-  'project.branches.initialize.report.skipped': 'Skipped {count} item(s)',
-  'project.branches.initialize.report.reason.alreadyExists': 'Already exists',
-  'project.branches.initialize.report.reason.unresolvedField':
+  'scaffold.initialize.title': 'Initialize project folder',
+  'scaffold.initialize.structure': 'Structure template',
+  'scaffold.initialize.required': 'Select a structure template',
+  'scaffold.initialize.failed': 'Initialize failed: {message}',
+  'scaffold.initialize.report.created': 'Created {count} item(s)',
+  'scaffold.initialize.report.skipped': 'Skipped {count} item(s)',
+  'scaffold.initialize.report.reason.alreadyExists': 'Already exists',
+  'scaffold.initialize.report.reason.unresolvedField':
     'No field "{detail}" in this context',
-  'project.branches.initialize.report.reason.malformedTemplate':
+  'scaffold.initialize.report.reason.malformedTemplate':
     'Malformed template',
-  'project.branches.initialize.report.reason.invalidName':
+  'scaffold.initialize.report.reason.invalidName':
     'Not a valid folder name',
-  'project.branches.initialize.report.reason.noReference': 'No file to copy',
-  'project.branches.initialize.report.reason.referenceFailed':
+  'scaffold.initialize.report.reason.noReference': 'No file to copy',
+  'scaffold.initialize.report.reason.referenceFailed':
     'The file could not be copied',
-  'project.branches.initialize.report.reason.migrationFailed':
+  'scaffold.initialize.report.reason.migrationFailed':
     'The migration could not be copied',
   'project.branches.loadFailed': 'Failed to load branches: {message}',
   'project.field.active': 'Active',

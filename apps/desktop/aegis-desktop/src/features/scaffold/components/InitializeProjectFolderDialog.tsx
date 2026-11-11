@@ -18,7 +18,7 @@ import { useI18n } from "@aegis/ui/i18n";
 import type { TranslationKey } from "@aegis/ui/i18n";
 
 import { useListTemplateStructures } from "../../templates";
-import { useInitializeProjectFolder } from "../data/project-branches";
+import { useInitializeProjectFolder } from "../data/project-folder";
 import { errorMessage } from "../../../shared/api/error";
 import type {
   InitReport,
@@ -35,17 +35,17 @@ import type {
  * label at runtime.
  */
 const SKIP_REASON_KEYS: Record<SkipReason, TranslationKey> = {
-  alreadyExists: "project.branches.initialize.report.reason.alreadyExists",
+  alreadyExists: "scaffold.initialize.report.reason.alreadyExists",
   unresolvedField:
-    "project.branches.initialize.report.reason.unresolvedField",
+    "scaffold.initialize.report.reason.unresolvedField",
   malformedTemplate:
-    "project.branches.initialize.report.reason.malformedTemplate",
-  invalidName: "project.branches.initialize.report.reason.invalidName",
-  noReference: "project.branches.initialize.report.reason.noReference",
+    "scaffold.initialize.report.reason.malformedTemplate",
+  invalidName: "scaffold.initialize.report.reason.invalidName",
+  noReference: "scaffold.initialize.report.reason.noReference",
   referenceFailed:
-    "project.branches.initialize.report.reason.referenceFailed",
+    "scaffold.initialize.report.reason.referenceFailed",
   migrationFailed:
-    "project.branches.initialize.report.reason.migrationFailed",
+    "scaffold.initialize.report.reason.migrationFailed",
 };
 
 export interface InitializeProjectFolderDialogProps {
@@ -108,7 +108,7 @@ export function InitializeProjectFolderDialog({
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth>
-      <DialogTitle>{t("project.branches.initialize.title")}</DialogTitle>
+      <DialogTitle>{t("scaffold.initialize.title")}</DialogTitle>
       <DialogContent>
         {branch && (
           <Typography variant="body2" color="primary" sx={{ mb: 2 }}>
@@ -123,7 +123,7 @@ export function InitializeProjectFolderDialog({
                 variant="body2"
                 data-testid="initialize-report-created"
               >
-                {t("project.branches.initialize.report.created", {
+                {t("scaffold.initialize.report.created", {
                   count: report.created.length,
                 })}
               </Typography>
@@ -131,7 +131,7 @@ export function InitializeProjectFolderDialog({
                 variant="body2"
                 data-testid="initialize-report-skipped"
               >
-                {t("project.branches.initialize.report.skipped", {
+                {t("scaffold.initialize.report.skipped", {
                   count: report.skipped.length,
                 })}
               </Typography>
@@ -159,7 +159,7 @@ export function InitializeProjectFolderDialog({
               select
               fullWidth
               size="small"
-              label={t("project.branches.initialize.structure")}
+              label={t("scaffold.initialize.structure")}
               value={structureId ?? ""}
               onChange={(e) => {
                 const raw = e.target.value;
@@ -167,7 +167,7 @@ export function InitializeProjectFolderDialog({
               }}
               helperText={
                 structureId === null
-                  ? t("project.branches.initialize.required")
+                  ? t("scaffold.initialize.required")
                   : undefined
               }
               data-testid="initialize-folder-structure"
@@ -180,7 +180,7 @@ export function InitializeProjectFolderDialog({
             </TextField>
             {initialize.isError && (
               <Alert severity="error" sx={{ mt: 2 }}>
-                {t("project.branches.initialize.failed", {
+                {t("scaffold.initialize.failed", {
                   message: errorMessage(initialize.error),
                 })}
               </Alert>
