@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
@@ -77,10 +77,15 @@ beforeEach(() => {
 });
 afterEach(() => cleanup());
 
-function renderPage(user: UserView, projects: ProjectView[]) {
+function renderPage(
+  user: UserView,
+  projects: ProjectView[],
+  extra: Record<string, (args?: Record<string, unknown>) => unknown> = {},
+) {
   mockCommands({
     current_user: () => user,
     list_projects: () => projects,
+    ...extra,
   });
   return renderInRouter(
     <AegisThemeProvider>
@@ -92,6 +97,18 @@ function renderPage(user: UserView, projects: ProjectView[]) {
     </AegisThemeProvider>,
   );
 }
+
+/** The one template structure the dialog offers. */
+const TEMPLATES = [
+  {
+    id: 2,
+    name: "Minimal",
+    rootpath: "/templates/minimal",
+    level: "template",
+    projectCode: null,
+    templateId: null,
+  },
+];
 
 describe("ProjectListPage — basic rendering", () => {
   it("renders one row per project", async () => {
@@ -216,5 +233,42 @@ describe("ProjectListPage — search filter spans tags", () => {
     await screen.findByText("alpha");
     expect(screen.getByText("beta")).toBeInTheDocument();
     expect(screen.getByText("gamma")).toBeInTheDocument();
+  });
+});
+describe("ProjectListPage — folder initialization failure", () => {
+  it("shows a Snackbar when the project folder could not be initialized", async () => {
+    await renderPage(adminUser, [], {
+      list_users: () => [adminUser],
+      list_structures: () => TEMPLATES,
+      create_project: () => projectA,
+      initialize_project_folder: () => {
+        throw { kind: "parse", message: "rootpath is not writable" };
+      },
+    });
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: /add project/i }),
+    );
+    await userEvent.type(await screen.findByLabelText(/\bcode\b/i), "AK001-001");
+    await userEvent.type(
+      await screen.findByLabelText(/\bdescription\b/i),
+      "New desc",
+    );
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+
+    // The page's own search field is also a combobox, so the dialog's
+    // select is addressed by its test id.
+    const structureSelect = await screen.findByTestId(
+      "initialize-folder-structure",
+    );
+    await userEvent.click(within(structureSelect).getByRole("combobox"));
+    await userEvent.click(await screen.findByRole("option", { name: "Minimal" }));
+    await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
+
+    expect(
+      await screen.findByText(
+        /project was created, but its folder could not be initialized/i,
+      ),
+    ).toBeInTheDocument();
   });
 });

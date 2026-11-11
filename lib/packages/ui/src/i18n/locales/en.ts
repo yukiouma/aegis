@@ -168,6 +168,11 @@ export const en = {
     'The migration could not be copied',
   'project.branches.loadFailed': 'Failed to load branches: {message}',
   'project.field.active': 'Active',
+  'project.field.initializeFolder': 'Initialize project folder',
+  'project.field.initializeFolder.hint':
+    'Pick a structure template to create the project folder on this machine',
+  'project.folder.failed':
+    'The project was created, but its folder could not be initialized: {message}',
   'project.field.members.leaders': 'Members — leaders',
   'project.field.members.workers': 'Members — workers',
   'project.field.unblindMembers.leaders': 'Unblind members — leaders',

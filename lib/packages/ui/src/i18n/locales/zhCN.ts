@@ -161,6 +161,11 @@ export const zhCN = {
   'scaffold.initialize.report.reason.migrationFailed': '迁移文件复制失败',
   'project.branches.loadFailed': '加载分支失败：{message}',
   'project.field.active': '已启用',
+  'project.field.initializeFolder': '初始化项目文件夹',
+  'project.field.initializeFolder.hint':
+    '选择一个结构模板，在本机创建项目文件夹',
+  'project.folder.failed':
+    '项目已创建，但项目文件夹初始化失败：{message}',
   'project.field.members.leaders': '负责人',
   'project.field.members.workers': '项目成员',
   'project.field.unblindMembers.leaders': '负责人 - 非盲',
