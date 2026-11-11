@@ -147,6 +147,8 @@ export const zhCN = {
   'scaffold.initialize.structure': '结构模板',
   'scaffold.initialize.required': '请选择结构模板',
   'scaffold.initialize.failed': '初始化失败：{message}',
+  'scaffold.initialize.listFailed': '加载结构模板失败：{message}',
+  'scaffold.initialize.noTemplates': '没有可用的结构模板。',
   'scaffold.initialize.report.created': '已创建 {count} 项',
   'scaffold.initialize.report.skipped': '已跳过 {count} 项',
   'scaffold.initialize.report.reason.alreadyExists': '已存在',

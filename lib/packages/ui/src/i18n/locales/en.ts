@@ -149,6 +149,9 @@ export const en = {
   'scaffold.initialize.structure': 'Structure template',
   'scaffold.initialize.required': 'Select a structure template',
   'scaffold.initialize.failed': 'Initialize failed: {message}',
+  'scaffold.initialize.listFailed':
+    'Could not load structure templates: {message}',
+  'scaffold.initialize.noTemplates': 'No structure templates are available.',
   'scaffold.initialize.report.created': 'Created {count} item(s)',
   'scaffold.initialize.report.skipped': 'Skipped {count} item(s)',
   'scaffold.initialize.report.reason.alreadyExists': 'Already exists',

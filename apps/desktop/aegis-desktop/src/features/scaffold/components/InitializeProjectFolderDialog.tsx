@@ -193,6 +193,18 @@ export function InitializeProjectFolderDialog({
           </Stack>
         ) : (
           <>
+            {structures.isError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {t("scaffold.initialize.listFailed", {
+                  message: errorMessage(structures.error),
+                })}
+              </Alert>
+            )}
+            {structures.data?.length === 0 && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                {t("scaffold.initialize.noTemplates")}
+              </Alert>
+            )}
             <TextField
               select
               fullWidth

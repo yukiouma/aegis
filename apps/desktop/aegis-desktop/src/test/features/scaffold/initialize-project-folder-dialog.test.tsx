@@ -303,8 +303,7 @@ describe("InitializeProjectFolderDialog — beforeInit", () => {
   });
 });
 
-describe("InitializeProjectFolderDialog — onInitError", () => {
-  it("calls onInitError instead of showing the inline error when supplied", async () => {
+describe("InitializeProjectFolderDialog — onInitError", () => {  it("calls onInitError instead of showing the inline error when supplied", async () => {
     vi.mocked(invoke).mockImplementation((cmd: string) => {
       if (cmd === "list_structures") return Promise.resolve(TEMPLATES);
       if (cmd === "initialize_project_folder") {
@@ -334,5 +333,35 @@ describe("InitializeProjectFolderDialog — onInitError", () => {
     await confirmWithMinimal();
 
     expect(await screen.findByText(/boom/)).toBeInTheDocument();
+  });
+});
+
+describe("InitializeProjectFolderDialog — template list states", () => {
+  it("shows an error when the template list fails to load", async () => {
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "list_structures") {
+        return Promise.reject({ kind: "network", message: "boom" });
+      }
+      return Promise.reject(new Error(`unexpected tauri command: ${cmd}`));
+    });
+    renderDialog();
+
+    expect(
+      await screen.findByText(/could not load structure templates/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /confirm/i })).toBeDisabled();
+  });
+
+  it("shows an empty-state message when there are no templates", async () => {
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "list_structures") return Promise.resolve([]);
+      return Promise.reject(new Error(`unexpected tauri command: ${cmd}`));
+    });
+    renderDialog();
+
+    expect(
+      await screen.findByText(/no structure templates/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /confirm/i })).toBeDisabled();
   });
 });
