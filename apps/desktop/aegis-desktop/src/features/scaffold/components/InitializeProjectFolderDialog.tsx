@@ -221,6 +221,7 @@ export function InitializeProjectFolderDialog({
                   : undefined
               }
               data-testid="initialize-folder-structure"
+              sx={{ mt: 1 }}
             >
               {(structures.data ?? []).map((s) => (
                 <MenuItem key={s.id} value={s.id}>
