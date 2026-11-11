@@ -107,20 +107,17 @@ export function InitializeProjectFolderDialog({
   }
 
   return (
-    <Dialog open={open} onClose={handleClose}>
+    <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth>
       <DialogTitle>{t("project.branches.initialize.title")}</DialogTitle>
       <DialogContent>
         {branch && (
-          <Typography variant="body2" sx={{ mb: 2 }}>
+          <Typography variant="body2" color="primary" sx={{ mb: 2 }}>
             {branch.branch}
           </Typography>
         )}
 
         {report ? (
           <Stack spacing={2} data-testid="initialize-report">
-            <Typography variant="body2" data-testid="initialize-report-root">
-              {report.root}
-            </Typography>
             <Box sx={{ display: "flex", gap: 2 }}>
               <Typography
                 variant="body2"
@@ -143,9 +140,11 @@ export function InitializeProjectFolderDialog({
               <List dense data-testid="initialize-report-skipped-list">
                 {report.skipped.map((item, index) => (
                   <ListItem key={index}>
-                    <Typography variant="body2">{item.path}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {t(SKIP_REASON_KEYS[item.reason], {
+                    <Typography variant="body2" color="primary">
+                      {item.path}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      : {t(SKIP_REASON_KEYS[item.reason], {
                         detail: item.detail ?? "",
                       })}
                     </Typography>
