@@ -40,6 +40,7 @@ import type {
   DomainAnnotation,
   DomainAnnotationListResponse,
   Identity,
+  InitReport,
   IssueListQuery,
   IssueState,
   IssueViewResponse,
@@ -590,6 +591,16 @@ export const api = {
     call<StructureView>("update_structure", { id, body: { ...input } }),
   deleteStructure: (id: number): Promise<void> =>
     call<void>("delete_structure", { id }),
+  initializeProjectFolder: (input: {
+    structureId: number;
+    study: string;
+    branch?: string | null;
+  }): Promise<InitReport> =>
+    call<InitReport>("initialize_project_folder", {
+      structureId: input.structureId,
+      study: input.study,
+      branch: input.branch ?? null,
+    }),
 } as const;
 
 export type { ApiError } from "./types";
@@ -636,6 +647,7 @@ export type {
   DomainCategory,
   Identity,
   ImportAlsInput,
+  InitReport,
   IssueCommentViewResponse,
   IssueListQuery,
   IssueListResponse,
@@ -672,6 +684,8 @@ export type {
   SdtmVariableView,
   SdtmVersionListResponse,
   SdtmVersionView,
+  SkipReason,
+  SkippedItem,
   StructureLevel,
   StructureNodeInput,
   StructureNodeView,

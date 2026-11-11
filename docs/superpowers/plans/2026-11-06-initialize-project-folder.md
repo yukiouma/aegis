@@ -1924,11 +1924,38 @@ import {
   Typography,
 } from "@aegis/ui/mui";
 import { useI18n } from "@aegis/ui/i18n";
+import type { TranslationKey } from "@aegis/ui/i18n";
 
 import { useListTemplateStructures } from "../../templates";
 import { useInitializeProjectFolder } from "../data/project-branches";
 import { errorMessage } from "../../../shared/api/error";
-import type { InitReport, ProjectBranchView } from "../../../shared/api";
+import type {
+  InitReport,
+  ProjectBranchView,
+  SkipReason,
+} from "../../../shared/api";
+
+/**
+ * The translation key for each skip reason.
+ *
+ * A map rather than a template literal: `TranslationKey` is a union of
+ * the catalogue's keys, so a computed key would not typecheck — and the
+ * map makes a missing translation a compile error rather than a blank
+ * label at runtime.
+ */
+const SKIP_REASON_KEYS: Record<SkipReason, TranslationKey> = {
+  alreadyExists: "project.branches.initialize.report.reason.alreadyExists",
+  unresolvedField:
+    "project.branches.initialize.report.reason.unresolvedField",
+  malformedTemplate:
+    "project.branches.initialize.report.reason.malformedTemplate",
+  invalidName: "project.branches.initialize.report.reason.invalidName",
+  noReference: "project.branches.initialize.report.reason.noReference",
+  referenceFailed:
+    "project.branches.initialize.report.reason.referenceFailed",
+  migrationFailed:
+    "project.branches.initialize.report.reason.migrationFailed",
+};
 
 export interface InitializeProjectFolderDialogProps {
   open: boolean;
@@ -2027,9 +2054,9 @@ export function InitializeProjectFolderDialog({
                   <ListItem key={index}>
                     <Typography variant="body2">{item.path}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {t(
-                        `project.branches.initialize.report.reason.${item.reason}`,
-                      )}
+                      {t(SKIP_REASON_KEYS[item.reason], {
+                        detail: item.detail ?? "",
+                      })}
                     </Typography>
                   </ListItem>
                 ))}
@@ -2097,7 +2124,8 @@ export function InitializeProjectFolderDialog({
 
 - [ ] **Step 8: Add the i18n keys**
 
-In `lib/packages/ui/src/i18n/locales/en.ts`, after `'project.branches.initialize.success':`, add:
+In `lib/packages/ui/src/i18n/locales/en.ts`, replace the line
+`'project.branches.initialize.success': 'Initialize successfully',` with:
 
 ```ts
   'project.branches.initialize.failed': 'Initialize failed: {message}',
@@ -2118,7 +2146,8 @@ In `lib/packages/ui/src/i18n/locales/en.ts`, after `'project.branches.initialize
     'The migration could not be copied',
 ```
 
-In `lib/packages/ui/src/i18n/locales/zhCN.ts`, add the same keys with Chinese values:
+In `lib/packages/ui/src/i18n/locales/zhCN.ts`, replace the line
+`'project.branches.initialize.success': '初始化成功',` with the same keys, translated:
 
 ```ts
   'project.branches.initialize.failed': '初始化失败：{message}',

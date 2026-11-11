@@ -4,6 +4,7 @@ import {
   api,
   type ApiError,
   type CreateProjectBranchInput,
+  type InitReport,
   type ProjectBranchView,
   type UpdateProjectBranchInput,
 } from "../../../shared/api";
@@ -88,5 +89,21 @@ export function useSetActiveBranchId(projectCode: string) {
     onSuccess: (_void, branchId) => {
       qc.setQueryData(queryKeys.project.activeBranch(projectCode), branchId);
     },
+  });
+}
+
+/**
+ * Materialise a structure template into a project folder on disk.
+ *
+ * The command does real filesystem work on the desktop machine, so it
+ * is not retried — a retry would re-run a partially-applied scaffold.
+ */
+export function useInitializeProjectFolder() {
+  return useMutation<
+    InitReport,
+    ApiError,
+    { structureId: number; study: string; branch?: string | null }
+  >({
+    mutationFn: (input) => api.initializeProjectFolder(input),
   });
 }

@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   IconButton,
-  Snackbar,
   Switch,
   Table,
   TableBody,
@@ -63,7 +62,6 @@ export function ProjectBranchesSection({
   const [initializeBranch, setInitializeBranch] = useState<ProjectBranchView | null>(
     null,
   );
-  const [initialized, setInitialized] = useState(false);
 
   const mutationError =
     nameDialog?.mode === "create"
@@ -86,6 +84,17 @@ export function ProjectBranchesSection({
   function openRename(branch: ProjectBranchView) {
     updateBranch.reset();
     setNameDialog({ mode: "edit", branch });
+  }
+
+  /**
+   * The folder has been generated.
+   *
+   * The report stays in the dialog — a skipped node is a normal
+   * outcome and the user needs to see its reason there, so there is
+   * nothing to announce from here.
+   */
+  function handleInitialized() {
+    // Intentionally empty; see the doc comment above.
   }
 
   async function handleSubmit(name: string) {
@@ -207,18 +216,12 @@ export function ProjectBranchesSection({
       {initializeBranch && (
         <InitializeProjectFolderDialog
           open
+          projectCode={projectCode}
           branch={initializeBranch}
           onClose={() => setInitializeBranch(null)}
-          onInitialized={() => setInitialized(true)}
+          onInitialized={handleInitialized}
         />
       )}
-
-      <Snackbar
-        open={initialized}
-        autoHideDuration={6000}
-        onClose={() => setInitialized(false)}
-        message={t("project.branches.initialize.success")}
-      />
     </>
   );
 }
