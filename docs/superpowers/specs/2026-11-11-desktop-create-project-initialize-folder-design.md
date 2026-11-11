@@ -188,14 +188,15 @@ failure means "the project was created, the folder was not".
 
 ### i18n
 
-`en.ts` and `zhCN.ts` move the dialog's fourteen `project.branches.initialize.*`
-keys to `scaffold.initialize.*` and add:
+`en.ts` and `zhCN.ts` move the dialog's thirteen `project.branches.initialize.*`
+keys to `scaffold.initialize.*` — `project.branches.initializeFolder` stays
+where it is, because it is the branch-row button's `aria-label`, not a dialog
+key. Five keys are added:
 
 | Key | en | zh-CN |
 | --- | --- | --- |
 | `project.field.initializeFolder` | Initialize project folder | 初始化项目文件夹 |
 | `project.field.initializeFolder.hint` | Pick a structure template to create the project folder on this machine | 选择一个结构模板，在本机创建项目文件夹 |
-| `scaffold.initialize.failed` | Initialize failed: {message} | 初始化失败：{message} |
 | `scaffold.initialize.listFailed` | Could not load structure templates: {message} | 加载结构模板失败：{message} |
 | `scaffold.initialize.noTemplates` | No structure templates are available. | 没有可用的结构模板。 |
 | `project.folder.failed` | The project was created, but its folder could not be initialized: {message} | 项目已创建，但项目文件夹初始化失败：{message} |
