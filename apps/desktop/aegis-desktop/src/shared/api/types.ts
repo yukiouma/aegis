@@ -811,3 +811,41 @@ export interface StructureNodeInput {
   reference: string | null;
   migration: MigrationView | null;
 }
+
+// ---- initialize project folder --------------------------------------
+//
+// Wire types for the initialize-project-folder command. They mirror
+// the Rust DTOs in `src-tauri/src/scaffold/report.rs` field for field.
+// The report has no server counterpart — the desktop answers it
+// itself about what happened on disk.
+
+/** Why a node was not created. */
+export type SkipReason =
+  | "alreadyExists"
+  | "unresolvedField"
+  | "malformedTemplate"
+  | "invalidName"
+  | "noReference"
+  | "referenceFailed"
+  | "migrationFailed";
+
+export interface SkippedItem {
+  /**
+   * The path the node would have had. For a node whose name could
+   * not be resolved this joins the raw, unresolved `entryName` — it
+   * is not a real directory.
+   */
+  path: string;
+  reason: SkipReason;
+  /** The missing field name, the raw template text, or the I/O error. */
+  detail: string | null;
+}
+
+export interface InitReport {
+  /** The base the tree was written under. */
+  root: string;
+  /** The paths that were created. */
+  created: string[];
+  /** The nodes that were not created, with the reason. */
+  skipped: SkippedItem[];
+}

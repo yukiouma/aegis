@@ -32,6 +32,22 @@ const TEMPLATES = [
   },
 ];
 
+/** What the command answers: two created items, one skip. */
+const REPORT = {
+  root: "D:\\studies\\ak001\\001",
+  created: [
+    "D:\\studies\\ak001\\001\\01_raw",
+    "D:\\studies\\ak001\\001\\01_raw\\spec.docx",
+  ],
+  skipped: [
+    {
+      path: "D:\\studies\\ak001\\001\\02_clean",
+      reason: "alreadyExists",
+      detail: null,
+    },
+  ],
+};
+
 function wrapperFor(client: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
@@ -46,7 +62,7 @@ function wrapperFor(client: QueryClient) {
 
 function renderDialog(overrides: {
   onClose?: () => void;
-  onInitialized?: (structureName: string) => void;
+  onInitialized?: (report: unknown) => void;
 } = {}) {
   const onClose = overrides.onClose ?? vi.fn();
   const onInitialized = overrides.onInitialized ?? vi.fn();
@@ -59,6 +75,7 @@ function renderDialog(overrides: {
   render(
     <InitializeProjectFolderDialog
       open
+      projectCode="AK001-001"
       onClose={onClose}
       onInitialized={onInitialized}
     />,
@@ -69,7 +86,11 @@ function renderDialog(overrides: {
 
 beforeEach(() => {
   vi.mocked(invoke).mockReset();
-  vi.mocked(invoke).mockResolvedValue(TEMPLATES);
+  vi.mocked(invoke).mockImplementation((cmd: string) => {
+    if (cmd === "list_structures") return Promise.resolve(TEMPLATES);
+    if (cmd === "initialize_project_folder") return Promise.resolve(REPORT);
+    return Promise.reject(new Error(`unexpected tauri command: ${cmd}`));
+  });
 });
 afterEach(() => {
   cleanup();
@@ -105,30 +126,7 @@ describe("InitializeProjectFolderDialog", () => {
     expect(screen.getByRole("button", { name: /confirm/i })).toBeEnabled();
   });
 
-  it("reports the selected structure and closes", async () => {
-    const { onClose, onInitialized } = renderDialog();
-    await userEvent.click(screen.getByRole("combobox"));
-    await userEvent.click(
-      await screen.findByRole("option", {
-        name: "Standard Project Folder Structure",
-      }),
-    );
-    await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
-
-    expect(onInitialized).toHaveBeenCalledWith(
-      "Standard Project Folder Structure",
-    );
-    expect(onClose).toHaveBeenCalled();
-  });
-
-  it("cancels without reporting a structure", async () => {
-    const { onClose, onInitialized } = renderDialog();
-    await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
-    expect(onClose).toHaveBeenCalled();
-    expect(onInitialized).not.toHaveBeenCalled();
-  });
-
-  it("makes no request beyond the structure list", async () => {
+  it("runs the command and shows the report", async () => {
     const { onInitialized } = renderDialog();
     await userEvent.click(screen.getByRole("combobox"));
     await userEvent.click(
@@ -136,11 +134,55 @@ describe("InitializeProjectFolderDialog", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
 
-    expect(onInitialized).toHaveBeenCalled();
-    const commands = vi
-      .mocked(invoke)
-      .mock.calls.map((call) => call[0])
-      .filter((cmd) => cmd !== "list_structures");
-    expect(commands).toEqual([]);
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("initialize_project_folder", {
+        structureId: 2,
+        study: "AK001-001",
+        branch: null,
+      }),
+    );
+    expect(screen.getByTestId("initialize-report-created")).toHaveTextContent(
+      "2",
+    );
+    expect(screen.getByTestId("initialize-report-skipped")).toHaveTextContent(
+      "1",
+    );
+    // Each skipped node is listed with its path and the reason.
+    expect(
+      screen.getByText("D:\\studies\\ak001\\001\\02_clean"),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/already exists/i)).toBeInTheDocument();
+    expect(onInitialized).toHaveBeenCalledWith(REPORT);
+  });
+
+  it("keeps the dialog open and shows the error when the command fails", async () => {
+    vi.mocked(invoke).mockImplementation((cmd: string) => {
+      if (cmd === "list_structures") return Promise.resolve(TEMPLATES);
+      if (cmd === "initialize_project_folder") {
+        return Promise.reject({ kind: "network", message: "boom" });
+      }
+      return Promise.reject(new Error(`unexpected tauri command: ${cmd}`));
+    });
+    renderDialog();
+    await userEvent.click(screen.getByRole("combobox"));
+    await userEvent.click(
+      await screen.findByRole("option", { name: "Minimal" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
+
+    expect(await screen.findByText(/boom/)).toBeInTheDocument();
+    // Still open — the user can retry or cancel.
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
+  });
+
+  it("cancels without running the command", async () => {
+    const { onClose, onInitialized } = renderDialog();
+    await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    expect(onClose).toHaveBeenCalled();
+    expect(onInitialized).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalledWith(
+      "initialize_project_folder",
+      expect.anything(),
+    );
   });
 });

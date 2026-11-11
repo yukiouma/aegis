@@ -148,7 +148,21 @@ export const en = {
   'project.branches.initialize.title': 'Initialize project folder',
   'project.branches.initialize.structure': 'Structure template',
   'project.branches.initialize.required': 'Select a structure template',
-  'project.branches.initialize.success': 'Initialize successfully',
+  'project.branches.initialize.failed': 'Initialize failed: {message}',
+  'project.branches.initialize.report.created': 'Created {count} item(s)',
+  'project.branches.initialize.report.skipped': 'Skipped {count} item(s)',
+  'project.branches.initialize.report.reason.alreadyExists': 'Already exists',
+  'project.branches.initialize.report.reason.unresolvedField':
+    'No field "{detail}" in this context',
+  'project.branches.initialize.report.reason.malformedTemplate':
+    'Malformed template',
+  'project.branches.initialize.report.reason.invalidName':
+    'Not a valid folder name',
+  'project.branches.initialize.report.reason.noReference': 'No file to copy',
+  'project.branches.initialize.report.reason.referenceFailed':
+    'The file could not be copied',
+  'project.branches.initialize.report.reason.migrationFailed':
+    'The migration could not be copied',
   'project.branches.loadFailed': 'Failed to load branches: {message}',
   'project.field.active': 'Active',
   'project.field.members.leaders': 'Members — leaders',

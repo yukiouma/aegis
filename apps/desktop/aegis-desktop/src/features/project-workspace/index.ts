@@ -3,6 +3,7 @@ export { useProjectConfiguration } from "./data/project-configuration";
 export {
   useActiveBranchId,
   useCreateProjectBranch,
+  useInitializeProjectFolder,
   useProjectBranches,
   useSetActiveBranchId,
   useUpdateProjectBranch,

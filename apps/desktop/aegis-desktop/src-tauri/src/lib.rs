@@ -7,6 +7,7 @@ use tauri_plugin_store::StoreExt;
 
 mod commands;
 mod http;
+mod scaffold;
 mod state;
 mod system;
 mod trace_id_setup;
@@ -130,6 +131,8 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::structures::add_structure_node,
             commands::structures::update_structure_node,
             commands::structures::delete_structure_node,
+            // scaffold
+            commands::scaffold::initialize_project_folder,
             // health
             commands::healthz::healthz,
             // webview log forwarder (sink for console.warn / console.error)

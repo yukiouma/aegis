@@ -24,6 +24,7 @@ const EXPECTED_INVOKE_KEYS: Record<string, string[]> = {
   add_structure_node: ["structureId", "body"],
   update_structure_node: ["structureId", "nodeId", "body"],
   delete_structure_node: ["structureId", "nodeId"],
+  initialize_project_folder: ["structureId", "study", "branch"],
 };
 
 describe("structures api", () => {
@@ -66,6 +67,15 @@ describe("structures api", () => {
         () => api.updateStructure(3, { name: "Renamed", rootpath: "/abs/root" }),
       ],
       ["delete_structure", () => api.deleteStructure(3)],
+      [
+        "initialize_project_folder",
+        () =>
+          api.initializeProjectFolder({
+            structureId: 3,
+            study: "AK001-001",
+            branch: "2026Q1",
+          }),
+      ],
     ];
 
     mockCommands({
@@ -77,6 +87,11 @@ describe("structures api", () => {
       create_structure: () => ({}),
       update_structure: () => ({}),
       delete_structure: () => undefined,
+      initialize_project_folder: () => ({
+        root: "D:\\studies",
+        created: [],
+        skipped: [],
+      }),
     });
 
     for (const [command, call] of cases) {

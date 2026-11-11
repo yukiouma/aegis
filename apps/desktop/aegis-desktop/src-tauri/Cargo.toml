@@ -57,6 +57,10 @@ tracing-subscriber = { workspace = true }
 # copy and to source `TraceIdGenerator` from a single crate.
 # Local path dep.
 logging-utils = { path = "../../../../lib/crates/logging-utils" }
+# `scaffolding` holds the pure planning for the initialize-project-folder
+# command — context derivation, template resolution, and the tree ->
+# scaffold transformation. The desktop keeps only the filesystem half.
+scaffolding = { path = "../../../../lib/crates/scaffolding" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-utils = { path = "../../../../lib/crates/windows-utils" }

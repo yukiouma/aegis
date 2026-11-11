@@ -66,6 +66,13 @@ function mockInvokeWith(
   vi.mocked(invoke).mockImplementation((cmd: string) => {
     if (cmd === "list_project_branches") return Promise.resolve(branches);
     if (cmd === "list_structures") return Promise.resolve(TEMPLATES);
+    if (cmd === "initialize_project_folder") {
+      return Promise.resolve({
+        root: "D:\\studies\\ak001\\001",
+        created: ["D:\\studies\\ak001\\001\\01_raw"],
+        skipped: [],
+      });
+    }
     const handler = handlers[cmd];
     if (!handler) {
       return Promise.reject(new Error(`unexpected tauri command: ${cmd}`));
@@ -301,7 +308,7 @@ describe("ProjectBranchesSection", () => {
     expect(screen.getByLabelText("Branch name")).toBeInTheDocument();
   });
 
-  it("reports the initialization with a success message", async () => {
+  it("shows the initialization report in the dialog", async () => {
     renderSection();
     await userEvent.click(await screen.findByTestId("branch-initialize-4"));
     await userEvent.click(await screen.findByRole("combobox"));
@@ -312,6 +319,11 @@ describe("ProjectBranchesSection", () => {
     );
     await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
 
-    expect(await screen.findByText("Initialize successfully")).toBeInTheDocument();
+    // The report stays in the dialog — a skipped node is a normal
+    // outcome, so the user needs to read it there.
+    expect(await screen.findByTestId("initialize-report")).toBeInTheDocument();
+    expect(screen.getByTestId("initialize-report-created")).toHaveTextContent(
+      "1",
+    );
   });
 });
