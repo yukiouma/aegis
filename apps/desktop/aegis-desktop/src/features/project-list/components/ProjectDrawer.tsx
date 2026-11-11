@@ -206,164 +206,164 @@ export function ProjectDrawer({
         slotProps={{ paper: { sx: { width: 480 } } }}
       >
         <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}>
-        <Typography variant="h6">
-          {t(mode === "create" ? "project.create.title" : "project.edit.title")}
-        </Typography>
+          <Typography variant="h6">
+            {t(mode === "create" ? "project.create.title" : "project.edit.title")}
+          </Typography>
 
-        <TextField
-          label={t("project.field.code")}
-          value={formCode}
-          onChange={(event) => setFormCode(event.target.value)}
-          disabled={mode === "edit"}
-          size="small"
-          required
-        />
+          <TextField
+            label={t("project.field.code")}
+            value={formCode}
+            onChange={(event) => setFormCode(event.target.value)}
+            disabled={mode === "edit"}
+            size="small"
+            required
+          />
 
-        <TextField
-          label={t("project.field.description")}
-          value={description}
-          onChange={(event) => setDescription(event.target.value)}
-          multiline
-          minRows={2}
-          size="small"
-          required
-        />
+          <TextField
+            label={t("project.field.description")}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            multiline
+            minRows={2}
+            size="small"
+            required
+          />
 
-        <FormControl size="small" sx={{ maxWidth: 320 }}>
-          <InputLabel id="project-language-label">
-            {t("project.field.language")}
-          </InputLabel>
-          <Select<ProjectLanguage | "" >
-            labelId="project-language-label"
-            label={t("project.field.language")}
-            value={language ?? ""}
-            onChange={(e) => {
-              const v = e.target.value;
-              setLanguage(v === "" ? null : (v as ProjectLanguage));
-              if (!languageTouched) setLanguageTouched(true);
-            }}
-          >
-            <MenuItem value="">{t("project.field.language.none")}</MenuItem>
-            <MenuItem value="en">{t("language.english")}</MenuItem>
-            <MenuItem value="zh-CN">
-              {t("language.simplifiedChinese")}
-            </MenuItem>
-          </Select>
-        </FormControl>
+          <FormControl size="small" sx={{ maxWidth: 320 }}>
+            <InputLabel id="project-language-label">
+              {t("project.field.language")}
+            </InputLabel>
+            <Select<ProjectLanguage | "" >
+              labelId="project-language-label"
+              label={t("project.field.language")}
+              value={language ?? ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                setLanguage(v === "" ? null : (v as ProjectLanguage));
+                if (!languageTouched) setLanguageTouched(true);
+              }}
+            >
+              <MenuItem value="">{t("project.field.language.none")}</MenuItem>
+              <MenuItem value="en">{t("language.english")}</MenuItem>
+              <MenuItem value="zh-CN">
+                {t("language.simplifiedChinese")}
+              </MenuItem>
+            </Select>
+          </FormControl>
 
-        <TagEditor
-          value={tags}
-          onChange={setTags}
-          onTouched={() => setTagsTouched(true)}
-        />
+          <TagEditor
+            value={tags}
+            onChange={setTags}
+            onTouched={() => setTagsTouched(true)}
+          />
 
-        <Autocomplete<UserSummary, true>
-          multiple
-          options={users.data ?? []}
-          getOptionLabel={(u) => `${u.code} — ${u.name}`}
-          value={memberLeaders}
-          onChange={(_e, value) => setMemberLeaders(value)}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label={t("project.field.members.leaders")}
-              size="small"
-            />
+          <Autocomplete<UserSummary, true>
+            multiple
+            options={users.data ?? []}
+            getOptionLabel={(u) => `${u.code} — ${u.name}`}
+            value={memberLeaders}
+            onChange={(_e, value) => setMemberLeaders(value)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label={t("project.field.members.leaders")}
+                size="small"
+              />
+            )}
+          />
+
+          <Autocomplete<UserSummary, true>
+            multiple
+            options={users.data ?? []}
+            getOptionLabel={(u) => `${u.code} — ${u.name}`}
+            value={memberWorkers}
+            onChange={(_e, value) => setMemberWorkers(value)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label={t("project.field.members.workers")}
+                size="small"
+              />
+            )}
+          />
+
+          <Autocomplete<UserSummary, true>
+            multiple
+            options={users.data ?? []}
+            getOptionLabel={(u) => `${u.code} — ${u.name}`}
+            value={unblindLeaders}
+            onChange={(_e, value) => setUnblindLeaders(value)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label={t("project.field.unblindMembers.leaders")}
+                size="small"
+              />
+            )}
+          />
+
+          <Autocomplete<UserSummary, true>
+            multiple
+            options={users.data ?? []}
+            getOptionLabel={(u) => `${u.code} — ${u.name}`}
+            value={unblindWorkers}
+            onChange={(_e, value) => setUnblindWorkers(value)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label={t("project.field.unblindMembers.workers")}
+                size="small"
+              />
+            )}
+          />
+
+          {mode === "create" && (
+            <Box>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={initializeFolder}
+                    onChange={(event) =>
+                      setInitializeFolder(event.target.checked)
+                    }
+                  />
+                }
+                label={t("project.field.initializeFolder")}
+              />
+              <Typography variant="body2" color="text.secondary">
+                {t("project.field.initializeFolder.hint")}
+              </Typography>
+            </Box>
           )}
-        />
 
-        <Autocomplete<UserSummary, true>
-          multiple
-          options={users.data ?? []}
-          getOptionLabel={(u) => `${u.code} — ${u.name}`}
-          value={memberWorkers}
-          onChange={(_e, value) => setMemberWorkers(value)}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label={t("project.field.members.workers")}
-              size="small"
-            />
-          )}
-        />
-
-        <Autocomplete<UserSummary, true>
-          multiple
-          options={users.data ?? []}
-          getOptionLabel={(u) => `${u.code} — ${u.name}`}
-          value={unblindLeaders}
-          onChange={(_e, value) => setUnblindLeaders(value)}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label={t("project.field.unblindMembers.leaders")}
-              size="small"
-            />
-          )}
-        />
-
-        <Autocomplete<UserSummary, true>
-          multiple
-          options={users.data ?? []}
-          getOptionLabel={(u) => `${u.code} — ${u.name}`}
-          value={unblindWorkers}
-          onChange={(_e, value) => setUnblindWorkers(value)}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              label={t("project.field.unblindMembers.workers")}
-              size="small"
-            />
-          )}
-        />
-
-        {mode === "create" && (
-          <Box>
+          {mode === "edit" && (
             <FormControlLabel
               control={
-                <Checkbox
-                  checked={initializeFolder}
-                  onChange={(event) =>
-                    setInitializeFolder(event.target.checked)
-                  }
+                <Switch
+                  checked={active}
+                  onChange={(event) => setActive(event.target.checked)}
                 />
               }
-              label={t("project.field.initializeFolder")}
+              label={t("project.field.active")}
             />
-            <Typography variant="body2" color="text.secondary">
-              {t("project.field.initializeFolder.hint")}
-            </Typography>
-          </Box>
-        )}
+          )}
 
-        {mode === "edit" && (
-          <FormControlLabel
-            control={
-              <Switch
-                checked={active}
-                onChange={(event) => setActive(event.target.checked)}
-              />
-            }
-            label={t("project.field.active")}
-          />
-        )}
+          {mutationError && (
+            <Alert severity="error">{errorMessage(mutationError)}</Alert>
+          )}
 
-        {mutationError && (
-          <Alert severity="error">{errorMessage(mutationError)}</Alert>
-        )}
-
-        <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
-          <Button onClick={onClose}>{t("common.cancel")}</Button>
-          <Button
-            variant="contained"
-            disabled={submitDisabled}
-            onClick={() => void onSubmit()}
-          >
-            {t(mode === "create" ? "project.action.create" : "project.action.save")}
-          </Button>
-        </Stack>
-      </Box>
-    </Drawer>
+          <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
+            <Button onClick={onClose}>{t("common.cancel")}</Button>
+            <Button
+              variant="contained"
+              disabled={submitDisabled}
+              onClick={() => void onSubmit()}
+            >
+              {t(mode === "create" ? "project.action.create" : "project.action.save")}
+            </Button>
+          </Stack>
+        </Box>
+      </Drawer>
     {/* A sibling of the Drawer, not a child: the Drawer unmounts its
         children when it closes, and the dialog has to outlive the
         drawer so the report stays on screen. */}
