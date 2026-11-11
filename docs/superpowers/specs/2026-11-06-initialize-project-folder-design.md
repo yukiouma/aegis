@@ -474,9 +474,11 @@ source, per rule 8.
 
 - On confirm, it calls `api.initializeProjectFolder({ structureId, study, branch })`.
 - While the command runs, the confirm button shows a pending state.
-- On success, the dialog **stays open** and shows the report: the resolved
-  root, the created count, the skipped count, and each skipped path with
-  its reason.
+- On success, the dialog **stays open** and shows the report: the created
+  count, the skipped count, and each skipped path with its reason. The
+  resolved root is part of the command's report but is not displayed —
+  the paths of the created and skipped items already say where the
+  folder landed.
 - On failure, the dialog shows the error and stays open.
 
 The current `onInitialized(structureName)` prop is replaced by

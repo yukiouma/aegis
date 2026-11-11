@@ -321,9 +321,7 @@ describe("ProjectBranchesSection", () => {
 
     // The report stays in the dialog — a skipped node is a normal
     // outcome, so the user needs to read it there.
-    expect(
-      await screen.findByTestId("initialize-report-root"),
-    ).toHaveTextContent("D:\\studies\\ak001\\001");
+    expect(await screen.findByTestId("initialize-report")).toBeInTheDocument();
     expect(screen.getByTestId("initialize-report-created")).toHaveTextContent(
       "1",
     );

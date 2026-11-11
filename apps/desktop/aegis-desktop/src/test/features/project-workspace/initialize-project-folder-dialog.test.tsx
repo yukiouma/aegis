@@ -141,15 +141,16 @@ describe("InitializeProjectFolderDialog", () => {
         branch: null,
       }),
     );
-    expect(
-      await screen.findByTestId("initialize-report-root"),
-    ).toHaveTextContent("D:\\studies\\ak001\\001");
     expect(screen.getByTestId("initialize-report-created")).toHaveTextContent(
       "2",
     );
     expect(screen.getByTestId("initialize-report-skipped")).toHaveTextContent(
       "1",
     );
+    // Each skipped node is listed with its path and the reason.
+    expect(
+      screen.getByText("D:\\studies\\ak001\\001\\02_clean"),
+    ).toBeInTheDocument();
     expect(screen.getByText(/already exists/i)).toBeInTheDocument();
     expect(onInitialized).toHaveBeenCalledWith(REPORT);
   });
