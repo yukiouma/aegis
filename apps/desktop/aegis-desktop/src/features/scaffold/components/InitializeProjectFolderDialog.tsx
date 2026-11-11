@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -19,8 +19,9 @@ import type { TranslationKey } from "@aegis/ui/i18n";
 
 import { useListTemplateStructures } from "../../templates";
 import { useInitializeProjectFolder } from "../data/project-folder";
-import { errorMessage } from "../../../shared/api/error";
+import { errorMessage, toApiError } from "../../../shared/api/error";
 import type {
+  ApiError,
   InitReport,
   ProjectBranchView,
   SkipReason,
@@ -55,6 +56,19 @@ export interface InitializeProjectFolderDialogProps {
   /** The branch the folder is being initialized for, when the dialog
    *  was opened from a branch row. */
   branch?: ProjectBranchView;
+  /**
+   * Awaited after the user confirms a template and before the folder
+   * is materialized. Rejecting aborts the whole operation — nothing
+   * is written to disk — and closes the dialog, so the caller can
+   * show the error where the user can act on it.
+   */
+  beforeInit?: () => Promise<void>;
+  /**
+   * Called when the folder could not be materialized. When omitted,
+   * the dialog keeps itself open and renders the error inline, so
+   * the user can retry.
+   */
+  onInitError?: (error: ApiError) => void;
   onClose: () => void;
   /** Called with the report when the folder has been generated. */
   onInitialized: (report: InitReport) => void;
@@ -73,6 +87,8 @@ export function InitializeProjectFolderDialog({
   open,
   projectCode,
   branch,
+  beforeInit,
+  onInitError,
   onClose,
   onInitialized,
 }: InitializeProjectFolderDialogProps) {
@@ -81,12 +97,28 @@ export function InitializeProjectFolderDialog({
   const initialize = useInitializeProjectFolder();
   const [structureId, setStructureId] = useState<number | null>(null);
   const [report, setReport] = useState<InitReport | null>(null);
+  const [preparing, setPreparing] = useState(false);
+  // A ref, not state: two clicks in the same tick would both read a
+  // stale `preparing`, and `beforeInit` must run exactly once.
+  const confirming = useRef(false);
 
   const selected = structures.data?.find((s) => s.id === structureId);
 
   async function handleConfirm() {
-    if (!selected) return;
+    if (!selected || confirming.current) return;
+    confirming.current = true;
+    setPreparing(true);
     try {
+      if (beforeInit) {
+        try {
+          await beforeInit();
+        } catch {
+          // The caller's own mutation state holds the error. The init
+          // command never runs, so nothing is written to disk.
+          onClose();
+          return;
+        }
+      }
       const result = await initialize.mutateAsync({
         structureId: selected.id,
         study: projectCode,
@@ -94,8 +126,14 @@ export function InitializeProjectFolderDialog({
       });
       setReport(result);
       onInitialized(result);
-    } catch {
-      // The error is rendered inside the dialog, which stays open.
+    } catch (e) {
+      if (onInitError) {
+        onInitError(toApiError(e));
+      }
+      // Otherwise the inline Alert renders initialize.error, as before.
+    } finally {
+      confirming.current = false;
+      setPreparing(false);
     }
   }
 
@@ -178,7 +216,7 @@ export function InitializeProjectFolderDialog({
                 </MenuItem>
               ))}
             </TextField>
-            {initialize.isError && (
+            {initialize.isError && !onInitError && (
               <Alert severity="error" sx={{ mt: 2 }}>
                 {t("scaffold.initialize.failed", {
                   message: errorMessage(initialize.error),
@@ -193,12 +231,15 @@ export function InitializeProjectFolderDialog({
           <Button onClick={handleClose}>{t("common.close")}</Button>
         ) : (
           <>
-            <Button onClick={handleClose} disabled={initialize.isPending}>
+            <Button
+              onClick={handleClose}
+              disabled={preparing || initialize.isPending}
+            >
               {t("common.cancel")}
             </Button>
             <Button
               variant="contained"
-              disabled={!selected || initialize.isPending}
+              disabled={!selected || preparing || initialize.isPending}
               onClick={() => void handleConfirm()}
               data-testid="initialize-folder-confirm"
             >
