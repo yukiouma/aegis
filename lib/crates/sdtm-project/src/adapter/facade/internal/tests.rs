@@ -6,9 +6,9 @@
 //! intentionally not shared with the usecase tests so each layer can
 //! evolve independently.
 //!
-//! One store backs all five repositories (a single struct implements
-//! all five ports) so the domain and variable repositories can hydrate
-//! their override the way the postgres adapters' LEFT JOIN does.
+//! One store backs all three repositories (a single struct implements
+//! all three ports), mirroring the way the postgres adapters read the
+//! same rows.
 
 use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -16,19 +16,17 @@ use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
 
 use apis::sdtm_project::{
-    CreateSdtmProjectDomainRequest, CreateSdtmProjectVariableRequest,
-    CreateSdtmProjectVersionRequest, SdtmProjectApiError, SdtmProjectService,
+    ConversionRule, CreateSdtmProjectDomainRequest, CreateSdtmProjectVariableRequest,
+    CreateSdtmProjectVersionRequest, DomainCategory, FromCrf, SdtmProjectApiError,
+    SdtmProjectService, SdtmRole, SdtmVariableCore, SdtmVariableType,
     UpdateSdtmProjectDomainRequest, UpdateSdtmProjectVariableRequest,
-    UpdateSdtmProjectVersionRequest,
+    UpdateSdtmProjectVersionRequest, VariableSource,
 };
 
 use crate::domain::{
-    DomainError, ProjectLookup, SdtmProjectDomain, SdtmProjectDomainNew, SdtmProjectDomainOverride,
-    SdtmProjectDomainOverrideNew, SdtmProjectDomainOverrideRepository,
-    SdtmProjectDomainOverrideUpdate, SdtmProjectDomainRepository, SdtmProjectDomainUpdate,
-    SdtmProjectVariable, SdtmProjectVariableNew, SdtmProjectVariableOverride,
-    SdtmProjectVariableOverrideNew, SdtmProjectVariableOverrideRepository,
-    SdtmProjectVariableOverrideUpdate, SdtmProjectVariableRepository, SdtmProjectVariableUpdate,
+    DomainError, ProjectLookup, SdtmProjectDomain, SdtmProjectDomainNew,
+    SdtmProjectDomainRepository, SdtmProjectDomainUpdate, SdtmProjectVariable,
+    SdtmProjectVariableNew, SdtmProjectVariableRepository, SdtmProjectVariableUpdate,
     SdtmProjectVersion, SdtmProjectVersionNew, SdtmProjectVersionRepository,
     SdtmProjectVersionUpdate,
 };
@@ -47,9 +45,7 @@ fn epoch() -> chrono::DateTime<chrono::Utc> {
 struct InMemoryStore {
     versions: Mutex<Vec<SdtmProjectVersion>>,
     domains: Mutex<Vec<SdtmProjectDomain>>,
-    domain_overrides: Mutex<Vec<SdtmProjectDomainOverride>>,
     variables: Mutex<Vec<SdtmProjectVariable>>,
-    variable_overrides: Mutex<Vec<SdtmProjectVariableOverride>>,
     next_id: AtomicI64,
 }
 
@@ -67,36 +63,6 @@ struct InMemoryRepo {
 impl InMemoryRepo {
     fn new(store: Arc<InMemoryStore>) -> Self {
         Self { store }
-    }
-
-    fn hydrate_domain(&self, d: SdtmProjectDomain) -> SdtmProjectDomain {
-        let ov = self
-            .store
-            .domain_overrides
-            .lock()
-            .unwrap()
-            .iter()
-            .find(|o| o.domain_id == d.id)
-            .cloned();
-        SdtmProjectDomain {
-            domain_override: ov,
-            ..d
-        }
-    }
-
-    fn hydrate_variable(&self, v: SdtmProjectVariable) -> SdtmProjectVariable {
-        let ov = self
-            .store
-            .variable_overrides
-            .lock()
-            .unwrap()
-            .iter()
-            .find(|o| o.variable_id == v.id)
-            .cloned();
-        SdtmProjectVariable {
-            variable_override: ov,
-            ..v
-        }
     }
 }
 
@@ -180,21 +146,23 @@ impl SdtmProjectVersionRepository for InMemoryRepo {
 impl SdtmProjectDomainRepository for InMemoryRepo {
     async fn create(&self, input: SdtmProjectDomainNew) -> Result<SdtmProjectDomain, DomainError> {
         let mut g = self.store.domains.lock().unwrap();
-        if g.iter()
-            .any(|d| d.version_id == input.version_id && d.domain_code == input.domain_code)
-        {
+        if g.iter().any(|d| {
+            d.sdtm_project_version_id == input.sdtm_project_version_id
+                && d.domain_code == input.domain_code
+        }) {
             return Err(DomainError::DuplicateSdtmProjectDomain {
-                version_id: input.version_id,
+                version_id: input.sdtm_project_version_id,
                 domain_code: input.domain_code,
             });
         }
         let now = epoch();
         let d = SdtmProjectDomain::for_repository(
             self.store.next_id(),
-            input.version_id,
+            input.sdtm_project_version_id,
             input.domain_code,
+            input.category,
+            input.descriptions,
             input.key_variables,
-            None,
             now,
             now,
         );
@@ -203,16 +171,14 @@ impl SdtmProjectDomainRepository for InMemoryRepo {
     }
 
     async fn find_by_id(&self, id: i64) -> Result<SdtmProjectDomain, DomainError> {
-        let d = self
-            .store
+        self.store
             .domains
             .lock()
             .unwrap()
             .iter()
             .find(|d| d.id == id)
             .cloned()
-            .ok_or(DomainError::SdtmProjectDomainNotFound(id))?;
-        Ok(self.hydrate_domain(d))
+            .ok_or(DomainError::SdtmProjectDomainNotFound(id))
     }
 
     async fn list_by_version(
@@ -220,12 +186,10 @@ impl SdtmProjectDomainRepository for InMemoryRepo {
         version_id: i64,
     ) -> Result<Vec<SdtmProjectDomain>, DomainError> {
         let g = self.store.domains.lock().unwrap();
-        let rows: Vec<SdtmProjectDomain> = g
-            .iter()
-            .filter(|d| d.version_id == version_id)
+        Ok(g.iter()
+            .filter(|d| d.sdtm_project_version_id == version_id)
             .cloned()
-            .collect();
-        Ok(rows.into_iter().map(|d| self.hydrate_domain(d)).collect())
+            .collect())
     }
 
     async fn update(
@@ -240,11 +204,17 @@ impl SdtmProjectDomainRepository for InMemoryRepo {
         if let Some(code) = input.domain_code {
             d.domain_code = code;
         }
+        if let Some(category) = input.category {
+            d.category = category;
+        }
+        if let Some(descriptions) = input.descriptions {
+            d.descriptions = descriptions;
+        }
         if let Some(kv) = input.key_variables {
             d.key_variables = kv;
         }
         d.updated_at = epoch();
-        Ok(self.hydrate_domain(d.clone()))
+        Ok(d.clone())
     }
 
     async fn delete(&self, id: i64) -> Result<(), DomainError> {
@@ -259,98 +229,33 @@ impl SdtmProjectDomainRepository for InMemoryRepo {
 }
 
 #[async_trait]
-impl SdtmProjectDomainOverrideRepository for InMemoryRepo {
-    async fn create(
-        &self,
-        input: SdtmProjectDomainOverrideNew,
-    ) -> Result<SdtmProjectDomainOverride, DomainError> {
-        let mut g = self.store.domain_overrides.lock().unwrap();
-        if g.iter().any(|o| o.domain_id == input.domain_id) {
-            return Err(DomainError::DuplicateSdtmProjectDomainOverride {
-                domain_id: input.domain_id,
-            });
-        }
-        let now = epoch();
-        let o = SdtmProjectDomainOverride::for_repository(
-            self.store.next_id(),
-            input.domain_id,
-            input.category,
-            input.descriptions,
-            now,
-            now,
-        );
-        g.push(o.clone());
-        Ok(o)
-    }
-
-    async fn find_by_domain_id(
-        &self,
-        domain_id: i64,
-    ) -> Result<SdtmProjectDomainOverride, DomainError> {
-        self.store
-            .domain_overrides
-            .lock()
-            .unwrap()
-            .iter()
-            .find(|o| o.domain_id == domain_id)
-            .cloned()
-            .ok_or(DomainError::SdtmProjectDomainOverrideNotFound(domain_id))
-    }
-
-    async fn update(
-        &self,
-        input: SdtmProjectDomainOverrideUpdate,
-    ) -> Result<SdtmProjectDomainOverride, DomainError> {
-        let mut g = self.store.domain_overrides.lock().unwrap();
-        let o = g
-            .iter_mut()
-            .find(|o| o.domain_id == input.domain_id)
-            .ok_or(DomainError::SdtmProjectDomainOverrideNotFound(
-                input.domain_id,
-            ))?;
-        if let Some(category) = input.category {
-            o.category = category;
-        }
-        if let Some(descriptions) = input.descriptions {
-            o.descriptions = descriptions;
-        }
-        o.updated_at = epoch();
-        Ok(o.clone())
-    }
-
-    async fn delete(&self, domain_id: i64) -> Result<(), DomainError> {
-        let mut g = self.store.domain_overrides.lock().unwrap();
-        let before = g.len();
-        g.retain(|o| o.domain_id != domain_id);
-        if g.len() == before {
-            return Err(DomainError::SdtmProjectDomainOverrideNotFound(domain_id));
-        }
-        Ok(())
-    }
-}
-
-#[async_trait]
 impl SdtmProjectVariableRepository for InMemoryRepo {
     async fn create(
         &self,
         input: SdtmProjectVariableNew,
     ) -> Result<SdtmProjectVariable, DomainError> {
         let mut g = self.store.variables.lock().unwrap();
-        if g.iter()
-            .any(|v| v.domain_id == input.domain_id && v.variable_code == input.variable_code)
-        {
+        if g.iter().any(|v| {
+            v.sdtm_project_domain_id == input.sdtm_project_domain_id
+                && v.variable_code == input.variable_code
+        }) {
             return Err(DomainError::DuplicateSdtmProjectVariable {
-                domain_id: input.domain_id,
+                domain_id: input.sdtm_project_domain_id,
                 variable_code: input.variable_code,
             });
         }
         let now = epoch();
         let v = SdtmProjectVariable::for_repository(
             self.store.next_id(),
-            input.domain_id,
+            input.sdtm_project_domain_id,
             input.variable_code,
+            input.variable_controlled,
+            input.variable_type,
+            input.variable_core,
+            input.variable_role,
             input.variable_sequence,
-            None,
+            input.descriptions,
+            input.conversion_rules,
             now,
             now,
         );
@@ -359,16 +264,14 @@ impl SdtmProjectVariableRepository for InMemoryRepo {
     }
 
     async fn find_by_id(&self, id: i64) -> Result<SdtmProjectVariable, DomainError> {
-        let v = self
-            .store
+        self.store
             .variables
             .lock()
             .unwrap()
             .iter()
             .find(|v| v.id == id)
             .cloned()
-            .ok_or(DomainError::SdtmProjectVariableNotFound(id))?;
-        Ok(self.hydrate_variable(v))
+            .ok_or(DomainError::SdtmProjectVariableNotFound(id))
     }
 
     async fn list_by_domain(
@@ -376,12 +279,10 @@ impl SdtmProjectVariableRepository for InMemoryRepo {
         domain_id: i64,
     ) -> Result<Vec<SdtmProjectVariable>, DomainError> {
         let g = self.store.variables.lock().unwrap();
-        let rows: Vec<SdtmProjectVariable> = g
-            .iter()
-            .filter(|v| v.domain_id == domain_id)
+        Ok(g.iter()
+            .filter(|v| v.sdtm_project_domain_id == domain_id)
             .cloned()
-            .collect();
-        Ok(rows.into_iter().map(|v| self.hydrate_variable(v)).collect())
+            .collect())
     }
 
     async fn update(
@@ -396,11 +297,29 @@ impl SdtmProjectVariableRepository for InMemoryRepo {
         if let Some(code) = input.variable_code {
             v.variable_code = code;
         }
+        if let Some(controlled) = input.variable_controlled {
+            v.variable_controlled = controlled;
+        }
+        if let Some(t) = input.variable_type {
+            v.variable_type = t;
+        }
+        if let Some(c) = input.variable_core {
+            v.variable_core = c;
+        }
+        if let Some(role) = input.variable_role {
+            v.variable_role = role;
+        }
         if let Some(seq) = input.variable_sequence {
             v.variable_sequence = seq;
         }
+        if let Some(descriptions) = input.descriptions {
+            v.descriptions = descriptions;
+        }
+        if let Some(rules) = input.conversion_rules {
+            v.conversion_rules = rules;
+        }
         v.updated_at = epoch();
-        Ok(self.hydrate_variable(v.clone()))
+        Ok(v.clone())
     }
 
     async fn delete(&self, id: i64) -> Result<(), DomainError> {
@@ -409,89 +328,6 @@ impl SdtmProjectVariableRepository for InMemoryRepo {
         g.retain(|v| v.id != id);
         if g.len() == before {
             return Err(DomainError::SdtmProjectVariableNotFound(id));
-        }
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl SdtmProjectVariableOverrideRepository for InMemoryRepo {
-    async fn create(
-        &self,
-        input: SdtmProjectVariableOverrideNew,
-    ) -> Result<SdtmProjectVariableOverride, DomainError> {
-        let mut g = self.store.variable_overrides.lock().unwrap();
-        if g.iter().any(|o| o.variable_id == input.variable_id) {
-            return Err(DomainError::DuplicateSdtmProjectVariableOverride {
-                variable_id: input.variable_id,
-            });
-        }
-        let now = epoch();
-        let o = SdtmProjectVariableOverride::for_repository(
-            self.store.next_id(),
-            input.variable_id,
-            input.variable_type,
-            input.variable_core,
-            input.variable_role,
-            input.descriptions,
-            now,
-            now,
-        );
-        g.push(o.clone());
-        Ok(o)
-    }
-
-    async fn find_by_variable_id(
-        &self,
-        variable_id: i64,
-    ) -> Result<SdtmProjectVariableOverride, DomainError> {
-        self.store
-            .variable_overrides
-            .lock()
-            .unwrap()
-            .iter()
-            .find(|o| o.variable_id == variable_id)
-            .cloned()
-            .ok_or(DomainError::SdtmProjectVariableOverrideNotFound(
-                variable_id,
-            ))
-    }
-
-    async fn update(
-        &self,
-        input: SdtmProjectVariableOverrideUpdate,
-    ) -> Result<SdtmProjectVariableOverride, DomainError> {
-        let mut g = self.store.variable_overrides.lock().unwrap();
-        let o = g
-            .iter_mut()
-            .find(|o| o.variable_id == input.variable_id)
-            .ok_or(DomainError::SdtmProjectVariableOverrideNotFound(
-                input.variable_id,
-            ))?;
-        if let Some(t) = input.variable_type {
-            o.variable_type = t;
-        }
-        if let Some(c) = input.variable_core {
-            o.variable_core = c;
-        }
-        if let Some(role) = input.variable_role {
-            o.variable_role = role;
-        }
-        if let Some(descriptions) = input.descriptions {
-            o.descriptions = descriptions;
-        }
-        o.updated_at = epoch();
-        Ok(o.clone())
-    }
-
-    async fn delete(&self, variable_id: i64) -> Result<(), DomainError> {
-        let mut g = self.store.variable_overrides.lock().unwrap();
-        let before = g.len();
-        g.retain(|o| o.variable_id != variable_id);
-        if g.len() == before {
-            return Err(DomainError::SdtmProjectVariableOverrideNotFound(
-                variable_id,
-            ));
         }
         Ok(())
     }
@@ -525,21 +361,13 @@ impl ProjectLookup for FakeProjectLookup {
 
 // ---- service construction ----
 
-type TestService = SdtmProjectServiceImpl<
-    InMemoryRepo,
-    InMemoryRepo,
-    InMemoryRepo,
-    InMemoryRepo,
-    InMemoryRepo,
-    FakeProjectLookup,
->;
+type TestService =
+    SdtmProjectServiceImpl<InMemoryRepo, InMemoryRepo, InMemoryRepo, FakeProjectLookup>;
 
 fn make_service() -> TestService {
     let store = Arc::new(InMemoryStore::default());
     let repo = InMemoryRepo::new(store);
     SdtmProjectServiceImpl::from_repos(
-        repo.clone(),
-        repo.clone(),
         repo.clone(),
         repo.clone(),
         repo.clone(),
@@ -657,13 +485,16 @@ async fn domain_crud_round_trips_through_api() {
     let version_id = seed_version(&svc).await;
     let created = svc
         .create_domain(CreateSdtmProjectDomainRequest {
-            version_id,
+            sdtm_project_version_id: version_id,
             domain_code: "AE".into(),
-            key_variables: vec!["AETERM".into()],
+            category: DomainCategory::Events,
+            descriptions: Vec::new(),
+            key_variables: Vec::new(),
         })
         .await
         .unwrap();
     assert_eq!(created.domain_code, "AE");
+    assert_eq!(created.category, DomainCategory::Events);
 
     let by_id = svc.get_domain_by_id(created.id).await.unwrap();
     assert_eq!(by_id.id, created.id);
@@ -675,11 +506,14 @@ async fn domain_crud_round_trips_through_api() {
         .update_domain(UpdateSdtmProjectDomainRequest {
             id: created.id,
             domain_code: Some("AE2".into()),
+            category: Some(DomainCategory::Findings),
+            descriptions: None,
             key_variables: None,
         })
         .await
         .unwrap();
     assert_eq!(updated.domain_code, "AE2");
+    assert_eq!(updated.category, DomainCategory::Findings);
 
     svc.delete_domain(created.id).await.unwrap();
     assert!(
@@ -697,15 +531,42 @@ async fn key_variables_order_survives_the_api() {
     let version_id = seed_version(&svc).await;
     let created = svc
         .create_domain(CreateSdtmProjectDomainRequest {
-            version_id,
+            sdtm_project_version_id: version_id,
             domain_code: "AE".into(),
-            key_variables: vec!["AESEV".into(), "AETERM".into()],
+            category: DomainCategory::Events,
+            descriptions: Vec::new(),
+            key_variables: Vec::new(),
+        })
+        .await
+        .unwrap();
+    for code in ["AESEV", "AETERM"] {
+        svc.create_variable(CreateSdtmProjectVariableRequest {
+            sdtm_project_domain_id: created.id,
+            variable_code: code.into(),
+            variable_controlled: None,
+            variable_type: SdtmVariableType::Character,
+            variable_core: SdtmVariableCore::Req,
+            variable_role: None,
+            variable_sequence: 11,
+            descriptions: Vec::new(),
+            conversion_rules: Vec::new(),
+        })
+        .await
+        .unwrap();
+    }
+    let updated = svc
+        .update_domain(UpdateSdtmProjectDomainRequest {
+            id: created.id,
+            domain_code: None,
+            category: None,
+            descriptions: None,
+            key_variables: Some(vec!["AESEV".into(), "AETERM".into()]),
         })
         .await
         .unwrap();
     // The caller's order is authoritative and is not re-sorted.
     assert_eq!(
-        created.key_variables,
+        updated.key_variables,
         vec!["AESEV".to_string(), "AETERM".to_string()]
     );
 
@@ -724,8 +585,10 @@ async fn variable_crud_round_trips_through_api() {
     let version_id = seed_version(&svc).await;
     let domain = svc
         .create_domain(CreateSdtmProjectDomainRequest {
-            version_id,
+            sdtm_project_version_id: version_id,
             domain_code: "AE".into(),
+            category: DomainCategory::Events,
+            descriptions: Vec::new(),
             key_variables: Vec::new(),
         })
         .await
@@ -733,14 +596,34 @@ async fn variable_crud_round_trips_through_api() {
 
     let created = svc
         .create_variable(CreateSdtmProjectVariableRequest {
-            domain_id: domain.id,
+            sdtm_project_domain_id: domain.id,
             variable_code: "AETERM".into(),
+            variable_controlled: None,
+            variable_type: SdtmVariableType::Character,
+            variable_core: SdtmVariableCore::Req,
+            variable_role: Some(SdtmRole::Topic),
             variable_sequence: 11,
+            descriptions: Vec::new(),
+            conversion_rules: vec![ConversionRule {
+                source: VariableSource::Crf(Some(FromCrf {
+                    form_code: "AE".into(),
+                })),
+                rule: "AESEV".into(),
+            }],
         })
         .await
         .unwrap();
     assert_eq!(created.variable_code, "AETERM");
     assert_eq!(created.variable_sequence, 11);
+    assert_eq!(created.variable_role, Some(SdtmRole::Topic));
+    assert_eq!(created.conversion_rules.len(), 1);
+    assert_eq!(created.conversion_rules[0].rule, "AESEV");
+    assert_eq!(
+        created.conversion_rules[0].source,
+        VariableSource::Crf(Some(FromCrf {
+            form_code: "AE".into(),
+        }))
+    );
 
     let listed = svc.list_variables_by_domain(domain.id).await.unwrap();
     assert_eq!(listed.variables.len(), 1);
@@ -749,7 +632,13 @@ async fn variable_crud_round_trips_through_api() {
         .update_variable(UpdateSdtmProjectVariableRequest {
             id: created.id,
             variable_code: None,
+            variable_controlled: None,
+            variable_type: None,
+            variable_core: None,
+            variable_role: None,
             variable_sequence: Some(12),
+            descriptions: None,
+            conversion_rules: None,
         })
         .await
         .unwrap();

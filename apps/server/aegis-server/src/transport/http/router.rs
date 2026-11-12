@@ -584,6 +584,64 @@ mod tests {
         );
     }
 
+    /// The sdtm-project namespace advertises the standalone model: the
+    /// domain and variable schemas carry the metadata the aggregates
+    /// now hold.
+    #[tokio::test]
+    async fn openapi_json_advertises_the_standalone_sdtm_project_model() {
+        let app = router(test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api-docs/openapi.json")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let doc: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        let schemas = &doc["components"]["schemas"];
+        for (schema, fields) in [
+            (
+                "SdtmProjectDomainViewResponse",
+                &[
+                    "sdtmProjectVersionId",
+                    "domainCode",
+                    "category",
+                    "descriptions",
+                    "keyVariables",
+                ][..],
+            ),
+            (
+                "SdtmProjectVariableViewResponse",
+                &[
+                    "sdtmProjectDomainId",
+                    "variableCode",
+                    "variableControlled",
+                    "variableType",
+                    "variableCore",
+                    "variableRole",
+                    "variableSequence",
+                    "descriptions",
+                    "conversionRules",
+                ][..],
+            ),
+        ] {
+            let properties = &schemas[schema]["properties"];
+            for field in fields {
+                assert!(
+                    properties.get(*field).is_some(),
+                    "{schema} must carry `{field}`: {properties}",
+                );
+            }
+        }
+    }
+
     /// The `/api/sdtm-project` namespace must advertise every route
     /// with the BearerAuth requirement. No route advertises a 403:
     /// the namespace has no role gate, so a 403 can never be produced.

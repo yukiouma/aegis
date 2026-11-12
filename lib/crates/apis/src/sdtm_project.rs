@@ -246,8 +246,10 @@ pub struct SdtmProjectVersionView {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SdtmProjectDomainView {
     pub id: i64,
-    pub version_id: i64,
+    pub sdtm_project_version_id: i64,
     pub domain_code: String,
+    pub category: DomainCategory,
+    pub descriptions: Vec<SdtmDomainDescription>,
     pub key_variables: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -257,9 +259,15 @@ pub struct SdtmProjectDomainView {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SdtmProjectVariableView {
     pub id: i64,
-    pub domain_id: i64,
+    pub sdtm_project_domain_id: i64,
     pub variable_code: String,
+    pub variable_controlled: Option<SdtmVariableControlled>,
+    pub variable_type: SdtmVariableType,
+    pub variable_core: SdtmVariableCore,
+    pub variable_role: Option<SdtmRole>,
     pub variable_sequence: i64,
+    pub descriptions: Vec<SdtmVariableDescription>,
+    pub conversion_rules: Vec<ConversionRule>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -307,8 +315,10 @@ pub struct UpdateSdtmProjectVersionRequest {
 /// Input DTO for [`SdtmProjectService::create_domain`].
 #[derive(Debug, Clone)]
 pub struct CreateSdtmProjectDomainRequest {
-    pub version_id: i64,
+    pub sdtm_project_version_id: i64,
     pub domain_code: String,
+    pub category: DomainCategory,
+    pub descriptions: Vec<SdtmDomainDescription>,
     pub key_variables: Vec<String>,
 }
 
@@ -318,23 +328,41 @@ pub struct CreateSdtmProjectDomainRequest {
 pub struct UpdateSdtmProjectDomainRequest {
     pub id: i64,
     pub domain_code: Option<String>,
+    pub category: Option<DomainCategory>,
+    pub descriptions: Option<Vec<SdtmDomainDescription>>,
     pub key_variables: Option<Vec<String>>,
 }
 
 /// Input DTO for [`SdtmProjectService::create_variable`].
 #[derive(Debug, Clone)]
 pub struct CreateSdtmProjectVariableRequest {
-    pub domain_id: i64,
+    pub sdtm_project_domain_id: i64,
     pub variable_code: String,
+    pub variable_controlled: Option<SdtmVariableControlled>,
+    pub variable_type: SdtmVariableType,
+    pub variable_core: SdtmVariableCore,
+    pub variable_role: Option<SdtmRole>,
     pub variable_sequence: i64,
+    pub descriptions: Vec<SdtmVariableDescription>,
+    pub conversion_rules: Vec<ConversionRule>,
 }
 
 /// Input DTO for [`SdtmProjectService::update_variable`].
+///
+/// `variable_controlled` and `variable_role` use `Option<Option<T>>` so
+/// the caller can distinguish "don't change" (outer `None`) from
+/// "clear the field" (outer `Some(None)`).
 #[derive(Debug, Default, Clone)]
 pub struct UpdateSdtmProjectVariableRequest {
     pub id: i64,
     pub variable_code: Option<String>,
+    pub variable_controlled: Option<Option<SdtmVariableControlled>>,
+    pub variable_type: Option<SdtmVariableType>,
+    pub variable_core: Option<SdtmVariableCore>,
+    pub variable_role: Option<Option<SdtmRole>>,
     pub variable_sequence: Option<i64>,
+    pub descriptions: Option<Vec<SdtmVariableDescription>>,
+    pub conversion_rules: Option<Vec<ConversionRule>>,
 }
 
 /// Outbound port for the per-project SDTM model tree.

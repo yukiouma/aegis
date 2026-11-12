@@ -8,8 +8,15 @@
 //! The crate deliberately shares no types with `domain-model`: the
 //! standard and the project overlay are allowed to drift independently,
 //! so the value objects (`DomainCategory`, `SdtmVariableType`,
-//! `SdtmVariableCore`, `SdtmRole` and the description DTOs) are copied
-//! rather than imported.
+//! `SdtmVariableCore`, `SdtmRole`, `SdtmVariableControlled` and the
+//! description DTOs) are copied rather than imported.
+//!
+//! A project domain and a project variable are **complete copies** of
+//! the corresponding standard domain / variable: they carry their own
+//! category, descriptions, type, core, role and controlled terminology
+//! rather than pointing at the standard and patching it. A variable also
+//! carries its `conversion_rules` — where its value comes from and how
+//! it is derived.
 
 pub mod adapter;
 pub mod domain;
@@ -17,30 +24,23 @@ pub mod usecase;
 
 pub use adapter::facade::SdtmProjectServiceImpl;
 pub use adapter::persistence::postgres::{
-    sdtm_project_domain_override_repo::SdtmProjectDomainOverrideRepoPg,
     sdtm_project_domain_repo::SdtmProjectDomainRepoPg,
-    sdtm_project_variable_override_repo::SdtmProjectVariableOverrideRepoPg,
     sdtm_project_variable_repo::SdtmProjectVariableRepoPg,
     sdtm_project_version_repo::SdtmProjectVersionRepoPg,
 };
 pub use adapter::service::project::ProjectLookupImpl;
 pub use domain::{
-    DomainCategory, DomainError, ProjectLookup, SdtmDomainDescription, SdtmDomainDescriptionDetail,
-    SdtmProjectDomain, SdtmProjectDomainNew, SdtmProjectDomainOverride,
-    SdtmProjectDomainOverrideNew, SdtmProjectDomainOverrideRepository,
-    SdtmProjectDomainOverrideUpdate, SdtmProjectDomainRepository, SdtmProjectDomainUpdate,
-    SdtmProjectVariable, SdtmProjectVariableNew, SdtmProjectVariableOverride,
-    SdtmProjectVariableOverrideNew, SdtmProjectVariableOverrideRepository,
-    SdtmProjectVariableOverrideUpdate, SdtmProjectVariableRepository, SdtmProjectVariableUpdate,
+    ConversionRule, DomainCategory, DomainError, FromCrf, ProjectLookup, SdtmDomainDescription,
+    SdtmDomainDescriptionDetail, SdtmProjectDomain, SdtmProjectDomainNew,
+    SdtmProjectDomainRepository, SdtmProjectDomainUpdate, SdtmProjectVariable,
+    SdtmProjectVariableNew, SdtmProjectVariableRepository, SdtmProjectVariableUpdate,
     SdtmProjectVersion, SdtmProjectVersionNew, SdtmProjectVersionRepository,
-    SdtmProjectVersionUpdate, SdtmRole, SdtmVariableCore, SdtmVariableDescription,
-    SdtmVariableDescriptionDetail, SdtmVariableType,
+    SdtmProjectVersionUpdate, SdtmRole, SdtmVariableControlled, SdtmVariableCore,
+    SdtmVariableDescription, SdtmVariableDescriptionDetail, SdtmVariableType, VariableSource,
 };
 pub use usecase::{
-    CreateSdtmProjectDomain, CreateSdtmProjectDomainOverride, CreateSdtmProjectVariable,
-    CreateSdtmProjectVariableOverride, CreateSdtmProjectVersion, SdtmProjectDomainOverrideView,
-    SdtmProjectDomainView, SdtmProjectUsecase, SdtmProjectUsecaseConfig,
-    SdtmProjectVariableOverrideView, SdtmProjectVariableView, SdtmProjectVersionView,
-    UpdateSdtmProjectDomain, UpdateSdtmProjectDomainOverride, UpdateSdtmProjectVariable,
-    UpdateSdtmProjectVariableOverride, UpdateSdtmProjectVersion, UsecaseError,
+    CreateSdtmProjectDomain, CreateSdtmProjectVariable, CreateSdtmProjectVersion,
+    SdtmProjectDomainView, SdtmProjectUsecase, SdtmProjectUsecaseConfig, SdtmProjectVariableView,
+    SdtmProjectVersionView, UpdateSdtmProjectDomain, UpdateSdtmProjectVariable,
+    UpdateSdtmProjectVersion, UsecaseError,
 };

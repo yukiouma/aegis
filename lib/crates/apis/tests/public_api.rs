@@ -347,17 +347,28 @@ fn sdtm_project_public_types_are_nameable() {
     });
     assert_domain_view(SdtmProjectDomainView {
         id: 2,
-        version_id: 1,
+        sdtm_project_version_id: 1,
         domain_code: "AE".into(),
+        category: DomainCategory::Events,
+        descriptions: Vec::new(),
         key_variables: vec!["AETERM".into()],
         created_at: ts,
         updated_at: ts,
     });
     assert_variable_view(SdtmProjectVariableView {
         id: 4,
-        domain_id: 2,
+        sdtm_project_domain_id: 2,
         variable_code: "AETERM".into(),
+        variable_controlled: None,
+        variable_type: SdtmVariableType::Character,
+        variable_core: SdtmVariableCore::Req,
+        variable_role: Some(SdtmRole::Topic),
         variable_sequence: 11,
+        descriptions: Vec::new(),
+        conversion_rules: vec![ConversionRule {
+            source: VariableSource::Protocol,
+            rule: "AESEV".into(),
+        }],
         created_at: ts,
         updated_at: ts,
     });
@@ -380,24 +391,40 @@ fn sdtm_project_public_types_are_nameable() {
         version_name: None,
     });
     assert_create_domain(CreateSdtmProjectDomainRequest {
-        version_id: 1,
+        sdtm_project_version_id: 1,
         domain_code: "AE".into(),
+        category: DomainCategory::Events,
+        descriptions: Vec::new(),
         key_variables: vec!["AETERM".into()],
     });
     assert_update_domain(UpdateSdtmProjectDomainRequest {
         id: 1,
         domain_code: None,
+        category: None,
+        descriptions: None,
         key_variables: None,
     });
     assert_create_variable(CreateSdtmProjectVariableRequest {
-        domain_id: 1,
+        sdtm_project_domain_id: 1,
         variable_code: "AETERM".into(),
+        variable_controlled: None,
+        variable_type: SdtmVariableType::Character,
+        variable_core: SdtmVariableCore::Req,
+        variable_role: None,
         variable_sequence: 11,
+        descriptions: Vec::new(),
+        conversion_rules: Vec::new(),
     });
     assert_update_variable(UpdateSdtmProjectVariableRequest {
         id: 1,
         variable_code: None,
+        variable_controlled: None,
+        variable_type: None,
+        variable_core: None,
+        variable_role: None,
         variable_sequence: None,
+        descriptions: None,
+        conversion_rules: None,
     });
 
     // Touch the error type to keep it from being dead-code-eliminated

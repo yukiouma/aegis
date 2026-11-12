@@ -191,8 +191,42 @@ pub async fn create_domain(
     let view = state
         .sdtm_project
         .create_domain(apis::sdtm_project::CreateSdtmProjectDomainRequest {
-            version_id: req.version_id,
+            sdtm_project_version_id: req.sdtm_project_version_id,
             domain_code: req.domain_code,
+            category: match req.category {
+                dto::SdtmProjectDomainCategory::SpecialPurpose => {
+                    apis::sdtm_project::DomainCategory::SpecialPurpose
+                }
+                dto::SdtmProjectDomainCategory::Interventions => {
+                    apis::sdtm_project::DomainCategory::Interventions
+                }
+                dto::SdtmProjectDomainCategory::Events => {
+                    apis::sdtm_project::DomainCategory::Events
+                }
+                dto::SdtmProjectDomainCategory::Findings => {
+                    apis::sdtm_project::DomainCategory::Findings
+                }
+                dto::SdtmProjectDomainCategory::TrialDesign => {
+                    apis::sdtm_project::DomainCategory::TrialDesign
+                }
+                dto::SdtmProjectDomainCategory::Relationships => {
+                    apis::sdtm_project::DomainCategory::Relationships
+                }
+                dto::SdtmProjectDomainCategory::StudyReference => {
+                    apis::sdtm_project::DomainCategory::StudyReference
+                }
+            },
+            descriptions: req
+                .descriptions
+                .into_iter()
+                .map(|d| apis::sdtm_project::SdtmDomainDescription {
+                    lang: d.lang,
+                    details: apis::sdtm_project::SdtmDomainDescriptionDetail {
+                        description: d.details.description,
+                        structure: d.details.structure,
+                    },
+                })
+                .collect(),
             key_variables: req.key_variables,
         })
         .await?;
@@ -279,6 +313,40 @@ pub async fn update_domain(
         .update_domain(apis::sdtm_project::UpdateSdtmProjectDomainRequest {
             id,
             domain_code: req.domain_code,
+            category: req.category.map(|c| match c {
+                dto::SdtmProjectDomainCategory::SpecialPurpose => {
+                    apis::sdtm_project::DomainCategory::SpecialPurpose
+                }
+                dto::SdtmProjectDomainCategory::Interventions => {
+                    apis::sdtm_project::DomainCategory::Interventions
+                }
+                dto::SdtmProjectDomainCategory::Events => {
+                    apis::sdtm_project::DomainCategory::Events
+                }
+                dto::SdtmProjectDomainCategory::Findings => {
+                    apis::sdtm_project::DomainCategory::Findings
+                }
+                dto::SdtmProjectDomainCategory::TrialDesign => {
+                    apis::sdtm_project::DomainCategory::TrialDesign
+                }
+                dto::SdtmProjectDomainCategory::Relationships => {
+                    apis::sdtm_project::DomainCategory::Relationships
+                }
+                dto::SdtmProjectDomainCategory::StudyReference => {
+                    apis::sdtm_project::DomainCategory::StudyReference
+                }
+            }),
+            descriptions: req.descriptions.map(|v| {
+                v.into_iter()
+                    .map(|d| apis::sdtm_project::SdtmDomainDescription {
+                        lang: d.lang,
+                        details: apis::sdtm_project::SdtmDomainDescriptionDetail {
+                            description: d.details.description,
+                            structure: d.details.structure,
+                        },
+                    })
+                    .collect()
+            }),
             key_variables: req.key_variables,
         })
         .await?;
@@ -334,9 +402,89 @@ pub async fn create_variable(
     let view = state
         .sdtm_project
         .create_variable(apis::sdtm_project::CreateSdtmProjectVariableRequest {
-            domain_id: req.domain_id,
+            sdtm_project_domain_id: req.sdtm_project_domain_id,
             variable_code: req.variable_code,
+            variable_controlled: req.variable_controlled.map(|c| {
+                apis::sdtm_project::SdtmVariableControlled {
+                    code: c.code,
+                    format: c.format,
+                }
+            }),
+            variable_type: match req.variable_type {
+                dto::SdtmProjectVariableType::Numeric => {
+                    apis::sdtm_project::SdtmVariableType::Numeric
+                }
+                dto::SdtmProjectVariableType::Character => {
+                    apis::sdtm_project::SdtmVariableType::Character
+                }
+            },
+            variable_core: match req.variable_core {
+                dto::SdtmProjectVariableCore::Req => apis::sdtm_project::SdtmVariableCore::Req,
+                dto::SdtmProjectVariableCore::Exp => apis::sdtm_project::SdtmVariableCore::Exp,
+                dto::SdtmProjectVariableCore::Perm => apis::sdtm_project::SdtmVariableCore::Perm,
+                dto::SdtmProjectVariableCore::Supp => apis::sdtm_project::SdtmVariableCore::Supp,
+            },
+            variable_role: req.variable_role.map(|r| match r {
+                dto::SdtmProjectRole::Identifier => apis::sdtm_project::SdtmRole::Identifier,
+                dto::SdtmProjectRole::Topic => apis::sdtm_project::SdtmRole::Topic,
+                dto::SdtmProjectRole::Timing => apis::sdtm_project::SdtmRole::Timing,
+                dto::SdtmProjectRole::RecordQualifier => {
+                    apis::sdtm_project::SdtmRole::RecordQualifier
+                }
+                dto::SdtmProjectRole::SynonymQualifier => {
+                    apis::sdtm_project::SdtmRole::SynonymQualifier
+                }
+                dto::SdtmProjectRole::VariableQualifier => {
+                    apis::sdtm_project::SdtmRole::VariableQualifier
+                }
+                dto::SdtmProjectRole::GroupingQualifier => {
+                    apis::sdtm_project::SdtmRole::GroupingQualifier
+                }
+                dto::SdtmProjectRole::Rule => apis::sdtm_project::SdtmRole::Rule,
+            }),
             variable_sequence: req.variable_sequence,
+            descriptions: req
+                .descriptions
+                .into_iter()
+                .map(|d| apis::sdtm_project::SdtmVariableDescription {
+                    lang: d.lang,
+                    details: apis::sdtm_project::SdtmVariableDescriptionDetail {
+                        label: d.details.label,
+                    },
+                })
+                .collect(),
+            conversion_rules: req
+                .conversion_rules
+                .into_iter()
+                .map(|r| apis::sdtm_project::ConversionRule {
+                    source: match r.source {
+                        dto::SdtmProjectVariableSource::Protocol => {
+                            apis::sdtm_project::VariableSource::Protocol
+                        }
+                        dto::SdtmProjectVariableSource::Derived => {
+                            apis::sdtm_project::VariableSource::Derived
+                        }
+                        dto::SdtmProjectVariableSource::Assigned(f) => {
+                            apis::sdtm_project::VariableSource::Assigned(f.map(|f| {
+                                apis::sdtm_project::FromCrf {
+                                    form_code: f.form_code,
+                                }
+                            }))
+                        }
+                        dto::SdtmProjectVariableSource::Crf(f) => {
+                            apis::sdtm_project::VariableSource::Crf(f.map(|f| {
+                                apis::sdtm_project::FromCrf {
+                                    form_code: f.form_code,
+                                }
+                            }))
+                        }
+                        dto::SdtmProjectVariableSource::Edt => {
+                            apis::sdtm_project::VariableSource::Edt
+                        }
+                    },
+                    rule: r.rule,
+                })
+                .collect(),
         })
         .await?;
     Ok((StatusCode::CREATED, Json(view.into())))
@@ -422,7 +570,89 @@ pub async fn update_variable(
         .update_variable(apis::sdtm_project::UpdateSdtmProjectVariableRequest {
             id,
             variable_code: req.variable_code,
+            variable_controlled: req.variable_controlled.map(|c| {
+                c.map(|c| apis::sdtm_project::SdtmVariableControlled {
+                    code: c.code,
+                    format: c.format,
+                })
+            }),
+            variable_type: req.variable_type.map(|t| match t {
+                dto::SdtmProjectVariableType::Numeric => {
+                    apis::sdtm_project::SdtmVariableType::Numeric
+                }
+                dto::SdtmProjectVariableType::Character => {
+                    apis::sdtm_project::SdtmVariableType::Character
+                }
+            }),
+            variable_core: req.variable_core.map(|c| match c {
+                dto::SdtmProjectVariableCore::Req => apis::sdtm_project::SdtmVariableCore::Req,
+                dto::SdtmProjectVariableCore::Exp => apis::sdtm_project::SdtmVariableCore::Exp,
+                dto::SdtmProjectVariableCore::Perm => apis::sdtm_project::SdtmVariableCore::Perm,
+                dto::SdtmProjectVariableCore::Supp => apis::sdtm_project::SdtmVariableCore::Supp,
+            }),
+            variable_role: req.variable_role.map(|r| {
+                r.map(|r| match r {
+                    dto::SdtmProjectRole::Identifier => apis::sdtm_project::SdtmRole::Identifier,
+                    dto::SdtmProjectRole::Topic => apis::sdtm_project::SdtmRole::Topic,
+                    dto::SdtmProjectRole::Timing => apis::sdtm_project::SdtmRole::Timing,
+                    dto::SdtmProjectRole::RecordQualifier => {
+                        apis::sdtm_project::SdtmRole::RecordQualifier
+                    }
+                    dto::SdtmProjectRole::SynonymQualifier => {
+                        apis::sdtm_project::SdtmRole::SynonymQualifier
+                    }
+                    dto::SdtmProjectRole::VariableQualifier => {
+                        apis::sdtm_project::SdtmRole::VariableQualifier
+                    }
+                    dto::SdtmProjectRole::GroupingQualifier => {
+                        apis::sdtm_project::SdtmRole::GroupingQualifier
+                    }
+                    dto::SdtmProjectRole::Rule => apis::sdtm_project::SdtmRole::Rule,
+                })
+            }),
             variable_sequence: req.variable_sequence,
+            descriptions: req.descriptions.map(|v| {
+                v.into_iter()
+                    .map(|d| apis::sdtm_project::SdtmVariableDescription {
+                        lang: d.lang,
+                        details: apis::sdtm_project::SdtmVariableDescriptionDetail {
+                            label: d.details.label,
+                        },
+                    })
+                    .collect()
+            }),
+            conversion_rules: req.conversion_rules.map(|v| {
+                v.into_iter()
+                    .map(|r| apis::sdtm_project::ConversionRule {
+                        source: match r.source {
+                            dto::SdtmProjectVariableSource::Protocol => {
+                                apis::sdtm_project::VariableSource::Protocol
+                            }
+                            dto::SdtmProjectVariableSource::Derived => {
+                                apis::sdtm_project::VariableSource::Derived
+                            }
+                            dto::SdtmProjectVariableSource::Assigned(f) => {
+                                apis::sdtm_project::VariableSource::Assigned(f.map(|f| {
+                                    apis::sdtm_project::FromCrf {
+                                        form_code: f.form_code,
+                                    }
+                                }))
+                            }
+                            dto::SdtmProjectVariableSource::Crf(f) => {
+                                apis::sdtm_project::VariableSource::Crf(f.map(|f| {
+                                    apis::sdtm_project::FromCrf {
+                                        form_code: f.form_code,
+                                    }
+                                }))
+                            }
+                            dto::SdtmProjectVariableSource::Edt => {
+                                apis::sdtm_project::VariableSource::Edt
+                            }
+                        },
+                        rule: r.rule,
+                    })
+                    .collect()
+            }),
         })
         .await?;
     Ok(Json(view.into()))
@@ -588,8 +818,10 @@ mod tests {
     fn domain_view() -> apis::sdtm_project::SdtmProjectDomainView {
         apis::sdtm_project::SdtmProjectDomainView {
             id: 2,
-            version_id: 1,
+            sdtm_project_version_id: 1,
             domain_code: "AE".into(),
+            category: apis::sdtm_project::DomainCategory::Events,
+            descriptions: Vec::new(),
             key_variables: vec!["AETERM".into()],
             created_at: ts(),
             updated_at: ts(),
@@ -599,9 +831,15 @@ mod tests {
     fn variable_view() -> apis::sdtm_project::SdtmProjectVariableView {
         apis::sdtm_project::SdtmProjectVariableView {
             id: 4,
-            domain_id: 2,
+            sdtm_project_domain_id: 2,
             variable_code: "AETERM".into(),
+            variable_controlled: None,
+            variable_type: apis::sdtm_project::SdtmVariableType::Character,
+            variable_core: apis::sdtm_project::SdtmVariableCore::Req,
+            variable_role: None,
             variable_sequence: 11,
+            descriptions: Vec::new(),
+            conversion_rules: Vec::new(),
             created_at: ts(),
             updated_at: ts(),
         }
@@ -799,7 +1037,9 @@ mod tests {
             (
                 "POST",
                 "/api/sdtm-project/domains",
-                Some(r#"{"versionId":1,"domainCode":"AE","keyVariables":["AETERM"]}"#),
+                Some(
+                    r#"{"sdtmProjectVersionId":1,"domainCode":"AE","category":"Events","descriptions":[],"keyVariables":["AETERM"]}"#,
+                ),
                 AxStatus::CREATED,
             ),
             ("GET", "/api/sdtm-project/domains/2", None, AxStatus::OK),
@@ -824,7 +1064,9 @@ mod tests {
             (
                 "POST",
                 "/api/sdtm-project/variables",
-                Some(r#"{"domainId":2,"variableCode":"AETERM","variableSequence":11}"#),
+                Some(
+                    r#"{"sdtmProjectDomainId":2,"variableCode":"AETERM","variableType":"Character","variableCore":"Req","variableSequence":11,"descriptions":[],"conversionRules":[]}"#,
+                ),
                 AxStatus::CREATED,
             ),
             ("GET", "/api/sdtm-project/variables/4", None, AxStatus::OK),
@@ -837,7 +1079,9 @@ mod tests {
             (
                 "PUT",
                 "/api/sdtm-project/variables/4",
-                Some(r#"{"variableCode":"AETERM"}"#),
+                Some(
+                    r#"{"variableCode":"AETERM","variableType":"Character","variableCore":"Req"}"#,
+                ),
                 AxStatus::OK,
             ),
             (
@@ -897,7 +1141,7 @@ mod tests {
                 "POST",
                 "/api/sdtm-project/domains",
                 Some(
-                    r#"{"versionId":1,"domainCode":"AE","keyVariables":["AESEV","AETERM"]}"#.into(),
+                    r#"{"sdtmProjectVersionId":1,"domainCode":"AE","category":"Events","descriptions":[],"keyVariables":["AESEV","AETERM"]}"#.into(),
                 ),
                 Some("Bearer good"),
             ))
@@ -907,7 +1151,8 @@ mod tests {
         let (status, body) = read_json(response).await;
         assert_eq!(status, AxStatus::CREATED);
         assert_eq!(body["domainCode"], serde_json::json!("AE"));
-        assert_eq!(body["versionId"], serde_json::json!(1));
+        assert_eq!(body["sdtmProjectVersionId"], serde_json::json!(1));
+        assert_eq!(body["category"], serde_json::json!("Events"));
         // The request reached the service with the caller's order.
         let recorded = service.created_domain.lock().unwrap().clone().unwrap();
         assert_eq!(
@@ -924,7 +1169,7 @@ mod tests {
             .oneshot(build_request(
                 "POST",
                 "/api/sdtm-project/domains",
-                Some(r#"{"versionId":1,"domainCode":"AE","keyVariables":[]}"#.into()),
+                Some(r#"{"sdtmProjectVersionId":1,"domainCode":"AE","category":"Events","descriptions":[],"keyVariables":[]}"#.into()),
                 None,
             ))
             .await

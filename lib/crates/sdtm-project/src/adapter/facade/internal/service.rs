@@ -1,8 +1,8 @@
 //! `SdtmProjectService` adapter over the repository ports.
 //!
-//! Hosts `SdtmProjectServiceImpl<V, D, DO, Va, VO, P>` — the
-//! implementation of `apis::sdtm_project::SdtmProjectService` that
-//! adapts `sdtm_project::SdtmProjectUsecase` to the API contract.
+//! Hosts `SdtmProjectServiceImpl<V, D, Va, P>` — the implementation of
+//! `apis::sdtm_project::SdtmProjectService` that adapts
+//! `sdtm_project::SdtmProjectUsecase` to the API contract.
 //! Translation between `apis::sdtm_project::*` and
 //! `sdtm_project::usecase::*` happens inline in each trait method.
 
@@ -11,17 +11,26 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use apis::sdtm_project::{
-    CreateSdtmProjectDomainRequest, CreateSdtmProjectVariableRequest,
-    CreateSdtmProjectVersionRequest, SdtmProjectApiError, SdtmProjectDomainList,
-    SdtmProjectDomainView, SdtmProjectService, SdtmProjectVariableList, SdtmProjectVariableView,
-    SdtmProjectVersionList, SdtmProjectVersionView, UpdateSdtmProjectDomainRequest,
+    ConversionRule as ApiConversionRule, CreateSdtmProjectDomainRequest,
+    CreateSdtmProjectVariableRequest, CreateSdtmProjectVersionRequest,
+    DomainCategory as ApiCategory, FromCrf as ApiFromCrf,
+    SdtmDomainDescription as ApiDomainDescription,
+    SdtmDomainDescriptionDetail as ApiDomainDescriptionDetail, SdtmProjectApiError,
+    SdtmProjectDomainList, SdtmProjectDomainView, SdtmProjectService, SdtmProjectVariableList,
+    SdtmProjectVariableView, SdtmProjectVersionList, SdtmProjectVersionView,
+    SdtmRole as ApiSdtmRole, SdtmVariableControlled as ApiSdtmVariableControlled,
+    SdtmVariableCore as ApiSdtmVariableCore, SdtmVariableDescription as ApiVariableDescription,
+    SdtmVariableDescriptionDetail as ApiVariableDescriptionDetail,
+    SdtmVariableType as ApiSdtmVariableType, UpdateSdtmProjectDomainRequest,
     UpdateSdtmProjectVariableRequest, UpdateSdtmProjectVersionRequest,
+    VariableSource as ApiVariableSource,
 };
 
 use crate::domain::{
-    DomainError, ProjectLookup, SdtmProjectDomainOverrideRepository, SdtmProjectDomainRepository,
-    SdtmProjectVariableOverrideRepository, SdtmProjectVariableRepository,
-    SdtmProjectVersionRepository,
+    ConversionRule, DomainCategory, DomainError, FromCrf, ProjectLookup, SdtmDomainDescription,
+    SdtmDomainDescriptionDetail, SdtmProjectDomainRepository, SdtmProjectVariableRepository,
+    SdtmProjectVersionRepository, SdtmRole, SdtmVariableControlled, SdtmVariableCore,
+    SdtmVariableDescription, SdtmVariableDescriptionDetail, SdtmVariableType, VariableSource,
 };
 use crate::usecase::{
     CreateSdtmProjectDomain, CreateSdtmProjectVariable, CreateSdtmProjectVersion,
@@ -33,36 +42,32 @@ use crate::usecase::{
 /// Adapter that implements [`SdtmProjectService`] on top of a
 /// [`SdtmProjectUsecase`].
 ///
-/// Generic over the five persistence ports plus the project lookup so
+/// Generic over the three persistence ports plus the project lookup so
 /// the adapter can be exercised against in-memory fakes in tests and
 /// against the PostgreSQL-backed repositories in production.
 pub struct SdtmProjectServiceImpl<
     V: SdtmProjectVersionRepository,
     D: SdtmProjectDomainRepository,
-    DO: SdtmProjectDomainOverrideRepository,
     Va: SdtmProjectVariableRepository,
-    VO: SdtmProjectVariableOverrideRepository,
     P: ProjectLookup,
 > {
-    usecase: SdtmProjectUsecase<V, D, DO, Va, VO, P>,
+    usecase: SdtmProjectUsecase<V, D, Va, P>,
 }
 
-impl<V, D, DO, Va, VO, P> SdtmProjectServiceImpl<V, D, DO, Va, VO, P>
+impl<V, D, Va, P> SdtmProjectServiceImpl<V, D, Va, P>
 where
     V: SdtmProjectVersionRepository,
     D: SdtmProjectDomainRepository,
-    DO: SdtmProjectDomainOverrideRepository,
     Va: SdtmProjectVariableRepository,
-    VO: SdtmProjectVariableOverrideRepository,
     P: ProjectLookup,
 {
     /// Build a new `SdtmProjectServiceImpl` wrapping the supplied
     /// usecase.
-    pub fn new(usecase: SdtmProjectUsecase<V, D, DO, Va, VO, P>) -> Self {
+    pub fn new(usecase: SdtmProjectUsecase<V, D, Va, P>) -> Self {
         Self { usecase }
     }
 
-    /// Build a new `SdtmProjectServiceImpl` from the five repositories
+    /// Build a new `SdtmProjectServiceImpl` from the three repositories
     /// and the project lookup directly. Mirrors the
     /// [`SdtmProjectUsecase::new`] constructor shape so callers who
     /// already hold the repositories do not need to assemble a
@@ -70,27 +75,217 @@ where
     pub fn from_repos(
         version_repo: V,
         domain_repo: D,
-        domain_override_repo: DO,
         variable_repo: Va,
-        variable_override_repo: VO,
         projects: Arc<P>,
     ) -> Self {
         Self::new(SdtmProjectUsecase::new(SdtmProjectUsecaseConfig {
             version_repo,
             domain_repo,
-            domain_override_repo,
             variable_repo,
-            variable_override_repo,
             projects,
         }))
     }
 }
 
 // ---- enum mappers (api <-> domain) ----
-//
-// The mappers for the promoted metadata (category, variable type / core /
-// role, descriptions) land with the standalone model; until then the
-// override surface is the only consumer and it is gone.
+
+fn to_internal_category(c: ApiCategory) -> DomainCategory {
+    match c {
+        ApiCategory::SpecialPurpose => DomainCategory::SpecialPurpose,
+        ApiCategory::Interventions => DomainCategory::Interventions,
+        ApiCategory::Events => DomainCategory::Events,
+        ApiCategory::Findings => DomainCategory::Findings,
+        ApiCategory::TrialDesign => DomainCategory::TrialDesign,
+        ApiCategory::Relationships => DomainCategory::Relationships,
+        ApiCategory::StudyReference => DomainCategory::StudyReference,
+    }
+}
+
+fn from_internal_category(c: DomainCategory) -> ApiCategory {
+    match c {
+        DomainCategory::SpecialPurpose => ApiCategory::SpecialPurpose,
+        DomainCategory::Interventions => ApiCategory::Interventions,
+        DomainCategory::Events => ApiCategory::Events,
+        DomainCategory::Findings => ApiCategory::Findings,
+        DomainCategory::TrialDesign => ApiCategory::TrialDesign,
+        DomainCategory::Relationships => ApiCategory::Relationships,
+        DomainCategory::StudyReference => ApiCategory::StudyReference,
+    }
+}
+
+fn to_internal_variable_type(t: ApiSdtmVariableType) -> SdtmVariableType {
+    match t {
+        ApiSdtmVariableType::Numeric => SdtmVariableType::Numeric,
+        ApiSdtmVariableType::Character => SdtmVariableType::Character,
+    }
+}
+
+fn from_internal_variable_type(t: SdtmVariableType) -> ApiSdtmVariableType {
+    match t {
+        SdtmVariableType::Numeric => ApiSdtmVariableType::Numeric,
+        SdtmVariableType::Character => ApiSdtmVariableType::Character,
+    }
+}
+
+fn to_internal_variable_core(c: ApiSdtmVariableCore) -> SdtmVariableCore {
+    match c {
+        ApiSdtmVariableCore::Req => SdtmVariableCore::Req,
+        ApiSdtmVariableCore::Exp => SdtmVariableCore::Exp,
+        ApiSdtmVariableCore::Perm => SdtmVariableCore::Perm,
+        ApiSdtmVariableCore::Supp => SdtmVariableCore::Supp,
+    }
+}
+
+fn from_internal_variable_core(c: SdtmVariableCore) -> ApiSdtmVariableCore {
+    match c {
+        SdtmVariableCore::Req => ApiSdtmVariableCore::Req,
+        SdtmVariableCore::Exp => ApiSdtmVariableCore::Exp,
+        SdtmVariableCore::Perm => ApiSdtmVariableCore::Perm,
+        SdtmVariableCore::Supp => ApiSdtmVariableCore::Supp,
+    }
+}
+
+fn to_internal_role(r: ApiSdtmRole) -> SdtmRole {
+    match r {
+        ApiSdtmRole::Identifier => SdtmRole::Identifier,
+        ApiSdtmRole::Topic => SdtmRole::Topic,
+        ApiSdtmRole::Timing => SdtmRole::Timing,
+        ApiSdtmRole::RecordQualifier => SdtmRole::RecordQualifier,
+        ApiSdtmRole::SynonymQualifier => SdtmRole::SynonymQualifier,
+        ApiSdtmRole::VariableQualifier => SdtmRole::VariableQualifier,
+        ApiSdtmRole::GroupingQualifier => SdtmRole::GroupingQualifier,
+        ApiSdtmRole::Rule => SdtmRole::Rule,
+    }
+}
+
+fn from_internal_role(r: SdtmRole) -> ApiSdtmRole {
+    match r {
+        SdtmRole::Identifier => ApiSdtmRole::Identifier,
+        SdtmRole::Topic => ApiSdtmRole::Topic,
+        SdtmRole::Timing => ApiSdtmRole::Timing,
+        SdtmRole::RecordQualifier => ApiSdtmRole::RecordQualifier,
+        SdtmRole::SynonymQualifier => ApiSdtmRole::SynonymQualifier,
+        SdtmRole::VariableQualifier => ApiSdtmRole::VariableQualifier,
+        SdtmRole::GroupingQualifier => ApiSdtmRole::GroupingQualifier,
+        SdtmRole::Rule => ApiSdtmRole::Rule,
+    }
+}
+
+fn to_internal_variable_source(s: ApiVariableSource) -> VariableSource {
+    match s {
+        ApiVariableSource::Protocol => VariableSource::Protocol,
+        ApiVariableSource::Derived => VariableSource::Derived,
+        ApiVariableSource::Assigned(f) => VariableSource::Assigned(f.map(|f| FromCrf {
+            form_code: f.form_code,
+        })),
+        ApiVariableSource::Crf(f) => VariableSource::Crf(f.map(|f| FromCrf {
+            form_code: f.form_code,
+        })),
+        ApiVariableSource::Edt => VariableSource::Edt,
+    }
+}
+
+fn from_internal_variable_source(s: VariableSource) -> ApiVariableSource {
+    match s {
+        VariableSource::Protocol => ApiVariableSource::Protocol,
+        VariableSource::Derived => ApiVariableSource::Derived,
+        VariableSource::Assigned(f) => ApiVariableSource::Assigned(f.map(|f| ApiFromCrf {
+            form_code: f.form_code,
+        })),
+        VariableSource::Crf(f) => ApiVariableSource::Crf(f.map(|f| ApiFromCrf {
+            form_code: f.form_code,
+        })),
+        VariableSource::Edt => ApiVariableSource::Edt,
+    }
+}
+
+// ---- description mappers ----
+
+fn domain_descriptions_from_api(v: Vec<ApiDomainDescription>) -> Vec<SdtmDomainDescription> {
+    v.into_iter()
+        .map(|d| SdtmDomainDescription {
+            lang: d.lang,
+            details: SdtmDomainDescriptionDetail {
+                description: d.details.description,
+                structure: d.details.structure,
+            },
+        })
+        .collect()
+}
+
+fn domain_descriptions_to_api(v: Vec<SdtmDomainDescription>) -> Vec<ApiDomainDescription> {
+    v.into_iter()
+        .map(|d| ApiDomainDescription {
+            lang: d.lang,
+            details: ApiDomainDescriptionDetail {
+                description: d.details.description,
+                structure: d.details.structure,
+            },
+        })
+        .collect()
+}
+
+fn variable_descriptions_from_api(v: Vec<ApiVariableDescription>) -> Vec<SdtmVariableDescription> {
+    v.into_iter()
+        .map(|d| SdtmVariableDescription {
+            lang: d.lang,
+            details: SdtmVariableDescriptionDetail {
+                label: d.details.label,
+            },
+        })
+        .collect()
+}
+
+fn variable_descriptions_to_api(v: Vec<SdtmVariableDescription>) -> Vec<ApiVariableDescription> {
+    v.into_iter()
+        .map(|d| ApiVariableDescription {
+            lang: d.lang,
+            details: ApiVariableDescriptionDetail {
+                label: d.details.label,
+            },
+        })
+        .collect()
+}
+
+// ---- controlled-terminology mappers ----
+
+fn variable_controlled_from_api(
+    v: Option<ApiSdtmVariableControlled>,
+) -> Option<SdtmVariableControlled> {
+    v.map(|c| SdtmVariableControlled {
+        code: c.code,
+        format: c.format,
+    })
+}
+
+fn variable_controlled_to_api(
+    v: Option<SdtmVariableControlled>,
+) -> Option<ApiSdtmVariableControlled> {
+    v.map(|c| ApiSdtmVariableControlled {
+        code: c.code,
+        format: c.format,
+    })
+}
+
+// ---- conversion-rule mappers ----
+
+fn conversion_rules_from_api(v: Vec<ApiConversionRule>) -> Vec<ConversionRule> {
+    v.into_iter()
+        .map(|r| ConversionRule {
+            source: to_internal_variable_source(r.source),
+            rule: r.rule,
+        })
+        .collect()
+}
+
+fn conversion_rules_to_api(v: Vec<ConversionRule>) -> Vec<ApiConversionRule> {
+    v.into_iter()
+        .map(|r| ApiConversionRule {
+            source: from_internal_variable_source(r.source),
+            rule: r.rule,
+        })
+        .collect()
+}
 
 // ---- view mappers ----
 
@@ -107,8 +302,10 @@ fn version_view_from_internal(view: InternalVersionView) -> SdtmProjectVersionVi
 fn domain_view_from_internal(view: InternalDomainView) -> SdtmProjectDomainView {
     SdtmProjectDomainView {
         id: view.id,
-        version_id: view.version_id,
+        sdtm_project_version_id: view.sdtm_project_version_id,
         domain_code: view.domain_code,
+        category: from_internal_category(view.category),
+        descriptions: domain_descriptions_to_api(view.descriptions),
         key_variables: view.key_variables,
         created_at: view.created_at,
         updated_at: view.updated_at,
@@ -118,9 +315,15 @@ fn domain_view_from_internal(view: InternalDomainView) -> SdtmProjectDomainView 
 fn variable_view_from_internal(view: InternalVariableView) -> SdtmProjectVariableView {
     SdtmProjectVariableView {
         id: view.id,
-        domain_id: view.domain_id,
+        sdtm_project_domain_id: view.sdtm_project_domain_id,
         variable_code: view.variable_code,
+        variable_controlled: variable_controlled_to_api(view.variable_controlled),
+        variable_type: from_internal_variable_type(view.variable_type),
+        variable_core: from_internal_variable_core(view.variable_core),
+        variable_role: view.variable_role.map(from_internal_role),
         variable_sequence: view.variable_sequence,
+        descriptions: variable_descriptions_to_api(view.descriptions),
+        conversion_rules: conversion_rules_to_api(view.conversion_rules),
         created_at: view.created_at,
         updated_at: view.updated_at,
     }
@@ -151,17 +354,11 @@ impl From<UsecaseError> for SdtmProjectApiError {
                 DomainError::SdtmProjectVariableNotFound(id) => {
                     SdtmProjectApiError::SdtmProjectVariableNotFound(id)
                 }
-                // The override sub-resource is no longer part of the
-                // API surface, so these variants have no apis
-                // counterpart. They are unreachable through this
-                // facade — the override endpoints are gone — and the
-                // crate's internal override machinery goes away with
-                // the domain model itself.
-                DomainError::SdtmProjectDomainOverrideNotFound(_)
-                | DomainError::SdtmProjectVariableOverrideNotFound(_)
-                | DomainError::DuplicateSdtmProjectDomainOverride { .. }
-                | DomainError::DuplicateSdtmProjectVariableOverride { .. } => {
-                    SdtmProjectApiError::Repository(domain.to_string())
+                DomainError::KeyVariableNotFound { variable_code } => {
+                    SdtmProjectApiError::KeyVariableNotFound { variable_code }
+                }
+                DomainError::VariableReferencedByKeyVariables { variable_code } => {
+                    SdtmProjectApiError::VariableReferencedByKeyVariables { variable_code }
                 }
                 DomainError::DuplicateSdtmProjectVersion {
                     project_code,
@@ -198,6 +395,7 @@ impl From<UsecaseError> for SdtmProjectApiError {
                 | DomainError::EmptyDomainCode
                 | DomainError::EmptyVariableCode
                 | DomainError::EmptyKeyVariable
+                | DomainError::EmptyConversionRule
                 | DomainError::InvalidDomainCategory(_)
                 | DomainError::InvalidVariableType(_)
                 | DomainError::InvalidVariableCore(_)
@@ -214,13 +412,11 @@ impl From<UsecaseError> for SdtmProjectApiError {
 }
 
 #[async_trait]
-impl<V, D, DO, Va, VO, P> SdtmProjectService for SdtmProjectServiceImpl<V, D, DO, Va, VO, P>
+impl<V, D, Va, P> SdtmProjectService for SdtmProjectServiceImpl<V, D, Va, P>
 where
     V: SdtmProjectVersionRepository,
     D: SdtmProjectDomainRepository,
-    DO: SdtmProjectDomainOverrideRepository,
     Va: SdtmProjectVariableRepository,
-    VO: SdtmProjectVariableOverrideRepository,
     P: ProjectLookup,
 {
     // ---- SdtmProjectVersion ----
@@ -279,8 +475,10 @@ where
         req: CreateSdtmProjectDomainRequest,
     ) -> Result<SdtmProjectDomainView, SdtmProjectApiError> {
         let cmd = CreateSdtmProjectDomain {
-            version_id: req.version_id,
+            sdtm_project_version_id: req.sdtm_project_version_id,
             domain_code: req.domain_code,
+            category: to_internal_category(req.category),
+            descriptions: domain_descriptions_from_api(req.descriptions),
             key_variables: req.key_variables,
         };
         let view = self.usecase.create_domain(cmd).await?;
@@ -312,6 +510,8 @@ where
         let cmd = UpdateSdtmProjectDomain {
             id: req.id,
             domain_code: req.domain_code,
+            category: req.category.map(to_internal_category),
+            descriptions: req.descriptions.map(domain_descriptions_from_api),
             key_variables: req.key_variables,
         };
         let view = self.usecase.update_domain(cmd).await?;
@@ -330,9 +530,15 @@ where
         req: CreateSdtmProjectVariableRequest,
     ) -> Result<SdtmProjectVariableView, SdtmProjectApiError> {
         let cmd = CreateSdtmProjectVariable {
-            domain_id: req.domain_id,
+            sdtm_project_domain_id: req.sdtm_project_domain_id,
             variable_code: req.variable_code,
+            variable_controlled: variable_controlled_from_api(req.variable_controlled),
+            variable_type: to_internal_variable_type(req.variable_type),
+            variable_core: to_internal_variable_core(req.variable_core),
+            variable_role: req.variable_role.map(to_internal_role),
             variable_sequence: req.variable_sequence,
+            descriptions: variable_descriptions_from_api(req.descriptions),
+            conversion_rules: conversion_rules_from_api(req.conversion_rules),
         };
         let view = self.usecase.create_variable(cmd).await?;
         Ok(variable_view_from_internal(view))
@@ -363,7 +569,13 @@ where
         let cmd = UpdateSdtmProjectVariable {
             id: req.id,
             variable_code: req.variable_code,
+            variable_controlled: req.variable_controlled.map(variable_controlled_from_api),
+            variable_type: req.variable_type.map(to_internal_variable_type),
+            variable_core: req.variable_core.map(to_internal_variable_core),
+            variable_role: req.variable_role.map(|opt| opt.map(to_internal_role)),
             variable_sequence: req.variable_sequence,
+            descriptions: req.descriptions.map(variable_descriptions_from_api),
+            conversion_rules: req.conversion_rules.map(conversion_rules_from_api),
         };
         let view = self.usecase.update_variable(cmd).await?;
         Ok(variable_view_from_internal(view))

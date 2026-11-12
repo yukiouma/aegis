@@ -1,8 +1,7 @@
 use super::{
-    DomainCategory, DomainError, SdtmDomainDescription, SdtmDomainDescriptionDetail,
-    SdtmProjectDomain, SdtmProjectDomainOverride, SdtmProjectVariable, SdtmProjectVariableOverride,
-    SdtmProjectVersion, SdtmRole, SdtmVariableCore, SdtmVariableDescription,
-    SdtmVariableDescriptionDetail, SdtmVariableType,
+    ConversionRule, DomainCategory, DomainError, FromCrf, SdtmProjectDomain, SdtmProjectVariable,
+    SdtmProjectVersion, SdtmRole, SdtmVariableControlled, SdtmVariableCore, SdtmVariableType,
+    VariableSource,
 };
 
 // ---- enums ---------------------------------------------------------------
@@ -116,20 +115,42 @@ fn sdtm_project_version_new_accepts_valid_input() {
 
 #[test]
 fn sdtm_project_domain_new_rejects_blank_domain_code() {
-    let err = SdtmProjectDomain::new(1, "  ".into(), Vec::new()).unwrap_err();
+    let err = SdtmProjectDomain::new(
+        1,
+        "  ".into(),
+        DomainCategory::Events,
+        Vec::new(),
+        Vec::new(),
+    )
+    .unwrap_err();
     assert!(matches!(err, DomainError::EmptyDomainCode));
 }
 
 #[test]
 fn sdtm_project_domain_new_rejects_blank_key_variable() {
-    let err = SdtmProjectDomain::new(1, "AE".into(), vec!["  ".into()]).unwrap_err();
+    let err = SdtmProjectDomain::new(
+        1,
+        "AE".into(),
+        DomainCategory::Events,
+        Vec::new(),
+        vec!["  ".into()],
+    )
+    .unwrap_err();
     assert!(matches!(err, DomainError::EmptyKeyVariable));
 }
 
 #[test]
 fn sdtm_project_domain_new_accepts_valid_input() {
-    let d = SdtmProjectDomain::new(1, "AE".into(), vec!["AETERM".into()]).unwrap();
+    let d = SdtmProjectDomain::new(
+        1,
+        "AE".into(),
+        DomainCategory::Events,
+        Vec::new(),
+        vec!["AETERM".into()],
+    )
+    .unwrap();
     assert_eq!(d.domain_code, "AE");
+    assert_eq!(d.category, DomainCategory::Events);
     assert_eq!(d.key_variables, vec!["AETERM".to_string()]);
 }
 
@@ -166,50 +187,122 @@ fn normalize_key_variables_rejects_blank_entry() {
 
 #[test]
 fn sdtm_project_variable_new_rejects_blank_variable_code() {
-    let err = SdtmProjectVariable::new(1, " ".into(), 1).unwrap_err();
+    let err = SdtmProjectVariable::new(
+        1,
+        " ".into(),
+        None,
+        SdtmVariableType::Character,
+        SdtmVariableCore::Req,
+        None,
+        1,
+        Vec::new(),
+        Vec::new(),
+    )
+    .unwrap_err();
     assert!(matches!(err, DomainError::EmptyVariableCode));
 }
 
 #[test]
-fn sdtm_project_variable_new_accepts_valid_input() {
-    let v = SdtmProjectVariable::new(1, "AETERM".into(), 11).unwrap();
-    assert_eq!(v.variable_code, "AETERM");
-    assert_eq!(v.variable_sequence, 11);
-}
-
-#[test]
-fn domain_override_new_accepts_valid_input() {
-    let desc = SdtmDomainDescription {
-        lang: "en".into(),
-        details: SdtmDomainDescriptionDetail {
-            description: "Adverse events".into(),
-            structure: "One record per AE".into(),
-        },
-    };
-    let o = SdtmProjectDomainOverride::new(1, DomainCategory::Events, vec![desc]).unwrap();
-    assert_eq!(o.category, DomainCategory::Events);
-    assert_eq!(o.descriptions.len(), 1);
-    assert_eq!(o.descriptions[0].details.description, "Adverse events");
-}
-
-#[test]
-fn variable_override_new_accepts_valid_input() {
-    let desc = SdtmVariableDescription {
-        lang: "en".into(),
-        details: SdtmVariableDescriptionDetail {
-            label: "Adverse Event Term".into(),
-        },
-    };
-    let o = SdtmProjectVariableOverride::new(
+fn sdtm_project_variable_new_rejects_a_blank_conversion_rule() {
+    let err = SdtmProjectVariable::new(
         1,
+        "AETERM".into(),
+        None,
+        SdtmVariableType::Character,
+        SdtmVariableCore::Req,
+        None,
+        1,
+        Vec::new(),
+        vec![ConversionRule {
+            source: VariableSource::Protocol,
+            rule: "   ".into(),
+        }],
+    )
+    .unwrap_err();
+    assert!(matches!(err, DomainError::EmptyConversionRule));
+}
+
+#[test]
+fn sdtm_project_variable_new_accepts_valid_input() {
+    let v = SdtmProjectVariable::new(
+        1,
+        "AETERM".into(),
+        Some(SdtmVariableControlled {
+            code: Some(vec!["C66731".into()]),
+            format: None,
+        }),
         SdtmVariableType::Character,
         SdtmVariableCore::Req,
         Some(SdtmRole::Topic),
-        vec![desc],
+        11,
+        Vec::new(),
+        vec![ConversionRule {
+            source: VariableSource::Protocol,
+            rule: "AESEV".into(),
+        }],
     )
     .unwrap();
-    assert_eq!(o.variable_type, SdtmVariableType::Character);
-    assert_eq!(o.variable_core, SdtmVariableCore::Req);
-    assert_eq!(o.variable_role, Some(SdtmRole::Topic));
-    assert_eq!(o.descriptions.len(), 1);
+    assert_eq!(v.variable_code, "AETERM");
+    assert_eq!(v.variable_sequence, 11);
+    assert_eq!(v.variable_type, SdtmVariableType::Character);
+    assert_eq!(v.variable_core, SdtmVariableCore::Req);
+    assert_eq!(v.variable_role, Some(SdtmRole::Topic));
+    assert_eq!(v.conversion_rules.len(), 1);
+    assert_eq!(v.conversion_rules[0].rule, "AESEV");
+}
+
+/// The wire spelling of `VariableSource` is pinned: unit variants omit
+/// the `from` key entirely, payload variants carry it (as `null` when
+/// the form is absent). A flat `Option<FromCrf>` field cannot express
+/// both, which is why the enum is adjacently tagged.
+#[test]
+fn variable_source_serializes_to_the_agreed_json() {
+    let cases: Vec<(VariableSource, &str)> = vec![
+        (VariableSource::Protocol, r#"{"source":"Protocol"}"#),
+        (VariableSource::Derived, r#"{"source":"Derived"}"#),
+        (VariableSource::Edt, r#"{"source":"eDT"}"#),
+        (
+            VariableSource::Crf(Some(FromCrf {
+                form_code: "AE".into(),
+            })),
+            r#"{"source":"CRF","from":{"form_code":"AE"}}"#,
+        ),
+        (
+            VariableSource::Assigned(None),
+            r#"{"source":"Assigned","from":null}"#,
+        ),
+    ];
+    for (source, expected) in cases {
+        assert_eq!(serde_json::to_string(&source).unwrap(), expected);
+    }
+}
+
+/// A conversion rule flattens its source, so the source's own fields
+/// sit beside the rule text rather than nesting under a second
+/// `source` key.
+#[test]
+fn conversion_rule_serializes_the_source_flat() {
+    let rule = ConversionRule {
+        source: VariableSource::Crf(Some(FromCrf {
+            form_code: "AE".into(),
+        })),
+        rule: "AESEV".into(),
+    };
+    let json = serde_json::to_string(&rule).unwrap();
+    assert_eq!(
+        json,
+        r#"{"source":"CRF","from":{"form_code":"AE"},"rule":"AESEV"}"#
+    );
+    let back: ConversionRule = serde_json::from_str(&json).unwrap();
+    assert_eq!(back, rule);
+}
+
+#[test]
+fn sdtm_variable_controlled_omits_unset_members() {
+    let json = serde_json::to_string(&SdtmVariableControlled {
+        code: Some(vec!["C66731".into()]),
+        format: None,
+    })
+    .unwrap();
+    assert_eq!(json, r#"{"code":["C66731"]}"#);
 }

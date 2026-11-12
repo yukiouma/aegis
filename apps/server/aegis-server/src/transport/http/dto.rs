@@ -3024,11 +3024,62 @@ pub struct UpdateSdtmProjectVersionRequest {
     pub version_name: Option<String>,
 }
 
+/// Controlled-terminology metadata attached to an SDTM variable.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectVariableControlled {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<Vec<String>>,
+}
+
+/// The CRF form a conversion rule draws from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SdtmProjectFromCrf {
+    pub form_code: String,
+}
+
+/// Where a project variable's value comes from.
+///
+/// Adjacently tagged exactly like the crate's `VariableSource`, so the
+/// bytes on the wire are identical to the ones the crate serialises: a
+/// unit variant omits `from`, a payload variant carries it (as `null`
+/// when the form is absent).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(tag = "source", content = "from")]
+pub enum SdtmProjectVariableSource {
+    #[serde(rename = "Protocol")]
+    Protocol,
+    #[serde(rename = "Derived")]
+    Derived,
+    #[serde(rename = "Assigned")]
+    Assigned(Option<SdtmProjectFromCrf>),
+    #[serde(rename = "CRF")]
+    Crf(Option<SdtmProjectFromCrf>),
+    #[serde(rename = "eDT")]
+    Edt,
+}
+
+/// One rule that turns a source into a variable's value.
+///
+/// The source is flattened, so the source's own fields sit beside the
+/// rule text rather than nesting under a second `source` key.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SdtmProjectConversionRule {
+    #[serde(flatten)]
+    pub source: SdtmProjectVariableSource,
+    pub rule: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSdtmProjectDomainRequest {
-    pub version_id: i64,
+    pub sdtm_project_version_id: i64,
     pub domain_code: String,
+    pub category: SdtmProjectDomainCategory,
+    pub descriptions: Vec<SdtmProjectDomainDescription>,
     pub key_variables: Vec<String>,
 }
 
@@ -3036,22 +3087,42 @@ pub struct CreateSdtmProjectDomainRequest {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSdtmProjectDomainRequest {
     pub domain_code: Option<String>,
+    pub category: Option<SdtmProjectDomainCategory>,
+    pub descriptions: Option<Vec<SdtmProjectDomainDescription>>,
     pub key_variables: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSdtmProjectVariableRequest {
-    pub domain_id: i64,
+    pub sdtm_project_domain_id: i64,
     pub variable_code: String,
+    pub variable_controlled: Option<SdtmProjectVariableControlled>,
+    pub variable_type: SdtmProjectVariableType,
+    pub variable_core: SdtmProjectVariableCore,
+    pub variable_role: Option<SdtmProjectRole>,
     pub variable_sequence: i64,
+    pub descriptions: Vec<SdtmProjectVariableDescription>,
+    pub conversion_rules: Vec<SdtmProjectConversionRule>,
 }
 
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpdateSdtmProjectVariableRequest {
     pub variable_code: Option<String>,
+    /// Three-state: absent = unchanged, `null` = clear, value =
+    /// replace. See [`double_option`].
+    #[serde(default, deserialize_with = "double_option")]
+    pub variable_controlled: Option<Option<SdtmProjectVariableControlled>>,
+    pub variable_type: Option<SdtmProjectVariableType>,
+    pub variable_core: Option<SdtmProjectVariableCore>,
+    /// Three-state: absent = unchanged, `null` = clear, value =
+    /// replace. See [`double_option`].
+    #[serde(default, deserialize_with = "double_option")]
+    pub variable_role: Option<Option<SdtmProjectRole>>,
     pub variable_sequence: Option<i64>,
+    pub descriptions: Option<Vec<SdtmProjectVariableDescription>>,
+    pub conversion_rules: Option<Vec<SdtmProjectConversionRule>>,
 }
 
 /// Query for `GET /api/sdtm-project/versions`. The parameter is
@@ -3078,8 +3149,10 @@ pub struct SdtmProjectVersionViewResponse {
 #[serde(rename_all = "camelCase")]
 pub struct SdtmProjectDomainViewResponse {
     pub id: i64,
-    pub version_id: i64,
+    pub sdtm_project_version_id: i64,
     pub domain_code: String,
+    pub category: SdtmProjectDomainCategory,
+    pub descriptions: Vec<SdtmProjectDomainDescription>,
     /// The variable codes, in the order the caller supplied them.
     pub key_variables: Vec<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -3090,9 +3163,15 @@ pub struct SdtmProjectDomainViewResponse {
 #[serde(rename_all = "camelCase")]
 pub struct SdtmProjectVariableViewResponse {
     pub id: i64,
-    pub domain_id: i64,
+    pub sdtm_project_domain_id: i64,
     pub variable_code: String,
+    pub variable_controlled: Option<SdtmProjectVariableControlled>,
+    pub variable_type: SdtmProjectVariableType,
+    pub variable_core: SdtmProjectVariableCore,
+    pub variable_role: Option<SdtmProjectRole>,
     pub variable_sequence: i64,
+    pub descriptions: Vec<SdtmProjectVariableDescription>,
+    pub conversion_rules: Vec<SdtmProjectConversionRule>,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -3131,8 +3210,38 @@ impl From<apis::sdtm_project::SdtmProjectDomainView> for SdtmProjectDomainViewRe
     fn from(v: apis::sdtm_project::SdtmProjectDomainView) -> Self {
         Self {
             id: v.id,
-            version_id: v.version_id,
+            sdtm_project_version_id: v.sdtm_project_version_id,
             domain_code: v.domain_code,
+            category: match v.category {
+                apis::sdtm_project::DomainCategory::SpecialPurpose => {
+                    SdtmProjectDomainCategory::SpecialPurpose
+                }
+                apis::sdtm_project::DomainCategory::Interventions => {
+                    SdtmProjectDomainCategory::Interventions
+                }
+                apis::sdtm_project::DomainCategory::Events => SdtmProjectDomainCategory::Events,
+                apis::sdtm_project::DomainCategory::Findings => SdtmProjectDomainCategory::Findings,
+                apis::sdtm_project::DomainCategory::TrialDesign => {
+                    SdtmProjectDomainCategory::TrialDesign
+                }
+                apis::sdtm_project::DomainCategory::Relationships => {
+                    SdtmProjectDomainCategory::Relationships
+                }
+                apis::sdtm_project::DomainCategory::StudyReference => {
+                    SdtmProjectDomainCategory::StudyReference
+                }
+            },
+            descriptions: v
+                .descriptions
+                .into_iter()
+                .map(|d| SdtmProjectDomainDescription {
+                    lang: d.lang,
+                    details: SdtmProjectDomainDescriptionDetail {
+                        description: d.details.description,
+                        structure: d.details.structure,
+                    },
+                })
+                .collect(),
             key_variables: v.key_variables,
             created_at: v.created_at,
             updated_at: v.updated_at,
@@ -3144,9 +3253,77 @@ impl From<apis::sdtm_project::SdtmProjectVariableView> for SdtmProjectVariableVi
     fn from(v: apis::sdtm_project::SdtmProjectVariableView) -> Self {
         Self {
             id: v.id,
-            domain_id: v.domain_id,
+            sdtm_project_domain_id: v.sdtm_project_domain_id,
             variable_code: v.variable_code,
+            variable_controlled: v
+                .variable_controlled
+                .map(|c| SdtmProjectVariableControlled {
+                    code: c.code,
+                    format: c.format,
+                }),
+            variable_type: match v.variable_type {
+                apis::sdtm_project::SdtmVariableType::Numeric => SdtmProjectVariableType::Numeric,
+                apis::sdtm_project::SdtmVariableType::Character => {
+                    SdtmProjectVariableType::Character
+                }
+            },
+            variable_core: match v.variable_core {
+                apis::sdtm_project::SdtmVariableCore::Req => SdtmProjectVariableCore::Req,
+                apis::sdtm_project::SdtmVariableCore::Exp => SdtmProjectVariableCore::Exp,
+                apis::sdtm_project::SdtmVariableCore::Perm => SdtmProjectVariableCore::Perm,
+                apis::sdtm_project::SdtmVariableCore::Supp => SdtmProjectVariableCore::Supp,
+            },
+            variable_role: v.variable_role.map(|r| match r {
+                apis::sdtm_project::SdtmRole::Identifier => SdtmProjectRole::Identifier,
+                apis::sdtm_project::SdtmRole::Topic => SdtmProjectRole::Topic,
+                apis::sdtm_project::SdtmRole::Timing => SdtmProjectRole::Timing,
+                apis::sdtm_project::SdtmRole::RecordQualifier => SdtmProjectRole::RecordQualifier,
+                apis::sdtm_project::SdtmRole::SynonymQualifier => SdtmProjectRole::SynonymQualifier,
+                apis::sdtm_project::SdtmRole::VariableQualifier => {
+                    SdtmProjectRole::VariableQualifier
+                }
+                apis::sdtm_project::SdtmRole::GroupingQualifier => {
+                    SdtmProjectRole::GroupingQualifier
+                }
+                apis::sdtm_project::SdtmRole::Rule => SdtmProjectRole::Rule,
+            }),
             variable_sequence: v.variable_sequence,
+            descriptions: v
+                .descriptions
+                .into_iter()
+                .map(|d| SdtmProjectVariableDescription {
+                    lang: d.lang,
+                    details: SdtmProjectVariableDescriptionDetail {
+                        label: d.details.label,
+                    },
+                })
+                .collect(),
+            conversion_rules: v
+                .conversion_rules
+                .into_iter()
+                .map(|r| SdtmProjectConversionRule {
+                    source: match r.source {
+                        apis::sdtm_project::VariableSource::Protocol => {
+                            SdtmProjectVariableSource::Protocol
+                        }
+                        apis::sdtm_project::VariableSource::Derived => {
+                            SdtmProjectVariableSource::Derived
+                        }
+                        apis::sdtm_project::VariableSource::Assigned(f) => {
+                            SdtmProjectVariableSource::Assigned(f.map(|f| SdtmProjectFromCrf {
+                                form_code: f.form_code,
+                            }))
+                        }
+                        apis::sdtm_project::VariableSource::Crf(f) => {
+                            SdtmProjectVariableSource::Crf(f.map(|f| SdtmProjectFromCrf {
+                                form_code: f.form_code,
+                            }))
+                        }
+                        apis::sdtm_project::VariableSource::Edt => SdtmProjectVariableSource::Edt,
+                    },
+                    rule: r.rule,
+                })
+                .collect(),
             created_at: v.created_at,
             updated_at: v.updated_at,
         }
