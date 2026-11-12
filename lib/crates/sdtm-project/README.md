@@ -1,13 +1,14 @@
 # sdtm-project
 
 Owns the **per-project SDTM model tree** — the domains and variables a project
-declares on top of the CDISC SDTM standard — behind five PostgreSQL tables and
+declares on top of the CDISC SDTM standard — behind three PostgreSQL tables and
 an `apis::sdtm_project::SdtmProjectService` port.
 
 The crate deliberately shares no types with `domain-model`: the CDISC standard
 and a project's overlay are allowed to drift independently, so the value objects
-(`DomainCategory`, `SdtmVariableType`, `SdtmVariableCore`, `SdtmRole` and the
-description DTOs) are **copied** rather than imported.
+(`DomainCategory`, `SdtmVariableType`, `SdtmVariableCore`, `SdtmRole`,
+`SdtmVariableControlled` and the description DTOs) are **copied** rather than
+imported.
 
 ## Layout
 
@@ -22,18 +23,17 @@ src/
 │   ├── sdtm_variable_description.rs
 │   ├── sdtm_project_version.rs
 │   ├── sdtm_project_domain.rs
-│   ├── sdtm_project_domain_override.rs
 │   ├── sdtm_project_variable.rs
-│   ├── sdtm_project_variable_override.rs
+│   ├── conversion_rule.rs        # VariableSource / FromCrf / ConversionRule
 │   ├── project_lookup.rs         # cross-crate port onto the `project` crate
-│   ├── repository.rs             # the five repository ports
+│   ├── repository.rs             # the three repository ports
 │   ├── error.rs                  # DomainError
 │   └── tests.rs
 ├── usecase.rs
 ├── usecase/
 │   ├── commands.rs               # ten Create/Update command DTOs
 │   ├── error.rs                  # UsecaseError
-│   ├── views.rs                  # five view DTOs + From impls
+│   ├── views.rs                  # three view DTOs + From impls
 │   ├── sdtm_project_usecase.rs   # the usecase + its config
 │   └── tests.rs
 └── adapter.rs
@@ -52,10 +52,14 @@ src/
 | Aggregate | Table | Uniqueness |
 | --- | --- | --- |
 | `SdtmProjectVersion` | `sdtm_project_versions` | `(project_code, version_name)` |
-| `SdtmProjectDomain` | `sdtm_project_domains` | `(version_id, domain_code)` |
-| `SdtmProjectDomainOverride` | `sdtm_project_domain_overrides` | one per domain |
-| `SdtmProjectVariable` | `sdtm_project_variables` | `(domain_id, variable_code)` |
-| `SdtmProjectVariableOverride` | `sdtm_project_variable_overrides` | one per variable |
+| `SdtmProjectDomain` | `sdtm_project_domains` | `(sdtm_project_version_id, domain_code)` |
+| `SdtmProjectVariable` | `sdtm_project_variables` | `(sdtm_project_domain_id, variable_code)` |
+
+A project domain and a project variable are **complete copies** of the
+corresponding `domain-model` SDTM domain and variable: a domain carries its
+own `category` and `descriptions`, a variable its own `variable_type`,
+`variable_core`, `variable_role`, `variable_controlled` and `descriptions`.
+There is no override row and no reference-to-the-standard design.
 
 `project_code` is a **soft reference** to `projects.code` in the `project`
 crate. It is validated at the application level through a
@@ -66,9 +70,42 @@ crates' schemas stay independent and either can be migrated first.
 preserved through the JSONB column and out to the wire. Duplicates collapse to
 their first occurrence; nothing is ever re-sorted.
 
+Every code in `key_variables` must name a variable of the **same** domain. A
+code that exists in a sibling domain is still missing here. The usecase
+enforces this on every write: a `key_variables` value naming no variable is
+rejected with `KeyVariableNotFound` (HTTP 400), and renaming or deleting a
+variable a domain names as a key variable is rejected with
+`VariableReferencedByKeyVariables` (HTTP 409) rather than silently rewriting
+the study's key.
+
+Because a brand-new domain has no variables yet, **a domain is created with
+an empty `key_variables`**. The authoring order is *create domain → create
+variables → set `key_variables`*.
+
+### Conversion rules
+
+A variable carries `conversion_rules`: where its value comes from and how it
+is derived.
+
+```json
+{ "source": "CRF", "from": { "form_code": "AE" }, "rule": "AESEV" }
+```
+
+`VariableSource` is adjacently tagged (`source` / `from`) and a
+`ConversionRule` **flattens** its source, so the source's own fields sit
+beside the rule text rather than nesting under a second `source` key. The
+variant spellings are pinned per-variant — `Protocol`, `Derived`, `Assigned`,
+`CRF`, `eDT` — because no blanket `rename_all` produces both `CRF` and
+`eDT`. A unit variant omits `from` entirely; a payload variant carries it
+(as `null` when the form is absent).
+
+`rule` is opaque text: the crate neither parses nor evaluates it. A blank
+`rule` is rejected. `form_code` names a CRF form but is **not** validated
+against the `crf` crate.
+
 ## Database setup
 
-The server does not auto-migrate. To create the five `sdtm_project_*` tables
+The server does not auto-migrate. To create the three `sdtm_project_*` tables
 in the server's database:
 
 ```bash
@@ -114,17 +151,14 @@ silently skips.
 use std::sync::Arc;
 
 use sdtm_project::{
-    ProjectLookupImpl, SdtmProjectDomainOverrideRepoPg, SdtmProjectDomainRepoPg,
-    SdtmProjectServiceImpl, SdtmProjectUsecase, SdtmProjectUsecaseConfig,
-    SdtmProjectVariableOverrideRepoPg, SdtmProjectVariableRepoPg, SdtmProjectVersionRepoPg,
+    ProjectLookupImpl, SdtmProjectDomainRepoPg, SdtmProjectServiceImpl, SdtmProjectUsecase,
+    SdtmProjectUsecaseConfig, SdtmProjectVariableRepoPg, SdtmProjectVersionRepoPg,
 };
 
 let usecase = SdtmProjectUsecase::new(SdtmProjectUsecaseConfig {
     version_repo: SdtmProjectVersionRepoPg::new(pool.clone()),
     domain_repo: SdtmProjectDomainRepoPg::new(pool.clone()),
-    domain_override_repo: SdtmProjectDomainOverrideRepoPg::new(pool.clone()),
-    variable_repo: SdtmProjectVariableRepoPg::new(pool.clone()),
-    variable_override_repo: SdtmProjectVariableOverrideRepoPg::new(pool),
+    variable_repo: SdtmProjectVariableRepoPg::new(pool),
     projects: Arc::new(ProjectLookupImpl::new(project_service)),
 });
 let service = SdtmProjectServiceImpl::new(usecase);
@@ -133,23 +167,6 @@ let service = SdtmProjectServiceImpl::new(usecase);
 `project_service` is an `Arc<dyn apis::project::ProjectService>` — the same
 service the server already builds — so the project-existence check reuses the
 canonical `projects` table.
-
-## Optional overrides
-
-An override is **optional**: a domain or variable that has never been
-overridden is a normal state, not a broken one. So `get_domain_override` and
-`get_variable_override` return `Result<Option<…>, _>` — the repository still
-reports a missing row as `SdtmProject{Domain,Variable}OverrideNotFound`, but
-the usecase turns exactly that variant into `Ok(None)`.
-
-On the wire, `GET …/override` on a domain or variable with no override is
-**200 with `{"override": null}`**, not 404. The response is always an
-envelope with an `override` key — `null` when there is no override, the
-override itself when there is one — so a client reads `body.override`
-without first null-checking the body.
-
-`update_*_override` and `delete_*_override` keep their 404: asking to change
-or remove something that does not exist is still a client error.
 
 ## Conventions
 
