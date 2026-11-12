@@ -1,5 +1,12 @@
 import "@testing-library/jest-dom/vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -301,9 +308,72 @@ describe("InitializeProjectFolderDialog — beforeInit", () => {
 
     await waitFor(() => expect(calls).toBe(1));
   });
+
+  it("ignores Escape while the operation is in flight", async () => {
+    let release: () => void = () => {};
+    const { onClose } = renderDialog({
+      beforeInit: () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    });
+
+    await userEvent.click(await screen.findByRole("combobox"));
+    await userEvent.click(await screen.findByRole("option", { name: "Minimal" }));
+    await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
+    await waitFor(() =>
+      expect(screen.getByTestId("initialize-folder-confirm")).toBeDisabled(),
+    );
+
+    // Focus the dialog itself — the select still holds focus, and
+    // Escape only reaches the dialog from within it.
+    const dialog = screen.getByRole("dialog");
+    dialog.focus();
+    await userEvent.keyboard("{Escape}");
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId("initialize-folder-structure")).toBeInTheDocument();
+
+    release();
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("initialize_project_folder", {
+        structureId: 2,
+        study: "AK001-001",
+        branch: null,
+      }),
+    );
+  });
+
+  it("ignores a backdrop click while the operation is in flight", async () => {
+    let release: () => void = () => {};
+    const { onClose } = renderDialog({
+      beforeInit: () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    });
+
+    await userEvent.click(await screen.findByRole("combobox"));
+    await userEvent.click(await screen.findByRole("option", { name: "Minimal" }));
+    await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
+    await waitFor(() =>
+      expect(screen.getByTestId("initialize-folder-confirm")).toBeDisabled(),
+    );
+
+    // The backdrop is the dialog container's own backdrop.
+    const backdrop = document.querySelector(".MuiBackdrop-root");
+    expect(backdrop).not.toBeNull();
+    fireEvent.click(backdrop!);
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId("initialize-folder-structure")).toBeInTheDocument();
+
+    release();
+  });
 });
 
-describe("InitializeProjectFolderDialog — onInitError", () => {  it("calls onInitError instead of showing the inline error when supplied", async () => {
+describe("InitializeProjectFolderDialog — onInitError", () => {
+  it("calls onInitError instead of showing the inline error when supplied", async () => {
     vi.mocked(invoke).mockImplementation((cmd: string) => {
       if (cmd === "list_structures") return Promise.resolve(TEMPLATES);
       if (cmd === "initialize_project_folder") {

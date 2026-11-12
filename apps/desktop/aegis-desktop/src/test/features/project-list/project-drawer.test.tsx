@@ -65,7 +65,7 @@ afterEach(() => cleanup());
 function renderDrawer(
   mode: "closed" | "create" | "edit",
   code: string | null = null,
-  onFolderInitFailed?: (message: string) => void,
+  onFolderInitFailed: (message: string) => void = vi.fn(),
 ) {
   return renderInRouter(
     <AegisThemeProvider>
@@ -546,6 +546,30 @@ describe("ProjectDrawer — initialize project folder", () => {
     );
   });
 
+  it("does not lose a successful create when the dialog is dismissed mid-operation", async () => {
+    mockCommands({
+      list_users: () => [userFixture],
+      list_structures: () => TEMPLATES,
+      create_project: () => projectFixture,
+      initialize_project_folder: () => ({
+        root: "D:\\studies",
+        created: ["D:\\studies\\ak001"],
+        skipped: [],
+      }),
+    });
+    await renderDrawer("create");
+    await fillCreateForm("newproj");
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await confirmTemplate();
+
+    // The report survives, so the user is told what happened.
+    expect(await screen.findByTestId("initialize-report")).toBeVisible();
+    expect(invoke).toHaveBeenCalledWith(
+      "initialize_project_folder",
+      expect.objectContaining({ study: "newproj" }),
+    );
+  });
+
   it("keeps the report on screen after the drawer closes", async () => {
     mockCommands({
       list_users: () => [userFixture],
@@ -567,6 +591,7 @@ describe("ProjectDrawer — initialize project folder", () => {
             mode={mode}
             code={null}
             onClose={() => setMode("closed")}
+            onFolderInitFailed={vi.fn()}
           />
         </>
       );

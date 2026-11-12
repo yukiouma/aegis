@@ -138,6 +138,11 @@ export function InitializeProjectFolderDialog({
   }
 
   function handleClose() {
+    // An operation in flight must not be dismissed. Escape and a
+    // backdrop click both route here, and the create and the init
+    // both keep running after the dialog goes away — dismissing would
+    // lose the report the user needs to see.
+    if (preparing || initialize.isPending) return;
     setReport(null);
     setStructureId(null);
     initialize.reset();
@@ -216,7 +221,9 @@ export function InitializeProjectFolderDialog({
                 setStructureId(raw === "" ? null : Number(raw));
               }}
               helperText={
-                structureId === null
+                // Not "Select a structure template" when there are
+                // none — that would contradict the message above.
+                structureId === null && structures.data?.length !== 0
                   ? t("scaffold.initialize.required")
                   : undefined
               }

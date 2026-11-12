@@ -43,8 +43,11 @@ export interface ProjectDrawerProps {
   onClose: () => void;
   /** Called when the project was created but its folder could not be
    *  materialized. The drawer closes itself; the page surfaces the
-   *  message, because the drawer is gone by then. */
-  onFolderInitFailed?: (message: string) => void;
+   *  message, because the drawer is gone by then.
+   *
+   *  Required: a folder failure that nobody reports leaves the user
+   *  with a project and no folder, and no way to know. */
+  onFolderInitFailed: (message: string) => void;
 }
 
 /**
@@ -379,7 +382,7 @@ export function ProjectDrawer({
         }}
         onInitError={(error) => {
           setPendingInput(null);
-          onFolderInitFailed?.(
+          onFolderInitFailed(
             t("project.folder.failed", { message: errorMessage(error) }),
           );
         }}
