@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -18,9 +18,10 @@ import { useI18n } from "@aegis/ui/i18n";
 import type { TranslationKey } from "@aegis/ui/i18n";
 
 import { useListTemplateStructures } from "../../templates";
-import { useInitializeProjectFolder } from "../data/project-branches";
-import { errorMessage } from "../../../shared/api/error";
+import { useInitializeProjectFolder } from "../data/project-folder";
+import { errorMessage, toApiError } from "../../../shared/api/error";
 import type {
+  ApiError,
   InitReport,
   ProjectBranchView,
   SkipReason,
@@ -35,17 +36,17 @@ import type {
  * label at runtime.
  */
 const SKIP_REASON_KEYS: Record<SkipReason, TranslationKey> = {
-  alreadyExists: "project.branches.initialize.report.reason.alreadyExists",
+  alreadyExists: "scaffold.initialize.report.reason.alreadyExists",
   unresolvedField:
-    "project.branches.initialize.report.reason.unresolvedField",
+    "scaffold.initialize.report.reason.unresolvedField",
   malformedTemplate:
-    "project.branches.initialize.report.reason.malformedTemplate",
-  invalidName: "project.branches.initialize.report.reason.invalidName",
-  noReference: "project.branches.initialize.report.reason.noReference",
+    "scaffold.initialize.report.reason.malformedTemplate",
+  invalidName: "scaffold.initialize.report.reason.invalidName",
+  noReference: "scaffold.initialize.report.reason.noReference",
   referenceFailed:
-    "project.branches.initialize.report.reason.referenceFailed",
+    "scaffold.initialize.report.reason.referenceFailed",
   migrationFailed:
-    "project.branches.initialize.report.reason.migrationFailed",
+    "scaffold.initialize.report.reason.migrationFailed",
 };
 
 export interface InitializeProjectFolderDialogProps {
@@ -55,6 +56,19 @@ export interface InitializeProjectFolderDialogProps {
   /** The branch the folder is being initialized for, when the dialog
    *  was opened from a branch row. */
   branch?: ProjectBranchView;
+  /**
+   * Awaited after the user confirms a template and before the folder
+   * is materialized. Rejecting aborts the whole operation — nothing
+   * is written to disk — and closes the dialog, so the caller can
+   * show the error where the user can act on it.
+   */
+  beforeInit?: () => Promise<void>;
+  /**
+   * Called when the folder could not be materialized. When omitted,
+   * the dialog keeps itself open and renders the error inline, so
+   * the user can retry.
+   */
+  onInitError?: (error: ApiError) => void;
   onClose: () => void;
   /** Called with the report when the folder has been generated. */
   onInitialized: (report: InitReport) => void;
@@ -73,6 +87,8 @@ export function InitializeProjectFolderDialog({
   open,
   projectCode,
   branch,
+  beforeInit,
+  onInitError,
   onClose,
   onInitialized,
 }: InitializeProjectFolderDialogProps) {
@@ -81,12 +97,28 @@ export function InitializeProjectFolderDialog({
   const initialize = useInitializeProjectFolder();
   const [structureId, setStructureId] = useState<number | null>(null);
   const [report, setReport] = useState<InitReport | null>(null);
+  const [preparing, setPreparing] = useState(false);
+  // A ref, not state: two clicks in the same tick would both read a
+  // stale `preparing`, and `beforeInit` must run exactly once.
+  const confirming = useRef(false);
 
   const selected = structures.data?.find((s) => s.id === structureId);
 
   async function handleConfirm() {
-    if (!selected) return;
+    if (!selected || confirming.current) return;
+    confirming.current = true;
+    setPreparing(true);
     try {
+      if (beforeInit) {
+        try {
+          await beforeInit();
+        } catch {
+          // The caller's own mutation state holds the error. The init
+          // command never runs, so nothing is written to disk.
+          onClose();
+          return;
+        }
+      }
       const result = await initialize.mutateAsync({
         structureId: selected.id,
         study: projectCode,
@@ -94,12 +126,23 @@ export function InitializeProjectFolderDialog({
       });
       setReport(result);
       onInitialized(result);
-    } catch {
-      // The error is rendered inside the dialog, which stays open.
+    } catch (e) {
+      if (onInitError) {
+        onInitError(toApiError(e));
+      }
+      // Otherwise the inline Alert renders initialize.error, as before.
+    } finally {
+      confirming.current = false;
+      setPreparing(false);
     }
   }
 
   function handleClose() {
+    // An operation in flight must not be dismissed. Escape and a
+    // backdrop click both route here, and the create and the init
+    // both keep running after the dialog goes away — dismissing would
+    // lose the report the user needs to see.
+    if (preparing || initialize.isPending) return;
     setReport(null);
     setStructureId(null);
     initialize.reset();
@@ -108,7 +151,7 @@ export function InitializeProjectFolderDialog({
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="lg" fullWidth>
-      <DialogTitle>{t("project.branches.initialize.title")}</DialogTitle>
+      <DialogTitle>{t("scaffold.initialize.title")}</DialogTitle>
       <DialogContent>
         {branch && (
           <Typography variant="body2" color="primary" sx={{ mb: 2 }}>
@@ -123,7 +166,7 @@ export function InitializeProjectFolderDialog({
                 variant="body2"
                 data-testid="initialize-report-created"
               >
-                {t("project.branches.initialize.report.created", {
+                {t("scaffold.initialize.report.created", {
                   count: report.created.length,
                 })}
               </Typography>
@@ -131,7 +174,7 @@ export function InitializeProjectFolderDialog({
                 variant="body2"
                 data-testid="initialize-report-skipped"
               >
-                {t("project.branches.initialize.report.skipped", {
+                {t("scaffold.initialize.report.skipped", {
                   count: report.skipped.length,
                 })}
               </Typography>
@@ -155,22 +198,37 @@ export function InitializeProjectFolderDialog({
           </Stack>
         ) : (
           <>
+            {structures.isError && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                {t("scaffold.initialize.listFailed", {
+                  message: errorMessage(structures.error),
+                })}
+              </Alert>
+            )}
+            {structures.data?.length === 0 && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                {t("scaffold.initialize.noTemplates")}
+              </Alert>
+            )}
             <TextField
               select
               fullWidth
               size="small"
-              label={t("project.branches.initialize.structure")}
+              label={t("scaffold.initialize.structure")}
               value={structureId ?? ""}
               onChange={(e) => {
                 const raw = e.target.value;
                 setStructureId(raw === "" ? null : Number(raw));
               }}
               helperText={
-                structureId === null
-                  ? t("project.branches.initialize.required")
+                // Not "Select a structure template" when there are
+                // none — that would contradict the message above.
+                structureId === null && structures.data?.length !== 0
+                  ? t("scaffold.initialize.required")
                   : undefined
               }
               data-testid="initialize-folder-structure"
+              sx={{ mt: 1 }}
             >
               {(structures.data ?? []).map((s) => (
                 <MenuItem key={s.id} value={s.id}>
@@ -178,9 +236,9 @@ export function InitializeProjectFolderDialog({
                 </MenuItem>
               ))}
             </TextField>
-            {initialize.isError && (
+            {initialize.isError && !onInitError && (
               <Alert severity="error" sx={{ mt: 2 }}>
-                {t("project.branches.initialize.failed", {
+                {t("scaffold.initialize.failed", {
                   message: errorMessage(initialize.error),
                 })}
               </Alert>
@@ -193,12 +251,15 @@ export function InitializeProjectFolderDialog({
           <Button onClick={handleClose}>{t("common.close")}</Button>
         ) : (
           <>
-            <Button onClick={handleClose} disabled={initialize.isPending}>
+            <Button
+              onClick={handleClose}
+              disabled={preparing || initialize.isPending}
+            >
               {t("common.cancel")}
             </Button>
             <Button
               variant="contained"
-              disabled={!selected || initialize.isPending}
+              disabled={!selected || preparing || initialize.isPending}
               onClick={() => void handleConfirm()}
               data-testid="initialize-folder-confirm"
             >

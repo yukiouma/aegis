@@ -24,7 +24,7 @@ import {
   useUpdateProjectBranch,
 } from "../data/project-branches";
 import { BranchNameDialog } from "./BranchNameDialog";
-import { InitializeProjectFolderDialog } from "./InitializeProjectFolderDialog";
+import { InitializeProjectFolderDialog } from "../../scaffold";
 
 export interface ProjectBranchesSectionProps {
   projectCode: string;

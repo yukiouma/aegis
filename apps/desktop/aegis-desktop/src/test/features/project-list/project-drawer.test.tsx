@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useState } from "react";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
@@ -64,16 +65,47 @@ afterEach(() => cleanup());
 function renderDrawer(
   mode: "closed" | "create" | "edit",
   code: string | null = null,
+  onFolderInitFailed: (message: string) => void = vi.fn(),
 ) {
   return renderInRouter(
     <AegisThemeProvider>
       <TestQueryProvider>
         <AegisI18nProvider>
-          <ProjectDrawer mode={mode} code={code} onClose={vi.fn()} />
+          <ProjectDrawer
+            mode={mode}
+            code={code}
+            onClose={vi.fn()}
+            onFolderInitFailed={onFolderInitFailed}
+          />
         </AegisI18nProvider>
       </TestQueryProvider>
     </AegisThemeProvider>,
   );
+}
+
+/** The one template structure the dialog offers. */
+const TEMPLATES = [
+  {
+    id: 2,
+    name: "Minimal",
+    rootpath: "/templates/minimal",
+    level: "template",
+    projectCode: null,
+    templateId: null,
+  },
+];
+
+/** Fill in the two required fields of the create form. */
+async function fillCreateForm(code: string) {
+  await userEvent.type(screen.getByLabelText(/\bcode\b/i), code);
+  await userEvent.type(screen.getByLabelText(/\bdescription\b/i), "New desc");
+}
+
+/** Pick "Minimal" in the template dialog and press Confirm. */
+async function confirmTemplate() {
+  await userEvent.click(await screen.findByRole("combobox"));
+  await userEvent.click(await screen.findByRole("option", { name: "Minimal" }));
+  await userEvent.click(screen.getByRole("button", { name: /confirm/i }));
 }
 
 describe("ProjectDrawer — closed", () => {
@@ -124,6 +156,11 @@ describe("ProjectDrawer — create mode", () => {
 
     await userEvent.type(screen.getByLabelText(/\bcode\b/i), "newproj");
     await userEvent.type(screen.getByLabelText(/\bdescription\b/i), "New desc");
+    // Untick the folder checkbox so this keeps testing the plain
+    // create path.
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /initialize project folder/i }),
+    );
 
     const memberLeadersInput = screen.getByLabelText(/^members\s*—\s*leaders$/i);
     await userEvent.click(memberLeadersInput);
@@ -211,6 +248,10 @@ describe("ProjectDrawer — mutation error", () => {
 
     await userEvent.type(screen.getByLabelText(/\bcode\b/i), "newproj");
     await userEvent.type(screen.getByLabelText(/\bdescription\b/i), "New desc");
+    // Untick the folder checkbox so the create happens on submit.
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /initialize project folder/i }),
+    );
 
     await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
 
@@ -256,6 +297,10 @@ describe("ProjectDrawer — tags", () => {
     const valueInput = screen.getByLabelText(/tag value/i);
     await userEvent.type(keyInput, "Product");
     await userEvent.type(valueInput, "DEMO-007");
+    // Untick the folder checkbox so the create happens on submit.
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /initialize project folder/i }),
+    );
     await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
     await waitFor(() =>
       expect(invoke).toHaveBeenCalledWith(
@@ -325,5 +370,283 @@ describe("ProjectDrawer — tags", () => {
         tags: [{ key: "Product", value: "DEMO-002" }],
       });
     });
+  });
+});
+
+describe("ProjectDrawer — initialize project folder", () => {
+  it("shows the initialize-folder checkbox in create mode, checked by default", async () => {
+    mockCommands({ list_users: () => [userFixture] });
+    await renderDrawer("create");
+    const box = screen.getByRole("checkbox", {
+      name: /initialize project folder/i,
+    });
+    expect(box).toBeInTheDocument();
+    expect(box).toBeChecked();
+  });
+
+  it("does not show the initialize-folder checkbox in edit mode", async () => {
+    mockCommands({
+      list_users: () => [userFixture],
+      get_project_by_code: () => projectFixture,
+    });
+    await renderDrawer("edit", "alpha");
+    expect(
+      screen.queryByRole("checkbox", { name: /initialize project folder/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("opens the template dialog instead of creating when the box is checked", async () => {
+    mockCommands({ list_users: () => [userFixture] });
+    await renderDrawer("create");
+    await fillCreateForm("newproj");
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    expect(
+      await screen.findByRole("heading", { name: /initialize project folder/i }),
+    ).toBeInTheDocument();
+    expect(invoke).not.toHaveBeenCalledWith(
+      "create_project",
+      expect.anything(),
+    );
+  });
+
+  it("creates the project and initializes the folder when the template is confirmed", async () => {
+    mockCommands({
+      list_users: () => [userFixture],
+      list_structures: () => TEMPLATES,
+      create_project: () => projectFixture,
+      initialize_project_folder: () => ({
+        root: "D:\studies",
+        created: [],
+        skipped: [],
+      }),
+    });
+    await renderDrawer("create");
+    await fillCreateForm("AK001-001");
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await confirmTemplate();
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        "create_project",
+        expect.objectContaining({ code: "AK001-001" }),
+      ),
+    );
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("initialize_project_folder", {
+        structureId: 2,
+        study: "AK001-001",
+        branch: null,
+      }),
+    );
+  });
+
+  it("sends the same code to create_project and to the scaffold", async () => {
+    mockCommands({
+      list_users: () => [userFixture],
+      list_structures: () => TEMPLATES,
+      create_project: () => projectFixture,
+      initialize_project_folder: () => ({
+        root: "D:\studies",
+        created: [],
+        skipped: [],
+      }),
+    });
+    await renderDrawer("create");
+    // "AK001" has no "-", so it yields no `trial` — the create must
+    // still go through, and both commands must receive the same string.
+    await fillCreateForm("AK001");
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await confirmTemplate();
+
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        "create_project",
+        expect.objectContaining({ code: "AK001" }),
+      ),
+    );
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith("initialize_project_folder", {
+        structureId: 2,
+        study: "AK001",
+        branch: null,
+      }),
+    );
+  });
+
+  it("creates nothing when the template dialog is cancelled", async () => {
+    mockCommands({
+      list_users: () => [userFixture],
+      list_structures: () => TEMPLATES,
+    });
+    await renderDrawer("create");
+    await fillCreateForm("newproj");
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /cancel/i }));
+    expect(invoke).not.toHaveBeenCalledWith(
+      "create_project",
+      expect.anything(),
+    );
+    expect(invoke).not.toHaveBeenCalledWith(
+      "initialize_project_folder",
+      expect.anything(),
+    );
+  });
+
+  it("keeps the drawer open with the error when create_project fails", async () => {
+    mockCommands({
+      list_users: () => [userFixture],
+      list_structures: () => TEMPLATES,
+      create_project: () => {
+        throw {
+          kind: "http",
+          status: 409,
+          code: "duplicate_code",
+          message: "dup",
+        };
+      },
+    });
+    await renderDrawer("create");
+    await fillCreateForm("newproj");
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await confirmTemplate();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /duplicate_code/i,
+    );
+    expect(invoke).not.toHaveBeenCalledWith(
+      "initialize_project_folder",
+      expect.anything(),
+    );
+  });
+
+  it("reports a folder failure to the page and leaves the project standing", async () => {
+    const onFolderInitFailed = vi.fn();
+    mockCommands({
+      list_users: () => [userFixture],
+      list_structures: () => TEMPLATES,
+      create_project: () => projectFixture,
+      initialize_project_folder: () => {
+        throw { kind: "parse", message: "rootpath is not writable" };
+      },
+    });
+    await renderDrawer("create", null, onFolderInitFailed);
+    await fillCreateForm("newproj");
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await confirmTemplate();
+
+    await waitFor(() =>
+      expect(onFolderInitFailed).toHaveBeenCalledWith(
+        expect.stringMatching(/rootpath is not writable/i),
+      ),
+    );
+    // The project itself was created — only the folder failed.
+    expect(invoke).toHaveBeenCalledWith(
+      "create_project",
+      expect.objectContaining({ code: "newproj" }),
+    );
+  });
+
+  it("does not lose a successful create when the dialog is dismissed mid-operation", async () => {
+    mockCommands({
+      list_users: () => [userFixture],
+      list_structures: () => TEMPLATES,
+      create_project: () => projectFixture,
+      initialize_project_folder: () => ({
+        root: "D:\\studies",
+        created: ["D:\\studies\\ak001"],
+        skipped: [],
+      }),
+    });
+    await renderDrawer("create");
+    await fillCreateForm("newproj");
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await confirmTemplate();
+
+    // The report survives, so the user is told what happened.
+    expect(await screen.findByTestId("initialize-report")).toBeVisible();
+    expect(invoke).toHaveBeenCalledWith(
+      "initialize_project_folder",
+      expect.objectContaining({ study: "newproj" }),
+    );
+  });
+
+  it("keeps the report on screen after the drawer closes", async () => {
+    mockCommands({
+      list_users: () => [userFixture],
+      list_structures: () => TEMPLATES,
+      create_project: () => projectFixture,
+      initialize_project_folder: () => ({
+        root: "D:\\studies",
+        created: ["D:\\studies\\ak001"],
+        skipped: [],
+      }),
+    });
+    // A harness that really closes the drawer, as the projects page does.
+    function Harness() {
+      const [mode, setMode] = useState<"closed" | "create" | "edit">("create");
+      return (
+        <>
+          <span data-testid="mode">{mode}</span>
+          <ProjectDrawer
+            mode={mode}
+            code={null}
+            onClose={() => setMode("closed")}
+            onFolderInitFailed={vi.fn()}
+          />
+        </>
+      );
+    }
+    await renderInRouter(
+      <AegisThemeProvider>
+        <TestQueryProvider>
+          <AegisI18nProvider>
+            <Harness />
+          </AegisI18nProvider>
+        </TestQueryProvider>
+      </AegisThemeProvider>,
+    );
+    await fillCreateForm("AK001-001");
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await confirmTemplate();
+
+    // The drawer closed when the project was created...
+    await waitFor(() =>
+      expect(screen.getByTestId("mode")).toHaveTextContent("closed"),
+    );
+    // ...and the report is still on screen.
+    expect(screen.getByTestId("initialize-report")).toBeVisible();
+    expect(screen.getByRole("button", { name: /^close$/i })).toBeInTheDocument();
+  });
+
+  it("lets the user create without a folder when no templates exist", async () => {
+    mockCommands({
+      list_users: () => [userFixture],
+      list_structures: () => [],
+      create_project: () => projectFixture,
+    });
+    await renderDrawer("create");
+    await fillCreateForm("newproj");
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    // The dialog explains that there is nothing to pick.
+    expect(
+      await screen.findByText(/no structure templates/i),
+    ).toBeInTheDocument();
+    // Cancelling returns to the drawer; unticking the box then creates
+    // the project with no folder at all.
+    await userEvent.click(screen.getByRole("button", { name: /cancel/i }));
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /initialize project folder/i }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        "create_project",
+        expect.objectContaining({ code: "newproj" }),
+      ),
+    );
+    expect(invoke).not.toHaveBeenCalledWith(
+      "initialize_project_folder",
+      expect.anything(),
+    );
   });
 });

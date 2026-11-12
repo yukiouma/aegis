@@ -3,7 +3,6 @@ export { useProjectConfiguration } from "./data/project-configuration";
 export {
   useActiveBranchId,
   useCreateProjectBranch,
-  useInitializeProjectFolder,
   useProjectBranches,
   useSetActiveBranchId,
   useUpdateProjectBranch,
@@ -16,6 +15,12 @@ export {
   ConfigurationSidebar,
   type ConfigurationSection,
 } from "./components/ConfigurationSidebar";
-export { InitializeProjectFolderDialog } from "./components/InitializeProjectFolderDialog";
 export { BranchNameDialog } from "./components/BranchNameDialog";
 export { ProjectBranchesSection } from "./components/ProjectBranchesSection";
+
+// The scaffold feature owns the dialog and its hook; re-exported here
+// so consumers of the project-workspace barrel keep working.
+export {
+  InitializeProjectFolderDialog,
+  useInitializeProjectFolder,
+} from "../scaffold";

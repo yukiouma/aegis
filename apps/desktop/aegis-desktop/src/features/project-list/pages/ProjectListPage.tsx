@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { Box } from "@aegis/ui/mui";
+import { Alert, Box, Snackbar } from "@aegis/ui/mui";
 
 import { useCurrentUser } from "../../auth";
 import { useListProjects } from "../data/projects";
@@ -33,6 +33,9 @@ export function ProjectListPage() {
     mode: "closed",
     code: null,
   });
+  // A folder failure is reported after the drawer has closed, so the
+  // message lives here rather than in the drawer.
+  const [folderError, setFolderError] = useState<string | null>(null);
 
   const filteredRows = useMemo<ProjectView[]>(() => {
     const all = projects.data ?? [];
@@ -91,7 +94,20 @@ export function ProjectListPage() {
         mode={drawer.mode}
         code={drawer.code}
         onClose={() => setDrawer({ mode: "closed", code: null })}
+        onFolderInitFailed={(message) => setFolderError(message)}
       />
+
+      {/* The drawer has closed by the time a folder failure is
+          reported, so the message is raised here. */}
+      <Snackbar
+        open={folderError !== null}
+        autoHideDuration={6000}
+        onClose={() => setFolderError(null)}
+      >
+        <Alert severity="error" onClose={() => setFolderError(null)}>
+          {folderError}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
