@@ -173,8 +173,15 @@ impl SdtmProjectVariableRepository for SdtmProjectVariableRepoPg {
         // A `CASE WHEN` with a bound flag distinguishes the three,
         // because `COALESCE` cannot tell "clear" from "leave alone".
         let controlled_json = match &input.variable_controlled {
+            // Unchanged: the CASE expression never reads this
+            // parameter, so binding NULL here is harmless.
             None => None,
-            Some(c) => {
+            // Clear: bind SQL NULL. The JSON literal `null` would be
+            // stored as a JSONB value, and the row would then fail to
+            // deserialise on the way back.
+            Some(None) => None,
+            // Replace: bind the structure.
+            Some(Some(c)) => {
                 Some(serde_json::to_value(c).map_err(|e| DomainError::Repository(e.to_string()))?)
             }
         };

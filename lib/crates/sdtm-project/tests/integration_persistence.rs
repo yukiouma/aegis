@@ -839,3 +839,149 @@ async fn variable_controlled_round_trips_through_the_repository() {
     })
     .await
 }
+
+#[tokio::test]
+#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
+async fn variable_controlled_can_be_cleared() {
+    with_pool(|pool| async move {
+        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
+        let domains = SdtmProjectDomainRepoPg::new(pool.clone());
+        let variables = SdtmProjectVariableRepoPg::new(pool);
+        let v = versions
+            .create(SdtmProjectVersionNew {
+                project_code: unique("p"),
+                version_name: unique("v"),
+            })
+            .await
+            .unwrap();
+        let d = domains
+            .create(SdtmProjectDomainNew {
+                sdtm_project_version_id: v.id,
+                domain_code: "AE".into(),
+                category: DomainCategory::Events,
+                descriptions: Vec::new(),
+                key_variables: Vec::new(),
+            })
+            .await
+            .unwrap();
+
+        let controlled = SdtmVariableControlled {
+            code: Some(vec!["C66731".to_string()]),
+            format: None,
+        };
+        let var = variables
+            .create(SdtmProjectVariableNew {
+                sdtm_project_domain_id: d.id,
+                variable_code: "AETERM".into(),
+                variable_controlled: Some(controlled),
+                variable_type: SdtmVariableType::Character,
+                variable_core: SdtmVariableCore::Req,
+                variable_role: None,
+                variable_sequence: 11,
+                descriptions: Vec::new(),
+                conversion_rules: Vec::new(),
+            })
+            .await
+            .expect("variable create");
+
+        // Outer Some(None) clears the column to SQL NULL — not to the
+        // JSON literal `null`, which would make the row unreadable.
+        let cleared = variables
+            .update(SdtmProjectVariableUpdate {
+                id: var.id,
+                variable_code: None,
+                variable_controlled: Some(None),
+                variable_type: None,
+                variable_core: None,
+                variable_role: None,
+                variable_sequence: None,
+                descriptions: None,
+                conversion_rules: None,
+            })
+            .await
+            .expect("variable update");
+        assert_eq!(cleared.variable_controlled, None);
+
+        // And the cleared row still reads back cleanly.
+        let by_id = variables.find_by_id(var.id).await.expect("find by id");
+        assert_eq!(by_id.variable_controlled, None);
+    })
+    .await
+}
+
+#[tokio::test]
+#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
+async fn variable_role_can_be_cleared() {
+    with_pool(|pool| async move {
+        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
+        let domains = SdtmProjectDomainRepoPg::new(pool.clone());
+        let variables = SdtmProjectVariableRepoPg::new(pool);
+        let v = versions
+            .create(SdtmProjectVersionNew {
+                project_code: unique("p"),
+                version_name: unique("v"),
+            })
+            .await
+            .unwrap();
+        let d = domains
+            .create(SdtmProjectDomainNew {
+                sdtm_project_version_id: v.id,
+                domain_code: "AE".into(),
+                category: DomainCategory::Events,
+                descriptions: Vec::new(),
+                key_variables: Vec::new(),
+            })
+            .await
+            .unwrap();
+
+        let var = variables
+            .create(SdtmProjectVariableNew {
+                sdtm_project_domain_id: d.id,
+                variable_code: "AETERM".into(),
+                variable_controlled: None,
+                variable_type: SdtmVariableType::Character,
+                variable_core: SdtmVariableCore::Req,
+                variable_role: Some(SdtmRole::Topic),
+                variable_sequence: 11,
+                descriptions: Vec::new(),
+                conversion_rules: Vec::new(),
+            })
+            .await
+            .expect("variable create");
+
+        // Outer Some(None) clears the role to SQL NULL.
+        let cleared = variables
+            .update(SdtmProjectVariableUpdate {
+                id: var.id,
+                variable_code: None,
+                variable_controlled: None,
+                variable_type: None,
+                variable_core: None,
+                variable_role: Some(None),
+                variable_sequence: None,
+                descriptions: None,
+                conversion_rules: None,
+            })
+            .await
+            .expect("variable update");
+        assert_eq!(cleared.variable_role, None);
+
+        // Outer None leaves the role unchanged.
+        let unchanged = variables
+            .update(SdtmProjectVariableUpdate {
+                id: var.id,
+                variable_code: None,
+                variable_controlled: None,
+                variable_type: None,
+                variable_core: None,
+                variable_role: None,
+                variable_sequence: None,
+                descriptions: None,
+                conversion_rules: None,
+            })
+            .await
+            .expect("variable update");
+        assert_eq!(unchanged.variable_role, None);
+    })
+    .await
+}

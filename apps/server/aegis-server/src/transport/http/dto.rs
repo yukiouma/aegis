@@ -3401,6 +3401,39 @@ mod tests {
 
     use super::*;
 
+    /// The three-state `variable_controlled` field distinguishes
+    /// "unchanged" (absent), "clear" (explicit null) and "replace"
+    /// (a value). A plain `Option<Option<T>>` derive collapses the
+    /// first two, which makes the clear state unreachable from a
+    /// client.
+    #[test]
+    fn sdtm_project_variable_update_distinguishes_absent_null_and_value() {
+        let absent: UpdateSdtmProjectVariableRequest = serde_json::from_str("{}").unwrap();
+        assert_eq!(
+            absent.variable_controlled, None,
+            "missing key must mean 'unchanged'"
+        );
+
+        let null: UpdateSdtmProjectVariableRequest =
+            serde_json::from_str(r#"{"variableControlled":null}"#).unwrap();
+        assert_eq!(
+            null.variable_controlled,
+            Some(None),
+            "explicit null must mean 'clear the controlled terminology'"
+        );
+
+        let value: UpdateSdtmProjectVariableRequest =
+            serde_json::from_str(r#"{"variableControlled":{"code":["C66731"]}}"#).unwrap();
+        assert_eq!(
+            value.variable_controlled,
+            Some(Some(SdtmProjectVariableControlled {
+                code: Some(vec!["C66731".to_string()]),
+                format: None,
+            })),
+            "a value must mean 'replace the controlled terminology'"
+        );
+    }
+
     #[test]
     fn login_request_roundtrip() {
         let json = r#"{"code":"u1","password":"p"}"#;
