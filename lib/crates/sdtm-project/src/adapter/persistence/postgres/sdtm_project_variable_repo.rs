@@ -3,10 +3,9 @@
 // compile-time-checked macros would require either a live
 // `DATABASE_URL` at build time or a checked-in `sqlx-data.json`.
 //
-// Every read here LEFT JOINs `sdtm_project_variable_overrides` so the
-// returned variable carries its override in the same round trip. The
-// UPDATE path uses a data-modifying CTE for the same reason: `PUT` and
-// `GET` on a variable must return the same shape.
+// The variable is a complete copy: it carries its own type, core,
+// role, controlled terminology and descriptions, so there is no join
+// and no separate override row to hydrate.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -14,66 +13,59 @@ use serde_json::Value as JsonValue;
 use sqlx::{FromRow, PgPool};
 
 use crate::domain::{
-    DomainError, SdtmProjectVariable, SdtmProjectVariableNew, SdtmProjectVariableRepository,
-    SdtmProjectVariableUpdate, SdtmRole, SdtmVariableCore, SdtmVariableDescription,
-    SdtmVariableType,
+    ConversionRule, DomainError, SdtmProjectVariable, SdtmProjectVariableNew,
+    SdtmProjectVariableRepository, SdtmProjectVariableUpdate, SdtmRole, SdtmVariableControlled,
+    SdtmVariableCore, SdtmVariableDescription, SdtmVariableType,
 };
 
 #[derive(FromRow)]
 struct SdtmProjectVariableRow {
     id: i64,
-    domain_id: i64,
+    sdtm_project_domain_id: i64,
     variable_code: String,
+    variable_controlled: Option<JsonValue>,
+    variable_type: String,
+    variable_core: String,
+    variable_role: Option<String>,
     variable_sequence: i64,
+    descriptions: JsonValue,
+    conversion_rules: JsonValue,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
-    // The override columns come from a LEFT JOIN and are all NULL
-    // when the variable has no override.
-    override_id: Option<i64>,
-    override_variable_type: Option<String>,
-    override_variable_core: Option<String>,
-    override_variable_role: Option<String>,
-    override_descriptions: Option<JsonValue>,
-    override_created_at: Option<DateTime<Utc>>,
-    override_updated_at: Option<DateTime<Utc>>,
 }
 
 impl SdtmProjectVariableRow {
     fn into_variable(self) -> Result<SdtmProjectVariable, DomainError> {
-        let variable_override = match self.override_id {
+        let variable_type = SdtmVariableType::try_from(self.variable_type.as_str())?;
+        let variable_core = SdtmVariableCore::try_from(self.variable_core.as_str())?;
+        let variable_role = match self.variable_role.as_deref() {
             None => None,
-            Some(id) => {
-                let variable_type = SdtmVariableType::try_from(
-                    self.override_variable_type.as_deref().unwrap_or_default(),
-                )?;
-                let variable_core = SdtmVariableCore::try_from(
-                    self.override_variable_core.as_deref().unwrap_or_default(),
-                )?;
-                let variable_role = match self.override_variable_role.as_deref() {
-                    None => None,
-                    Some(s) => Some(SdtmRole::try_from(s)?),
-                };
-                let descriptions: Vec<SdtmVariableDescription> =
-                    serde_json::from_value(self.override_descriptions.unwrap_or(JsonValue::Null))
-                        .map_err(|e| DomainError::Repository(e.to_string()))?;
-                Some(crate::domain::SdtmProjectVariableOverride::for_repository(
-                    id,
-                    self.id,
-                    variable_type,
-                    variable_core,
-                    variable_role,
-                    descriptions,
-                    self.override_created_at.unwrap_or(self.created_at),
-                    self.override_updated_at.unwrap_or(self.updated_at),
-                ))
-            }
+            Some(s) => Some(SdtmRole::try_from(s)?),
         };
+        // A SQL NULL arrives as `None`, so "no controlled terminology"
+        // stays `None` rather than becoming an empty structure.
+        let variable_controlled: Option<SdtmVariableControlled> = match self.variable_controlled {
+            None => None,
+            Some(v) => Some(
+                serde_json::from_value(v).map_err(|e| DomainError::Repository(e.to_string()))?,
+            ),
+        };
+        let descriptions: Vec<SdtmVariableDescription> = serde_json::from_value(self.descriptions)
+            .map_err(|e| DomainError::Repository(e.to_string()))?;
+        let conversion_rules: Vec<ConversionRule> =
+            serde_json::from_value(self.conversion_rules)
+                .map_err(|e| DomainError::Repository(e.to_string()))?;
         Ok(SdtmProjectVariable::for_repository(
             self.id,
-            self.domain_id,
+            self.sdtm_project_domain_id,
             self.variable_code,
+            variable_controlled,
+            variable_type,
+            variable_core,
+            variable_role,
             self.variable_sequence,
-            variable_override,
+            descriptions,
+            conversion_rules,
             self.created_at,
             self.updated_at,
         ))
@@ -97,47 +89,47 @@ impl SdtmProjectVariableRepository for SdtmProjectVariableRepoPg {
         &self,
         input: SdtmProjectVariableNew,
     ) -> Result<SdtmProjectVariable, DomainError> {
+        let controlled_json = match &input.variable_controlled {
+            None => None,
+            Some(c) => {
+                Some(serde_json::to_value(c).map_err(|e| DomainError::Repository(e.to_string()))?)
+            }
+        };
+        let descriptions_json = serde_json::to_value(&input.descriptions)
+            .map_err(|e| DomainError::Repository(e.to_string()))?;
+        let conversion_rules_json = serde_json::to_value(&input.conversion_rules)
+            .map_err(|e| DomainError::Repository(e.to_string()))?;
         let row: SdtmProjectVariableRow = sqlx::query_as::<_, SdtmProjectVariableRow>(
-            "WITH inserted AS (
-                 INSERT INTO sdtm_project_variables (domain_id, variable_code, variable_sequence)
-                 VALUES ($1, $2, $3)
-                 RETURNING id, domain_id, variable_code, variable_sequence, created_at, updated_at
-             )
-             SELECT i.id, i.domain_id, i.variable_code, i.variable_sequence,
-                    i.created_at, i.updated_at,
-                    o.id AS override_id,
-                    o.variable_type AS override_variable_type,
-                    o.variable_core AS override_variable_core,
-                    o.variable_role AS override_variable_role,
-                    o.descriptions AS override_descriptions,
-                    o.created_at AS override_created_at,
-                    o.updated_at AS override_updated_at
-             FROM inserted i
-             LEFT JOIN sdtm_project_variable_overrides o ON o.variable_id = i.id",
+            "INSERT INTO sdtm_project_variables
+                (sdtm_project_domain_id, variable_code, variable_controlled, variable_type,
+                 variable_core, variable_role, variable_sequence, descriptions, conversion_rules)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             RETURNING id, sdtm_project_domain_id, variable_code, variable_controlled,
+                       variable_type, variable_core, variable_role, variable_sequence,
+                       descriptions, conversion_rules, created_at, updated_at",
         )
-        .bind(input.domain_id)
+        .bind(input.sdtm_project_domain_id)
         .bind(&input.variable_code)
+        .bind(controlled_json)
+        .bind(input.variable_type.as_str())
+        .bind(input.variable_core.as_str())
+        .bind(input.variable_role.map(|r| r.as_str()))
         .bind(input.variable_sequence)
+        .bind(descriptions_json)
+        .bind(conversion_rules_json)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| map_variable_err(e, input.domain_id))?;
+        .map_err(|e| map_variable_err(e, input.sdtm_project_domain_id))?;
         row.into_variable()
     }
 
     async fn find_by_id(&self, id: i64) -> Result<SdtmProjectVariable, DomainError> {
         let row: SdtmProjectVariableRow = sqlx::query_as::<_, SdtmProjectVariableRow>(
-            "SELECT v.id, v.domain_id, v.variable_code, v.variable_sequence,
-                    v.created_at, v.updated_at,
-                    o.id AS override_id,
-                    o.variable_type AS override_variable_type,
-                    o.variable_core AS override_variable_core,
-                    o.variable_role AS override_variable_role,
-                    o.descriptions AS override_descriptions,
-                    o.created_at AS override_created_at,
-                    o.updated_at AS override_updated_at
-             FROM sdtm_project_variables v
-             LEFT JOIN sdtm_project_variable_overrides o ON o.variable_id = v.id
-             WHERE v.id = $1",
+            "SELECT id, sdtm_project_domain_id, variable_code, variable_controlled,
+                    variable_type, variable_core, variable_role, variable_sequence,
+                    descriptions, conversion_rules, created_at, updated_at
+             FROM sdtm_project_variables
+             WHERE id = $1",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -151,20 +143,13 @@ impl SdtmProjectVariableRepository for SdtmProjectVariableRepoPg {
         &self,
         domain_id: i64,
     ) -> Result<Vec<SdtmProjectVariable>, DomainError> {
-        let rows = sqlx::query_as::<_, SdtmProjectVariableRow>(
-            "SELECT v.id, v.domain_id, v.variable_code, v.variable_sequence,
-                    v.created_at, v.updated_at,
-                    o.id AS override_id,
-                    o.variable_type AS override_variable_type,
-                    o.variable_core AS override_variable_core,
-                    o.variable_role AS override_variable_role,
-                    o.descriptions AS override_descriptions,
-                    o.created_at AS override_created_at,
-                    o.updated_at AS override_updated_at
-             FROM sdtm_project_variables v
-             LEFT JOIN sdtm_project_variable_overrides o ON o.variable_id = v.id
-             WHERE v.domain_id = $1
-             ORDER BY v.variable_sequence ASC, v.id ASC",
+        let rows: Vec<SdtmProjectVariableRow> = sqlx::query_as::<_, SdtmProjectVariableRow>(
+            "SELECT id, sdtm_project_domain_id, variable_code, variable_controlled,
+                    variable_type, variable_core, variable_role, variable_sequence,
+                    descriptions, conversion_rules, created_at, updated_at
+             FROM sdtm_project_variables
+             WHERE sdtm_project_domain_id = $1
+             ORDER BY variable_sequence ASC, id ASC",
         )
         .bind(domain_id)
         .fetch_all(&self.pool)
@@ -180,29 +165,65 @@ impl SdtmProjectVariableRepository for SdtmProjectVariableRepoPg {
         input: SdtmProjectVariableUpdate,
     ) -> Result<SdtmProjectVariable, DomainError> {
         // COALESCE: a NULL argument leaves the column unchanged.
+        //
+        // For the two nullable columns the three-state semantics are:
+        //   - outer None       -> column unchanged
+        //   - outer Some(None) -> column cleared to NULL
+        //   - outer Some(Some) -> column replaced
+        // A `CASE WHEN` with a bound flag distinguishes the three,
+        // because `COALESCE` cannot tell "clear" from "leave alone".
+        let controlled_json = match &input.variable_controlled {
+            // Unchanged: the CASE expression never reads this
+            // parameter, so binding NULL here is harmless.
+            None => None,
+            // Clear: bind SQL NULL. The JSON literal `null` would be
+            // stored as a JSONB value, and the row would then fail to
+            // deserialise on the way back.
+            Some(None) => None,
+            // Replace: bind the structure.
+            Some(Some(c)) => {
+                Some(serde_json::to_value(c).map_err(|e| DomainError::Repository(e.to_string()))?)
+            }
+        };
+        let descriptions_json = match &input.descriptions {
+            None => None,
+            Some(v) => {
+                Some(serde_json::to_value(v).map_err(|e| DomainError::Repository(e.to_string()))?)
+            }
+        };
+        let conversion_rules_json = match &input.conversion_rules {
+            None => None,
+            Some(v) => {
+                Some(serde_json::to_value(v).map_err(|e| DomainError::Repository(e.to_string()))?)
+            }
+        };
+
         let row: SdtmProjectVariableRow = sqlx::query_as::<_, SdtmProjectVariableRow>(
-            "WITH updated AS (
-                 UPDATE sdtm_project_variables
-                 SET variable_code     = COALESCE($2, variable_code),
-                     variable_sequence = COALESCE($3, variable_sequence)
-                 WHERE id = $1
-                 RETURNING id, domain_id, variable_code, variable_sequence, created_at, updated_at
-             )
-             SELECT u.id, u.domain_id, u.variable_code, u.variable_sequence,
-                    u.created_at, u.updated_at,
-                    o.id AS override_id,
-                    o.variable_type AS override_variable_type,
-                    o.variable_core AS override_variable_core,
-                    o.variable_role AS override_variable_role,
-                    o.descriptions AS override_descriptions,
-                    o.created_at AS override_created_at,
-                    o.updated_at AS override_updated_at
-             FROM updated u
-             LEFT JOIN sdtm_project_variable_overrides o ON o.variable_id = u.id",
+            "UPDATE sdtm_project_variables
+             SET variable_code      = COALESCE($2, variable_code),
+                 variable_sequence  = COALESCE($3, variable_sequence),
+                 variable_type      = COALESCE($4, variable_type),
+                 variable_core      = COALESCE($5, variable_core),
+                 descriptions       = COALESCE($6, descriptions),
+                 conversion_rules   = COALESCE($7, conversion_rules),
+                 variable_role      = CASE WHEN $8 THEN $9::text ELSE variable_role END,
+                 variable_controlled = CASE WHEN $10 THEN $11::jsonb ELSE variable_controlled END
+             WHERE id = $1
+             RETURNING id, sdtm_project_domain_id, variable_code, variable_controlled,
+                       variable_type, variable_core, variable_role, variable_sequence,
+                       descriptions, conversion_rules, created_at, updated_at",
         )
         .bind(input.id)
         .bind(input.variable_code.as_deref())
         .bind(input.variable_sequence)
+        .bind(input.variable_type.map(|t| t.as_str()))
+        .bind(input.variable_core.map(|c| c.as_str()))
+        .bind(descriptions_json)
+        .bind(conversion_rules_json)
+        .bind(input.variable_role.is_some())
+        .bind(input.variable_role.flatten().map(|r| r.as_str()))
+        .bind(input.variable_controlled.is_some())
+        .bind(controlled_json)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| map_variable_err(e, 0))?
@@ -211,7 +232,6 @@ impl SdtmProjectVariableRepository for SdtmProjectVariableRepoPg {
     }
 
     async fn delete(&self, id: i64) -> Result<(), DomainError> {
-        // The FK cascades: deleting a variable removes its override.
         let res = sqlx::query("DELETE FROM sdtm_project_variables WHERE id = $1")
             .bind(id)
             .execute(&self.pool)
@@ -235,8 +255,9 @@ fn map_variable_err(err: sqlx::Error, parent_domain_id: i64) -> DomainError {
     match &err {
         E::Database(db) => {
             if db.code().as_deref() == Some("23505") {
-                // Unique violation on (domain_id, variable_code). The
-                // driver does not surface the natural key.
+                // Unique violation on (sdtm_project_domain_id,
+                // variable_code). The driver does not surface the
+                // natural key.
                 return DomainError::DuplicateSdtmProjectVariable {
                     domain_id: 0,
                     variable_code: "(unknown)".into(),
@@ -262,9 +283,14 @@ mod tests {
         let sql =
             include_str!("../../../../migrations/20261103135414_create_sdtm_project_variables.sql");
         assert!(sql.contains("CREATE TABLE IF NOT EXISTS sdtm_project_variables"));
+        assert!(sql.contains("sdtm_project_domain_id  BIGINT"));
         assert!(sql.contains(
-            "CONSTRAINT sdtm_project_variables_domain_code_unique UNIQUE (domain_id, variable_code)"
+            "CONSTRAINT sdtm_project_variables_domain_code_unique UNIQUE (sdtm_project_domain_id, variable_code)"
         ));
+        assert!(sql.contains("variable_controlled      JSONB"));
+        assert!(sql.contains("conversion_rules         JSONB"));
         assert!(sql.contains("sdtm_project_variables_updated_at"));
+        // The DDL is rewritten in place, never amended.
+        assert!(!sql.contains("ALTER TABLE"));
     }
 }

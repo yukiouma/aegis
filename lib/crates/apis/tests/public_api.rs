@@ -278,17 +278,13 @@ fn auth_service_is_send_sync() {
 // ---- sdtm_project --------------------------------------------------------
 
 use apis::sdtm_project::{
-    CreateSdtmProjectDomainOverrideRequest, CreateSdtmProjectDomainRequest,
-    CreateSdtmProjectVariableOverrideRequest, CreateSdtmProjectVariableRequest,
-    CreateSdtmProjectVersionRequest, DomainCategory, SdtmDomainDescription,
-    SdtmDomainDescriptionDetail, SdtmProjectApiError, SdtmProjectDomainList,
-    SdtmProjectDomainOverrideView, SdtmProjectDomainView, SdtmProjectService,
-    SdtmProjectVariableList, SdtmProjectVariableOverrideView, SdtmProjectVariableView,
-    SdtmProjectVersionList, SdtmProjectVersionView, SdtmRole, SdtmVariableCore,
-    SdtmVariableDescription, SdtmVariableDescriptionDetail, SdtmVariableType,
-    UpdateSdtmProjectDomainOverrideRequest, UpdateSdtmProjectDomainRequest,
-    UpdateSdtmProjectVariableOverrideRequest, UpdateSdtmProjectVariableRequest,
-    UpdateSdtmProjectVersionRequest,
+    ConversionRule, CreateSdtmProjectDomainRequest, CreateSdtmProjectVariableRequest,
+    CreateSdtmProjectVersionRequest, DomainCategory, FromCrf, SdtmDomainDescription,
+    SdtmDomainDescriptionDetail, SdtmProjectApiError, SdtmProjectDomainList, SdtmProjectDomainView,
+    SdtmProjectService, SdtmProjectVariableList, SdtmProjectVariableView, SdtmProjectVersionList,
+    SdtmProjectVersionView, SdtmRole, SdtmVariableCore, SdtmVariableDescription,
+    SdtmVariableDescriptionDetail, SdtmVariableType, UpdateSdtmProjectDomainRequest,
+    UpdateSdtmProjectVariableRequest, UpdateSdtmProjectVersionRequest, VariableSource,
 };
 
 /// Every public type in `apis::sdtm_project` is nameable from the test.
@@ -304,9 +300,7 @@ fn sdtm_project_public_types_are_nameable() {
     fn assert_var_desc_detail(_: SdtmVariableDescriptionDetail) {}
     fn assert_version_view(_: SdtmProjectVersionView) {}
     fn assert_domain_view(_: SdtmProjectDomainView) {}
-    fn assert_domain_override_view(_: SdtmProjectDomainOverrideView) {}
     fn assert_variable_view(_: SdtmProjectVariableView) {}
-    fn assert_variable_override_view(_: SdtmProjectVariableOverrideView) {}
     fn assert_version_list(_: SdtmProjectVersionList) {}
     fn assert_domain_list(_: SdtmProjectDomainList) {}
     fn assert_variable_list(_: SdtmProjectVariableList) {}
@@ -315,12 +309,8 @@ fn sdtm_project_public_types_are_nameable() {
     fn assert_update_version(_: UpdateSdtmProjectVersionRequest) {}
     fn assert_create_domain(_: CreateSdtmProjectDomainRequest) {}
     fn assert_update_domain(_: UpdateSdtmProjectDomainRequest) {}
-    fn assert_create_domain_override(_: CreateSdtmProjectDomainOverrideRequest) {}
-    fn assert_update_domain_override(_: UpdateSdtmProjectDomainOverrideRequest) {}
     fn assert_create_variable(_: CreateSdtmProjectVariableRequest) {}
     fn assert_update_variable(_: UpdateSdtmProjectVariableRequest) {}
-    fn assert_create_variable_override(_: CreateSdtmProjectVariableOverrideRequest) {}
-    fn assert_update_variable_override(_: UpdateSdtmProjectVariableOverrideRequest) {}
 
     assert_category(DomainCategory::Events);
     assert_var_type(SdtmVariableType::Character);
@@ -357,37 +347,28 @@ fn sdtm_project_public_types_are_nameable() {
     });
     assert_domain_view(SdtmProjectDomainView {
         id: 2,
-        version_id: 1,
+        sdtm_project_version_id: 1,
         domain_code: "AE".into(),
-        key_variables: vec!["AETERM".into()],
-        domain_override: None,
-        created_at: ts,
-        updated_at: ts,
-    });
-    assert_domain_override_view(SdtmProjectDomainOverrideView {
-        id: 3,
-        domain_id: 2,
         category: DomainCategory::Events,
         descriptions: Vec::new(),
+        key_variables: vec!["AETERM".into()],
         created_at: ts,
         updated_at: ts,
     });
     assert_variable_view(SdtmProjectVariableView {
         id: 4,
-        domain_id: 2,
+        sdtm_project_domain_id: 2,
         variable_code: "AETERM".into(),
-        variable_sequence: 11,
-        variable_override: None,
-        created_at: ts,
-        updated_at: ts,
-    });
-    assert_variable_override_view(SdtmProjectVariableOverrideView {
-        id: 5,
-        variable_id: 4,
+        variable_controlled: None,
         variable_type: SdtmVariableType::Character,
         variable_core: SdtmVariableCore::Req,
         variable_role: Some(SdtmRole::Topic),
+        variable_sequence: 11,
         descriptions: Vec::new(),
+        conversion_rules: vec![ConversionRule {
+            source: VariableSource::Protocol,
+            rule: "AESEV".into(),
+        }],
         created_at: ts,
         updated_at: ts,
     });
@@ -410,48 +391,40 @@ fn sdtm_project_public_types_are_nameable() {
         version_name: None,
     });
     assert_create_domain(CreateSdtmProjectDomainRequest {
-        version_id: 1,
+        sdtm_project_version_id: 1,
         domain_code: "AE".into(),
+        category: DomainCategory::Events,
+        descriptions: Vec::new(),
         key_variables: vec!["AETERM".into()],
     });
     assert_update_domain(UpdateSdtmProjectDomainRequest {
         id: 1,
         domain_code: None,
-        key_variables: None,
-    });
-    assert_create_domain_override(CreateSdtmProjectDomainOverrideRequest {
-        domain_id: 1,
-        category: DomainCategory::Events,
-        descriptions: Vec::new(),
-    });
-    assert_update_domain_override(UpdateSdtmProjectDomainOverrideRequest {
-        domain_id: 1,
         category: None,
         descriptions: None,
+        key_variables: None,
     });
     assert_create_variable(CreateSdtmProjectVariableRequest {
-        domain_id: 1,
+        sdtm_project_domain_id: 1,
         variable_code: "AETERM".into(),
+        variable_controlled: None,
+        variable_type: SdtmVariableType::Character,
+        variable_core: SdtmVariableCore::Req,
+        variable_role: None,
         variable_sequence: 11,
+        descriptions: Vec::new(),
+        conversion_rules: Vec::new(),
     });
     assert_update_variable(UpdateSdtmProjectVariableRequest {
         id: 1,
         variable_code: None,
-        variable_sequence: None,
-    });
-    assert_create_variable_override(CreateSdtmProjectVariableOverrideRequest {
-        variable_id: 1,
-        variable_type: SdtmVariableType::Character,
-        variable_core: SdtmVariableCore::Req,
-        variable_role: Some(SdtmRole::Topic),
-        descriptions: Vec::new(),
-    });
-    assert_update_variable_override(UpdateSdtmProjectVariableOverrideRequest {
-        variable_id: 1,
+        variable_controlled: None,
         variable_type: None,
         variable_core: None,
         variable_role: None,
+        variable_sequence: None,
         descriptions: None,
+        conversion_rules: None,
     });
 
     // Touch the error type to keep it from being dead-code-eliminated
@@ -475,6 +448,83 @@ fn sdtm_project_service_is_send_sync() {
     assert_send_sync::<Box<dyn SdtmProjectService>>();
 }
 
+/// The new value types are nameable and constructible from the test.
+#[test]
+fn sdtm_project_value_types_are_nameable() {
+    fn assert_source(_: VariableSource) {}
+    fn assert_from_crf(_: FromCrf) {}
+    fn assert_rule(_: ConversionRule) {}
+    fn assert_controlled(_: apis::sdtm_project::SdtmVariableControlled) {}
+
+    assert_source(VariableSource::Protocol);
+    assert_source(VariableSource::Derived);
+    assert_source(VariableSource::Edt);
+    assert_source(VariableSource::Assigned(None));
+    assert_source(VariableSource::Crf(Some(FromCrf {
+        form_code: "AE".into(),
+    })));
+    assert_from_crf(FromCrf {
+        form_code: "AE".into(),
+    });
+    assert_rule(ConversionRule {
+        source: VariableSource::Protocol,
+        rule: "AESEV = AESEV".into(),
+    });
+    assert_controlled(apis::sdtm_project::SdtmVariableControlled {
+        code: Some(vec!["C66731".into()]),
+        format: None,
+    });
+}
+
+/// The wire spelling of `VariableSource` is pinned: unit variants omit
+/// the `from` key entirely, payload variants carry it (as `null` when
+/// the form is absent). A flat `Option<FromCrf>` field cannot express
+/// both, which is why the enum is adjacently tagged.
+#[test]
+fn variable_source_serializes_to_the_agreed_json() {
+    let cases: Vec<(VariableSource, &str)> = vec![
+        (VariableSource::Protocol, r#"{"source":"Protocol"}"#),
+        (VariableSource::Derived, r#"{"source":"Derived"}"#),
+        (VariableSource::Edt, r#"{"source":"eDT"}"#),
+        (
+            VariableSource::Crf(Some(FromCrf {
+                form_code: "AE".into(),
+            })),
+            r#"{"source":"CRF","from":{"form_code":"AE"}}"#,
+        ),
+        (
+            VariableSource::Assigned(None),
+            r#"{"source":"Assigned","from":null}"#,
+        ),
+    ];
+    for (source, expected) in cases {
+        assert_eq!(
+            serde_json::to_string(&source).unwrap(),
+            expected,
+            "unexpected JSON for {source:?}",
+        );
+    }
+}
+
+/// A conversion rule is the source's own fields plus the rule text,
+/// side by side — not the source nested under a second `source` key.
+#[test]
+fn conversion_rule_serializes_the_source_flat() {
+    let rule = ConversionRule {
+        source: VariableSource::Crf(Some(FromCrf {
+            form_code: "AE".into(),
+        })),
+        rule: "AESEV".into(),
+    };
+    let json = serde_json::to_string(&rule).unwrap();
+    assert_eq!(
+        json,
+        r#"{"source":"CRF","from":{"form_code":"AE"},"rule":"AESEV"}"#
+    );
+    let back: ConversionRule = serde_json::from_str(&json).unwrap();
+    assert_eq!(back, rule);
+}
+
 // ---- domain_model --------------------------------------------------------
 
 use apis::domain_model::{
@@ -484,12 +534,12 @@ use apis::domain_model::{
 /// Every public type in `apis::domain_model` is nameable from the test.
 #[test]
 fn domain_model_public_types_are_nameable() {
-    fn assert_controlled(_: SdtmVariableControlled) {}
+    fn assert_controlled(_: apis::sdtm_project::SdtmVariableControlled) {}
     fn assert_view(_: SdtmVariableView) {}
     fn assert_create(_: CreateSdtmVariableRequest) {}
     fn assert_update(_: UpdateSdtmVariableRequest) {}
 
-    assert_controlled(SdtmVariableControlled {
+    assert_controlled(apis::sdtm_project::SdtmVariableControlled {
         code: Some(vec!["C66731".into()]),
         format: None,
     });

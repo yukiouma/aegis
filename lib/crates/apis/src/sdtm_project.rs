@@ -83,6 +83,63 @@ pub enum SdtmRole {
     Rule,
 }
 
+/// Where a project variable's value comes from.
+///
+/// Adjacently tagged: the unit variants are flat strings, the two
+/// payload variants carry an optional `from` object. The variant
+/// spellings are pinned per-variant — no blanket `rename_all` can
+/// produce both `CRF` and `eDT`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "source", content = "from")]
+pub enum VariableSource {
+    #[serde(rename = "Protocol")]
+    Protocol,
+    #[serde(rename = "Derived")]
+    Derived,
+    #[serde(rename = "Assigned")]
+    Assigned(Option<FromCrf>),
+    #[serde(rename = "CRF")]
+    Crf(Option<FromCrf>),
+    #[serde(rename = "eDT")]
+    Edt,
+}
+
+/// The CRF form a source draws from.
+///
+/// `form_code` is the code field of the CRF form. It is **not**
+/// validated against the `crf` crate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FromCrf {
+    pub form_code: String,
+}
+
+/// One rule that turns a source into a variable's value.
+///
+/// `rule` is opaque text: this crate neither parses nor evaluates it.
+///
+/// The source is **flattened** into the rule, so a rule serialises as
+/// `{"source": "CRF", "from": {…}, "rule": "…"}` — the source's own
+/// fields sit beside the rule text. Without the flatten the source
+/// would nest under a second `source` key.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConversionRule {
+    #[serde(flatten)]
+    pub source: VariableSource,
+    pub rule: String,
+}
+
+/// Controlled-terminology metadata attached to an SDTM variable.
+///
+/// Both lists are optional and are omitted from the JSON when unset,
+/// so the stored shape is e.g. `{"code": ["C66731"]}`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SdtmVariableControlled {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<Vec<String>>,
+}
+
 /// Error surface returned by every [`SdtmProjectService`] method.
 ///
 /// Adapters translate backend-specific errors (e.g.
@@ -105,12 +162,8 @@ pub enum SdtmProjectApiError {
     SdtmProjectVersionNotFound(i64),
     #[error("sdtm project domain not found: {0}")]
     SdtmProjectDomainNotFound(i64),
-    #[error("sdtm project domain override not found: {0}")]
-    SdtmProjectDomainOverrideNotFound(i64),
     #[error("sdtm project variable not found: {0}")]
     SdtmProjectVariableNotFound(i64),
-    #[error("sdtm project variable override not found: {0}")]
-    SdtmProjectVariableOverrideNotFound(i64),
 
     #[error("sdtm project version already exists: {project_code} / {version_name}")]
     DuplicateSdtmProjectVersion {
@@ -122,15 +175,11 @@ pub enum SdtmProjectApiError {
         version_id: i64,
         domain_code: String,
     },
-    #[error("sdtm project domain override already exists: domain {domain_id}")]
-    DuplicateSdtmProjectDomainOverride { domain_id: i64 },
     #[error("sdtm project variable already exists: domain {domain_id} / {variable_code}")]
     DuplicateSdtmProjectVariable {
         domain_id: i64,
         variable_code: String,
     },
-    #[error("sdtm project variable override already exists: variable {variable_id}")]
-    DuplicateSdtmProjectVariableOverride { variable_id: i64 },
 
     #[error("referenced sdtm project version not found: {0}")]
     FkSdtmProjectVersionNotFound(i64),
@@ -139,6 +188,12 @@ pub enum SdtmProjectApiError {
     #[error("referenced sdtm project variable not found: {0}")]
     FkSdtmProjectVariableNotFound(i64),
 
+    #[error("key variable not found in domain: {variable_code}")]
+    KeyVariableNotFound { variable_code: String },
+
+    #[error("variable referenced by key variables: {variable_code}")]
+    VariableReferencedByKeyVariables { variable_code: String },
+
     #[error("repository error: {0}")]
     Repository(String),
 }
@@ -146,8 +201,8 @@ pub enum SdtmProjectApiError {
 // ---- description DTOs ----
 
 /// Localised description of a domain. Carried on
-/// [`SdtmProjectDomainOverrideView`] and round-trips through the
-/// backend as a single JSONB blob.
+/// [`SdtmProjectDomainView`] and round-trips through the backend as a
+/// single JSONB blob.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SdtmDomainDescription {
     pub lang: String,
@@ -161,8 +216,8 @@ pub struct SdtmDomainDescriptionDetail {
 }
 
 /// Localised description of a variable. Carried on
-/// [`SdtmProjectVariableOverrideView`] and round-trips through the
-/// backend as a single JSONB blob.
+/// [`SdtmProjectVariableView`] and round-trips through the backend as a
+/// single JSONB blob.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SdtmVariableDescription {
     pub lang: String,
@@ -187,52 +242,32 @@ pub struct SdtmProjectVersionView {
     pub updated_at: DateTime<Utc>,
 }
 
-/// Safe projection of an `SdtmProjectDomain` aggregate. The nested
-/// `domain_override` carries the domain's one override, when it has one.
+/// Safe projection of an `SdtmProjectDomain` aggregate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SdtmProjectDomainView {
     pub id: i64,
-    pub version_id: i64,
+    pub sdtm_project_version_id: i64,
     pub domain_code: String,
-    pub key_variables: Vec<String>,
-    pub domain_override: Option<SdtmProjectDomainOverrideView>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-/// Safe projection of an `SdtmProjectDomainOverride` aggregate.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SdtmProjectDomainOverrideView {
-    pub id: i64,
-    pub domain_id: i64,
     pub category: DomainCategory,
     pub descriptions: Vec<SdtmDomainDescription>,
+    pub key_variables: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-/// Safe projection of an `SdtmProjectVariable` aggregate. The nested
-/// `variable_override` carries the variable's one override, when it has one.
+/// Safe projection of an `SdtmProjectVariable` aggregate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SdtmProjectVariableView {
     pub id: i64,
-    pub domain_id: i64,
+    pub sdtm_project_domain_id: i64,
     pub variable_code: String,
-    pub variable_sequence: i64,
-    pub variable_override: Option<SdtmProjectVariableOverrideView>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-/// Safe projection of an `SdtmProjectVariableOverride` aggregate.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SdtmProjectVariableOverrideView {
-    pub id: i64,
-    pub variable_id: i64,
+    pub variable_controlled: Option<SdtmVariableControlled>,
     pub variable_type: SdtmVariableType,
     pub variable_core: SdtmVariableCore,
     pub variable_role: Option<SdtmRole>,
+    pub variable_sequence: i64,
     pub descriptions: Vec<SdtmVariableDescription>,
+    pub conversion_rules: Vec<ConversionRule>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -280,8 +315,10 @@ pub struct UpdateSdtmProjectVersionRequest {
 /// Input DTO for [`SdtmProjectService::create_domain`].
 #[derive(Debug, Clone)]
 pub struct CreateSdtmProjectDomainRequest {
-    pub version_id: i64,
+    pub sdtm_project_version_id: i64,
     pub domain_code: String,
+    pub category: DomainCategory,
+    pub descriptions: Vec<SdtmDomainDescription>,
     pub key_variables: Vec<String>,
 }
 
@@ -291,63 +328,41 @@ pub struct CreateSdtmProjectDomainRequest {
 pub struct UpdateSdtmProjectDomainRequest {
     pub id: i64,
     pub domain_code: Option<String>,
-    pub key_variables: Option<Vec<String>>,
-}
-
-/// Input DTO for [`SdtmProjectService::create_domain_override`].
-#[derive(Debug, Clone)]
-pub struct CreateSdtmProjectDomainOverrideRequest {
-    pub domain_id: i64,
-    pub category: DomainCategory,
-    pub descriptions: Vec<SdtmDomainDescription>,
-}
-
-/// Input DTO for [`SdtmProjectService::update_domain_override`]. Keyed
-/// on the parent `domain_id` — a 1:1 sub-resource's natural key.
-#[derive(Debug, Default, Clone)]
-pub struct UpdateSdtmProjectDomainOverrideRequest {
-    pub domain_id: i64,
     pub category: Option<DomainCategory>,
     pub descriptions: Option<Vec<SdtmDomainDescription>>,
+    pub key_variables: Option<Vec<String>>,
 }
 
 /// Input DTO for [`SdtmProjectService::create_variable`].
 #[derive(Debug, Clone)]
 pub struct CreateSdtmProjectVariableRequest {
-    pub domain_id: i64,
+    pub sdtm_project_domain_id: i64,
     pub variable_code: String,
+    pub variable_controlled: Option<SdtmVariableControlled>,
+    pub variable_type: SdtmVariableType,
+    pub variable_core: SdtmVariableCore,
+    pub variable_role: Option<SdtmRole>,
     pub variable_sequence: i64,
+    pub descriptions: Vec<SdtmVariableDescription>,
+    pub conversion_rules: Vec<ConversionRule>,
 }
 
 /// Input DTO for [`SdtmProjectService::update_variable`].
+///
+/// `variable_controlled` and `variable_role` use `Option<Option<T>>` so
+/// the caller can distinguish "don't change" (outer `None`) from
+/// "clear the field" (outer `Some(None)`).
 #[derive(Debug, Default, Clone)]
 pub struct UpdateSdtmProjectVariableRequest {
     pub id: i64,
     pub variable_code: Option<String>,
-    pub variable_sequence: Option<i64>,
-}
-
-/// Input DTO for [`SdtmProjectService::create_variable_override`].
-#[derive(Debug, Clone)]
-pub struct CreateSdtmProjectVariableOverrideRequest {
-    pub variable_id: i64,
-    pub variable_type: SdtmVariableType,
-    pub variable_core: SdtmVariableCore,
-    pub variable_role: Option<SdtmRole>,
-    pub descriptions: Vec<SdtmVariableDescription>,
-}
-
-/// Input DTO for [`SdtmProjectService::update_variable_override`].
-/// `variable_role` uses `Option<Option<SdtmRole>>` so the caller can
-/// distinguish "don't change" (outer `None`) from "clear the field"
-/// (outer `Some(None)`).
-#[derive(Debug, Default, Clone)]
-pub struct UpdateSdtmProjectVariableOverrideRequest {
-    pub variable_id: i64,
+    pub variable_controlled: Option<Option<SdtmVariableControlled>>,
     pub variable_type: Option<SdtmVariableType>,
     pub variable_core: Option<SdtmVariableCore>,
     pub variable_role: Option<Option<SdtmRole>>,
+    pub variable_sequence: Option<i64>,
     pub descriptions: Option<Vec<SdtmVariableDescription>>,
+    pub conversion_rules: Option<Vec<ConversionRule>>,
 }
 
 /// Outbound port for the per-project SDTM model tree.
@@ -396,8 +411,7 @@ pub trait SdtmProjectService: Send + Sync {
     ) -> Result<SdtmProjectVersionView, SdtmProjectApiError>;
 
     /// Hard delete the version identified by `id`. Cascades to its
-    /// domains, overrides, variables and variable overrides at the
-    /// backend.
+    /// domains and their variables at the backend.
     async fn delete_version(&self, id: i64) -> Result<(), SdtmProjectApiError>;
 
     // ---- SdtmProjectDomain ----
@@ -432,38 +446,8 @@ pub trait SdtmProjectService: Send + Sync {
     ) -> Result<SdtmProjectDomainView, SdtmProjectApiError>;
 
     /// Hard delete the domain identified by `id`. Cascades to its
-    /// override and its variables at the backend.
+    /// variables at the backend.
     async fn delete_domain(&self, id: i64) -> Result<(), SdtmProjectApiError>;
-
-    // ---- SdtmProjectDomainOverride ----
-
-    /// Create the domain's one override. Returns
-    /// `DuplicateSdtmProjectDomainOverride { .. }` if the domain
-    /// already holds one.
-    async fn create_domain_override(
-        &self,
-        req: CreateSdtmProjectDomainOverrideRequest,
-    ) -> Result<SdtmProjectDomainOverrideView, SdtmProjectApiError>;
-
-    /// Fetch the domain's override.
-    ///
-    /// The override is **optional**: a domain without one is a normal
-    /// state, not a failure, so a missing override is `None` rather
-    /// than an error.
-    async fn get_domain_override(
-        &self,
-        domain_id: i64,
-    ) -> Result<Option<SdtmProjectDomainOverrideView>, SdtmProjectApiError>;
-
-    /// Apply the optional fields on `req` to the override of the
-    /// domain identified by `req.domain_id`.
-    async fn update_domain_override(
-        &self,
-        req: UpdateSdtmProjectDomainOverrideRequest,
-    ) -> Result<SdtmProjectDomainOverrideView, SdtmProjectApiError>;
-
-    /// Delete the domain's override.
-    async fn delete_domain_override(&self, domain_id: i64) -> Result<(), SdtmProjectApiError>;
 
     // ---- SdtmProjectVariable ----
 
@@ -499,34 +483,4 @@ pub trait SdtmProjectService: Send + Sync {
 
     /// Hard delete the variable identified by `id`.
     async fn delete_variable(&self, id: i64) -> Result<(), SdtmProjectApiError>;
-
-    // ---- SdtmProjectVariableOverride ----
-
-    /// Create the variable's one override. Returns
-    /// `DuplicateSdtmProjectVariableOverride { .. }` if the variable
-    /// already holds one.
-    async fn create_variable_override(
-        &self,
-        req: CreateSdtmProjectVariableOverrideRequest,
-    ) -> Result<SdtmProjectVariableOverrideView, SdtmProjectApiError>;
-
-    /// Fetch the variable's override.
-    ///
-    /// The override is **optional**: a variable without one is a
-    /// normal state, not a failure, so a missing override is `None`
-    /// rather than an error.
-    async fn get_variable_override(
-        &self,
-        variable_id: i64,
-    ) -> Result<Option<SdtmProjectVariableOverrideView>, SdtmProjectApiError>;
-
-    /// Apply the optional fields on `req` to the override of the
-    /// variable identified by `req.variable_id`.
-    async fn update_variable_override(
-        &self,
-        req: UpdateSdtmProjectVariableOverrideRequest,
-    ) -> Result<SdtmProjectVariableOverrideView, SdtmProjectApiError>;
-
-    /// Delete the variable's override.
-    async fn delete_variable_override(&self, variable_id: i64) -> Result<(), SdtmProjectApiError>;
 }

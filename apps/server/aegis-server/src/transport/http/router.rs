@@ -584,6 +584,64 @@ mod tests {
         );
     }
 
+    /// The sdtm-project namespace advertises the standalone model: the
+    /// domain and variable schemas carry the metadata the aggregates
+    /// now hold.
+    #[tokio::test]
+    async fn openapi_json_advertises_the_standalone_sdtm_project_model() {
+        let app = router(test_state());
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api-docs/openapi.json")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), AxStatus::OK);
+        let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+            .await
+            .unwrap();
+        let doc: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+        let schemas = &doc["components"]["schemas"];
+        for (schema, fields) in [
+            (
+                "SdtmProjectDomainViewResponse",
+                &[
+                    "sdtmProjectVersionId",
+                    "domainCode",
+                    "category",
+                    "descriptions",
+                    "keyVariables",
+                ][..],
+            ),
+            (
+                "SdtmProjectVariableViewResponse",
+                &[
+                    "sdtmProjectDomainId",
+                    "variableCode",
+                    "variableControlled",
+                    "variableType",
+                    "variableCore",
+                    "variableRole",
+                    "variableSequence",
+                    "descriptions",
+                    "conversionRules",
+                ][..],
+            ),
+        ] {
+            let properties = &schemas[schema]["properties"];
+            for field in fields {
+                assert!(
+                    properties.get(*field).is_some(),
+                    "{schema} must carry `{field}`: {properties}",
+                );
+            }
+        }
+    }
+
     /// The `/api/sdtm-project` namespace must advertise every route
     /// with the BearerAuth requirement. No route advertises a 403:
     /// the namespace has no role gate, so a 403 can never be produced.
@@ -621,22 +679,11 @@ mod tests {
             ("get", "/api/sdtm-project/versions/{version_id}/domains"),
             ("put", "/api/sdtm-project/domains/{id}"),
             ("delete", "/api/sdtm-project/domains/{id}"),
-            ("post", "/api/sdtm-project/domains/{domain_id}/override"),
-            ("get", "/api/sdtm-project/domains/{domain_id}/override"),
-            ("put", "/api/sdtm-project/domains/{domain_id}/override"),
-            ("delete", "/api/sdtm-project/domains/{domain_id}/override"),
             ("post", "/api/sdtm-project/variables"),
             ("get", "/api/sdtm-project/variables/{id}"),
             ("get", "/api/sdtm-project/domains/{domain_id}/variables"),
             ("put", "/api/sdtm-project/variables/{id}"),
             ("delete", "/api/sdtm-project/variables/{id}"),
-            ("post", "/api/sdtm-project/variables/{variable_id}/override"),
-            ("get", "/api/sdtm-project/variables/{variable_id}/override"),
-            ("put", "/api/sdtm-project/variables/{variable_id}/override"),
-            (
-                "delete",
-                "/api/sdtm-project/variables/{variable_id}/override",
-            ),
         ] {
             let op = &doc["paths"][path][method];
             assert!(op.is_object(), "missing {method} {path} in openapi");
@@ -657,34 +704,32 @@ mod tests {
             );
         }
 
-        // The two `GET …/override` routes answer with an envelope
-        // carrying an `override` key, not a bare nullable override.
-        // The OpenAPI document must say so, or a generated client
-        // would read `null` where the server sends an object.
-        for (path, schema) in [
-            (
-                "/api/sdtm-project/domains/{domain_id}/override",
-                "SdtmProjectDomainOverrideResponse",
-            ),
-            (
-                "/api/sdtm-project/variables/{variable_id}/override",
-                "SdtmProjectVariableOverrideResponse",
-            ),
+        // A variable a domain names as a key variable conflicts with a
+        // rename or a delete. The document must say so, or a generated
+        // client reads the operation as conflict-free.
+        for (method, path) in [
+            ("put", "/api/sdtm-project/variables/{id}"),
+            ("delete", "/api/sdtm-project/variables/{id}"),
         ] {
-            let op = &doc["paths"][path]["get"];
-            let schema_ref =
-                op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
-                    .as_str()
-                    .unwrap_or_else(|| panic!("{path} GET has no $ref response schema"));
-            assert_eq!(
-                schema_ref,
-                format!("#/components/schemas/{schema}"),
-                "{path} GET must answer with the {schema} envelope",
-            );
-            let properties = &doc["components"]["schemas"][schema]["properties"];
+            let keys: Vec<&str> = doc["paths"][path][method]["responses"]
+                .as_object()
+                .expect("responses object")
+                .keys()
+                .map(|s| s.as_str())
+                .collect();
             assert!(
-                properties.get("override").is_some(),
-                "{schema} must carry an `override` property: {properties}",
+                keys.contains(&"409"),
+                "{method} {path} must advertise a 409 (got {keys:?})",
+            );
+        }
+
+        // The override sub-resource is gone: no route under
+        // /api/sdtm-project mentions `/override` any more. A domain
+        // and a variable carry their own metadata now.
+        for path in doc["paths"].as_object().expect("paths object").keys() {
+            assert!(
+                !path.contains("/override"),
+                "override route still advertised: {path}",
             );
         }
     }

@@ -25,6 +25,8 @@ pub enum DomainError {
     InvalidVariableCore(String),
     #[error("invalid variable role: {0}")]
     InvalidVariableRole(String),
+    #[error("empty conversion rule")]
+    EmptyConversionRule,
 
     // ---- existence / FK / duplicate (runtime) ----
     #[error("project not found: {0}")]
@@ -33,12 +35,14 @@ pub enum DomainError {
     SdtmProjectVersionNotFound(i64),
     #[error("sdtm project domain not found: {0}")]
     SdtmProjectDomainNotFound(i64),
-    #[error("sdtm project domain override not found: {0}")]
-    SdtmProjectDomainOverrideNotFound(i64),
     #[error("sdtm project variable not found: {0}")]
     SdtmProjectVariableNotFound(i64),
-    #[error("sdtm project variable override not found: {0}")]
-    SdtmProjectVariableOverrideNotFound(i64),
+
+    #[error("key variable not found in domain: {variable_code}")]
+    KeyVariableNotFound { variable_code: String },
+
+    #[error("variable is referenced by key variables: {variable_code}")]
+    VariableReferencedByKeyVariables { variable_code: String },
 
     #[error("sdtm project version already exists: {project_code} / {version_name}")]
     DuplicateSdtmProjectVersion {
@@ -50,15 +54,11 @@ pub enum DomainError {
         version_id: i64,
         domain_code: String,
     },
-    #[error("sdtm project domain override already exists: domain {domain_id}")]
-    DuplicateSdtmProjectDomainOverride { domain_id: i64 },
     #[error("sdtm project variable already exists: domain {domain_id} / {variable_code}")]
     DuplicateSdtmProjectVariable {
         domain_id: i64,
         variable_code: String,
     },
-    #[error("sdtm project variable override already exists: variable {variable_id}")]
-    DuplicateSdtmProjectVariableOverride { variable_id: i64 },
 
     #[error("referenced sdtm project version not found: {0}")]
     FkSdtmProjectVersionNotFound(i64),

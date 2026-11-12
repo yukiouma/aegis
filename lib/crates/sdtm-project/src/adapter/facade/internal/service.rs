@@ -1,8 +1,8 @@
 //! `SdtmProjectService` adapter over the repository ports.
 //!
-//! Hosts `SdtmProjectServiceImpl<V, D, DO, Va, VO, P>` — the
-//! implementation of `apis::sdtm_project::SdtmProjectService` that
-//! adapts `sdtm_project::SdtmProjectUsecase` to the API contract.
+//! Hosts `SdtmProjectServiceImpl<V, D, Va, P>` — the implementation of
+//! `apis::sdtm_project::SdtmProjectService` that adapts
+//! `sdtm_project::SdtmProjectUsecase` to the API contract.
 //! Translation between `apis::sdtm_project::*` and
 //! `sdtm_project::usecase::*` happens inline in each trait method.
 
@@ -11,73 +11,63 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use apis::sdtm_project::{
-    CreateSdtmProjectDomainOverrideRequest, CreateSdtmProjectDomainRequest,
-    CreateSdtmProjectVariableOverrideRequest, CreateSdtmProjectVariableRequest,
-    CreateSdtmProjectVersionRequest, DomainCategory as ApiCategory,
+    ConversionRule as ApiConversionRule, CreateSdtmProjectDomainRequest,
+    CreateSdtmProjectVariableRequest, CreateSdtmProjectVersionRequest,
+    DomainCategory as ApiCategory, FromCrf as ApiFromCrf,
     SdtmDomainDescription as ApiDomainDescription,
     SdtmDomainDescriptionDetail as ApiDomainDescriptionDetail, SdtmProjectApiError,
-    SdtmProjectDomainList, SdtmProjectDomainOverrideView, SdtmProjectDomainView,
-    SdtmProjectService, SdtmProjectVariableList, SdtmProjectVariableOverrideView,
+    SdtmProjectDomainList, SdtmProjectDomainView, SdtmProjectService, SdtmProjectVariableList,
     SdtmProjectVariableView, SdtmProjectVersionList, SdtmProjectVersionView,
-    SdtmRole as ApiSdtmRole, SdtmVariableCore as ApiSdtmVariableCore,
-    SdtmVariableDescription as ApiVariableDescription,
+    SdtmRole as ApiSdtmRole, SdtmVariableControlled as ApiSdtmVariableControlled,
+    SdtmVariableCore as ApiSdtmVariableCore, SdtmVariableDescription as ApiVariableDescription,
     SdtmVariableDescriptionDetail as ApiVariableDescriptionDetail,
-    SdtmVariableType as ApiSdtmVariableType, UpdateSdtmProjectDomainOverrideRequest,
-    UpdateSdtmProjectDomainRequest, UpdateSdtmProjectVariableOverrideRequest,
+    SdtmVariableType as ApiSdtmVariableType, UpdateSdtmProjectDomainRequest,
     UpdateSdtmProjectVariableRequest, UpdateSdtmProjectVersionRequest,
+    VariableSource as ApiVariableSource,
 };
 
 use crate::domain::{
-    DomainCategory, DomainError, ProjectLookup, SdtmDomainDescription, SdtmDomainDescriptionDetail,
-    SdtmProjectDomainOverrideRepository, SdtmProjectDomainRepository,
-    SdtmProjectVariableOverrideRepository, SdtmProjectVariableRepository,
-    SdtmProjectVersionRepository, SdtmRole, SdtmVariableCore, SdtmVariableDescription,
-    SdtmVariableDescriptionDetail, SdtmVariableType,
+    ConversionRule, DomainCategory, DomainError, FromCrf, ProjectLookup, SdtmDomainDescription,
+    SdtmDomainDescriptionDetail, SdtmProjectDomainRepository, SdtmProjectVariableRepository,
+    SdtmProjectVersionRepository, SdtmRole, SdtmVariableControlled, SdtmVariableCore,
+    SdtmVariableDescription, SdtmVariableDescriptionDetail, SdtmVariableType, VariableSource,
 };
 use crate::usecase::{
-    CreateSdtmProjectDomain, CreateSdtmProjectDomainOverride, CreateSdtmProjectVariable,
-    CreateSdtmProjectVariableOverride, CreateSdtmProjectVersion,
-    SdtmProjectDomainOverrideView as InternalDomainOverrideView,
+    CreateSdtmProjectDomain, CreateSdtmProjectVariable, CreateSdtmProjectVersion,
     SdtmProjectDomainView as InternalDomainView, SdtmProjectUsecase, SdtmProjectUsecaseConfig,
-    SdtmProjectVariableOverrideView as InternalVariableOverrideView,
     SdtmProjectVariableView as InternalVariableView, SdtmProjectVersionView as InternalVersionView,
-    UpdateSdtmProjectDomain, UpdateSdtmProjectDomainOverride, UpdateSdtmProjectVariable,
-    UpdateSdtmProjectVariableOverride, UpdateSdtmProjectVersion, UsecaseError,
+    UpdateSdtmProjectDomain, UpdateSdtmProjectVariable, UpdateSdtmProjectVersion, UsecaseError,
 };
 
 /// Adapter that implements [`SdtmProjectService`] on top of a
 /// [`SdtmProjectUsecase`].
 ///
-/// Generic over the five persistence ports plus the project lookup so
+/// Generic over the three persistence ports plus the project lookup so
 /// the adapter can be exercised against in-memory fakes in tests and
 /// against the PostgreSQL-backed repositories in production.
 pub struct SdtmProjectServiceImpl<
     V: SdtmProjectVersionRepository,
     D: SdtmProjectDomainRepository,
-    DO: SdtmProjectDomainOverrideRepository,
     Va: SdtmProjectVariableRepository,
-    VO: SdtmProjectVariableOverrideRepository,
     P: ProjectLookup,
 > {
-    usecase: SdtmProjectUsecase<V, D, DO, Va, VO, P>,
+    usecase: SdtmProjectUsecase<V, D, Va, P>,
 }
 
-impl<V, D, DO, Va, VO, P> SdtmProjectServiceImpl<V, D, DO, Va, VO, P>
+impl<V, D, Va, P> SdtmProjectServiceImpl<V, D, Va, P>
 where
     V: SdtmProjectVersionRepository,
     D: SdtmProjectDomainRepository,
-    DO: SdtmProjectDomainOverrideRepository,
     Va: SdtmProjectVariableRepository,
-    VO: SdtmProjectVariableOverrideRepository,
     P: ProjectLookup,
 {
     /// Build a new `SdtmProjectServiceImpl` wrapping the supplied
     /// usecase.
-    pub fn new(usecase: SdtmProjectUsecase<V, D, DO, Va, VO, P>) -> Self {
+    pub fn new(usecase: SdtmProjectUsecase<V, D, Va, P>) -> Self {
         Self { usecase }
     }
 
-    /// Build a new `SdtmProjectServiceImpl` from the five repositories
+    /// Build a new `SdtmProjectServiceImpl` from the three repositories
     /// and the project lookup directly. Mirrors the
     /// [`SdtmProjectUsecase::new`] constructor shape so callers who
     /// already hold the repositories do not need to assemble a
@@ -85,17 +75,13 @@ where
     pub fn from_repos(
         version_repo: V,
         domain_repo: D,
-        domain_override_repo: DO,
         variable_repo: Va,
-        variable_override_repo: VO,
         projects: Arc<P>,
     ) -> Self {
         Self::new(SdtmProjectUsecase::new(SdtmProjectUsecaseConfig {
             version_repo,
             domain_repo,
-            domain_override_repo,
             variable_repo,
-            variable_override_repo,
             projects,
         }))
     }
@@ -185,6 +171,34 @@ fn from_internal_role(r: SdtmRole) -> ApiSdtmRole {
     }
 }
 
+fn to_internal_variable_source(s: ApiVariableSource) -> VariableSource {
+    match s {
+        ApiVariableSource::Protocol => VariableSource::Protocol,
+        ApiVariableSource::Derived => VariableSource::Derived,
+        ApiVariableSource::Assigned(f) => VariableSource::Assigned(f.map(|f| FromCrf {
+            form_code: f.form_code,
+        })),
+        ApiVariableSource::Crf(f) => VariableSource::Crf(f.map(|f| FromCrf {
+            form_code: f.form_code,
+        })),
+        ApiVariableSource::Edt => VariableSource::Edt,
+    }
+}
+
+fn from_internal_variable_source(s: VariableSource) -> ApiVariableSource {
+    match s {
+        VariableSource::Protocol => ApiVariableSource::Protocol,
+        VariableSource::Derived => ApiVariableSource::Derived,
+        VariableSource::Assigned(f) => ApiVariableSource::Assigned(f.map(|f| ApiFromCrf {
+            form_code: f.form_code,
+        })),
+        VariableSource::Crf(f) => ApiVariableSource::Crf(f.map(|f| ApiFromCrf {
+            form_code: f.form_code,
+        })),
+        VariableSource::Edt => ApiVariableSource::Edt,
+    }
+}
+
 // ---- description mappers ----
 
 fn domain_descriptions_from_api(v: Vec<ApiDomainDescription>) -> Vec<SdtmDomainDescription> {
@@ -233,6 +247,46 @@ fn variable_descriptions_to_api(v: Vec<SdtmVariableDescription>) -> Vec<ApiVaria
         .collect()
 }
 
+// ---- controlled-terminology mappers ----
+
+fn variable_controlled_from_api(
+    v: Option<ApiSdtmVariableControlled>,
+) -> Option<SdtmVariableControlled> {
+    v.map(|c| SdtmVariableControlled {
+        code: c.code,
+        format: c.format,
+    })
+}
+
+fn variable_controlled_to_api(
+    v: Option<SdtmVariableControlled>,
+) -> Option<ApiSdtmVariableControlled> {
+    v.map(|c| ApiSdtmVariableControlled {
+        code: c.code,
+        format: c.format,
+    })
+}
+
+// ---- conversion-rule mappers ----
+
+fn conversion_rules_from_api(v: Vec<ApiConversionRule>) -> Vec<ConversionRule> {
+    v.into_iter()
+        .map(|r| ConversionRule {
+            source: to_internal_variable_source(r.source),
+            rule: r.rule,
+        })
+        .collect()
+}
+
+fn conversion_rules_to_api(v: Vec<ConversionRule>) -> Vec<ApiConversionRule> {
+    v.into_iter()
+        .map(|r| ApiConversionRule {
+            source: from_internal_variable_source(r.source),
+            rule: r.rule,
+        })
+        .collect()
+}
+
 // ---- view mappers ----
 
 fn version_view_from_internal(view: InternalVersionView) -> SdtmProjectVersionView {
@@ -248,23 +302,11 @@ fn version_view_from_internal(view: InternalVersionView) -> SdtmProjectVersionVi
 fn domain_view_from_internal(view: InternalDomainView) -> SdtmProjectDomainView {
     SdtmProjectDomainView {
         id: view.id,
-        version_id: view.version_id,
+        sdtm_project_version_id: view.sdtm_project_version_id,
         domain_code: view.domain_code,
-        key_variables: view.key_variables,
-        domain_override: view.domain_override.map(domain_override_view_from_internal),
-        created_at: view.created_at,
-        updated_at: view.updated_at,
-    }
-}
-
-fn domain_override_view_from_internal(
-    view: InternalDomainOverrideView,
-) -> SdtmProjectDomainOverrideView {
-    SdtmProjectDomainOverrideView {
-        id: view.id,
-        domain_id: view.domain_id,
         category: from_internal_category(view.category),
         descriptions: domain_descriptions_to_api(view.descriptions),
+        key_variables: view.key_variables,
         created_at: view.created_at,
         updated_at: view.updated_at,
     }
@@ -273,27 +315,15 @@ fn domain_override_view_from_internal(
 fn variable_view_from_internal(view: InternalVariableView) -> SdtmProjectVariableView {
     SdtmProjectVariableView {
         id: view.id,
-        domain_id: view.domain_id,
+        sdtm_project_domain_id: view.sdtm_project_domain_id,
         variable_code: view.variable_code,
-        variable_sequence: view.variable_sequence,
-        variable_override: view
-            .variable_override
-            .map(variable_override_view_from_internal),
-        created_at: view.created_at,
-        updated_at: view.updated_at,
-    }
-}
-
-fn variable_override_view_from_internal(
-    view: InternalVariableOverrideView,
-) -> SdtmProjectVariableOverrideView {
-    SdtmProjectVariableOverrideView {
-        id: view.id,
-        variable_id: view.variable_id,
+        variable_controlled: variable_controlled_to_api(view.variable_controlled),
         variable_type: from_internal_variable_type(view.variable_type),
         variable_core: from_internal_variable_core(view.variable_core),
         variable_role: view.variable_role.map(from_internal_role),
+        variable_sequence: view.variable_sequence,
         descriptions: variable_descriptions_to_api(view.descriptions),
+        conversion_rules: conversion_rules_to_api(view.conversion_rules),
         created_at: view.created_at,
         updated_at: view.updated_at,
     }
@@ -321,14 +351,14 @@ impl From<UsecaseError> for SdtmProjectApiError {
                 DomainError::SdtmProjectDomainNotFound(id) => {
                     SdtmProjectApiError::SdtmProjectDomainNotFound(id)
                 }
-                DomainError::SdtmProjectDomainOverrideNotFound(id) => {
-                    SdtmProjectApiError::SdtmProjectDomainOverrideNotFound(id)
-                }
                 DomainError::SdtmProjectVariableNotFound(id) => {
                     SdtmProjectApiError::SdtmProjectVariableNotFound(id)
                 }
-                DomainError::SdtmProjectVariableOverrideNotFound(id) => {
-                    SdtmProjectApiError::SdtmProjectVariableOverrideNotFound(id)
+                DomainError::KeyVariableNotFound { variable_code } => {
+                    SdtmProjectApiError::KeyVariableNotFound { variable_code }
+                }
+                DomainError::VariableReferencedByKeyVariables { variable_code } => {
+                    SdtmProjectApiError::VariableReferencedByKeyVariables { variable_code }
                 }
                 DomainError::DuplicateSdtmProjectVersion {
                     project_code,
@@ -344,9 +374,6 @@ impl From<UsecaseError> for SdtmProjectApiError {
                     version_id,
                     domain_code,
                 },
-                DomainError::DuplicateSdtmProjectDomainOverride { domain_id } => {
-                    SdtmProjectApiError::DuplicateSdtmProjectDomainOverride { domain_id }
-                }
                 DomainError::DuplicateSdtmProjectVariable {
                     domain_id,
                     variable_code,
@@ -354,9 +381,6 @@ impl From<UsecaseError> for SdtmProjectApiError {
                     domain_id,
                     variable_code,
                 },
-                DomainError::DuplicateSdtmProjectVariableOverride { variable_id } => {
-                    SdtmProjectApiError::DuplicateSdtmProjectVariableOverride { variable_id }
-                }
                 DomainError::FkSdtmProjectVersionNotFound(id) => {
                     SdtmProjectApiError::FkSdtmProjectVersionNotFound(id)
                 }
@@ -371,6 +395,7 @@ impl From<UsecaseError> for SdtmProjectApiError {
                 | DomainError::EmptyDomainCode
                 | DomainError::EmptyVariableCode
                 | DomainError::EmptyKeyVariable
+                | DomainError::EmptyConversionRule
                 | DomainError::InvalidDomainCategory(_)
                 | DomainError::InvalidVariableType(_)
                 | DomainError::InvalidVariableCore(_)
@@ -387,13 +412,11 @@ impl From<UsecaseError> for SdtmProjectApiError {
 }
 
 #[async_trait]
-impl<V, D, DO, Va, VO, P> SdtmProjectService for SdtmProjectServiceImpl<V, D, DO, Va, VO, P>
+impl<V, D, Va, P> SdtmProjectService for SdtmProjectServiceImpl<V, D, Va, P>
 where
     V: SdtmProjectVersionRepository,
     D: SdtmProjectDomainRepository,
-    DO: SdtmProjectDomainOverrideRepository,
     Va: SdtmProjectVariableRepository,
-    VO: SdtmProjectVariableOverrideRepository,
     P: ProjectLookup,
 {
     // ---- SdtmProjectVersion ----
@@ -452,8 +475,10 @@ where
         req: CreateSdtmProjectDomainRequest,
     ) -> Result<SdtmProjectDomainView, SdtmProjectApiError> {
         let cmd = CreateSdtmProjectDomain {
-            version_id: req.version_id,
+            sdtm_project_version_id: req.sdtm_project_version_id,
             domain_code: req.domain_code,
+            category: to_internal_category(req.category),
+            descriptions: domain_descriptions_from_api(req.descriptions),
             key_variables: req.key_variables,
         };
         let view = self.usecase.create_domain(cmd).await?;
@@ -485,6 +510,8 @@ where
         let cmd = UpdateSdtmProjectDomain {
             id: req.id,
             domain_code: req.domain_code,
+            category: req.category.map(to_internal_category),
+            descriptions: req.descriptions.map(domain_descriptions_from_api),
             key_variables: req.key_variables,
         };
         let view = self.usecase.update_domain(cmd).await?;
@@ -496,47 +523,6 @@ where
         Ok(())
     }
 
-    // ---- SdtmProjectDomainOverride ----
-
-    async fn create_domain_override(
-        &self,
-        req: CreateSdtmProjectDomainOverrideRequest,
-    ) -> Result<SdtmProjectDomainOverrideView, SdtmProjectApiError> {
-        let cmd = CreateSdtmProjectDomainOverride {
-            domain_id: req.domain_id,
-            category: to_internal_category(req.category),
-            descriptions: domain_descriptions_from_api(req.descriptions),
-        };
-        let view = self.usecase.create_domain_override(cmd).await?;
-        Ok(domain_override_view_from_internal(view))
-    }
-
-    async fn get_domain_override(
-        &self,
-        domain_id: i64,
-    ) -> Result<Option<SdtmProjectDomainOverrideView>, SdtmProjectApiError> {
-        let view = self.usecase.get_domain_override(domain_id).await?;
-        Ok(view.map(domain_override_view_from_internal))
-    }
-
-    async fn update_domain_override(
-        &self,
-        req: UpdateSdtmProjectDomainOverrideRequest,
-    ) -> Result<SdtmProjectDomainOverrideView, SdtmProjectApiError> {
-        let cmd = UpdateSdtmProjectDomainOverride {
-            domain_id: req.domain_id,
-            category: req.category.map(to_internal_category),
-            descriptions: req.descriptions.map(domain_descriptions_from_api),
-        };
-        let view = self.usecase.update_domain_override(cmd).await?;
-        Ok(domain_override_view_from_internal(view))
-    }
-
-    async fn delete_domain_override(&self, domain_id: i64) -> Result<(), SdtmProjectApiError> {
-        self.usecase.delete_domain_override(domain_id).await?;
-        Ok(())
-    }
-
     // ---- SdtmProjectVariable ----
 
     async fn create_variable(
@@ -544,9 +530,15 @@ where
         req: CreateSdtmProjectVariableRequest,
     ) -> Result<SdtmProjectVariableView, SdtmProjectApiError> {
         let cmd = CreateSdtmProjectVariable {
-            domain_id: req.domain_id,
+            sdtm_project_domain_id: req.sdtm_project_domain_id,
             variable_code: req.variable_code,
+            variable_controlled: variable_controlled_from_api(req.variable_controlled),
+            variable_type: to_internal_variable_type(req.variable_type),
+            variable_core: to_internal_variable_core(req.variable_core),
+            variable_role: req.variable_role.map(to_internal_role),
             variable_sequence: req.variable_sequence,
+            descriptions: variable_descriptions_from_api(req.descriptions),
+            conversion_rules: conversion_rules_from_api(req.conversion_rules),
         };
         let view = self.usecase.create_variable(cmd).await?;
         Ok(variable_view_from_internal(view))
@@ -577,7 +569,13 @@ where
         let cmd = UpdateSdtmProjectVariable {
             id: req.id,
             variable_code: req.variable_code,
+            variable_controlled: req.variable_controlled.map(variable_controlled_from_api),
+            variable_type: req.variable_type.map(to_internal_variable_type),
+            variable_core: req.variable_core.map(to_internal_variable_core),
+            variable_role: req.variable_role.map(|opt| opt.map(to_internal_role)),
             variable_sequence: req.variable_sequence,
+            descriptions: req.descriptions.map(variable_descriptions_from_api),
+            conversion_rules: req.conversion_rules.map(conversion_rules_from_api),
         };
         let view = self.usecase.update_variable(cmd).await?;
         Ok(variable_view_from_internal(view))
@@ -585,51 +583,6 @@ where
 
     async fn delete_variable(&self, id: i64) -> Result<(), SdtmProjectApiError> {
         self.usecase.delete_variable(id).await?;
-        Ok(())
-    }
-
-    // ---- SdtmProjectVariableOverride ----
-
-    async fn create_variable_override(
-        &self,
-        req: CreateSdtmProjectVariableOverrideRequest,
-    ) -> Result<SdtmProjectVariableOverrideView, SdtmProjectApiError> {
-        let cmd = CreateSdtmProjectVariableOverride {
-            variable_id: req.variable_id,
-            variable_type: to_internal_variable_type(req.variable_type),
-            variable_core: to_internal_variable_core(req.variable_core),
-            variable_role: req.variable_role.map(to_internal_role),
-            descriptions: variable_descriptions_from_api(req.descriptions),
-        };
-        let view = self.usecase.create_variable_override(cmd).await?;
-        Ok(variable_override_view_from_internal(view))
-    }
-
-    async fn get_variable_override(
-        &self,
-        variable_id: i64,
-    ) -> Result<Option<SdtmProjectVariableOverrideView>, SdtmProjectApiError> {
-        let view = self.usecase.get_variable_override(variable_id).await?;
-        Ok(view.map(variable_override_view_from_internal))
-    }
-
-    async fn update_variable_override(
-        &self,
-        req: UpdateSdtmProjectVariableOverrideRequest,
-    ) -> Result<SdtmProjectVariableOverrideView, SdtmProjectApiError> {
-        let cmd = UpdateSdtmProjectVariableOverride {
-            variable_id: req.variable_id,
-            variable_type: req.variable_type.map(to_internal_variable_type),
-            variable_core: req.variable_core.map(to_internal_variable_core),
-            variable_role: req.variable_role.map(|opt| opt.map(to_internal_role)),
-            descriptions: req.descriptions.map(variable_descriptions_from_api),
-        };
-        let view = self.usecase.update_variable_override(cmd).await?;
-        Ok(variable_override_view_from_internal(view))
-    }
-
-    async fn delete_variable_override(&self, variable_id: i64) -> Result<(), SdtmProjectApiError> {
-        self.usecase.delete_variable_override(variable_id).await?;
         Ok(())
     }
 }

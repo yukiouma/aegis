@@ -191,8 +191,42 @@ pub async fn create_domain(
     let view = state
         .sdtm_project
         .create_domain(apis::sdtm_project::CreateSdtmProjectDomainRequest {
-            version_id: req.version_id,
+            sdtm_project_version_id: req.sdtm_project_version_id,
             domain_code: req.domain_code,
+            category: match req.category {
+                dto::SdtmProjectDomainCategory::SpecialPurpose => {
+                    apis::sdtm_project::DomainCategory::SpecialPurpose
+                }
+                dto::SdtmProjectDomainCategory::Interventions => {
+                    apis::sdtm_project::DomainCategory::Interventions
+                }
+                dto::SdtmProjectDomainCategory::Events => {
+                    apis::sdtm_project::DomainCategory::Events
+                }
+                dto::SdtmProjectDomainCategory::Findings => {
+                    apis::sdtm_project::DomainCategory::Findings
+                }
+                dto::SdtmProjectDomainCategory::TrialDesign => {
+                    apis::sdtm_project::DomainCategory::TrialDesign
+                }
+                dto::SdtmProjectDomainCategory::Relationships => {
+                    apis::sdtm_project::DomainCategory::Relationships
+                }
+                dto::SdtmProjectDomainCategory::StudyReference => {
+                    apis::sdtm_project::DomainCategory::StudyReference
+                }
+            },
+            descriptions: req
+                .descriptions
+                .into_iter()
+                .map(|d| apis::sdtm_project::SdtmDomainDescription {
+                    lang: d.lang,
+                    details: apis::sdtm_project::SdtmDomainDescriptionDetail {
+                        description: d.details.description,
+                        structure: d.details.structure,
+                    },
+                })
+                .collect(),
             key_variables: req.key_variables,
         })
         .await?;
@@ -279,6 +313,40 @@ pub async fn update_domain(
         .update_domain(apis::sdtm_project::UpdateSdtmProjectDomainRequest {
             id,
             domain_code: req.domain_code,
+            category: req.category.map(|c| match c {
+                dto::SdtmProjectDomainCategory::SpecialPurpose => {
+                    apis::sdtm_project::DomainCategory::SpecialPurpose
+                }
+                dto::SdtmProjectDomainCategory::Interventions => {
+                    apis::sdtm_project::DomainCategory::Interventions
+                }
+                dto::SdtmProjectDomainCategory::Events => {
+                    apis::sdtm_project::DomainCategory::Events
+                }
+                dto::SdtmProjectDomainCategory::Findings => {
+                    apis::sdtm_project::DomainCategory::Findings
+                }
+                dto::SdtmProjectDomainCategory::TrialDesign => {
+                    apis::sdtm_project::DomainCategory::TrialDesign
+                }
+                dto::SdtmProjectDomainCategory::Relationships => {
+                    apis::sdtm_project::DomainCategory::Relationships
+                }
+                dto::SdtmProjectDomainCategory::StudyReference => {
+                    apis::sdtm_project::DomainCategory::StudyReference
+                }
+            }),
+            descriptions: req.descriptions.map(|v| {
+                v.into_iter()
+                    .map(|d| apis::sdtm_project::SdtmDomainDescription {
+                        lang: d.lang,
+                        details: apis::sdtm_project::SdtmDomainDescriptionDetail {
+                            description: d.details.description,
+                            structure: d.details.structure,
+                        },
+                    })
+                    .collect()
+            }),
             key_variables: req.key_variables,
         })
         .await?;
@@ -309,131 +377,6 @@ pub async fn delete_domain(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// ---- SdtmProjectDomainOverride ----
-
-/// `POST /api/sdtm-project/domains/{domain_id}/override` — create the domain's override.
-#[utoipa::path(
-    post, path = "/domains/{domain_id}/override", tag = "sdtm-project",
-    operation_id = "sdtm_project_create_domain_override",
-    params(
-        ("domain_id" = i64, Path, description = "Sdtm project domain id"),
-    ),
-    request_body = dto::CreateSdtmProjectDomainOverrideRequest,
-    responses(
-        (status = 201, description = "Override created", body = dto::SdtmProjectDomainOverrideViewResponse),
-        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "Parent domain not found", body = crate::transport::http::error::ErrorBody),
-        (status = 409, description = "The domain already holds an override", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn create_domain_override(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-    Path(domain_id): Path<i64>,
-    Json(req): Json<dto::CreateSdtmProjectDomainOverrideRequest>,
-) -> Result<(StatusCode, Json<dto::SdtmProjectDomainOverrideViewResponse>), ApiError> {
-    let view = state
-        .sdtm_project
-        .create_domain_override(apis::sdtm_project::CreateSdtmProjectDomainOverrideRequest {
-            domain_id,
-            category: req.category.into(),
-            descriptions: req.descriptions.into_iter().map(Into::into).collect(),
-        })
-        .await?;
-    Ok((StatusCode::CREATED, Json(view.into())))
-}
-
-/// `GET /api/sdtm-project/domains/{domain_id}/override` — fetch the domain's override.
-///
-/// The override is optional, so a domain without one is **not** an
-/// error: the response is `200` with `{"override": null}`.
-#[utoipa::path(
-    get, path = "/domains/{domain_id}/override", tag = "sdtm-project",
-    operation_id = "sdtm_project_get_domain_override",
-    params(
-        ("domain_id" = i64, Path, description = "Sdtm project domain id"),
-    ),
-    responses(
-        (status = 200, description = "The domain's override, or null when it has none", body = dto::SdtmProjectDomainOverrideResponse),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn get_domain_override(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-    Path(domain_id): Path<i64>,
-) -> Result<Json<dto::SdtmProjectDomainOverrideResponse>, ApiError> {
-    let view = state.sdtm_project.get_domain_override(domain_id).await?;
-    Ok(Json(dto::SdtmProjectDomainOverrideResponse {
-        domain_override: view.map(Into::into),
-    }))
-}
-
-/// `PUT /api/sdtm-project/domains/{domain_id}/override` — update the domain's override.
-#[utoipa::path(
-    put, path = "/domains/{domain_id}/override", tag = "sdtm-project",
-    operation_id = "sdtm_project_update_domain_override",
-    params(
-        ("domain_id" = i64, Path, description = "Sdtm project domain id"),
-    ),
-    request_body = dto::UpdateSdtmProjectDomainOverrideRequest,
-    responses(
-        (status = 200, description = "Override updated", body = dto::SdtmProjectDomainOverrideViewResponse),
-        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "Override not found", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn update_domain_override(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-    Path(domain_id): Path<i64>,
-    Json(req): Json<dto::UpdateSdtmProjectDomainOverrideRequest>,
-) -> Result<Json<dto::SdtmProjectDomainOverrideViewResponse>, ApiError> {
-    let view = state
-        .sdtm_project
-        .update_domain_override(apis::sdtm_project::UpdateSdtmProjectDomainOverrideRequest {
-            domain_id,
-            category: req.category.map(Into::into),
-            descriptions: req
-                .descriptions
-                .map(|ds| ds.into_iter().map(Into::into).collect()),
-        })
-        .await?;
-    Ok(Json(view.into()))
-}
-
-/// `DELETE /api/sdtm-project/domains/{domain_id}/override` — delete the domain's override.
-#[utoipa::path(
-    delete, path = "/domains/{domain_id}/override", tag = "sdtm-project",
-    operation_id = "sdtm_project_delete_domain_override",
-    params(
-        ("domain_id" = i64, Path, description = "Sdtm project domain id"),
-    ),
-    responses(
-        (status = 204, description = "Override deleted"),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "Override not found", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn delete_domain_override(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-    Path(domain_id): Path<i64>,
-) -> Result<StatusCode, ApiError> {
-    state.sdtm_project.delete_domain_override(domain_id).await?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
 // ---- SdtmProjectVariable ----
 
 /// `POST /api/sdtm-project/variables` — create a project variable.
@@ -459,9 +402,89 @@ pub async fn create_variable(
     let view = state
         .sdtm_project
         .create_variable(apis::sdtm_project::CreateSdtmProjectVariableRequest {
-            domain_id: req.domain_id,
+            sdtm_project_domain_id: req.sdtm_project_domain_id,
             variable_code: req.variable_code,
+            variable_controlled: req.variable_controlled.map(|c| {
+                apis::sdtm_project::SdtmVariableControlled {
+                    code: c.code,
+                    format: c.format,
+                }
+            }),
+            variable_type: match req.variable_type {
+                dto::SdtmProjectVariableType::Numeric => {
+                    apis::sdtm_project::SdtmVariableType::Numeric
+                }
+                dto::SdtmProjectVariableType::Character => {
+                    apis::sdtm_project::SdtmVariableType::Character
+                }
+            },
+            variable_core: match req.variable_core {
+                dto::SdtmProjectVariableCore::Req => apis::sdtm_project::SdtmVariableCore::Req,
+                dto::SdtmProjectVariableCore::Exp => apis::sdtm_project::SdtmVariableCore::Exp,
+                dto::SdtmProjectVariableCore::Perm => apis::sdtm_project::SdtmVariableCore::Perm,
+                dto::SdtmProjectVariableCore::Supp => apis::sdtm_project::SdtmVariableCore::Supp,
+            },
+            variable_role: req.variable_role.map(|r| match r {
+                dto::SdtmProjectRole::Identifier => apis::sdtm_project::SdtmRole::Identifier,
+                dto::SdtmProjectRole::Topic => apis::sdtm_project::SdtmRole::Topic,
+                dto::SdtmProjectRole::Timing => apis::sdtm_project::SdtmRole::Timing,
+                dto::SdtmProjectRole::RecordQualifier => {
+                    apis::sdtm_project::SdtmRole::RecordQualifier
+                }
+                dto::SdtmProjectRole::SynonymQualifier => {
+                    apis::sdtm_project::SdtmRole::SynonymQualifier
+                }
+                dto::SdtmProjectRole::VariableQualifier => {
+                    apis::sdtm_project::SdtmRole::VariableQualifier
+                }
+                dto::SdtmProjectRole::GroupingQualifier => {
+                    apis::sdtm_project::SdtmRole::GroupingQualifier
+                }
+                dto::SdtmProjectRole::Rule => apis::sdtm_project::SdtmRole::Rule,
+            }),
             variable_sequence: req.variable_sequence,
+            descriptions: req
+                .descriptions
+                .into_iter()
+                .map(|d| apis::sdtm_project::SdtmVariableDescription {
+                    lang: d.lang,
+                    details: apis::sdtm_project::SdtmVariableDescriptionDetail {
+                        label: d.details.label,
+                    },
+                })
+                .collect(),
+            conversion_rules: req
+                .conversion_rules
+                .into_iter()
+                .map(|r| apis::sdtm_project::ConversionRule {
+                    source: match r.source {
+                        dto::SdtmProjectVariableSource::Protocol => {
+                            apis::sdtm_project::VariableSource::Protocol
+                        }
+                        dto::SdtmProjectVariableSource::Derived => {
+                            apis::sdtm_project::VariableSource::Derived
+                        }
+                        dto::SdtmProjectVariableSource::Assigned(f) => {
+                            apis::sdtm_project::VariableSource::Assigned(f.map(|f| {
+                                apis::sdtm_project::FromCrf {
+                                    form_code: f.form_code,
+                                }
+                            }))
+                        }
+                        dto::SdtmProjectVariableSource::Crf(f) => {
+                            apis::sdtm_project::VariableSource::Crf(f.map(|f| {
+                                apis::sdtm_project::FromCrf {
+                                    form_code: f.form_code,
+                                }
+                            }))
+                        }
+                        dto::SdtmProjectVariableSource::Edt => {
+                            apis::sdtm_project::VariableSource::Edt
+                        }
+                    },
+                    rule: r.rule,
+                })
+                .collect(),
         })
         .await?;
     Ok((StatusCode::CREATED, Json(view.into())))
@@ -532,6 +555,7 @@ pub async fn list_variables_by_domain(
         (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
         (status = 404, description = "Variable not found", body = crate::transport::http::error::ErrorBody),
+        (status = 409, description = "Variable is referenced by key variables", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
     security(("BearerAuth" = [])),
@@ -547,7 +571,89 @@ pub async fn update_variable(
         .update_variable(apis::sdtm_project::UpdateSdtmProjectVariableRequest {
             id,
             variable_code: req.variable_code,
+            variable_controlled: req.variable_controlled.map(|c| {
+                c.map(|c| apis::sdtm_project::SdtmVariableControlled {
+                    code: c.code,
+                    format: c.format,
+                })
+            }),
+            variable_type: req.variable_type.map(|t| match t {
+                dto::SdtmProjectVariableType::Numeric => {
+                    apis::sdtm_project::SdtmVariableType::Numeric
+                }
+                dto::SdtmProjectVariableType::Character => {
+                    apis::sdtm_project::SdtmVariableType::Character
+                }
+            }),
+            variable_core: req.variable_core.map(|c| match c {
+                dto::SdtmProjectVariableCore::Req => apis::sdtm_project::SdtmVariableCore::Req,
+                dto::SdtmProjectVariableCore::Exp => apis::sdtm_project::SdtmVariableCore::Exp,
+                dto::SdtmProjectVariableCore::Perm => apis::sdtm_project::SdtmVariableCore::Perm,
+                dto::SdtmProjectVariableCore::Supp => apis::sdtm_project::SdtmVariableCore::Supp,
+            }),
+            variable_role: req.variable_role.map(|r| {
+                r.map(|r| match r {
+                    dto::SdtmProjectRole::Identifier => apis::sdtm_project::SdtmRole::Identifier,
+                    dto::SdtmProjectRole::Topic => apis::sdtm_project::SdtmRole::Topic,
+                    dto::SdtmProjectRole::Timing => apis::sdtm_project::SdtmRole::Timing,
+                    dto::SdtmProjectRole::RecordQualifier => {
+                        apis::sdtm_project::SdtmRole::RecordQualifier
+                    }
+                    dto::SdtmProjectRole::SynonymQualifier => {
+                        apis::sdtm_project::SdtmRole::SynonymQualifier
+                    }
+                    dto::SdtmProjectRole::VariableQualifier => {
+                        apis::sdtm_project::SdtmRole::VariableQualifier
+                    }
+                    dto::SdtmProjectRole::GroupingQualifier => {
+                        apis::sdtm_project::SdtmRole::GroupingQualifier
+                    }
+                    dto::SdtmProjectRole::Rule => apis::sdtm_project::SdtmRole::Rule,
+                })
+            }),
             variable_sequence: req.variable_sequence,
+            descriptions: req.descriptions.map(|v| {
+                v.into_iter()
+                    .map(|d| apis::sdtm_project::SdtmVariableDescription {
+                        lang: d.lang,
+                        details: apis::sdtm_project::SdtmVariableDescriptionDetail {
+                            label: d.details.label,
+                        },
+                    })
+                    .collect()
+            }),
+            conversion_rules: req.conversion_rules.map(|v| {
+                v.into_iter()
+                    .map(|r| apis::sdtm_project::ConversionRule {
+                        source: match r.source {
+                            dto::SdtmProjectVariableSource::Protocol => {
+                                apis::sdtm_project::VariableSource::Protocol
+                            }
+                            dto::SdtmProjectVariableSource::Derived => {
+                                apis::sdtm_project::VariableSource::Derived
+                            }
+                            dto::SdtmProjectVariableSource::Assigned(f) => {
+                                apis::sdtm_project::VariableSource::Assigned(f.map(|f| {
+                                    apis::sdtm_project::FromCrf {
+                                        form_code: f.form_code,
+                                    }
+                                }))
+                            }
+                            dto::SdtmProjectVariableSource::Crf(f) => {
+                                apis::sdtm_project::VariableSource::Crf(f.map(|f| {
+                                    apis::sdtm_project::FromCrf {
+                                        form_code: f.form_code,
+                                    }
+                                }))
+                            }
+                            dto::SdtmProjectVariableSource::Edt => {
+                                apis::sdtm_project::VariableSource::Edt
+                            }
+                        },
+                        rule: r.rule,
+                    })
+                    .collect()
+            }),
         })
         .await?;
     Ok(Json(view.into()))
@@ -564,6 +670,7 @@ pub async fn update_variable(
         (status = 204, description = "Variable deleted"),
         (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
         (status = 404, description = "Variable not found", body = crate::transport::http::error::ErrorBody),
+        (status = 409, description = "Variable is referenced by key variables", body = crate::transport::http::error::ErrorBody),
         (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
     ),
     security(("BearerAuth" = [])),
@@ -574,151 +681,6 @@ pub async fn delete_variable(
     Path(dto::PathId { id }): Path<dto::PathId>,
 ) -> Result<StatusCode, ApiError> {
     state.sdtm_project.delete_variable(id).await?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-// ---- SdtmProjectVariableOverride ----
-
-/// `POST /api/sdtm-project/variables/{variable_id}/override` — create the variable's override.
-#[utoipa::path(
-    post, path = "/variables/{variable_id}/override", tag = "sdtm-project",
-    operation_id = "sdtm_project_create_variable_override",
-    params(
-        ("variable_id" = i64, Path, description = "Sdtm project variable id"),
-    ),
-    request_body = dto::CreateSdtmProjectVariableOverrideRequest,
-    responses(
-        (status = 201, description = "Override created", body = dto::SdtmProjectVariableOverrideViewResponse),
-        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "Parent variable not found", body = crate::transport::http::error::ErrorBody),
-        (status = 409, description = "The variable already holds an override", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn create_variable_override(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-    Path(variable_id): Path<i64>,
-    Json(req): Json<dto::CreateSdtmProjectVariableOverrideRequest>,
-) -> Result<
-    (
-        StatusCode,
-        Json<dto::SdtmProjectVariableOverrideViewResponse>,
-    ),
-    ApiError,
-> {
-    let view = state
-        .sdtm_project
-        .create_variable_override(
-            apis::sdtm_project::CreateSdtmProjectVariableOverrideRequest {
-                variable_id,
-                variable_type: req.variable_type.into(),
-                variable_core: req.variable_core.into(),
-                variable_role: req.variable_role.map(Into::into),
-                descriptions: req.descriptions.into_iter().map(Into::into).collect(),
-            },
-        )
-        .await?;
-    Ok((StatusCode::CREATED, Json(view.into())))
-}
-
-/// `GET /api/sdtm-project/variables/{variable_id}/override` — fetch the variable's override.
-///
-/// The override is optional, so a variable without one is **not** an
-/// error: the response is `200` with `{"override": null}`.
-#[utoipa::path(
-    get, path = "/variables/{variable_id}/override", tag = "sdtm-project",
-    operation_id = "sdtm_project_get_variable_override",
-    params(
-        ("variable_id" = i64, Path, description = "Sdtm project variable id"),
-    ),
-    responses(
-        (status = 200, description = "The variable's override, or null when it has none", body = dto::SdtmProjectVariableOverrideResponse),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn get_variable_override(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-    Path(variable_id): Path<i64>,
-) -> Result<Json<dto::SdtmProjectVariableOverrideResponse>, ApiError> {
-    let view = state
-        .sdtm_project
-        .get_variable_override(variable_id)
-        .await?;
-    Ok(Json(dto::SdtmProjectVariableOverrideResponse {
-        variable_override: view.map(Into::into),
-    }))
-}
-
-/// `PUT /api/sdtm-project/variables/{variable_id}/override` — update the variable's override.
-#[utoipa::path(
-    put, path = "/variables/{variable_id}/override", tag = "sdtm-project",
-    operation_id = "sdtm_project_update_variable_override",
-    params(
-        ("variable_id" = i64, Path, description = "Sdtm project variable id"),
-    ),
-    request_body = dto::UpdateSdtmProjectVariableOverrideRequest,
-    responses(
-        (status = 200, description = "Override updated", body = dto::SdtmProjectVariableOverrideViewResponse),
-        (status = 400, description = "Validation failed", body = crate::transport::http::error::ErrorBody),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "Override not found", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn update_variable_override(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-    Path(variable_id): Path<i64>,
-    Json(req): Json<dto::UpdateSdtmProjectVariableOverrideRequest>,
-) -> Result<Json<dto::SdtmProjectVariableOverrideViewResponse>, ApiError> {
-    let view = state
-        .sdtm_project
-        .update_variable_override(
-            apis::sdtm_project::UpdateSdtmProjectVariableOverrideRequest {
-                variable_id,
-                variable_type: req.variable_type.map(Into::into),
-                variable_core: req.variable_core.map(Into::into),
-                variable_role: req.variable_role.map(|inner| inner.map(Into::into)),
-                descriptions: req
-                    .descriptions
-                    .map(|ds| ds.into_iter().map(Into::into).collect()),
-            },
-        )
-        .await?;
-    Ok(Json(view.into()))
-}
-
-/// `DELETE /api/sdtm-project/variables/{variable_id}/override` — delete the variable's override.
-#[utoipa::path(
-    delete, path = "/variables/{variable_id}/override", tag = "sdtm-project",
-    operation_id = "sdtm_project_delete_variable_override",
-    params(
-        ("variable_id" = i64, Path, description = "Sdtm project variable id"),
-    ),
-    responses(
-        (status = 204, description = "Override deleted"),
-        (status = 401, description = "Missing / invalid token", body = crate::transport::http::error::ErrorBody),
-        (status = 404, description = "Override not found", body = crate::transport::http::error::ErrorBody),
-        (status = 500, description = "Repository failure", body = crate::transport::http::error::ErrorBody),
-    ),
-    security(("BearerAuth" = [])),
-)]
-pub async fn delete_variable_override(
-    State(state): State<AppState>,
-    _claims: AuthClaims,
-    Path(variable_id): Path<i64>,
-) -> Result<StatusCode, ApiError> {
-    state
-        .sdtm_project
-        .delete_variable_override(variable_id)
-        .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -758,11 +720,9 @@ mod tests {
     };
 
     use apis::sdtm_project::{
-        CreateSdtmProjectDomainOverrideRequest, CreateSdtmProjectDomainRequest,
-        CreateSdtmProjectVariableOverrideRequest, CreateSdtmProjectVariableRequest,
+        CreateSdtmProjectDomainRequest, CreateSdtmProjectVariableRequest,
         CreateSdtmProjectVersionRequest, SdtmProjectApiError, SdtmProjectService,
-        UpdateSdtmProjectDomainOverrideRequest, UpdateSdtmProjectDomainRequest,
-        UpdateSdtmProjectVariableOverrideRequest, UpdateSdtmProjectVariableRequest,
+        UpdateSdtmProjectDomainRequest, UpdateSdtmProjectVariableRequest,
         UpdateSdtmProjectVersionRequest,
     };
 
@@ -839,9 +799,6 @@ mod tests {
     pub struct MockSdtmProjectService {
         /// The last domain the handler asked to create.
         pub created_domain: Arc<std::sync::Mutex<Option<CreateSdtmProjectDomainRequest>>>,
-        /// When true, the override getters answer `None` — the state a
-        /// domain or variable that has never been overridden is in.
-        pub override_absent: bool,
     }
 
     fn ts() -> chrono::DateTime<chrono::Utc> {
@@ -863,21 +820,11 @@ mod tests {
     fn domain_view() -> apis::sdtm_project::SdtmProjectDomainView {
         apis::sdtm_project::SdtmProjectDomainView {
             id: 2,
-            version_id: 1,
+            sdtm_project_version_id: 1,
             domain_code: "AE".into(),
-            key_variables: vec!["AETERM".into()],
-            domain_override: None,
-            created_at: ts(),
-            updated_at: ts(),
-        }
-    }
-
-    fn domain_override_view() -> apis::sdtm_project::SdtmProjectDomainOverrideView {
-        apis::sdtm_project::SdtmProjectDomainOverrideView {
-            id: 3,
-            domain_id: 2,
             category: apis::sdtm_project::DomainCategory::Events,
             descriptions: Vec::new(),
+            key_variables: vec!["AETERM".into()],
             created_at: ts(),
             updated_at: ts(),
         }
@@ -886,23 +833,15 @@ mod tests {
     fn variable_view() -> apis::sdtm_project::SdtmProjectVariableView {
         apis::sdtm_project::SdtmProjectVariableView {
             id: 4,
-            domain_id: 2,
+            sdtm_project_domain_id: 2,
             variable_code: "AETERM".into(),
-            variable_sequence: 11,
-            variable_override: None,
-            created_at: ts(),
-            updated_at: ts(),
-        }
-    }
-
-    fn variable_override_view() -> apis::sdtm_project::SdtmProjectVariableOverrideView {
-        apis::sdtm_project::SdtmProjectVariableOverrideView {
-            id: 5,
-            variable_id: 4,
+            variable_controlled: None,
             variable_type: apis::sdtm_project::SdtmVariableType::Character,
             variable_core: apis::sdtm_project::SdtmVariableCore::Req,
-            variable_role: Some(apis::sdtm_project::SdtmRole::Topic),
+            variable_role: None,
+            variable_sequence: 11,
             descriptions: Vec::new(),
+            conversion_rules: Vec::new(),
             created_at: ts(),
             updated_at: ts(),
         }
@@ -971,35 +910,6 @@ mod tests {
             Ok(())
         }
 
-        async fn create_domain_override(
-            &self,
-            _req: CreateSdtmProjectDomainOverrideRequest,
-        ) -> Result<apis::sdtm_project::SdtmProjectDomainOverrideView, SdtmProjectApiError>
-        {
-            Ok(domain_override_view())
-        }
-        async fn get_domain_override(
-            &self,
-            _domain_id: i64,
-        ) -> Result<Option<apis::sdtm_project::SdtmProjectDomainOverrideView>, SdtmProjectApiError>
-        {
-            Ok(if self.override_absent {
-                None
-            } else {
-                Some(domain_override_view())
-            })
-        }
-        async fn update_domain_override(
-            &self,
-            _req: UpdateSdtmProjectDomainOverrideRequest,
-        ) -> Result<apis::sdtm_project::SdtmProjectDomainOverrideView, SdtmProjectApiError>
-        {
-            Ok(domain_override_view())
-        }
-        async fn delete_domain_override(&self, _domain_id: i64) -> Result<(), SdtmProjectApiError> {
-            Ok(())
-        }
-
         async fn create_variable(
             &self,
             _req: CreateSdtmProjectVariableRequest,
@@ -1027,38 +937,6 @@ mod tests {
             Ok(variable_view())
         }
         async fn delete_variable(&self, _id: i64) -> Result<(), SdtmProjectApiError> {
-            Ok(())
-        }
-
-        async fn create_variable_override(
-            &self,
-            _req: CreateSdtmProjectVariableOverrideRequest,
-        ) -> Result<apis::sdtm_project::SdtmProjectVariableOverrideView, SdtmProjectApiError>
-        {
-            Ok(variable_override_view())
-        }
-        async fn get_variable_override(
-            &self,
-            _variable_id: i64,
-        ) -> Result<Option<apis::sdtm_project::SdtmProjectVariableOverrideView>, SdtmProjectApiError>
-        {
-            Ok(if self.override_absent {
-                None
-            } else {
-                Some(variable_override_view())
-            })
-        }
-        async fn update_variable_override(
-            &self,
-            _req: UpdateSdtmProjectVariableOverrideRequest,
-        ) -> Result<apis::sdtm_project::SdtmProjectVariableOverrideView, SdtmProjectApiError>
-        {
-            Ok(variable_override_view())
-        }
-        async fn delete_variable_override(
-            &self,
-            _variable_id: i64,
-        ) -> Result<(), SdtmProjectApiError> {
             Ok(())
         }
     }
@@ -1161,7 +1039,9 @@ mod tests {
             (
                 "POST",
                 "/api/sdtm-project/domains",
-                Some(r#"{"versionId":1,"domainCode":"AE","keyVariables":["AETERM"]}"#),
+                Some(
+                    r#"{"sdtmProjectVersionId":1,"domainCode":"AE","category":"Events","descriptions":[],"keyVariables":["AETERM"]}"#,
+                ),
                 AxStatus::CREATED,
             ),
             ("GET", "/api/sdtm-project/domains/2", None, AxStatus::OK),
@@ -1185,32 +1065,10 @@ mod tests {
             ),
             (
                 "POST",
-                "/api/sdtm-project/domains/2/override",
-                Some(r#"{"category":"Events","descriptions":[]}"#),
-                AxStatus::CREATED,
-            ),
-            (
-                "GET",
-                "/api/sdtm-project/domains/2/override",
-                None,
-                AxStatus::OK,
-            ),
-            (
-                "PUT",
-                "/api/sdtm-project/domains/2/override",
-                Some(r#"{"category":"Findings"}"#),
-                AxStatus::OK,
-            ),
-            (
-                "DELETE",
-                "/api/sdtm-project/domains/2/override",
-                None,
-                AxStatus::NO_CONTENT,
-            ),
-            (
-                "POST",
                 "/api/sdtm-project/variables",
-                Some(r#"{"domainId":2,"variableCode":"AETERM","variableSequence":11}"#),
+                Some(
+                    r#"{"sdtmProjectDomainId":2,"variableCode":"AETERM","variableType":"Character","variableCore":"Req","variableSequence":11,"descriptions":[],"conversionRules":[]}"#,
+                ),
                 AxStatus::CREATED,
             ),
             ("GET", "/api/sdtm-project/variables/4", None, AxStatus::OK),
@@ -1223,36 +1081,14 @@ mod tests {
             (
                 "PUT",
                 "/api/sdtm-project/variables/4",
-                Some(r#"{"variableCode":"AETERM"}"#),
+                Some(
+                    r#"{"variableCode":"AETERM","variableType":"Character","variableCore":"Req"}"#,
+                ),
                 AxStatus::OK,
             ),
             (
                 "DELETE",
                 "/api/sdtm-project/variables/4",
-                None,
-                AxStatus::NO_CONTENT,
-            ),
-            (
-                "POST",
-                "/api/sdtm-project/variables/4/override",
-                Some(r#"{"variableType":"Character","variableCore":"Req","descriptions":[]}"#),
-                AxStatus::CREATED,
-            ),
-            (
-                "GET",
-                "/api/sdtm-project/variables/4/override",
-                None,
-                AxStatus::OK,
-            ),
-            (
-                "PUT",
-                "/api/sdtm-project/variables/4/override",
-                Some(r#"{"variableType":"Character"}"#),
-                AxStatus::OK,
-            ),
-            (
-                "DELETE",
-                "/api/sdtm-project/variables/4/override",
                 None,
                 AxStatus::NO_CONTENT,
             ),
@@ -1307,7 +1143,7 @@ mod tests {
                 "POST",
                 "/api/sdtm-project/domains",
                 Some(
-                    r#"{"versionId":1,"domainCode":"AE","keyVariables":["AESEV","AETERM"]}"#.into(),
+                    r#"{"sdtmProjectVersionId":1,"domainCode":"AE","category":"Events","descriptions":[],"keyVariables":["AESEV","AETERM"]}"#.into(),
                 ),
                 Some("Bearer good"),
             ))
@@ -1317,11 +1153,8 @@ mod tests {
         let (status, body) = read_json(response).await;
         assert_eq!(status, AxStatus::CREATED);
         assert_eq!(body["domainCode"], serde_json::json!("AE"));
-        assert_eq!(body["versionId"], serde_json::json!(1));
-        // The nested override is absent: the key is `override`, and
-        // the field is `None` here.
-        assert!(body["override"].is_null());
-
+        assert_eq!(body["sdtmProjectVersionId"], serde_json::json!(1));
+        assert_eq!(body["category"], serde_json::json!("Events"));
         // The request reached the service with the caller's order.
         let recorded = service.created_domain.lock().unwrap().clone().unwrap();
         assert_eq!(
@@ -1338,109 +1171,11 @@ mod tests {
             .oneshot(build_request(
                 "POST",
                 "/api/sdtm-project/domains",
-                Some(r#"{"versionId":1,"domainCode":"AE","keyVariables":[]}"#.into()),
+                Some(r#"{"sdtmProjectVersionId":1,"domainCode":"AE","category":"Events","descriptions":[],"keyVariables":[]}"#.into()),
                 None,
             ))
             .await
             .unwrap();
         assert_eq!(response.status(), AxStatus::UNAUTHORIZED);
-    }
-
-    /// An override is optional. A domain that has never been
-    /// overridden is a normal state, so reading its override is `200`
-    /// with `{"override": null}` — not `404`, and not a bare `null`
-    /// body.
-    #[tokio::test]
-    async fn get_domain_override_without_an_override_returns_a_null_override() {
-        let service = MockSdtmProjectService {
-            override_absent: true,
-            ..Default::default()
-        };
-        let state = test_state(service);
-        let response = app(state)
-            .oneshot(build_request(
-                "GET",
-                "/api/sdtm-project/domains/2/override",
-                None,
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::OK);
-        assert!(
-            body.get("override").is_some_and(serde_json::Value::is_null),
-            "expected {{\"override\": null}}, got {body}"
-        );
-    }
-
-    /// Same for a variable: no override is `200` with
-    /// `{"override": null}`.
-    #[tokio::test]
-    async fn get_variable_override_without_an_override_returns_a_null_override() {
-        let service = MockSdtmProjectService {
-            override_absent: true,
-            ..Default::default()
-        };
-        let state = test_state(service);
-        let response = app(state)
-            .oneshot(build_request(
-                "GET",
-                "/api/sdtm-project/variables/4/override",
-                None,
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::OK);
-        assert!(
-            body.get("override").is_some_and(serde_json::Value::is_null),
-            "expected {{\"override\": null}}, got {body}"
-        );
-    }
-
-    /// When the domain *does* have an override, it is carried under
-    /// the same `override` key.
-    #[tokio::test]
-    async fn get_domain_override_returns_the_override_under_the_override_key() {
-        let state = test_state(MockSdtmProjectService::default());
-        let response = app(state)
-            .oneshot(build_request(
-                "GET",
-                "/api/sdtm-project/domains/2/override",
-                None,
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::OK);
-        let ov = &body["override"];
-        assert!(ov.is_object(), "expected an override object, got {body}");
-        assert_eq!(ov["domainId"], serde_json::json!(2));
-        assert_eq!(ov["category"], serde_json::json!("Events"));
-    }
-
-    /// The variable-side twin of
-    /// `get_domain_override_returns_the_override_under_the_override_key`.
-    #[tokio::test]
-    async fn get_variable_override_returns_the_override_under_the_override_key() {
-        let state = test_state(MockSdtmProjectService::default());
-        let response = app(state)
-            .oneshot(build_request(
-                "GET",
-                "/api/sdtm-project/variables/4/override",
-                None,
-                Some("Bearer good"),
-            ))
-            .await
-            .unwrap();
-        let (status, body) = read_json(response).await;
-        assert_eq!(status, AxStatus::OK);
-        let ov = &body["override"];
-        assert!(ov.is_object(), "expected an override object, got {body}");
-        assert_eq!(ov["variableId"], serde_json::json!(4));
-        assert_eq!(ov["variableType"], serde_json::json!("Character"));
     }
 }

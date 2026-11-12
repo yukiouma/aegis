@@ -22,15 +22,13 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use sdtm_project::{
-    DomainCategory, DomainError, SdtmProjectDomainNew, SdtmProjectDomainOverrideNew,
-    SdtmProjectDomainOverrideRepoPg, SdtmProjectDomainOverrideRepository,
-    SdtmProjectDomainOverrideUpdate, SdtmProjectDomainRepoPg, SdtmProjectDomainRepository,
-    SdtmProjectDomainUpdate, SdtmProjectVariableNew, SdtmProjectVariableOverrideNew,
-    SdtmProjectVariableOverrideRepoPg, SdtmProjectVariableOverrideRepository,
-    SdtmProjectVariableOverrideUpdate, SdtmProjectVariableRepoPg, SdtmProjectVariableRepository,
-    SdtmProjectVariableUpdate, SdtmProjectVersionNew, SdtmProjectVersionRepoPg,
-    SdtmProjectVersionRepository, SdtmProjectVersionUpdate, SdtmRole, SdtmVariableCore,
-    SdtmVariableType,
+    ConversionRule, DomainCategory, DomainError, FromCrf, SdtmDomainDescription,
+    SdtmDomainDescriptionDetail, SdtmProjectDomainNew, SdtmProjectDomainRepoPg,
+    SdtmProjectDomainRepository, SdtmProjectDomainUpdate, SdtmProjectVariableNew,
+    SdtmProjectVariableRepoPg, SdtmProjectVariableRepository, SdtmProjectVariableUpdate,
+    SdtmProjectVersionNew, SdtmProjectVersionRepoPg, SdtmProjectVersionRepository,
+    SdtmProjectVersionUpdate, SdtmRole, SdtmVariableControlled, SdtmVariableCore, SdtmVariableType,
+    VariableSource,
 };
 use sqlx::PgPool;
 
@@ -57,9 +55,7 @@ where
     // statements are literals rather than a formatted list: sqlx
     // requires `&'static str`, and there is nothing to interpolate.
     for stmt in [
-        "DROP TABLE IF EXISTS sdtm_project_variable_overrides CASCADE",
         "DROP TABLE IF EXISTS sdtm_project_variables CASCADE",
-        "DROP TABLE IF EXISTS sdtm_project_domain_overrides CASCADE",
         "DROP TABLE IF EXISTS sdtm_project_domains CASCADE",
         "DROP TABLE IF EXISTS sdtm_project_versions CASCADE",
         "DROP TABLE IF EXISTS _sqlx_migrations CASCADE",
@@ -235,17 +231,19 @@ async fn domain_create_then_list_round_trips() {
 
         let d = domains
             .create(SdtmProjectDomainNew {
-                version_id: v.id,
+                sdtm_project_version_id: v.id,
                 domain_code: "AE".into(),
-                key_variables: vec!["AETERM".into()],
+                category: DomainCategory::Events,
+                descriptions: Vec::new(),
+                key_variables: Vec::new(),
             })
             .await
             .expect("domain create");
         assert!(d.id > 0);
-        assert_eq!(d.version_id, v.id);
+        assert_eq!(d.sdtm_project_version_id, v.id);
         assert_eq!(d.domain_code, "AE");
-        assert_eq!(d.key_variables, vec!["AETERM".to_string()]);
-        assert!(d.domain_override.is_none());
+        assert_eq!(d.category, DomainCategory::Events);
+        assert!(d.descriptions.is_empty());
 
         let listed = domains.list_by_version(v.id).await.expect("list");
         assert_eq!(listed.len(), 1);
@@ -272,8 +270,10 @@ async fn domain_key_variables_preserve_caller_order() {
         // order that must survive the JSONB round trip.
         let d = domains
             .create(SdtmProjectDomainNew {
-                version_id: v.id,
+                sdtm_project_version_id: v.id,
                 domain_code: "AE".into(),
+                category: DomainCategory::Events,
+                descriptions: Vec::new(),
                 key_variables: vec!["AESEV".into(), "AETERM".into()],
             })
             .await
@@ -307,9 +307,11 @@ async fn domain_update_changes_code_and_key_variables() {
             .unwrap();
         let d = domains
             .create(SdtmProjectDomainNew {
-                version_id: v.id,
+                sdtm_project_version_id: v.id,
                 domain_code: "AE".into(),
-                key_variables: vec!["AETERM".into()],
+                category: DomainCategory::Events,
+                descriptions: Vec::new(),
+                key_variables: Vec::new(),
             })
             .await
             .unwrap();
@@ -318,6 +320,8 @@ async fn domain_update_changes_code_and_key_variables() {
             .update(SdtmProjectDomainUpdate {
                 id: d.id,
                 domain_code: Some("AE2".into()),
+                category: Some(DomainCategory::Findings),
+                descriptions: None,
                 key_variables: Some(vec!["AESEV".into(), "AETERM".into()]),
             })
             .await
@@ -333,6 +337,8 @@ async fn domain_update_changes_code_and_key_variables() {
             .update(SdtmProjectDomainUpdate {
                 id: d.id,
                 domain_code: None,
+                category: None,
+                descriptions: None,
                 key_variables: Some(Vec::new()),
             })
             .await
@@ -351,6 +357,8 @@ async fn domain_update_of_missing_row_is_not_found() {
             .update(SdtmProjectDomainUpdate {
                 id: 999_999,
                 domain_code: Some("AE".into()),
+                category: None,
+                descriptions: None,
                 key_variables: None,
             })
             .await
@@ -403,8 +411,10 @@ async fn domain_create_when_version_vanished_maps_to_fk_not_found() {
 
         let err = domains
             .create(SdtmProjectDomainNew {
-                version_id: v.id,
+                sdtm_project_version_id: v.id,
                 domain_code: "AE".into(),
+                category: DomainCategory::Events,
+                descriptions: Vec::new(),
                 key_variables: Vec::new(),
             })
             .await
@@ -418,285 +428,6 @@ async fn domain_create_when_version_vanished_maps_to_fk_not_found() {
     .await
 }
 
-// ---- SdtmProjectDomainOverride --------------------------------------------
-
-#[tokio::test]
-#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
-async fn domain_override_create_then_get_round_trips() {
-    with_pool(|pool| async move {
-        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
-        let domains = SdtmProjectDomainRepoPg::new(pool.clone());
-        let overrides = SdtmProjectDomainOverrideRepoPg::new(pool);
-        let v = versions
-            .create(SdtmProjectVersionNew {
-                project_code: unique("p"),
-                version_name: unique("v"),
-            })
-            .await
-            .unwrap();
-        let d = domains
-            .create(SdtmProjectDomainNew {
-                version_id: v.id,
-                domain_code: "AE".into(),
-                key_variables: Vec::new(),
-            })
-            .await
-            .unwrap();
-
-        let o = overrides
-            .create(SdtmProjectDomainOverrideNew {
-                domain_id: d.id,
-                category: DomainCategory::Events,
-                descriptions: Vec::new(),
-            })
-            .await
-            .expect("override create");
-        assert_eq!(o.domain_id, d.id);
-        assert_eq!(o.category, DomainCategory::Events);
-
-        let got = overrides.find_by_domain_id(d.id).await.expect("get");
-        assert_eq!(got.id, o.id);
-        assert_eq!(got.category, DomainCategory::Events);
-    })
-    .await
-}
-
-#[tokio::test]
-#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
-async fn domain_override_is_unique_per_domain() {
-    with_pool(|pool| async move {
-        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
-        let domains = SdtmProjectDomainRepoPg::new(pool.clone());
-        let overrides = SdtmProjectDomainOverrideRepoPg::new(pool);
-        let v = versions
-            .create(SdtmProjectVersionNew {
-                project_code: unique("p"),
-                version_name: unique("v"),
-            })
-            .await
-            .unwrap();
-        let d = domains
-            .create(SdtmProjectDomainNew {
-                version_id: v.id,
-                domain_code: "AE".into(),
-                key_variables: Vec::new(),
-            })
-            .await
-            .unwrap();
-        overrides
-            .create(SdtmProjectDomainOverrideNew {
-                domain_id: d.id,
-                category: DomainCategory::Events,
-                descriptions: Vec::new(),
-            })
-            .await
-            .unwrap();
-
-        let err = overrides
-            .create(SdtmProjectDomainOverrideNew {
-                domain_id: d.id,
-                category: DomainCategory::Findings,
-                descriptions: Vec::new(),
-            })
-            .await
-            .unwrap_err();
-        assert!(matches!(
-            err,
-            DomainError::DuplicateSdtmProjectDomainOverride { .. }
-        ));
-    })
-    .await
-}
-
-#[tokio::test]
-#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
-async fn domain_override_update_changes_category() {
-    with_pool(|pool| async move {
-        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
-        let domains = SdtmProjectDomainRepoPg::new(pool.clone());
-        let overrides = SdtmProjectDomainOverrideRepoPg::new(pool);
-        let v = versions
-            .create(SdtmProjectVersionNew {
-                project_code: unique("p"),
-                version_name: unique("v"),
-            })
-            .await
-            .unwrap();
-        let d = domains
-            .create(SdtmProjectDomainNew {
-                version_id: v.id,
-                domain_code: "AE".into(),
-                key_variables: Vec::new(),
-            })
-            .await
-            .unwrap();
-        overrides
-            .create(SdtmProjectDomainOverrideNew {
-                domain_id: d.id,
-                category: DomainCategory::Events,
-                descriptions: Vec::new(),
-            })
-            .await
-            .unwrap();
-
-        let updated = overrides
-            .update(SdtmProjectDomainOverrideUpdate {
-                domain_id: d.id,
-                category: Some(DomainCategory::Findings),
-                descriptions: None,
-            })
-            .await
-            .expect("override update");
-        assert_eq!(updated.category, DomainCategory::Findings);
-    })
-    .await
-}
-
-#[tokio::test]
-#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
-async fn domain_override_delete_of_missing_row_is_not_found() {
-    with_pool(|pool| async move {
-        let overrides = SdtmProjectDomainOverrideRepoPg::new(pool);
-        let err = overrides.delete(999_999).await.unwrap_err();
-        assert!(matches!(
-            err,
-            DomainError::SdtmProjectDomainOverrideNotFound(999_999)
-        ));
-    })
-    .await
-}
-
-/// A domain that has never been overridden reports
-/// `SdtmProjectDomainOverrideNotFound` — the exact variant the
-/// usecase turns into `Ok(None)`. The repository must keep reporting
-/// it as a not-found rather than some other error, or the usecase's
-/// "no override" arm would never fire.
-#[tokio::test]
-#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
-async fn domain_override_read_of_a_domain_without_one_is_not_found() {
-    with_pool(|pool| async move {
-        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
-        let domains = SdtmProjectDomainRepoPg::new(pool.clone());
-        let overrides = SdtmProjectDomainOverrideRepoPg::new(pool);
-        let v = versions
-            .create(SdtmProjectVersionNew {
-                project_code: unique("p"),
-                version_name: unique("v"),
-            })
-            .await
-            .unwrap();
-        let d = domains
-            .create(SdtmProjectDomainNew {
-                version_id: v.id,
-                domain_code: "AE".into(),
-                key_variables: Vec::new(),
-            })
-            .await
-            .unwrap();
-
-        let err = overrides.find_by_domain_id(d.id).await.unwrap_err();
-        assert!(matches!(
-            err,
-            DomainError::SdtmProjectDomainOverrideNotFound(id) if id == d.id
-        ));
-    })
-    .await
-}
-
-#[tokio::test]
-#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
-async fn domain_read_carries_the_override() {
-    with_pool(|pool| async move {
-        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
-        let domains = SdtmProjectDomainRepoPg::new(pool.clone());
-        let overrides = SdtmProjectDomainOverrideRepoPg::new(pool);
-        let v = versions
-            .create(SdtmProjectVersionNew {
-                project_code: unique("p"),
-                version_name: unique("v"),
-            })
-            .await
-            .unwrap();
-        let d = domains
-            .create(SdtmProjectDomainNew {
-                version_id: v.id,
-                domain_code: "AE".into(),
-                key_variables: Vec::new(),
-            })
-            .await
-            .unwrap();
-        overrides
-            .create(SdtmProjectDomainOverrideNew {
-                domain_id: d.id,
-                category: DomainCategory::TrialDesign,
-                descriptions: Vec::new(),
-            })
-            .await
-            .unwrap();
-
-        let by_id = domains.find_by_id(d.id).await.expect("find");
-        let ov = by_id.domain_override.as_ref().expect("override hydrated");
-        assert_eq!(ov.category, DomainCategory::TrialDesign);
-        assert_eq!(ov.domain_id, d.id);
-
-        let listed = domains.list_by_version(v.id).await.expect("list");
-        let ov = listed[0]
-            .domain_override
-            .as_ref()
-            .expect("override hydrated");
-        assert_eq!(ov.category, DomainCategory::TrialDesign);
-        assert_eq!(ov.domain_id, d.id);
-    })
-    .await
-}
-
-#[tokio::test]
-#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
-async fn domain_update_carries_the_override() {
-    with_pool(|pool| async move {
-        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
-        let domains = SdtmProjectDomainRepoPg::new(pool.clone());
-        let overrides = SdtmProjectDomainOverrideRepoPg::new(pool);
-        let v = versions
-            .create(SdtmProjectVersionNew {
-                project_code: unique("p"),
-                version_name: unique("v"),
-            })
-            .await
-            .unwrap();
-        let d = domains
-            .create(SdtmProjectDomainNew {
-                version_id: v.id,
-                domain_code: "AE".into(),
-                key_variables: Vec::new(),
-            })
-            .await
-            .unwrap();
-        overrides
-            .create(SdtmProjectDomainOverrideNew {
-                domain_id: d.id,
-                category: DomainCategory::TrialDesign,
-                descriptions: Vec::new(),
-            })
-            .await
-            .unwrap();
-
-        // PUT and GET must return the same shape.
-        let updated = domains
-            .update(SdtmProjectDomainUpdate {
-                id: d.id,
-                domain_code: Some("AE2".into()),
-                key_variables: None,
-            })
-            .await
-            .expect("domain update");
-        let ov = updated.domain_override.as_ref().expect("override hydrated");
-        assert_eq!(ov.category, DomainCategory::TrialDesign);
-        assert_eq!(ov.domain_id, d.id);
-    })
-    .await
-}
-
 // ---- cascade --------------------------------------------------------------
 
 #[tokio::test]
@@ -705,74 +436,6 @@ async fn version_delete_cascades_to_the_whole_subtree() {
     with_pool(|pool| async move {
         let versions = SdtmProjectVersionRepoPg::new(pool.clone());
         let domains = SdtmProjectDomainRepoPg::new(pool.clone());
-        let domain_overrides = SdtmProjectDomainOverrideRepoPg::new(pool.clone());
-        let variables = SdtmProjectVariableRepoPg::new(pool.clone());
-        let variable_overrides = SdtmProjectVariableOverrideRepoPg::new(pool);
-
-        let v = versions
-            .create(SdtmProjectVersionNew {
-                project_code: unique("p"),
-                version_name: unique("v"),
-            })
-            .await
-            .unwrap();
-        let d = domains
-            .create(SdtmProjectDomainNew {
-                version_id: v.id,
-                domain_code: "AE".into(),
-                key_variables: Vec::new(),
-            })
-            .await
-            .unwrap();
-        domain_overrides
-            .create(SdtmProjectDomainOverrideNew {
-                domain_id: d.id,
-                category: DomainCategory::Events,
-                descriptions: Vec::new(),
-            })
-            .await
-            .unwrap();
-        let var = variables
-            .create(SdtmProjectVariableNew {
-                domain_id: d.id,
-                variable_code: "AETERM".into(),
-                variable_sequence: 1,
-            })
-            .await
-            .unwrap();
-        variable_overrides
-            .create(SdtmProjectVariableOverrideNew {
-                variable_id: var.id,
-                variable_type: SdtmVariableType::Character,
-                variable_core: SdtmVariableCore::Req,
-                variable_role: Some(SdtmRole::Topic),
-                descriptions: Vec::new(),
-            })
-            .await
-            .unwrap();
-
-        versions.delete(v.id).await.expect("delete version");
-
-        assert!(domains.find_by_id(d.id).await.is_err());
-        assert!(domain_overrides.find_by_domain_id(d.id).await.is_err());
-        assert!(variables.find_by_id(var.id).await.is_err());
-        assert!(
-            variable_overrides
-                .find_by_variable_id(var.id)
-                .await
-                .is_err()
-        );
-    })
-    .await
-}
-
-#[tokio::test]
-#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
-async fn domain_delete_cascades_to_override_and_variables() {
-    with_pool(|pool| async move {
-        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
-        let domains = SdtmProjectDomainRepoPg::new(pool.clone());
-        let domain_overrides = SdtmProjectDomainOverrideRepoPg::new(pool.clone());
         let variables = SdtmProjectVariableRepoPg::new(pool);
 
         let v = versions
@@ -784,32 +447,32 @@ async fn domain_delete_cascades_to_override_and_variables() {
             .unwrap();
         let d = domains
             .create(SdtmProjectDomainNew {
-                version_id: v.id,
+                sdtm_project_version_id: v.id,
                 domain_code: "AE".into(),
-                key_variables: Vec::new(),
-            })
-            .await
-            .unwrap();
-        domain_overrides
-            .create(SdtmProjectDomainOverrideNew {
-                domain_id: d.id,
                 category: DomainCategory::Events,
                 descriptions: Vec::new(),
+                key_variables: Vec::new(),
             })
             .await
             .unwrap();
         let var = variables
             .create(SdtmProjectVariableNew {
-                domain_id: d.id,
+                sdtm_project_domain_id: d.id,
                 variable_code: "AETERM".into(),
+                variable_controlled: None,
+                variable_type: SdtmVariableType::Character,
+                variable_core: SdtmVariableCore::Req,
+                variable_role: Some(SdtmRole::Topic),
                 variable_sequence: 1,
+                descriptions: Vec::new(),
+                conversion_rules: Vec::new(),
             })
             .await
             .unwrap();
 
-        domains.delete(d.id).await.expect("delete domain");
+        versions.delete(v.id).await.expect("delete version");
 
-        assert!(domain_overrides.find_by_domain_id(d.id).await.is_err());
+        assert!(domains.find_by_id(d.id).await.is_err());
         assert!(variables.find_by_id(var.id).await.is_err());
     })
     .await
@@ -833,8 +496,10 @@ async fn variable_create_then_list_orders_by_sequence() {
             .unwrap();
         let d = domains
             .create(SdtmProjectDomainNew {
-                version_id: v.id,
+                sdtm_project_version_id: v.id,
                 domain_code: "AE".into(),
+                category: DomainCategory::Events,
+                descriptions: Vec::new(),
                 key_variables: Vec::new(),
             })
             .await
@@ -842,17 +507,29 @@ async fn variable_create_then_list_orders_by_sequence() {
 
         variables
             .create(SdtmProjectVariableNew {
-                domain_id: d.id,
+                sdtm_project_domain_id: d.id,
                 variable_code: "AESEV".into(),
+                variable_controlled: None,
+                variable_type: SdtmVariableType::Character,
+                variable_core: SdtmVariableCore::Req,
+                variable_role: None,
                 variable_sequence: 20,
+                descriptions: Vec::new(),
+                conversion_rules: Vec::new(),
             })
             .await
             .unwrap();
         variables
             .create(SdtmProjectVariableNew {
-                domain_id: d.id,
+                sdtm_project_domain_id: d.id,
                 variable_code: "AETERM".into(),
+                variable_controlled: None,
+                variable_type: SdtmVariableType::Character,
+                variable_core: SdtmVariableCore::Req,
+                variable_role: None,
                 variable_sequence: 10,
+                descriptions: Vec::new(),
+                conversion_rules: Vec::new(),
             })
             .await
             .unwrap();
@@ -881,17 +558,25 @@ async fn variable_update_changes_sequence() {
             .unwrap();
         let d = domains
             .create(SdtmProjectDomainNew {
-                version_id: v.id,
+                sdtm_project_version_id: v.id,
                 domain_code: "AE".into(),
+                category: DomainCategory::Events,
+                descriptions: Vec::new(),
                 key_variables: Vec::new(),
             })
             .await
             .unwrap();
         let var = variables
             .create(SdtmProjectVariableNew {
-                domain_id: d.id,
+                sdtm_project_domain_id: d.id,
                 variable_code: "AETERM".into(),
+                variable_controlled: None,
+                variable_type: SdtmVariableType::Character,
+                variable_core: SdtmVariableCore::Req,
+                variable_role: None,
                 variable_sequence: 1,
+                descriptions: Vec::new(),
+                conversion_rules: Vec::new(),
             })
             .await
             .unwrap();
@@ -900,7 +585,13 @@ async fn variable_update_changes_sequence() {
             .update(SdtmProjectVariableUpdate {
                 id: var.id,
                 variable_code: Some("AETERMX".into()),
+                variable_controlled: None,
+                variable_type: None,
+                variable_core: None,
+                variable_role: None,
                 variable_sequence: Some(12),
+                descriptions: None,
+                conversion_rules: None,
             })
             .await
             .expect("variable update");
@@ -919,7 +610,13 @@ async fn variable_update_of_missing_row_is_not_found() {
             .update(SdtmProjectVariableUpdate {
                 id: 999_999,
                 variable_code: Some("AETERM".into()),
+                variable_controlled: None,
+                variable_type: None,
+                variable_core: None,
+                variable_role: None,
                 variable_sequence: None,
+                descriptions: None,
+                conversion_rules: None,
             })
             .await
             .unwrap_err();
@@ -947,12 +644,53 @@ async fn variable_delete_of_missing_row_is_not_found() {
 
 #[tokio::test]
 #[ignore = "requires AEGIS_TEST_DATABASE_URL"]
-async fn variable_delete_cascades_to_override() {
+async fn domain_round_trips_category_and_descriptions() {
+    with_pool(|pool| async move {
+        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
+        let domains = SdtmProjectDomainRepoPg::new(pool);
+        let v = versions
+            .create(SdtmProjectVersionNew {
+                project_code: unique("p"),
+                version_name: unique("v"),
+            })
+            .await
+            .unwrap();
+
+        let description = SdtmDomainDescription {
+            lang: "en".into(),
+            details: SdtmDomainDescriptionDetail {
+                description: "Adverse events".into(),
+                structure: "One record per AE".into(),
+            },
+        };
+        let d = domains
+            .create(SdtmProjectDomainNew {
+                sdtm_project_version_id: v.id,
+                domain_code: "AE".into(),
+                category: DomainCategory::Events,
+                descriptions: vec![description.clone()],
+                key_variables: Vec::new(),
+            })
+            .await
+            .expect("domain create");
+        assert_eq!(d.category, DomainCategory::Events);
+        assert_eq!(d.descriptions.len(), 1);
+
+        let by_id = domains.find_by_id(d.id).await.expect("find by id");
+        assert_eq!(by_id.category, DomainCategory::Events);
+        assert_eq!(by_id.descriptions.len(), 1);
+        assert_eq!(by_id.descriptions[0].details.description, "Adverse events");
+    })
+    .await
+}
+
+#[tokio::test]
+#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
+async fn conversion_rules_round_trip_through_the_repository() {
     with_pool(|pool| async move {
         let versions = SdtmProjectVersionRepoPg::new(pool.clone());
         let domains = SdtmProjectDomainRepoPg::new(pool.clone());
-        let variables = SdtmProjectVariableRepoPg::new(pool.clone());
-        let variable_overrides = SdtmProjectVariableOverrideRepoPg::new(pool);
+        let variables = SdtmProjectVariableRepoPg::new(pool);
         let v = versions
             .create(SdtmProjectVersionNew {
                 project_code: unique("p"),
@@ -962,52 +700,66 @@ async fn variable_delete_cascades_to_override() {
             .unwrap();
         let d = domains
             .create(SdtmProjectDomainNew {
-                version_id: v.id,
+                sdtm_project_version_id: v.id,
                 domain_code: "AE".into(),
+                category: DomainCategory::Events,
+                descriptions: Vec::new(),
                 key_variables: Vec::new(),
             })
             .await
             .unwrap();
+
+        let rules = vec![
+            ConversionRule {
+                source: VariableSource::Protocol,
+                rule: "AESEV".into(),
+            },
+            ConversionRule {
+                source: VariableSource::Crf(Some(FromCrf {
+                    form_code: "AE".into(),
+                })),
+                rule: "AETERM".into(),
+            },
+            // The payload variants with no form: `"from": null` must
+            // survive the JSONB round trip, and stay distinct from a
+            // unit variant, which omits `from` entirely.
+            ConversionRule {
+                source: VariableSource::Crf(None),
+                rule: "AESTDTC".into(),
+            },
+            ConversionRule {
+                source: VariableSource::Assigned(None),
+                rule: "AESEV".into(),
+            },
+        ];
         let var = variables
             .create(SdtmProjectVariableNew {
-                domain_id: d.id,
+                sdtm_project_domain_id: d.id,
                 variable_code: "AETERM".into(),
-                variable_sequence: 1,
-            })
-            .await
-            .unwrap();
-        variable_overrides
-            .create(SdtmProjectVariableOverrideNew {
-                variable_id: var.id,
+                variable_controlled: None,
                 variable_type: SdtmVariableType::Character,
                 variable_core: SdtmVariableCore::Req,
                 variable_role: None,
+                variable_sequence: 11,
                 descriptions: Vec::new(),
+                conversion_rules: rules.clone(),
             })
             .await
-            .unwrap();
+            .expect("variable create");
 
-        variables.delete(var.id).await.expect("delete variable");
-        assert!(
-            variable_overrides
-                .find_by_variable_id(var.id)
-                .await
-                .is_err()
-        );
+        let by_id = variables.find_by_id(var.id).await.expect("find by id");
+        assert_eq!(by_id.conversion_rules, rules);
     })
     .await
 }
 
-// ---- SdtmProjectVariableOverride ------------------------------------------
-
 #[tokio::test]
 #[ignore = "requires AEGIS_TEST_DATABASE_URL"]
-async fn variable_override_create_then_get_round_trips() {
+async fn variable_without_controlled_terminology_round_trips_as_null() {
     with_pool(|pool| async move {
         let versions = SdtmProjectVersionRepoPg::new(pool.clone());
         let domains = SdtmProjectDomainRepoPg::new(pool.clone());
-        let variables = SdtmProjectVariableRepoPg::new(pool.clone());
-        let overrides = SdtmProjectVariableOverrideRepoPg::new(pool);
+        let variables = SdtmProjectVariableRepoPg::new(pool);
         let v = versions
             .create(SdtmProjectVersionNew {
                 project_code: unique("p"),
@@ -1017,51 +769,43 @@ async fn variable_override_create_then_get_round_trips() {
             .unwrap();
         let d = domains
             .create(SdtmProjectDomainNew {
-                version_id: v.id,
+                sdtm_project_version_id: v.id,
                 domain_code: "AE".into(),
+                category: DomainCategory::Events,
+                descriptions: Vec::new(),
                 key_variables: Vec::new(),
             })
             .await
             .unwrap();
+
         let var = variables
             .create(SdtmProjectVariableNew {
-                domain_id: d.id,
+                sdtm_project_domain_id: d.id,
                 variable_code: "AETERM".into(),
-                variable_sequence: 1,
-            })
-            .await
-            .unwrap();
-
-        let o = overrides
-            .create(SdtmProjectVariableOverrideNew {
-                variable_id: var.id,
+                variable_controlled: None,
                 variable_type: SdtmVariableType::Character,
                 variable_core: SdtmVariableCore::Req,
-                variable_role: Some(SdtmRole::Topic),
+                variable_role: None,
+                variable_sequence: 11,
                 descriptions: Vec::new(),
+                conversion_rules: Vec::new(),
             })
             .await
-            .expect("override create");
-        assert_eq!(o.variable_id, var.id);
-        assert_eq!(o.variable_role, Some(SdtmRole::Topic));
+            .expect("variable create");
 
-        let got = overrides.find_by_variable_id(var.id).await.expect("get");
-        assert_eq!(got.id, o.id);
-        assert_eq!(got.variable_type, SdtmVariableType::Character);
-        assert_eq!(got.variable_core, SdtmVariableCore::Req);
-        assert_eq!(got.variable_role, Some(SdtmRole::Topic));
+        let by_id = variables.find_by_id(var.id).await.expect("find by id");
+        assert_eq!(by_id.variable_controlled, None);
     })
     .await
 }
 
 #[tokio::test]
 #[ignore = "requires AEGIS_TEST_DATABASE_URL"]
-async fn variable_override_role_can_be_cleared() {
+async fn variable_controlled_round_trips_through_the_repository() {
     with_pool(|pool| async move {
         let versions = SdtmProjectVersionRepoPg::new(pool.clone());
         let domains = SdtmProjectDomainRepoPg::new(pool.clone());
-        let variables = SdtmProjectVariableRepoPg::new(pool.clone());
-        let overrides = SdtmProjectVariableOverrideRepoPg::new(pool);
+        let variables = SdtmProjectVariableRepoPg::new(pool);
         let v = versions
             .create(SdtmProjectVersionNew {
                 project_code: unique("p"),
@@ -1071,125 +815,182 @@ async fn variable_override_role_can_be_cleared() {
             .unwrap();
         let d = domains
             .create(SdtmProjectDomainNew {
-                version_id: v.id,
+                sdtm_project_version_id: v.id,
                 domain_code: "AE".into(),
+                category: DomainCategory::Events,
+                descriptions: Vec::new(),
                 key_variables: Vec::new(),
             })
             .await
             .unwrap();
+
+        let controlled = SdtmVariableControlled {
+            code: Some(vec!["C66731".to_string()]),
+            format: None,
+        };
         let var = variables
             .create(SdtmProjectVariableNew {
-                domain_id: d.id,
+                sdtm_project_domain_id: d.id,
                 variable_code: "AETERM".into(),
-                variable_sequence: 1,
+                variable_controlled: Some(controlled.clone()),
+                variable_type: SdtmVariableType::Character,
+                variable_core: SdtmVariableCore::Req,
+                variable_role: None,
+                variable_sequence: 11,
+                descriptions: Vec::new(),
+                conversion_rules: Vec::new(),
+            })
+            .await
+            .expect("variable create");
+
+        let by_id = variables.find_by_id(var.id).await.expect("find by id");
+        assert_eq!(by_id.variable_controlled, Some(controlled));
+    })
+    .await
+}
+
+#[tokio::test]
+#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
+async fn variable_controlled_can_be_cleared() {
+    with_pool(|pool| async move {
+        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
+        let domains = SdtmProjectDomainRepoPg::new(pool.clone());
+        let variables = SdtmProjectVariableRepoPg::new(pool);
+        let v = versions
+            .create(SdtmProjectVersionNew {
+                project_code: unique("p"),
+                version_name: unique("v"),
             })
             .await
             .unwrap();
-        overrides
-            .create(SdtmProjectVariableOverrideNew {
-                variable_id: var.id,
-                variable_type: SdtmVariableType::Character,
-                variable_core: SdtmVariableCore::Req,
-                variable_role: Some(SdtmRole::Topic),
+        let d = domains
+            .create(SdtmProjectDomainNew {
+                sdtm_project_version_id: v.id,
+                domain_code: "AE".into(),
+                category: DomainCategory::Events,
                 descriptions: Vec::new(),
+                key_variables: Vec::new(),
             })
             .await
             .unwrap();
 
-        // Outer Some(None) clears the role.
-        let cleared = overrides
-            .update(SdtmProjectVariableOverrideUpdate {
-                variable_id: var.id,
+        let controlled = SdtmVariableControlled {
+            code: Some(vec!["C66731".to_string()]),
+            format: None,
+        };
+        let var = variables
+            .create(SdtmProjectVariableNew {
+                sdtm_project_domain_id: d.id,
+                variable_code: "AETERM".into(),
+                variable_controlled: Some(controlled),
+                variable_type: SdtmVariableType::Character,
+                variable_core: SdtmVariableCore::Req,
+                variable_role: None,
+                variable_sequence: 11,
+                descriptions: Vec::new(),
+                conversion_rules: Vec::new(),
+            })
+            .await
+            .expect("variable create");
+
+        // Outer Some(None) clears the column to SQL NULL — not to the
+        // JSON literal `null`, which would make the row unreadable.
+        let cleared = variables
+            .update(SdtmProjectVariableUpdate {
+                id: var.id,
+                variable_code: None,
+                variable_controlled: Some(None),
+                variable_type: None,
+                variable_core: None,
+                variable_role: None,
+                variable_sequence: None,
+                descriptions: None,
+                conversion_rules: None,
+            })
+            .await
+            .expect("variable update");
+        assert_eq!(cleared.variable_controlled, None);
+
+        // And the cleared row still reads back cleanly.
+        let by_id = variables.find_by_id(var.id).await.expect("find by id");
+        assert_eq!(by_id.variable_controlled, None);
+    })
+    .await
+}
+
+#[tokio::test]
+#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
+async fn variable_role_can_be_cleared() {
+    with_pool(|pool| async move {
+        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
+        let domains = SdtmProjectDomainRepoPg::new(pool.clone());
+        let variables = SdtmProjectVariableRepoPg::new(pool);
+        let v = versions
+            .create(SdtmProjectVersionNew {
+                project_code: unique("p"),
+                version_name: unique("v"),
+            })
+            .await
+            .unwrap();
+        let d = domains
+            .create(SdtmProjectDomainNew {
+                sdtm_project_version_id: v.id,
+                domain_code: "AE".into(),
+                category: DomainCategory::Events,
+                descriptions: Vec::new(),
+                key_variables: Vec::new(),
+            })
+            .await
+            .unwrap();
+
+        let var = variables
+            .create(SdtmProjectVariableNew {
+                sdtm_project_domain_id: d.id,
+                variable_code: "AETERM".into(),
+                variable_controlled: None,
+                variable_type: SdtmVariableType::Character,
+                variable_core: SdtmVariableCore::Req,
+                variable_role: Some(SdtmRole::Topic),
+                variable_sequence: 11,
+                descriptions: Vec::new(),
+                conversion_rules: Vec::new(),
+            })
+            .await
+            .expect("variable create");
+
+        // Outer Some(None) clears the role to SQL NULL.
+        let cleared = variables
+            .update(SdtmProjectVariableUpdate {
+                id: var.id,
+                variable_code: None,
+                variable_controlled: None,
                 variable_type: None,
                 variable_core: None,
                 variable_role: Some(None),
+                variable_sequence: None,
                 descriptions: None,
+                conversion_rules: None,
             })
             .await
-            .expect("clear the role");
+            .expect("variable update");
         assert_eq!(cleared.variable_role, None);
 
         // Outer None leaves the role unchanged.
-        let re_set = overrides
-            .update(SdtmProjectVariableOverrideUpdate {
-                variable_id: var.id,
-                variable_type: None,
-                variable_core: None,
-                variable_role: Some(Some(SdtmRole::Timing)),
-                descriptions: None,
-            })
-            .await
-            .expect("set the role");
-        assert_eq!(re_set.variable_role, Some(SdtmRole::Timing));
-
-        let unchanged = overrides
-            .update(SdtmProjectVariableOverrideUpdate {
-                variable_id: var.id,
+        let unchanged = variables
+            .update(SdtmProjectVariableUpdate {
+                id: var.id,
+                variable_code: None,
+                variable_controlled: None,
                 variable_type: None,
                 variable_core: None,
                 variable_role: None,
+                variable_sequence: None,
                 descriptions: None,
+                conversion_rules: None,
             })
             .await
-            .expect("leave the role alone");
-        assert_eq!(unchanged.variable_role, Some(SdtmRole::Timing));
-    })
-    .await
-}
-
-#[tokio::test]
-#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
-async fn variable_override_delete_of_missing_row_is_not_found() {
-    with_pool(|pool| async move {
-        let overrides = SdtmProjectVariableOverrideRepoPg::new(pool);
-        let err = overrides.delete(999_999).await.unwrap_err();
-        assert!(matches!(
-            err,
-            DomainError::SdtmProjectVariableOverrideNotFound(999_999)
-        ));
-    })
-    .await
-}
-
-/// The variable-side twin of
-/// `domain_override_read_of_a_domain_without_one_is_not_found`.
-#[tokio::test]
-#[ignore = "requires AEGIS_TEST_DATABASE_URL"]
-async fn variable_override_read_of_a_variable_without_one_is_not_found() {
-    with_pool(|pool| async move {
-        let versions = SdtmProjectVersionRepoPg::new(pool.clone());
-        let domains = SdtmProjectDomainRepoPg::new(pool.clone());
-        let variables = SdtmProjectVariableRepoPg::new(pool.clone());
-        let overrides = SdtmProjectVariableOverrideRepoPg::new(pool);
-        let v = versions
-            .create(SdtmProjectVersionNew {
-                project_code: unique("p"),
-                version_name: unique("v"),
-            })
-            .await
-            .unwrap();
-        let d = domains
-            .create(SdtmProjectDomainNew {
-                version_id: v.id,
-                domain_code: "AE".into(),
-                key_variables: Vec::new(),
-            })
-            .await
-            .unwrap();
-        let var = variables
-            .create(SdtmProjectVariableNew {
-                domain_id: d.id,
-                variable_code: "AETERM".into(),
-                variable_sequence: 11,
-            })
-            .await
-            .unwrap();
-
-        let err = overrides.find_by_variable_id(var.id).await.unwrap_err();
-        assert!(matches!(
-            err,
-            DomainError::SdtmProjectVariableOverrideNotFound(id) if id == var.id
-        ));
+            .expect("variable update");
+        assert_eq!(unchanged.variable_role, None);
     })
     .await
 }

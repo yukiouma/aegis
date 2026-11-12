@@ -28,20 +28,10 @@ pub fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(handlers::list_domains_by_version))
         .routes(routes!(handlers::update_domain))
         .routes(routes!(handlers::delete_domain))
-        // ---- SdtmProjectDomainOverride ----
-        .routes(routes!(handlers::create_domain_override))
-        .routes(routes!(handlers::get_domain_override))
-        .routes(routes!(handlers::update_domain_override))
-        .routes(routes!(handlers::delete_domain_override))
         // ---- SdtmProjectVariable ----
         .routes(routes!(handlers::create_variable))
         .routes(routes!(handlers::get_variable_by_id))
         .routes(routes!(handlers::list_variables_by_domain))
         .routes(routes!(handlers::update_variable))
         .routes(routes!(handlers::delete_variable))
-        // ---- SdtmProjectVariableOverride ----
-        .routes(routes!(handlers::create_variable_override))
-        .routes(routes!(handlers::get_variable_override))
-        .routes(routes!(handlers::update_variable_override))
-        .routes(routes!(handlers::delete_variable_override))
 }

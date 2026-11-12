@@ -203,39 +203,6 @@ pub(crate) mod test_support {
         ) -> Result<(), apis::sdtm_project::SdtmProjectApiError> {
             unimplemented!()
         }
-        async fn create_domain_override(
-            &self,
-            _req: apis::sdtm_project::CreateSdtmProjectDomainOverrideRequest,
-        ) -> Result<
-            apis::sdtm_project::SdtmProjectDomainOverrideView,
-            apis::sdtm_project::SdtmProjectApiError,
-        > {
-            unimplemented!()
-        }
-        async fn get_domain_override(
-            &self,
-            _domain_id: i64,
-        ) -> Result<
-            Option<apis::sdtm_project::SdtmProjectDomainOverrideView>,
-            apis::sdtm_project::SdtmProjectApiError,
-        > {
-            unimplemented!()
-        }
-        async fn update_domain_override(
-            &self,
-            _req: apis::sdtm_project::UpdateSdtmProjectDomainOverrideRequest,
-        ) -> Result<
-            apis::sdtm_project::SdtmProjectDomainOverrideView,
-            apis::sdtm_project::SdtmProjectApiError,
-        > {
-            unimplemented!()
-        }
-        async fn delete_domain_override(
-            &self,
-            _domain_id: i64,
-        ) -> Result<(), apis::sdtm_project::SdtmProjectApiError> {
-            unimplemented!()
-        }
         async fn create_variable(
             &self,
             _req: apis::sdtm_project::CreateSdtmProjectVariableRequest,
@@ -275,39 +242,6 @@ pub(crate) mod test_support {
         async fn delete_variable(
             &self,
             _id: i64,
-        ) -> Result<(), apis::sdtm_project::SdtmProjectApiError> {
-            unimplemented!()
-        }
-        async fn create_variable_override(
-            &self,
-            _req: apis::sdtm_project::CreateSdtmProjectVariableOverrideRequest,
-        ) -> Result<
-            apis::sdtm_project::SdtmProjectVariableOverrideView,
-            apis::sdtm_project::SdtmProjectApiError,
-        > {
-            unimplemented!()
-        }
-        async fn get_variable_override(
-            &self,
-            _variable_id: i64,
-        ) -> Result<
-            Option<apis::sdtm_project::SdtmProjectVariableOverrideView>,
-            apis::sdtm_project::SdtmProjectApiError,
-        > {
-            unimplemented!()
-        }
-        async fn update_variable_override(
-            &self,
-            _req: apis::sdtm_project::UpdateSdtmProjectVariableOverrideRequest,
-        ) -> Result<
-            apis::sdtm_project::SdtmProjectVariableOverrideView,
-            apis::sdtm_project::SdtmProjectApiError,
-        > {
-            unimplemented!()
-        }
-        async fn delete_variable_override(
-            &self,
-            _variable_id: i64,
         ) -> Result<(), apis::sdtm_project::SdtmProjectApiError> {
             unimplemented!()
         }

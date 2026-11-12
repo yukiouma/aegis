@@ -36,9 +36,9 @@ use mission::{
     ProjectLookupImpl as MissionProjectLookupImpl, UserLookupImpl as MissionUserLookupImpl,
 };
 use sdtm_project::{
-    ProjectLookupImpl as SdtmProjectLookupImpl, SdtmProjectDomainOverrideRepoPg,
-    SdtmProjectDomainRepoPg, SdtmProjectServiceImpl, SdtmProjectUsecase, SdtmProjectUsecaseConfig,
-    SdtmProjectVariableOverrideRepoPg, SdtmProjectVariableRepoPg, SdtmProjectVersionRepoPg,
+    ProjectLookupImpl as SdtmProjectLookupImpl, SdtmProjectDomainRepoPg, SdtmProjectServiceImpl,
+    SdtmProjectUsecase, SdtmProjectUsecaseConfig, SdtmProjectVariableRepoPg,
+    SdtmProjectVersionRepoPg,
 };
 use sqlx::PgPool;
 use sqlx::postgres::PgPoolOptions;
@@ -303,7 +303,7 @@ fn build_crf_service(
 }
 
 /// Wire the sdtm-project crate's adapters into the apis
-/// `SdtmProjectService` trait object. The five Postgres repos share
+/// `SdtmProjectService` trait object. The three Postgres repos share
 /// the same pool as the rest of the server; the project lookup is
 /// bridged off the shared `ProjectService` so the
 /// project-existence check reuses the canonical project table.
@@ -313,16 +313,12 @@ fn build_sdtm_project_service(
 ) -> Arc<dyn SdtmProjectService> {
     let version_repo = SdtmProjectVersionRepoPg::new(pool.clone());
     let domain_repo = SdtmProjectDomainRepoPg::new(pool.clone());
-    let domain_override_repo = SdtmProjectDomainOverrideRepoPg::new(pool.clone());
-    let variable_repo = SdtmProjectVariableRepoPg::new(pool.clone());
-    let variable_override_repo = SdtmProjectVariableOverrideRepoPg::new(pool);
+    let variable_repo = SdtmProjectVariableRepoPg::new(pool);
     let projects = Arc::new(SdtmProjectLookupImpl::new(project));
     let usecase = SdtmProjectUsecase::new(SdtmProjectUsecaseConfig {
         version_repo,
         domain_repo,
-        domain_override_repo,
         variable_repo,
-        variable_override_repo,
         projects,
     });
     Arc::new(SdtmProjectServiceImpl::new(usecase))

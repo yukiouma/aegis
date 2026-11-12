@@ -290,17 +290,21 @@ fn sdtm_project_status(e: &apis::sdtm_project::SdtmProjectApiError) -> StatusCod
         | SdtmProjectApiError::ProjectNotFound(_)
         | SdtmProjectApiError::SdtmProjectVersionNotFound(_)
         | SdtmProjectApiError::SdtmProjectDomainNotFound(_)
-        | SdtmProjectApiError::SdtmProjectDomainOverrideNotFound(_)
         | SdtmProjectApiError::SdtmProjectVariableNotFound(_)
-        | SdtmProjectApiError::SdtmProjectVariableOverrideNotFound(_)
         | SdtmProjectApiError::FkSdtmProjectVersionNotFound(_)
         | SdtmProjectApiError::FkSdtmProjectDomainNotFound(_)
         | SdtmProjectApiError::FkSdtmProjectVariableNotFound(_) => StatusCode::NOT_FOUND,
         SdtmProjectApiError::DuplicateSdtmProjectVersion { .. }
         | SdtmProjectApiError::DuplicateSdtmProjectDomain { .. }
-        | SdtmProjectApiError::DuplicateSdtmProjectDomainOverride { .. }
-        | SdtmProjectApiError::DuplicateSdtmProjectVariable { .. }
-        | SdtmProjectApiError::DuplicateSdtmProjectVariableOverride { .. } => StatusCode::CONFLICT,
+        | SdtmProjectApiError::DuplicateSdtmProjectVariable { .. } => StatusCode::CONFLICT,
+        // A key variable that names no variable is a malformed
+        // payload: the request body referenced something that does not
+        // exist.
+        SdtmProjectApiError::KeyVariableNotFound { .. } => StatusCode::BAD_REQUEST,
+        // A variable a domain names as a key variable cannot be
+        // renamed or deleted: the request conflicts with the current
+        // state of the domain.
+        SdtmProjectApiError::VariableReferencedByKeyVariables { .. } => StatusCode::CONFLICT,
         SdtmProjectApiError::Repository(_) => StatusCode::INTERNAL_SERVER_ERROR,
     }
 }
@@ -313,23 +317,15 @@ fn sdtm_project_code(e: &apis::sdtm_project::SdtmProjectApiError) -> &'static st
         SdtmProjectApiError::ProjectNotFound(_) => "project_not_found",
         SdtmProjectApiError::SdtmProjectVersionNotFound(_) => "sdtm_project_version_not_found",
         SdtmProjectApiError::SdtmProjectDomainNotFound(_) => "sdtm_project_domain_not_found",
-        SdtmProjectApiError::SdtmProjectDomainOverrideNotFound(_) => {
-            "sdtm_project_domain_override_not_found"
-        }
         SdtmProjectApiError::SdtmProjectVariableNotFound(_) => "sdtm_project_variable_not_found",
-        SdtmProjectApiError::SdtmProjectVariableOverrideNotFound(_) => {
-            "sdtm_project_variable_override_not_found"
-        }
         SdtmProjectApiError::DuplicateSdtmProjectVersion { .. } => "duplicate_sdtm_project_version",
         SdtmProjectApiError::DuplicateSdtmProjectDomain { .. } => "duplicate_sdtm_project_domain",
-        SdtmProjectApiError::DuplicateSdtmProjectDomainOverride { .. } => {
-            "duplicate_sdtm_project_domain_override"
-        }
         SdtmProjectApiError::DuplicateSdtmProjectVariable { .. } => {
             "duplicate_sdtm_project_variable"
         }
-        SdtmProjectApiError::DuplicateSdtmProjectVariableOverride { .. } => {
-            "duplicate_sdtm_project_variable_override"
+        SdtmProjectApiError::KeyVariableNotFound { .. } => "key_variable_not_found",
+        SdtmProjectApiError::VariableReferencedByKeyVariables { .. } => {
+            "variable_referenced_by_key_variables"
         }
         SdtmProjectApiError::FkSdtmProjectVersionNotFound(_) => "fk_sdtm_project_version_not_found",
         SdtmProjectApiError::FkSdtmProjectDomainNotFound(_) => "fk_sdtm_project_domain_not_found",
@@ -1199,5 +1195,30 @@ mod tests {
         });
         assert_eq!(err.status(), StatusCode::INTERNAL_SERVER_ERROR);
         assert_eq!(err.code(), "log_dir_create_failed");
+    }
+
+    // ---- sdtm-project key-variable errors ----
+
+    /// The two key-variable errors map to the documented status codes
+    /// and stable codes: a key variable naming no variable is a
+    /// malformed payload (400), a variable a domain names as a key
+    /// variable conflicts with the domain's current state (409).
+    #[test]
+    fn sdtm_project_key_variable_errors_map_to_status_and_code() {
+        let missing = ApiError::SdtmProject(
+            apis::sdtm_project::SdtmProjectApiError::KeyVariableNotFound {
+                variable_code: "AETERM".into(),
+            },
+        );
+        assert_eq!(missing.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(missing.code(), "key_variable_not_found");
+
+        let referenced = ApiError::SdtmProject(
+            apis::sdtm_project::SdtmProjectApiError::VariableReferencedByKeyVariables {
+                variable_code: "AETERM".into(),
+            },
+        );
+        assert_eq!(referenced.status(), StatusCode::CONFLICT);
+        assert_eq!(referenced.code(), "variable_referenced_by_key_variables");
     }
 }

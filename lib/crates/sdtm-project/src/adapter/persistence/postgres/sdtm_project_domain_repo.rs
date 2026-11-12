@@ -2,13 +2,12 @@
 // does not currently ship a `.sqlx/` offline cache, and the
 // compile-time-checked macros would require either a live
 // `DATABASE_URL` at build time or a checked-in `sqlx-data.json`.
-// `sqlx::query_as` + `sqlx::query` + `FromRow` + `QueryBuilder`
-// are sufficient and keep the crate reproducible.
+// `sqlx::query_as` + `sqlx::query` + `FromRow` are sufficient and
+// keep the crate reproducible.
 //
-// Every read here LEFT JOINs `sdtm_project_domain_overrides` so the
-// returned domain carries its override in the same round trip. The
-// UPDATE path uses a data-modifying CTE for the same reason: `PUT` and
-// `GET` on a domain must return the same shape.
+// The domain is a complete copy: it carries its own category and
+// descriptions, so there is no join and no separate override row to
+// hydrate.
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -17,55 +16,35 @@ use sqlx::{FromRow, PgPool};
 
 use crate::domain::{
     DomainCategory, DomainError, SdtmDomainDescription, SdtmProjectDomain, SdtmProjectDomainNew,
-    SdtmProjectDomainOverride, SdtmProjectDomainRepository, SdtmProjectDomainUpdate,
+    SdtmProjectDomainRepository, SdtmProjectDomainUpdate,
 };
 
 #[derive(FromRow)]
 struct SdtmProjectDomainRow {
     id: i64,
-    version_id: i64,
+    sdtm_project_version_id: i64,
     domain_code: String,
+    category: String,
+    descriptions: JsonValue,
     key_variables: JsonValue,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
-    // The override columns come from a LEFT JOIN and are all NULL
-    // when the domain has no override.
-    override_id: Option<i64>,
-    override_category: Option<String>,
-    override_descriptions: Option<JsonValue>,
-    override_created_at: Option<DateTime<Utc>>,
-    override_updated_at: Option<DateTime<Utc>>,
 }
 
 impl SdtmProjectDomainRow {
     fn into_domain(self) -> Result<SdtmProjectDomain, DomainError> {
+        let category = DomainCategory::try_from(self.category.as_str())?;
+        let descriptions: Vec<SdtmDomainDescription> = serde_json::from_value(self.descriptions)
+            .map_err(|e| DomainError::Repository(e.to_string()))?;
         let key_variables: Vec<String> = serde_json::from_value(self.key_variables)
             .map_err(|e| DomainError::Repository(e.to_string()))?;
-        let domain_override = match self.override_id {
-            None => None,
-            Some(id) => {
-                let category = DomainCategory::try_from(
-                    self.override_category.as_deref().unwrap_or_default(),
-                )?;
-                let descriptions: Vec<SdtmDomainDescription> =
-                    serde_json::from_value(self.override_descriptions.unwrap_or(JsonValue::Null))
-                        .map_err(|e| DomainError::Repository(e.to_string()))?;
-                Some(SdtmProjectDomainOverride::for_repository(
-                    id,
-                    self.id,
-                    category,
-                    descriptions,
-                    self.override_created_at.unwrap_or(self.created_at),
-                    self.override_updated_at.unwrap_or(self.updated_at),
-                ))
-            }
-        };
         Ok(SdtmProjectDomain::for_repository(
             self.id,
-            self.version_id,
+            self.sdtm_project_version_id,
             self.domain_code,
+            category,
+            descriptions,
             key_variables,
-            domain_override,
             self.created_at,
             self.updated_at,
         ))
@@ -86,47 +65,36 @@ impl SdtmProjectDomainRepoPg {
 #[async_trait]
 impl SdtmProjectDomainRepository for SdtmProjectDomainRepoPg {
     async fn create(&self, input: SdtmProjectDomainNew) -> Result<SdtmProjectDomain, DomainError> {
+        let descriptions_json = serde_json::to_value(&input.descriptions)
+            .map_err(|e| DomainError::Repository(e.to_string()))?;
         let key_variables_json = serde_json::to_value(&input.key_variables)
             .map_err(|e| DomainError::Repository(e.to_string()))?;
         // The caller's order is preserved verbatim: the vector is
         // serialised as-is and never re-sorted.
         let row: SdtmProjectDomainRow = sqlx::query_as::<_, SdtmProjectDomainRow>(
-            "WITH inserted AS (
-                 INSERT INTO sdtm_project_domains (version_id, domain_code, key_variables)
-                 VALUES ($1, $2, $3)
-                 RETURNING id, version_id, domain_code, key_variables, created_at, updated_at
-             )
-             SELECT i.id, i.version_id, i.domain_code, i.key_variables,
-                    i.created_at, i.updated_at,
-                    o.id AS override_id,
-                    o.category AS override_category,
-                    o.descriptions AS override_descriptions,
-                    o.created_at AS override_created_at,
-                    o.updated_at AS override_updated_at
-             FROM inserted i
-             LEFT JOIN sdtm_project_domain_overrides o ON o.domain_id = i.id",
+            "INSERT INTO sdtm_project_domains
+                (sdtm_project_version_id, domain_code, category, descriptions, key_variables)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id, sdtm_project_version_id, domain_code, category, descriptions,
+                       key_variables, created_at, updated_at",
         )
-        .bind(input.version_id)
+        .bind(input.sdtm_project_version_id)
         .bind(&input.domain_code)
+        .bind(input.category.as_str())
+        .bind(descriptions_json)
         .bind(key_variables_json)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| map_domain_err(e, input.version_id))?;
+        .map_err(|e| map_domain_err(e, input.sdtm_project_version_id))?;
         row.into_domain()
     }
 
     async fn find_by_id(&self, id: i64) -> Result<SdtmProjectDomain, DomainError> {
         let row: SdtmProjectDomainRow = sqlx::query_as::<_, SdtmProjectDomainRow>(
-            "SELECT d.id, d.version_id, d.domain_code, d.key_variables,
-                    d.created_at, d.updated_at,
-                    o.id AS override_id,
-                    o.category AS override_category,
-                    o.descriptions AS override_descriptions,
-                    o.created_at AS override_created_at,
-                    o.updated_at AS override_updated_at
-             FROM sdtm_project_domains d
-             LEFT JOIN sdtm_project_domain_overrides o ON o.domain_id = d.id
-             WHERE d.id = $1",
+            "SELECT id, sdtm_project_version_id, domain_code, category, descriptions,
+                    key_variables, created_at, updated_at
+             FROM sdtm_project_domains
+             WHERE id = $1",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -140,18 +108,12 @@ impl SdtmProjectDomainRepository for SdtmProjectDomainRepoPg {
         &self,
         version_id: i64,
     ) -> Result<Vec<SdtmProjectDomain>, DomainError> {
-        let rows = sqlx::query_as::<_, SdtmProjectDomainRow>(
-            "SELECT d.id, d.version_id, d.domain_code, d.key_variables,
-                    d.created_at, d.updated_at,
-                    o.id AS override_id,
-                    o.category AS override_category,
-                    o.descriptions AS override_descriptions,
-                    o.created_at AS override_created_at,
-                    o.updated_at AS override_updated_at
-             FROM sdtm_project_domains d
-             LEFT JOIN sdtm_project_domain_overrides o ON o.domain_id = d.id
-             WHERE d.version_id = $1
-             ORDER BY d.id ASC",
+        let rows: Vec<SdtmProjectDomainRow> = sqlx::query_as::<_, SdtmProjectDomainRow>(
+            "SELECT id, sdtm_project_version_id, domain_code, category, descriptions,
+                    key_variables, created_at, updated_at
+             FROM sdtm_project_domains
+             WHERE sdtm_project_version_id = $1
+             ORDER BY id ASC",
         )
         .bind(version_id)
         .fetch_all(&self.pool)
@@ -169,6 +131,12 @@ impl SdtmProjectDomainRepository for SdtmProjectDomainRepoPg {
         // COALESCE: a NULL argument leaves the column unchanged. A
         // `Some(vec![])` binds an empty JSONB array (not NULL), so the
         // column is cleared rather than left untouched.
+        let descriptions_json = match &input.descriptions {
+            None => None,
+            Some(v) => {
+                Some(serde_json::to_value(v).map_err(|e| DomainError::Repository(e.to_string()))?)
+            }
+        };
         let key_variables_json = match &input.key_variables {
             None => None,
             Some(kv) => {
@@ -176,25 +144,19 @@ impl SdtmProjectDomainRepository for SdtmProjectDomainRepoPg {
             }
         };
         let row: SdtmProjectDomainRow = sqlx::query_as::<_, SdtmProjectDomainRow>(
-            "WITH updated AS (
-                 UPDATE sdtm_project_domains
-                 SET domain_code   = COALESCE($2, domain_code),
-                     key_variables = COALESCE($3, key_variables)
-                 WHERE id = $1
-                 RETURNING id, version_id, domain_code, key_variables, created_at, updated_at
-             )
-             SELECT u.id, u.version_id, u.domain_code, u.key_variables,
-                    u.created_at, u.updated_at,
-                    o.id AS override_id,
-                    o.category AS override_category,
-                    o.descriptions AS override_descriptions,
-                    o.created_at AS override_created_at,
-                    o.updated_at AS override_updated_at
-             FROM updated u
-             LEFT JOIN sdtm_project_domain_overrides o ON o.domain_id = u.id",
+            "UPDATE sdtm_project_domains
+             SET domain_code   = COALESCE($2, domain_code),
+                 category      = COALESCE($3, category),
+                 descriptions  = COALESCE($4, descriptions),
+                 key_variables = COALESCE($5, key_variables)
+             WHERE id = $1
+             RETURNING id, sdtm_project_version_id, domain_code, category, descriptions,
+                       key_variables, created_at, updated_at",
         )
         .bind(input.id)
         .bind(input.domain_code.as_deref())
+        .bind(input.category.map(|c| c.as_str()))
+        .bind(descriptions_json)
         .bind(key_variables_json)
         .fetch_optional(&self.pool)
         .await
@@ -204,8 +166,7 @@ impl SdtmProjectDomainRepository for SdtmProjectDomainRepoPg {
     }
 
     async fn delete(&self, id: i64) -> Result<(), DomainError> {
-        // The FKs cascade: deleting a domain removes its override and
-        // its variables (and their overrides).
+        // The FK cascades: deleting a domain removes its variables.
         let res = sqlx::query("DELETE FROM sdtm_project_domains WHERE id = $1")
             .bind(id)
             .execute(&self.pool)
@@ -230,8 +191,9 @@ fn map_domain_err(err: sqlx::Error, parent_version_id: i64) -> DomainError {
     match &err {
         E::Database(db) => {
             if db.code().as_deref() == Some("23505") {
-                // Unique violation on (version_id, domain_code). The
-                // driver does not surface the natural key.
+                // Unique violation on (sdtm_project_version_id,
+                // domain_code). The driver does not surface the
+                // natural key.
                 return DomainError::DuplicateSdtmProjectDomain {
                     version_id: 0,
                     domain_code: "(unknown)".into(),
@@ -257,10 +219,15 @@ mod tests {
         let sql =
             include_str!("../../../../migrations/20261103135412_create_sdtm_project_domains.sql");
         assert!(sql.contains("CREATE TABLE IF NOT EXISTS sdtm_project_domains"));
+        assert!(sql.contains("sdtm_project_version_id  BIGINT"));
         assert!(sql.contains(
-            "CONSTRAINT sdtm_project_domains_version_code_unique UNIQUE (version_id, domain_code)"
+            "CONSTRAINT sdtm_project_domains_version_code_unique UNIQUE (sdtm_project_version_id, domain_code)"
         ));
-        assert!(sql.contains("key_variables  JSONB"));
+        assert!(sql.contains("category                 TEXT        NOT NULL"));
+        assert!(sql.contains("descriptions             JSONB"));
+        assert!(sql.contains("key_variables            JSONB"));
         assert!(sql.contains("sdtm_project_domains_updated_at"));
+        // The DDL is rewritten in place, never amended.
+        assert!(!sql.contains("ALTER TABLE"));
     }
 }
