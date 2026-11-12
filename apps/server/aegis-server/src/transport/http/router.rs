@@ -704,6 +704,25 @@ mod tests {
             );
         }
 
+        // A variable a domain names as a key variable conflicts with a
+        // rename or a delete. The document must say so, or a generated
+        // client reads the operation as conflict-free.
+        for (method, path) in [
+            ("put", "/api/sdtm-project/variables/{id}"),
+            ("delete", "/api/sdtm-project/variables/{id}"),
+        ] {
+            let keys: Vec<&str> = doc["paths"][path][method]["responses"]
+                .as_object()
+                .expect("responses object")
+                .keys()
+                .map(|s| s.as_str())
+                .collect();
+            assert!(
+                keys.contains(&"409"),
+                "{method} {path} must advertise a 409 (got {keys:?})",
+            );
+        }
+
         // The override sub-resource is gone: no route under
         // /api/sdtm-project mentions `/override` any more. A domain
         // and a variable carry their own metadata now.

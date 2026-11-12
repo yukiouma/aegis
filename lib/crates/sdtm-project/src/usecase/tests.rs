@@ -996,3 +996,25 @@ async fn update_variable_replaces_conversion_rules() {
     assert_eq!(updated.conversion_rules.len(), 1);
     assert_eq!(updated.conversion_rules[0].source, VariableSource::Derived);
 }
+
+/// A missing domain is a 404, not a 400 — even when the request also
+/// carries key variables. Otherwise a client updating a deleted domain
+/// is told the *variable* is wrong instead of the domain.
+#[tokio::test]
+async fn update_domain_of_missing_domain_is_not_found_even_with_key_variables() {
+    let uc = build_usecase();
+    let err = uc
+        .update_domain(UpdateSdtmProjectDomain {
+            id: 999,
+            domain_code: None,
+            category: None,
+            descriptions: None,
+            key_variables: Some(vec!["AETERM".into()]),
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        err,
+        UsecaseError::Repository(DomainError::SdtmProjectDomainNotFound(999))
+    ));
+}

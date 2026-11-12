@@ -265,10 +265,34 @@ natural authoring order is therefore *create domain → create variables → set
 `key_variables`*. A `create_domain` request carrying a non-empty
 `key_variables` is rejected with `KeyVariableNotFound`, not silently accepted.
 
-Rules 2 and 3 are the "reject" policy: the aggregate never enters a state
-where `key_variables` names a code that does not exist. The database does not
+Rules 2 and 3 are the "reject" policy: the usecase refuses writes that would
+leave `key_variables` naming a code that does not exist. The database does not
 enforce this (the codes live in a JSONB array, and the domain / variable live
 in different tables), so the usecase is the enforcement point.
+
+**The enforcement is check-then-act, not atomic.** The usecase reads the
+domain's variables in one statement and performs the write in a later one,
+with no transaction or row lock connecting them. Two concurrent requests can
+interleave and produce a `key_variables` entry naming a variable that was
+just renamed or deleted — the exact state rules 2 and 3 exist to prevent. The
+window is the gap between the check and the write, and the damage is
+recoverable (re-saving a valid `key_variables` list fixes it), but the
+invariant is a best-effort guard, not a guarantee under concurrency.
+
+Closing the window requires one of:
+
+- a transaction that `SELECT … FOR UPDATE`s the parent domain row and holds
+  the check and the write inside it — which means a unit-of-work / transaction
+  port the crate does not have today; or
+- folding the guard into the mutation SQL (`… WHERE NOT EXISTS (…`) so the
+  statement is atomic, which moves the policy into the adapter; or
+
+a database constraint trigger on `sdtm_project_domains` /
+`sdtm_project_variables`.
+
+All three are design changes beyond this refactor. The current choice — a
+usecase check for the clear error, no atomic backstop — is recorded here as a
+known limitation rather than an accident.
 
 ## Error surface
 

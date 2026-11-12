@@ -1,6 +1,6 @@
 //! Public-API compile-only test for the `sdtm-project` crate.
 //!
-//! Pins the documented `use sdtm_project::*;` surface, the five
+//! Pins the documented `use sdtm_project::*;` surface, the three
 //! concrete repo constructors (`fn(PgPool) -> Repo`), the
 //! `SdtmProjectUsecase::new(config)` constructor shape, and the
 //! `Send + Sync` bound the usecase config relies on.

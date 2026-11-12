@@ -176,6 +176,10 @@ where
             Some(kv) => {
                 let kv = SdtmProjectDomain::normalize_key_variables(kv)
                     .map_err(UsecaseError::Validation)?;
+                // Read the domain before checking the codes: a missing
+                // domain is a 404, and `list_by_domain` cannot tell an
+                // empty domain from a nonexistent one.
+                self.domain_repo.find_by_id(cmd.id).await?;
                 ensure_key_variables_exist(&self.variable_repo, cmd.id, &kv).await?;
                 Some(kv)
             }

@@ -31,7 +31,7 @@ src/
 │   └── tests.rs
 ├── usecase.rs
 ├── usecase/
-│   ├── commands.rs               # ten Create/Update command DTOs
+│   ├── commands.rs               # six Create/Update command DTOs
 │   ├── error.rs                  # UsecaseError
 │   ├── views.rs                  # three view DTOs + From impls
 │   ├── sdtm_project_usecase.rs   # the usecase + its config

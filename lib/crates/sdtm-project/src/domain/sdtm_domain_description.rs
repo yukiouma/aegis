@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 /// Localised description of a domain. Carried on the
-/// `SdtmProjectDomainOverride` aggregate and persisted as a single
-/// JSONB column on `sdtm_project_domain_overrides`.
+/// `SdtmProjectDomain` aggregate and persisted as a single JSONB
+/// column on `sdtm_project_domains`.
 ///
 /// Copied from `domain_model::SdtmDomainDescription` — see the note on
 /// [`DomainCategory`](super::domain_category::DomainCategory) for why

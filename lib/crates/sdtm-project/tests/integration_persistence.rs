@@ -642,8 +642,6 @@ async fn variable_delete_of_missing_row_is_not_found() {
     .await
 }
 
-// ---- SdtmProjectVariableOverride ------------------------------------------
-
 #[tokio::test]
 #[ignore = "requires AEGIS_TEST_DATABASE_URL"]
 async fn domain_round_trips_category_and_descriptions() {
@@ -721,6 +719,17 @@ async fn conversion_rules_round_trip_through_the_repository() {
                     form_code: "AE".into(),
                 })),
                 rule: "AETERM".into(),
+            },
+            // The payload variants with no form: `"from": null` must
+            // survive the JSONB round trip, and stay distinct from a
+            // unit variant, which omits `from` entirely.
+            ConversionRule {
+                source: VariableSource::Crf(None),
+                rule: "AESTDTC".into(),
+            },
+            ConversionRule {
+                source: VariableSource::Assigned(None),
+                rule: "AESEV".into(),
             },
         ];
         let var = variables
