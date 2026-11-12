@@ -278,17 +278,18 @@ fn auth_service_is_send_sync() {
 // ---- sdtm_project --------------------------------------------------------
 
 use apis::sdtm_project::{
-    CreateSdtmProjectDomainOverrideRequest, CreateSdtmProjectDomainRequest,
+    ConversionRule, CreateSdtmProjectDomainOverrideRequest, CreateSdtmProjectDomainRequest,
     CreateSdtmProjectVariableOverrideRequest, CreateSdtmProjectVariableRequest,
-    CreateSdtmProjectVersionRequest, DomainCategory, SdtmDomainDescription,
+    CreateSdtmProjectVersionRequest, DomainCategory, FromCrf, SdtmDomainDescription,
     SdtmDomainDescriptionDetail, SdtmProjectApiError, SdtmProjectDomainList,
     SdtmProjectDomainOverrideView, SdtmProjectDomainView, SdtmProjectService,
     SdtmProjectVariableList, SdtmProjectVariableOverrideView, SdtmProjectVariableView,
-    SdtmProjectVersionList, SdtmProjectVersionView, SdtmRole, SdtmVariableCore,
+    SdtmProjectVersionList, SdtmProjectVersionView, SdtmRole,
+    SdtmVariableControlled as SdtmProjectVariableControlled, SdtmVariableCore,
     SdtmVariableDescription, SdtmVariableDescriptionDetail, SdtmVariableType,
     UpdateSdtmProjectDomainOverrideRequest, UpdateSdtmProjectDomainRequest,
     UpdateSdtmProjectVariableOverrideRequest, UpdateSdtmProjectVariableRequest,
-    UpdateSdtmProjectVersionRequest,
+    UpdateSdtmProjectVersionRequest, VariableSource,
 };
 
 /// Every public type in `apis::sdtm_project` is nameable from the test.
@@ -473,6 +474,83 @@ fn sdtm_project_service_is_object_safe() {
 fn sdtm_project_service_is_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
     assert_send_sync::<Box<dyn SdtmProjectService>>();
+}
+
+/// The new value types are nameable and constructible from the test.
+#[test]
+fn sdtm_project_value_types_are_nameable() {
+    fn assert_source(_: VariableSource) {}
+    fn assert_from_crf(_: FromCrf) {}
+    fn assert_rule(_: ConversionRule) {}
+    fn assert_controlled(_: SdtmVariableControlled) {}
+
+    assert_source(VariableSource::Protocol);
+    assert_source(VariableSource::Derived);
+    assert_source(VariableSource::Edt);
+    assert_source(VariableSource::Assigned(None));
+    assert_source(VariableSource::Crf(Some(FromCrf {
+        form_code: "AE".into(),
+    })));
+    assert_from_crf(FromCrf {
+        form_code: "AE".into(),
+    });
+    assert_rule(ConversionRule {
+        source: VariableSource::Protocol,
+        rule: "AESEV = AESEV".into(),
+    });
+    assert_controlled(SdtmVariableControlled {
+        code: Some(vec!["C66731".into()]),
+        format: None,
+    });
+}
+
+/// The wire spelling of `VariableSource` is pinned: unit variants omit
+/// the `from` key entirely, payload variants carry it (as `null` when
+/// the form is absent). A flat `Option<FromCrf>` field cannot express
+/// both, which is why the enum is adjacently tagged.
+#[test]
+fn variable_source_serializes_to_the_agreed_json() {
+    let cases: Vec<(VariableSource, &str)> = vec![
+        (VariableSource::Protocol, r#"{"source":"Protocol"}"#),
+        (VariableSource::Derived, r#"{"source":"Derived"}"#),
+        (VariableSource::Edt, r#"{"source":"eDT"}"#),
+        (
+            VariableSource::Crf(Some(FromCrf {
+                form_code: "AE".into(),
+            })),
+            r#"{"source":"CRF","from":{"form_code":"AE"}}"#,
+        ),
+        (
+            VariableSource::Assigned(None),
+            r#"{"source":"Assigned","from":null}"#,
+        ),
+    ];
+    for (source, expected) in cases {
+        assert_eq!(
+            serde_json::to_string(&source).unwrap(),
+            expected,
+            "unexpected JSON for {source:?}",
+        );
+    }
+}
+
+/// A conversion rule is the source's own fields plus the rule text,
+/// side by side — not the source nested under a second `source` key.
+#[test]
+fn conversion_rule_serializes_the_source_flat() {
+    let rule = ConversionRule {
+        source: VariableSource::Crf(Some(FromCrf {
+            form_code: "AE".into(),
+        })),
+        rule: "AESEV".into(),
+    };
+    let json = serde_json::to_string(&rule).unwrap();
+    assert_eq!(
+        json,
+        r#"{"source":"CRF","from":{"form_code":"AE"},"rule":"AESEV"}"#
+    );
+    let back: ConversionRule = serde_json::from_str(&json).unwrap();
+    assert_eq!(back, rule);
 }
 
 // ---- domain_model --------------------------------------------------------

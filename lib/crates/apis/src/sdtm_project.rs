@@ -83,6 +83,63 @@ pub enum SdtmRole {
     Rule,
 }
 
+/// Where a project variable's value comes from.
+///
+/// Adjacently tagged: the unit variants are flat strings, the two
+/// payload variants carry an optional `from` object. The variant
+/// spellings are pinned per-variant — no blanket `rename_all` can
+/// produce both `CRF` and `eDT`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "source", content = "from")]
+pub enum VariableSource {
+    #[serde(rename = "Protocol")]
+    Protocol,
+    #[serde(rename = "Derived")]
+    Derived,
+    #[serde(rename = "Assigned")]
+    Assigned(Option<FromCrf>),
+    #[serde(rename = "CRF")]
+    Crf(Option<FromCrf>),
+    #[serde(rename = "eDT")]
+    Edt,
+}
+
+/// The CRF form a source draws from.
+///
+/// `form_code` is the code field of the CRF form. It is **not**
+/// validated against the `crf` crate.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FromCrf {
+    pub form_code: String,
+}
+
+/// One rule that turns a source into a variable's value.
+///
+/// `rule` is opaque text: this crate neither parses nor evaluates it.
+///
+/// The source is **flattened** into the rule, so a rule serialises as
+/// `{"source": "CRF", "from": {…}, "rule": "…"}` — the source's own
+/// fields sit beside the rule text. Without the flatten the source
+/// would nest under a second `source` key.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConversionRule {
+    #[serde(flatten)]
+    pub source: VariableSource,
+    pub rule: String,
+}
+
+/// Controlled-terminology metadata attached to an SDTM variable.
+///
+/// Both lists are optional and are omitted from the JSON when unset,
+/// so the stored shape is e.g. `{"code": ["C66731"]}`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SdtmVariableControlled {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<Vec<String>>,
+}
+
 /// Error surface returned by every [`SdtmProjectService`] method.
 ///
 /// Adapters translate backend-specific errors (e.g.
@@ -138,6 +195,12 @@ pub enum SdtmProjectApiError {
     FkSdtmProjectDomainNotFound(i64),
     #[error("referenced sdtm project variable not found: {0}")]
     FkSdtmProjectVariableNotFound(i64),
+
+    #[error("key variable not found in domain: {variable_code}")]
+    KeyVariableNotFound { variable_code: String },
+
+    #[error("variable referenced by key variables: {variable_code}")]
+    VariableReferencedByKeyVariables { variable_code: String },
 
     #[error("repository error: {0}")]
     Repository(String),
