@@ -290,17 +290,13 @@ fn sdtm_project_status(e: &apis::sdtm_project::SdtmProjectApiError) -> StatusCod
         | SdtmProjectApiError::ProjectNotFound(_)
         | SdtmProjectApiError::SdtmProjectVersionNotFound(_)
         | SdtmProjectApiError::SdtmProjectDomainNotFound(_)
-        | SdtmProjectApiError::SdtmProjectDomainOverrideNotFound(_)
         | SdtmProjectApiError::SdtmProjectVariableNotFound(_)
-        | SdtmProjectApiError::SdtmProjectVariableOverrideNotFound(_)
         | SdtmProjectApiError::FkSdtmProjectVersionNotFound(_)
         | SdtmProjectApiError::FkSdtmProjectDomainNotFound(_)
         | SdtmProjectApiError::FkSdtmProjectVariableNotFound(_) => StatusCode::NOT_FOUND,
         SdtmProjectApiError::DuplicateSdtmProjectVersion { .. }
         | SdtmProjectApiError::DuplicateSdtmProjectDomain { .. }
-        | SdtmProjectApiError::DuplicateSdtmProjectDomainOverride { .. }
-        | SdtmProjectApiError::DuplicateSdtmProjectVariable { .. }
-        | SdtmProjectApiError::DuplicateSdtmProjectVariableOverride { .. } => StatusCode::CONFLICT,
+        | SdtmProjectApiError::DuplicateSdtmProjectVariable { .. } => StatusCode::CONFLICT,
         // A key variable that names no variable is a malformed
         // payload: the request body referenced something that does not
         // exist.
@@ -321,23 +317,11 @@ fn sdtm_project_code(e: &apis::sdtm_project::SdtmProjectApiError) -> &'static st
         SdtmProjectApiError::ProjectNotFound(_) => "project_not_found",
         SdtmProjectApiError::SdtmProjectVersionNotFound(_) => "sdtm_project_version_not_found",
         SdtmProjectApiError::SdtmProjectDomainNotFound(_) => "sdtm_project_domain_not_found",
-        SdtmProjectApiError::SdtmProjectDomainOverrideNotFound(_) => {
-            "sdtm_project_domain_override_not_found"
-        }
         SdtmProjectApiError::SdtmProjectVariableNotFound(_) => "sdtm_project_variable_not_found",
-        SdtmProjectApiError::SdtmProjectVariableOverrideNotFound(_) => {
-            "sdtm_project_variable_override_not_found"
-        }
         SdtmProjectApiError::DuplicateSdtmProjectVersion { .. } => "duplicate_sdtm_project_version",
         SdtmProjectApiError::DuplicateSdtmProjectDomain { .. } => "duplicate_sdtm_project_domain",
-        SdtmProjectApiError::DuplicateSdtmProjectDomainOverride { .. } => {
-            "duplicate_sdtm_project_domain_override"
-        }
         SdtmProjectApiError::DuplicateSdtmProjectVariable { .. } => {
             "duplicate_sdtm_project_variable"
-        }
-        SdtmProjectApiError::DuplicateSdtmProjectVariableOverride { .. } => {
-            "duplicate_sdtm_project_variable_override"
         }
         SdtmProjectApiError::KeyVariableNotFound { .. } => "key_variable_not_found",
         SdtmProjectApiError::VariableReferencedByKeyVariables { .. } => {

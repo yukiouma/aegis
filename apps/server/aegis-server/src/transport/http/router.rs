@@ -621,22 +621,11 @@ mod tests {
             ("get", "/api/sdtm-project/versions/{version_id}/domains"),
             ("put", "/api/sdtm-project/domains/{id}"),
             ("delete", "/api/sdtm-project/domains/{id}"),
-            ("post", "/api/sdtm-project/domains/{domain_id}/override"),
-            ("get", "/api/sdtm-project/domains/{domain_id}/override"),
-            ("put", "/api/sdtm-project/domains/{domain_id}/override"),
-            ("delete", "/api/sdtm-project/domains/{domain_id}/override"),
             ("post", "/api/sdtm-project/variables"),
             ("get", "/api/sdtm-project/variables/{id}"),
             ("get", "/api/sdtm-project/domains/{domain_id}/variables"),
             ("put", "/api/sdtm-project/variables/{id}"),
             ("delete", "/api/sdtm-project/variables/{id}"),
-            ("post", "/api/sdtm-project/variables/{variable_id}/override"),
-            ("get", "/api/sdtm-project/variables/{variable_id}/override"),
-            ("put", "/api/sdtm-project/variables/{variable_id}/override"),
-            (
-                "delete",
-                "/api/sdtm-project/variables/{variable_id}/override",
-            ),
         ] {
             let op = &doc["paths"][path][method];
             assert!(op.is_object(), "missing {method} {path} in openapi");
@@ -657,34 +646,13 @@ mod tests {
             );
         }
 
-        // The two `GET …/override` routes answer with an envelope
-        // carrying an `override` key, not a bare nullable override.
-        // The OpenAPI document must say so, or a generated client
-        // would read `null` where the server sends an object.
-        for (path, schema) in [
-            (
-                "/api/sdtm-project/domains/{domain_id}/override",
-                "SdtmProjectDomainOverrideResponse",
-            ),
-            (
-                "/api/sdtm-project/variables/{variable_id}/override",
-                "SdtmProjectVariableOverrideResponse",
-            ),
-        ] {
-            let op = &doc["paths"][path]["get"];
-            let schema_ref =
-                op["responses"]["200"]["content"]["application/json"]["schema"]["$ref"]
-                    .as_str()
-                    .unwrap_or_else(|| panic!("{path} GET has no $ref response schema"));
-            assert_eq!(
-                schema_ref,
-                format!("#/components/schemas/{schema}"),
-                "{path} GET must answer with the {schema} envelope",
-            );
-            let properties = &doc["components"]["schemas"][schema]["properties"];
+        // The override sub-resource is gone: no route under
+        // /api/sdtm-project mentions `/override` any more. A domain
+        // and a variable carry their own metadata now.
+        for path in doc["paths"].as_object().expect("paths object").keys() {
             assert!(
-                properties.get("override").is_some(),
-                "{schema} must carry an `override` property: {properties}",
+                !path.contains("/override"),
+                "override route still advertised: {path}",
             );
         }
     }

@@ -278,18 +278,13 @@ fn auth_service_is_send_sync() {
 // ---- sdtm_project --------------------------------------------------------
 
 use apis::sdtm_project::{
-    ConversionRule, CreateSdtmProjectDomainOverrideRequest, CreateSdtmProjectDomainRequest,
-    CreateSdtmProjectVariableOverrideRequest, CreateSdtmProjectVariableRequest,
+    ConversionRule, CreateSdtmProjectDomainRequest, CreateSdtmProjectVariableRequest,
     CreateSdtmProjectVersionRequest, DomainCategory, FromCrf, SdtmDomainDescription,
-    SdtmDomainDescriptionDetail, SdtmProjectApiError, SdtmProjectDomainList,
-    SdtmProjectDomainOverrideView, SdtmProjectDomainView, SdtmProjectService,
-    SdtmProjectVariableList, SdtmProjectVariableOverrideView, SdtmProjectVariableView,
-    SdtmProjectVersionList, SdtmProjectVersionView, SdtmRole,
-    SdtmVariableControlled as SdtmProjectVariableControlled, SdtmVariableCore,
-    SdtmVariableDescription, SdtmVariableDescriptionDetail, SdtmVariableType,
-    UpdateSdtmProjectDomainOverrideRequest, UpdateSdtmProjectDomainRequest,
-    UpdateSdtmProjectVariableOverrideRequest, UpdateSdtmProjectVariableRequest,
-    UpdateSdtmProjectVersionRequest, VariableSource,
+    SdtmDomainDescriptionDetail, SdtmProjectApiError, SdtmProjectDomainList, SdtmProjectDomainView,
+    SdtmProjectService, SdtmProjectVariableList, SdtmProjectVariableView, SdtmProjectVersionList,
+    SdtmProjectVersionView, SdtmRole, SdtmVariableCore, SdtmVariableDescription,
+    SdtmVariableDescriptionDetail, SdtmVariableType, UpdateSdtmProjectDomainRequest,
+    UpdateSdtmProjectVariableRequest, UpdateSdtmProjectVersionRequest, VariableSource,
 };
 
 /// Every public type in `apis::sdtm_project` is nameable from the test.
@@ -305,9 +300,7 @@ fn sdtm_project_public_types_are_nameable() {
     fn assert_var_desc_detail(_: SdtmVariableDescriptionDetail) {}
     fn assert_version_view(_: SdtmProjectVersionView) {}
     fn assert_domain_view(_: SdtmProjectDomainView) {}
-    fn assert_domain_override_view(_: SdtmProjectDomainOverrideView) {}
     fn assert_variable_view(_: SdtmProjectVariableView) {}
-    fn assert_variable_override_view(_: SdtmProjectVariableOverrideView) {}
     fn assert_version_list(_: SdtmProjectVersionList) {}
     fn assert_domain_list(_: SdtmProjectDomainList) {}
     fn assert_variable_list(_: SdtmProjectVariableList) {}
@@ -316,12 +309,8 @@ fn sdtm_project_public_types_are_nameable() {
     fn assert_update_version(_: UpdateSdtmProjectVersionRequest) {}
     fn assert_create_domain(_: CreateSdtmProjectDomainRequest) {}
     fn assert_update_domain(_: UpdateSdtmProjectDomainRequest) {}
-    fn assert_create_domain_override(_: CreateSdtmProjectDomainOverrideRequest) {}
-    fn assert_update_domain_override(_: UpdateSdtmProjectDomainOverrideRequest) {}
     fn assert_create_variable(_: CreateSdtmProjectVariableRequest) {}
     fn assert_update_variable(_: UpdateSdtmProjectVariableRequest) {}
-    fn assert_create_variable_override(_: CreateSdtmProjectVariableOverrideRequest) {}
-    fn assert_update_variable_override(_: UpdateSdtmProjectVariableOverrideRequest) {}
 
     assert_category(DomainCategory::Events);
     assert_var_type(SdtmVariableType::Character);
@@ -361,15 +350,6 @@ fn sdtm_project_public_types_are_nameable() {
         version_id: 1,
         domain_code: "AE".into(),
         key_variables: vec!["AETERM".into()],
-        domain_override: None,
-        created_at: ts,
-        updated_at: ts,
-    });
-    assert_domain_override_view(SdtmProjectDomainOverrideView {
-        id: 3,
-        domain_id: 2,
-        category: DomainCategory::Events,
-        descriptions: Vec::new(),
         created_at: ts,
         updated_at: ts,
     });
@@ -378,17 +358,6 @@ fn sdtm_project_public_types_are_nameable() {
         domain_id: 2,
         variable_code: "AETERM".into(),
         variable_sequence: 11,
-        variable_override: None,
-        created_at: ts,
-        updated_at: ts,
-    });
-    assert_variable_override_view(SdtmProjectVariableOverrideView {
-        id: 5,
-        variable_id: 4,
-        variable_type: SdtmVariableType::Character,
-        variable_core: SdtmVariableCore::Req,
-        variable_role: Some(SdtmRole::Topic),
-        descriptions: Vec::new(),
         created_at: ts,
         updated_at: ts,
     });
@@ -420,16 +389,6 @@ fn sdtm_project_public_types_are_nameable() {
         domain_code: None,
         key_variables: None,
     });
-    assert_create_domain_override(CreateSdtmProjectDomainOverrideRequest {
-        domain_id: 1,
-        category: DomainCategory::Events,
-        descriptions: Vec::new(),
-    });
-    assert_update_domain_override(UpdateSdtmProjectDomainOverrideRequest {
-        domain_id: 1,
-        category: None,
-        descriptions: None,
-    });
     assert_create_variable(CreateSdtmProjectVariableRequest {
         domain_id: 1,
         variable_code: "AETERM".into(),
@@ -439,20 +398,6 @@ fn sdtm_project_public_types_are_nameable() {
         id: 1,
         variable_code: None,
         variable_sequence: None,
-    });
-    assert_create_variable_override(CreateSdtmProjectVariableOverrideRequest {
-        variable_id: 1,
-        variable_type: SdtmVariableType::Character,
-        variable_core: SdtmVariableCore::Req,
-        variable_role: Some(SdtmRole::Topic),
-        descriptions: Vec::new(),
-    });
-    assert_update_variable_override(UpdateSdtmProjectVariableOverrideRequest {
-        variable_id: 1,
-        variable_type: None,
-        variable_core: None,
-        variable_role: None,
-        descriptions: None,
     });
 
     // Touch the error type to keep it from being dead-code-eliminated
@@ -482,7 +427,7 @@ fn sdtm_project_value_types_are_nameable() {
     fn assert_source(_: VariableSource) {}
     fn assert_from_crf(_: FromCrf) {}
     fn assert_rule(_: ConversionRule) {}
-    fn assert_controlled(_: SdtmVariableControlled) {}
+    fn assert_controlled(_: apis::sdtm_project::SdtmVariableControlled) {}
 
     assert_source(VariableSource::Protocol);
     assert_source(VariableSource::Derived);
@@ -498,7 +443,7 @@ fn sdtm_project_value_types_are_nameable() {
         source: VariableSource::Protocol,
         rule: "AESEV = AESEV".into(),
     });
-    assert_controlled(SdtmVariableControlled {
+    assert_controlled(apis::sdtm_project::SdtmVariableControlled {
         code: Some(vec!["C66731".into()]),
         format: None,
     });
@@ -562,12 +507,12 @@ use apis::domain_model::{
 /// Every public type in `apis::domain_model` is nameable from the test.
 #[test]
 fn domain_model_public_types_are_nameable() {
-    fn assert_controlled(_: SdtmVariableControlled) {}
+    fn assert_controlled(_: apis::sdtm_project::SdtmVariableControlled) {}
     fn assert_view(_: SdtmVariableView) {}
     fn assert_create(_: CreateSdtmVariableRequest) {}
     fn assert_update(_: UpdateSdtmVariableRequest) {}
 
-    assert_controlled(SdtmVariableControlled {
+    assert_controlled(apis::sdtm_project::SdtmVariableControlled {
         code: Some(vec!["C66731".into()]),
         format: None,
     });
