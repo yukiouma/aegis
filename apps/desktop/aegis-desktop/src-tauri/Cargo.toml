@@ -65,6 +65,9 @@ scaffolding = { path = "../../../../lib/crates/scaffolding" }
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-utils = { path = "../../../../lib/crates/windows-utils" }
 
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2"
+
 
 [dev-dependencies]
 wiremock = "0.6"
