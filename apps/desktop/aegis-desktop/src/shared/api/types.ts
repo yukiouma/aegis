@@ -26,6 +26,29 @@ export type ApiError =
   | { kind: "parse"; message: string }
   | { kind: "update"; message: string };
 
+// Mirrors `updater::status::UpdateStatus`. The Rust enum is tagged with
+// `kind = "camelCase"`, so the wire form is
+// `{ kind: "ready", version: "...", ... }`.
+export type UpdateStatus =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | {
+      kind: "downloading";
+      version: string;
+      downloaded: number;
+      total: number | null;
+    }
+  | { kind: "ready"; version: string; notes: string | null; date: string | null }
+  | { kind: "installing"; version: string }
+  | { kind: "failed"; message: string };
+
+// Mirrors `updater::status::UpdateStatusDto`.
+export interface UpdateStatusDto {
+  status: UpdateStatus;
+  currentVersion: string;
+  lastCheckedAt: string | null;
+}
+
 // Mirrors `commands::webview_log::WebviewLogLevel`. The Rust enum
 // uses `#[serde(rename_all = "lowercase")]`, so the wire form is
 // `"warn"` / `"error"`. Other level strings are rejected at the wire

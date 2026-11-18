@@ -126,3 +126,35 @@ export async function writeActiveBranch(
   await store.set(activeBranchKey(projectCode), branchId);
   await store.save();
 }
+
+/**
+ * The settings-store key holding the version whose update prompt the
+ * user deferred. One key for the whole app: the prompt is about the
+ * application, not about a project.
+ */
+const updateDeferredKey = "update.deferredVersion";
+
+/**
+ * Read the version whose update prompt was deferred, or `null` when
+ * nothing has been deferred.
+ */
+export async function readUpdateDeferral(): Promise<string | null> {
+  const store = await getStore();
+  const value = await store.get<string | null>(updateDeferredKey);
+  return typeof value === "string" ? value : null;
+}
+
+/**
+ * Write the deferred version. `null` clears it.
+ */
+export async function writeUpdateDeferral(
+  version: string | null,
+): Promise<void> {
+  const store = await getStore();
+  if (version === null) {
+    await store.delete(updateDeferredKey);
+  } else {
+    await store.set(updateDeferredKey, version);
+  }
+  await store.save();
+}

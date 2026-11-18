@@ -77,6 +77,7 @@ import type {
   UpdateProjectBody,
   UpdateSdtmDomainInput,
   UpdateSdtmVariableInput,
+  UpdateStatusDto,
   UpdateStructureInput,
   UpdateTerminologyVersionInput,
   UpdateUserBody,
@@ -178,6 +179,14 @@ export const api = {
     message: string,
   ): Promise<void> =>
     call<void>("forward_webview_log", { level, message }),
+
+  // updater
+  updateStatus: (): Promise<UpdateStatusDto> =>
+    call<UpdateStatusDto>("update_status"),
+  checkForUpdates: (): Promise<UpdateStatusDto> =>
+    call<UpdateStatusDto>("check_for_updates"),
+  installReadyUpdate: (): Promise<void> =>
+    call<void>("install_ready_update"),
 
   // workspace window
   openProjectWorkspace: async (code: string): Promise<void> => {
@@ -707,6 +716,8 @@ export type {
   UpdateProjectBody,
   UpdateSdtmDomainInput,
   UpdateSdtmVariableInput,
+  UpdateStatus,
+  UpdateStatusDto,
   UpdateStructureInput,
   UpdateTerminologyVersionInput,
   UpdateUserBody,
