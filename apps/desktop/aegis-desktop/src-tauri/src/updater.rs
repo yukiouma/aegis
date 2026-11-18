@@ -10,6 +10,8 @@
 //! - [`version`] — ordering of announced versions against held ones.
 
 pub mod error;
+pub mod notifier;
+pub mod service;
 pub mod source;
 pub mod status;
 pub mod version;

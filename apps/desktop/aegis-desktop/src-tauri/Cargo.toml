@@ -24,7 +24,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-store = "2"
 reqwest = { workspace = true }
-tokio = { workspace = true }
+# The `time` feature is needed by the updater worker's hourly sleep.
+# `tauri` enables `tokio` without it, so it is declared here, on the
+# crate that needs it, rather than on the workspace entry.
+tokio = { workspace = true, features = ["time"] }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
