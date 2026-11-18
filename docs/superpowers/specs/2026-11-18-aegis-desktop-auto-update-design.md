@@ -136,12 +136,21 @@ best-effort: the artifact is in Rust state before the user is ever told.
 ### 7.1 Rust module layout
 
 ```
-src-tauri/src/updater.rs           ← barrel: pub mod status; pub mod source; pub mod service;
+src-tauri/src/updater.rs           ← barrel
+src-tauri/src/updater/error.rs     ← UpdateError + its ApiError conversion
 src-tauri/src/updater/status.rs    ← UpdateStatus + its DTO form
+src-tauri/src/updater/version.rs   ← semver ordering of announced vs held versions
 src-tauri/src/updater/source.rs    ← UpdateSource / PendingRelease traits + plugin impl
+src-tauri/src/updater/notifier.rs  ← UpdateNotifier trait + the Tauri event emitter
 src-tauri/src/updater/service.rs   ← UpdateService: worker, shared status, cache, install
 src-tauri/src/commands/updater.rs  ← #[tauri::command] shims
 ```
+
+The service holds no `AppHandle`. It takes the current version as a
+string and talks to the frontend through an `UpdateNotifier` trait, so
+the whole policy is testable without a Tauri runtime; the `AppHandle`
+stays inside the two adapters that genuinely need it (`PluginUpdateSource`
+calls `app.updater()`, `TauriNotifier` emits the event).
 
 `commands/updater.rs` keeps the guideline's naming rule (a feature with a
 Rust twin uses the same kebab-case name on both sides:
@@ -492,9 +501,32 @@ Settings row shows the failure inline and the manual "Check for updates"
 button is the retry.
 
 The updater has its own internal error type (`updater::UpdateError`) so the
-plugin's error variants are not leaked into the transport layer. At the
-command boundary it maps onto `http::dto::ApiError`, which the frontend
-already knows how to narrow.
+plugin's error variants are not leaked into the transport layer:
+
+```rust
+pub enum UpdateError {
+    /// The release server could not be reached, or the request failed.
+    Network { message: String },
+    /// The response could not be read as a usable release manifest.
+    Invalid { message: String },
+    /// The downloaded package failed signature verification.
+    Verification { message: String },
+    /// The installer could not be launched.
+    Install { message: String },
+    /// There is no downloaded artifact ready to install.
+    NotReady,
+}
+```
+
+The plugin adapter classifies its errors into these: a serialization
+failure, a missing release, a semver or URL parse failure and a missing
+platform are all `Invalid` — the server answered, it just answered with
+something unusable, which is exactly the case the currently-served
+manifest produces. A transport failure is `Network`.
+
+At the command boundary `UpdateError` maps onto `http::dto::ApiError`,
+which the frontend already knows how to narrow: `Network` becomes
+`ApiError::Network`, everything else becomes the new `ApiError::Update`.
 
 That mapping needs **one new `ApiError` variant**:
 
