@@ -1,5 +1,9 @@
 //! Failure modes of the release-update path.
 
+// The command layer maps these onto `ApiError`, so the conversion lives
+// next to the variants it maps.
+use crate::http::dto::ApiError;
+
 /// Everything that can go wrong while checking, downloading, verifying or
 /// installing a release.
 ///
@@ -22,6 +26,19 @@ pub enum UpdateError {
     /// There is no downloaded artifact ready to install.
     #[error("no update is ready to install")]
     NotReady,
+}
+
+impl From<UpdateError> for ApiError {
+    fn from(err: UpdateError) -> Self {
+        match err {
+            // A transport failure to the release server is a network
+            // failure like any other.
+            UpdateError::Network { message } => ApiError::Network { message },
+            other => ApiError::Update {
+                message: other.to_string(),
+            },
+        }
+    }
 }
 
 #[cfg(test)]

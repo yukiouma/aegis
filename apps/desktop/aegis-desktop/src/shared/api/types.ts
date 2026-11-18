@@ -23,7 +23,8 @@ export type ApiError =
   | { kind: "refreshFailed" }
   | { kind: "notImplemented"; detail: string }
   | { kind: "store"; message: string }
-  | { kind: "parse"; message: string };
+  | { kind: "parse"; message: string }
+  | { kind: "update"; message: string };
 
 // Mirrors `commands::webview_log::WebviewLogLevel`. The Rust enum
 // uses `#[serde(rename_all = "lowercase")]`, so the wire form is

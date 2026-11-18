@@ -9,6 +9,7 @@ pub mod project;
 pub mod scaffold;
 pub mod structures;
 pub mod terminology;
+pub mod updater;
 pub mod user;
 pub mod user_credential;
 pub mod webview_log;

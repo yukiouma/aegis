@@ -86,4 +86,10 @@ describe("errorMessage", () => {
       "3 validation error(s): form code empty; item BAD has kind 'text' but options are not allowed",
     );
   });
+
+  it("renders an update error as its message", () => {
+    expect(
+      errorMessage({ kind: "update", message: "verification failed" }),
+    ).toBe("verification failed");
+  });
 });

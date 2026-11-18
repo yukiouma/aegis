@@ -91,6 +91,12 @@ pub enum ApiError {
     /// the same way as the other variants.
     #[error("workbook parse error: {message}")]
     Parse { message: String },
+
+    /// The release-update path failed (check, download, verification or
+    /// install). The updater's own error kinds are folded into one so the
+    /// frontend has a single branch to render.
+    #[error("update failed: {message}")]
+    Update { message: String },
 }
 
 impl From<reqwest::Error> for ApiError {
@@ -153,6 +159,16 @@ mod tests {
         let j = serde_json::to_string(&e).unwrap();
         assert!(j.contains("\"kind\":\"network\""));
         assert!(j.contains("\"message\":\"dns\""));
+    }
+
+    #[test]
+    fn api_error_update_serializes_with_kind_tag() {
+        let e = ApiError::Update {
+            message: "verification failed".into(),
+        };
+        let j = serde_json::to_string(&e).unwrap();
+        assert!(j.contains("\"kind\":\"update\""), "got {j}");
+        assert!(j.contains("\"message\":\"verification failed\""));
     }
 
     #[test]
