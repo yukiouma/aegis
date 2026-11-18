@@ -11,6 +11,7 @@ mod scaffold;
 mod state;
 mod system;
 mod trace_id_setup;
+mod updater;
 
 #[tauri::command]
 fn greet(name: &str) -> String {

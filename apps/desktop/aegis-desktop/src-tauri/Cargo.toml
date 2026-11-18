@@ -41,6 +41,11 @@ tauri-plugin-dialog = "2"
 # middle segment of every trace id. Workspace-pinned so the same
 # version is used by any future crate that wants to mint ids.
 nanoid = { workspace = true }
+# `semver` orders the version the release server announces against the
+# version the updater already holds, so a server-side rollback is never
+# mistaken for a newer release. Not a shared workspace dependency —
+# only the desktop updater needs it.
+semver = "1"
 # `tracing` is the logging facade the desktop backend emits through.
 # Every command shim logs `enter` / `success` / `failed` events on a
 # span that carries `trace_id`; HttpClient emits request lines.
