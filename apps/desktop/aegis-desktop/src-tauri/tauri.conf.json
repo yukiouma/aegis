@@ -38,9 +38,9 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDIzODkwOUFGQjBFRjUzRDUKUldUVlUrK3dyd21KSXlMMEF4Z1Ywa0I0cG9yWjRadUd0Y3RzOVBDVGtPeHJyQzUwVE51dS9xSEEK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ3QzQwMkFCNkNDRjVDRTEKUldUaFhNOXNxd0xFMThRZlhxeWFaSGNyNVE2Q3NrTm5UazNDN2ZPQ0lxVGlkS3VIZ2MrbElaZncK",
       "endpoints": [
-        "http://localhost:3000/release/latest.json"
+        "http://localhost:3000/aegis-desktop/releases/manifest.json"
       ],
       "dangerousInsecureTransportProtocol": true,
       "windows": {
