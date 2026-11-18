@@ -578,6 +578,15 @@ is fixed, or its path is given so it can be fixed here. Either way the
 desktop side does not change: it consumes the plugin's documented manifest
 shape.
 
+**The test release must be a genuine 0.1.1 build, not the 0.1.0 artifact
+relabelled.** The signature covers the artifact bytes, so pointing a
+`"version": "0.1.1"` manifest at the existing signed 0.1.0 installer would
+pass verification — but installing it would put **0.1.0** back on the
+machine, and the next launch would see 0.1.1 > 0.1.0 again and offer the
+same update forever. The release therefore has to be rebuilt with version
+0.1.1 and signed with the same key. The local server already holds that
+signing setup, since it produced the signed 0.1.0 artifact.
+
 **(b) The signing key is correct, but the signatures carry no version.** The
 pubkey in `tauri.conf.json` decodes to minisign key id `D7C402AB6CCF5CE1`,
 and the signature in the served manifest was produced by the same key — the
@@ -675,13 +684,15 @@ with `CARGO_BUILD_JOBS=1` before suspecting the code.
 
 ## 10. What the builder still needs to decide
 
-- **Where the release server lives.** The manifest generator is outside this
-  repository. Fixing `plaform` → `platforms` and `pub_data` → `pub_date`,
-  and publishing a version above `0.1.0`, is a prerequisite for end-to-end
-  verification. If the generator is in a repo on this machine, point at it.
 - **Exact module/function names** for the pieces the design describes by
   intent rather than by name (`UpdateConfig` fields beyond `interval`,
   the internal name of the shared-status mutex wrapper).
+
+One prerequisite sits outside this repository and is **not** the builder's
+to close: the release manifest fix in §7.12(a), and publishing a genuine
+0.1.1 build signed with the existing key, so the flow can be exercised end
+to end. The desktop side is built against the plugin's documented manifest
+shape either way.
 
 ## 11. Decisions taken during design
 
