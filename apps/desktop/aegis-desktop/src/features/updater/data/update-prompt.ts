@@ -20,7 +20,17 @@ export function useUpdatePrompt() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const version = await readUpdateDeferral();
+      let version: string | null;
+      try {
+        version = await readUpdateDeferral();
+      } catch {
+        // A settings store that cannot be read leaves the deferral
+        // unknown, and an unknown deferral must not become a prompt.
+        // Leaving it unloaded keeps the dialog closed; the update is
+        // still visible in the Settings row, which does not depend on
+        // the deferral.
+        return;
+      }
       if (cancelled) return;
       setDeferredVersion(version);
       setDeferralLoaded(true);
@@ -38,7 +48,12 @@ export function useUpdatePrompt() {
   const defer = useCallback(async () => {
     if (!ready) return;
     setDeferredVersion(ready.version);
-    await writeUpdateDeferral(ready.version);
+    try {
+      await writeUpdateDeferral(ready.version);
+    } catch {
+      // The deferral still applies to this session — the state above is
+      // already set. Only the cross-launch persistence is lost.
+    }
   }, [ready]);
 
   return { ready, shouldPrompt, defer, status };

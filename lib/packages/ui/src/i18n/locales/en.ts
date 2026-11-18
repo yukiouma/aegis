@@ -30,6 +30,20 @@ export const en = {
   'settings.password.confirm.cancel': 'Cancel',
   'settings.password.error.updateFailed': 'Failed to update password: {message}',
 
+  'updater.title': 'Aegis {version} is ready to install',
+  'updater.message':
+    'The update has been downloaded and verified. Install it now, or do it later from Settings.',
+  'updater.action.install': 'Update now',
+  'updater.action.later': 'Later',
+  'updater.action.check': 'Check for updates',
+  'updater.status.current': 'Installed version: {version}',
+  'updater.status.checking': 'Checking for updates…',
+  'updater.status.downloading': 'Downloading update… {percent}%',
+  'updater.status.ready': 'Update available: {version}',
+  'updater.status.upToDate': 'Aegis {version} is up to date.',
+  'updater.status.failed': 'Update check failed: {message}',
+  'updater.error.installFailed': 'Failed to install the update: {message}',
+
   'bootstrap.title': 'Aegis Bootstrap',
   'bootstrap.step.health': 'Server health check',
   'bootstrap.step.loginStatus': 'Checking login status',

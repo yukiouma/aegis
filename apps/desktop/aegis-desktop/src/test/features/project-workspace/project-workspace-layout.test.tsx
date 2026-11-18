@@ -148,6 +148,14 @@ describe("ProjectWorkspaceLayout", () => {
     ).toBeInTheDocument();
   });
 
+  // The update prompt mounts in the authenticated shell of the main
+  // window only — a workspace window has its own layout and must not
+  // offer an update.
+  it("does not read the update status", async () => {
+    await renderLayout("/project/DEMO-001/dashboard");
+    expect(mockInvoke).not.toHaveBeenCalledWith("update_status");
+  });
+
   it("clicking the focus-main Button calls setFocus + show on the main window", async () => {
     mockGetAll.mockResolvedValue([
       { label: "main", setFocus: mockFocus, show: mockShow },

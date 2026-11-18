@@ -57,10 +57,16 @@ export function useUpdateReadyEvent() {
   useEffect(() => {
     let unlisten: (() => void) | null = null;
     void (async () => {
-      const { listen } = await import("@tauri-apps/api/event");
-      unlisten = await listen("aegis:update-ready", () => {
-        void qc.invalidateQueries({ queryKey: queryKeys.updater.status() });
-      });
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        unlisten = await listen("aegis:update-ready", () => {
+          void qc.invalidateQueries({ queryKey: queryKeys.updater.status() });
+        });
+      } catch {
+        // A failed subscription is not fatal: the status is still read
+        // when the query mounts, and the manual check still refreshes
+        // it. Only the push is lost.
+      }
     })();
     return () => {
       if (unlisten) unlisten();

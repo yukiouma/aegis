@@ -21,6 +21,7 @@ dependencies = [
  "nanoid",
  "reqwest",
  "scaffolding",
+ "semver",
  "serde",
  "serde_json",
  "tauri",

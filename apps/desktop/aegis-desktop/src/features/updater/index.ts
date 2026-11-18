@@ -7,3 +7,4 @@ export {
   useUpdateReadyEvent,
 } from "./data/update-status";
 export { useUpdatePrompt } from "./data/update-prompt";
+export { UpdateReadyDialog, UpdateStatusRow } from "./components";

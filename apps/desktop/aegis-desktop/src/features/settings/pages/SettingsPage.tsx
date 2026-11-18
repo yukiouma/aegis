@@ -22,6 +22,12 @@ import { useThemeMode, type ThemeMode } from "@aegis/ui/theme";
 
 import { useCurrentUser } from "../../auth/data/current-user";
 import { useLogout } from "../../auth/data/logout";
+import {
+  UpdateStatusRow,
+  useCheckForUpdates,
+  useInstallUpdate,
+  useUpdateStatus,
+} from "../../updater";
 import { useUpdatePassword } from "../data/update-password";
 import { errorMessage } from "../../../shared/api/error";
 
@@ -32,6 +38,9 @@ export function SettingsPage() {
   const currentUser = useCurrentUser();
   const updatePassword = useUpdatePassword();
   const logout = useLogout();
+  const updateStatus = useUpdateStatus();
+  const checkForUpdates = useCheckForUpdates();
+  const installUpdate = useInstallUpdate();
 
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -142,6 +151,23 @@ export function SettingsPage() {
           <MenuItem value="zh-CN">{t("language.simplifiedChinese")}</MenuItem>
         </Select>
       </FormControl>
+
+      <UpdateStatusRow
+        status={updateStatus.data?.status}
+        currentVersion={updateStatus.data?.currentVersion ?? ""}
+        lastCheckedAt={updateStatus.data?.lastCheckedAt ?? null}
+        onCheck={() => void checkForUpdates.mutate()}
+        onInstall={() => void installUpdate.mutate()}
+        checking={checkForUpdates.isPending}
+        installing={installUpdate.isPending}
+        errorMessage={
+          checkForUpdates.isError
+            ? errorMessage(checkForUpdates.error)
+            : installUpdate.isError
+              ? errorMessage(installUpdate.error)
+              : null
+        }
+      />
 
       <Box>
         <Button
