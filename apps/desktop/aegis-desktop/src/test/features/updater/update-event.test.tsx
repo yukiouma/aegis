@@ -14,7 +14,7 @@ vi.mock("@tauri-apps/api/event", () => ({
   emit: vi.fn(),
 }));
 
-import { useUpdateReadyEvent } from "../../../features/updater";
+import { useUpdateStatusEvent } from "../../../features/updater";
 import { captureUnhandledRejections } from "../../helpers/unhandled-rejections";
 
 function makeClient() {
@@ -31,11 +31,11 @@ function wrapperFor(client: QueryClient) {
 
 afterEach(() => cleanup());
 
-describe("useUpdateReadyEvent", () => {
+describe("useUpdateStatusEvent", () => {
   it("handles a subscription that fails instead of leaving an unhandled rejection", async () => {
     const captured = captureUnhandledRejections();
     try {
-      renderHook(() => useUpdateReadyEvent(), {
+      renderHook(() => useUpdateStatusEvent(), {
         wrapper: wrapperFor(makeClient()),
       });
       // Give the rejected subscription a tick to surface as an unhandled

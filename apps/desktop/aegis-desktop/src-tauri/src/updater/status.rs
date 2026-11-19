@@ -30,6 +30,24 @@ pub enum UpdateStatus {
     },
 }
 
+impl UpdateStatus {
+    /// The phase of the status, ignoring its payload.
+    ///
+    /// A download reports its progress through the payload while the
+    /// phase stays the same, so the phase is what tells the frontend
+    /// whether the status it renders has changed.
+    pub fn phase(&self) -> &'static str {
+        match self {
+            UpdateStatus::Idle => "idle",
+            UpdateStatus::Checking => "checking",
+            UpdateStatus::Downloading { .. } => "downloading",
+            UpdateStatus::Ready { .. } => "ready",
+            UpdateStatus::Installing { .. } => "installing",
+            UpdateStatus::Failed { .. } => "failed",
+        }
+    }
+}
+
 /// The status as the `update_status` command returns it.
 ///
 /// `current_version` is the running app's version. `last_checked_at` is
@@ -41,6 +59,12 @@ pub struct UpdateStatusDto {
     pub status: UpdateStatus,
     pub current_version: String,
     pub last_checked_at: Option<String>,
+    /// The message of the most recent failed check.
+    ///
+    /// It is set even when the status could not become `Failed` — a
+    /// check that fails while an update is already held leaves the
+    /// status at `Ready`, and this is where that failure is reported.
+    pub last_error: Option<String>,
 }
 
 #[cfg(test)]
@@ -80,10 +104,12 @@ mod tests {
             status: UpdateStatus::Idle,
             current_version: "0.1.0".into(),
             last_checked_at: Some("2026-11-18T06:05:10Z".into()),
+            last_error: Some("update network failure: offline".into()),
         };
         let json = serde_json::to_value(&dto).unwrap();
         assert_eq!(json["currentVersion"], "0.1.0");
         assert_eq!(json["lastCheckedAt"], "2026-11-18T06:05:10Z");
+        assert_eq!(json["lastError"], "update network failure: offline");
         assert_eq!(json["status"]["kind"], "idle");
     }
 }

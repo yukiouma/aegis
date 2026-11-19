@@ -25,8 +25,8 @@ vi.mock("@tauri-apps/api/event", () => ({
 import {
   useCheckForUpdates,
   useInstallUpdate,
-  useUpdateReadyEvent,
   useUpdateStatus,
+  useUpdateStatusEvent,
 } from "../../../features/updater";
 import { mockCommands, mockInvoke } from "../../helpers/tauri-mock";
 
@@ -58,6 +58,7 @@ describe("the updater hooks", () => {
         status: { kind: "ready", version: "0.1.1", notes: null, date: null },
         currentVersion: "0.1.0",
         lastCheckedAt: "2026-11-18T06:05:10Z",
+        lastError: null,
       }),
     });
     const { result } = renderHook(() => useUpdateStatus(), {
@@ -73,6 +74,7 @@ describe("the updater hooks", () => {
         status: { kind: "idle" },
         currentVersion: "0.1.0",
         lastCheckedAt: null,
+        lastError: null,
       }),
     });
     const { result } = renderHook(() => useCheckForUpdates(), {
@@ -95,16 +97,17 @@ describe("the updater hooks", () => {
     expect(mockInvoke).toHaveBeenCalledWith("install_ready_update");
   });
 
-  it("invalidates the status query when the ready event fires", async () => {
+  it("invalidates the status query when the status changes", async () => {
     mockCommands({
       update_status: () => ({
         status: { kind: "idle" },
         currentVersion: "0.1.0",
         lastCheckedAt: null,
+        lastError: null,
       }),
     });
     function Probe() {
-      useUpdateReadyEvent();
+      useUpdateStatusEvent();
       return null;
     }
     const client = makeClient();
@@ -112,10 +115,47 @@ describe("the updater hooks", () => {
     await waitFor(() => expect(handlers.length).toBe(1));
     const invalidate = vi.spyOn(client, "invalidateQueries");
     await act(async () => {
-      handlers[0]({ payload: { version: "0.1.1" } });
+      handlers[0]({ payload: { phase: "downloading" } });
     });
     expect(invalidate).toHaveBeenCalledWith(
       expect.objectContaining({ queryKey: ["updater", "status"] }),
     );
+  });
+
+  /// The progress bar rides on the status query, and the query only
+  /// refetches on its own while a download is running. Without that, a
+  /// download that starts after the page mounted would never move.
+  it("asks for the status again while a download is running", async () => {
+    vi.useFakeTimers();
+    try {
+      let calls = 0;
+      mockCommands({
+        update_status: () => {
+          calls += 1;
+          return {
+            status: {
+              kind: "downloading",
+              version: "0.1.1",
+              downloaded: 10,
+              total: 100,
+            },
+            currentVersion: "0.1.0",
+            lastCheckedAt: null,
+            lastError: null,
+          };
+        },
+      });
+      renderHook(() => useUpdateStatus(), { wrapper: wrapperFor(makeClient()) });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(calls).toBe(1);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(calls).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -47,6 +47,11 @@ export interface UpdateStatusDto {
   status: UpdateStatus;
   currentVersion: string;
   lastCheckedAt: string | null;
+  // The message of the most recent failed check. It is set even when
+  // the status could not become `failed` — a check that fails while an
+  // update is already held leaves the status at `ready`, and this is
+  // where that failure is reported.
+  lastError: string | null;
 }
 
 // Mirrors `commands::webview_log::WebviewLogLevel`. The Rust enum

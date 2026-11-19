@@ -127,15 +127,19 @@ impl PendingRelease for PluginRelease {
     ) -> Result<Vec<u8>, UpdateError> {
         // The plugin's callback is `FnMut(usize, Option<u64>)`; ours is
         // `Fn(u64, Option<u64>)`, so the chunk length is widened here.
+        //
+        // The plugin verifies the bytes it downloads, so a bad signature
+        // surfaces here as a download failure. Classifying it the same
+        // way as a check failure keeps it a verification failure rather
+        // than a network one — a tampered artifact is not a flaky
+        // connection.
         self.update
             .download(
                 |chunk_len, total| on_progress(chunk_len as u64, total),
                 || {},
             )
             .await
-            .map_err(|e| UpdateError::Network {
-                message: e.to_string(),
-            })
+            .map_err(classify_error)
     }
 
     fn verify(&self, bytes: &[u8]) -> Result<(), UpdateError> {
@@ -217,6 +221,21 @@ mod tests {
         let classified = classify_error(tauri_plugin_updater::Error::Network("status 500".into()));
         assert!(
             matches!(classified, UpdateError::Network { .. }),
+            "got {classified:?}"
+        );
+    }
+
+    /// The plugin verifies the bytes it downloads, so a bad signature
+    /// surfaces as a download failure. It must stay a verification
+    /// failure: a tampered artifact is not a flaky connection, and
+    /// calling it one would point the reader at the wrong thing.
+    #[test]
+    fn a_signature_failure_during_the_download_is_a_verification_failure() {
+        let classified = classify_error(tauri_plugin_updater::Error::Minisign(
+            minisign_verify::Error::InvalidSignature,
+        ));
+        assert!(
+            matches!(classified, UpdateError::Verification { .. }),
             "got {classified:?}"
         );
     }

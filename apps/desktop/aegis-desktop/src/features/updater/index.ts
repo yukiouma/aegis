@@ -4,7 +4,7 @@ export {
   useUpdateStatus,
   useCheckForUpdates,
   useInstallUpdate,
-  useUpdateReadyEvent,
+  useUpdateStatusEvent,
 } from "./data/update-status";
 export { useUpdatePrompt } from "./data/update-prompt";
 export { UpdateReadyDialog, UpdateStatusRow } from "./components";

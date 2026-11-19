@@ -156,6 +156,7 @@ export function SettingsPage() {
         status={updateStatus.data?.status}
         currentVersion={updateStatus.data?.currentVersion ?? ""}
         lastCheckedAt={updateStatus.data?.lastCheckedAt ?? null}
+        lastError={updateStatus.data?.lastError ?? null}
         onCheck={() => void checkForUpdates.mutate()}
         onInstall={() => void installUpdate.mutate()}
         checking={checkForUpdates.isPending}

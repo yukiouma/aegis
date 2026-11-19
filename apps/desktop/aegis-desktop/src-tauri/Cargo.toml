@@ -84,3 +84,8 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 # `tracing_init` and `trace_id_setup` tests don't touch the repo
 # working tree.
 tempfile = { workspace = true }
+# The updater's error classification test builds the plugin's signature
+# failure, which wraps a `minisign_verify::Error`. The crate is already
+# in the tree through `tauri-plugin-updater`; this makes it nameable
+# from a test.
+minisign-verify = "0.3"

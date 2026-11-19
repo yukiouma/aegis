@@ -18,6 +18,7 @@ dependencies = [
  "chrono",
  "entities",
  "logging-utils",
+ "minisign-verify",
  "nanoid",
  "reqwest",
  "scaffolding",

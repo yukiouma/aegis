@@ -13,6 +13,7 @@ export interface UpdateStatusRowProps {
   status: UpdateStatus | undefined;
   currentVersion: string;
   lastCheckedAt: string | null;
+  lastError: string | null;
   onCheck: () => void;
   onInstall: () => void;
   checking: boolean;
@@ -28,6 +29,7 @@ export function UpdateStatusRow({
   status,
   currentVersion,
   lastCheckedAt,
+  lastError,
   onCheck,
   onInstall,
   checking,
@@ -40,6 +42,13 @@ export function UpdateStatusRow({
     status?.kind === "downloading" && status.total
       ? Math.round((status.downloaded / status.total) * 100)
       : 0;
+
+  // The failure of the last check. A check that failed while a release
+  // is held leaves the status at `ready` — the download is still
+  // installable — so the failure is shown next to it rather than in
+  // place of it.
+  const failureMessage =
+    status?.kind === "failed" ? status.message : lastError;
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
@@ -81,9 +90,9 @@ export function UpdateStatusRow({
         </Typography>
       )}
 
-      {status?.kind === "failed" && (
+      {failureMessage !== null && (
         <Typography variant="body2" color="error">
-          {t("updater.status.failed", { message: status.message })}
+          {t("updater.status.failed", { message: failureMessage })}
         </Typography>
       )}
 

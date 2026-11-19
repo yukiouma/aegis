@@ -9,9 +9,9 @@ import { queryKeys } from "../../../shared/query";
  *
  * `refetchInterval` is active only while a download is running: the
  * global client sets `staleTime: Infinity`, so without this the
- * progress bar would never move. Once the download settles the polling
- * stops and the status is refreshed only by the `aegis:update-ready`
- * event.
+ * progress bar would never move. The download has to be *seen* first —
+ * the status event below is what brings the frontend from "idle" to
+ * "downloading" — and once the download settles the polling stops.
  */
 export function useUpdateStatus() {
   return useQuery<UpdateStatusDto, ApiError>({
@@ -47,19 +47,25 @@ export function useInstallUpdate() {
 }
 
 /**
- * Subscribes to `aegis:update-ready` and invalidates the status query,
- * so a release that finishes downloading after the page mounted is
- * picked up. The dynamic import keeps the listener off the synchronous
- * startup path, the same way `useListenForSettingsChanges` does.
+ * Subscribes to `aegis:update-status` and invalidates the status
+ * query, so a change the frontend did not ask for still reaches it: a
+ * download that starts after the page mounted, a check that failed in
+ * the background, the release that is ready to install.
+ *
+ * The event carries the new phase and nothing else — the status itself
+ * is read through the command, so there is one source of truth and the
+ * two cannot disagree. The dynamic import keeps the listener off the
+ * synchronous startup path, the same way `useListenForSettingsChanges`
+ * does.
  */
-export function useUpdateReadyEvent() {
+export function useUpdateStatusEvent() {
   const qc = useQueryClient();
   useEffect(() => {
     let unlisten: (() => void) | null = null;
     void (async () => {
       try {
         const { listen } = await import("@tauri-apps/api/event");
-        unlisten = await listen("aegis:update-ready", () => {
+        unlisten = await listen("aegis:update-status", () => {
           void qc.invalidateQueries({ queryKey: queryKeys.updater.status() });
         });
       } catch {

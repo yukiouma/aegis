@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Duration;
 
 use chrono::Utc;
@@ -40,6 +40,13 @@ struct ReadyRelease {
 struct ServiceState {
     status: UpdateStatus,
     last_checked_at: Option<String>,
+    /// The message of the most recent failed check.
+    ///
+    /// It is separate from the status because a check that fails while a
+    /// release is already held leaves the status at `Ready` — the
+    /// download is still installable, and the failure is reported next
+    /// to it rather than in place of it.
+    last_error: Option<String>,
     ready: Option<ReadyRelease>,
 }
 
@@ -108,6 +115,7 @@ impl UpdateService {
                 state: Mutex::new(ServiceState {
                     status: UpdateStatus::Idle,
                     last_checked_at: None,
+                    last_error: None,
                     ready: None,
                 }),
                 checking: AtomicBool::new(false),
@@ -115,17 +123,28 @@ impl UpdateService {
         }
     }
 
-    /// The current status, as the frontend reads it.
-    pub fn status(&self) -> UpdateStatusDto {
-        let state = self
-            .inner
+    /// The state mutex, recovered from poisoning.
+    ///
+    /// A panic in one of the updater's own paths poisons the mutex. The
+    /// frontend reads the status on a timer, so a poisoned mutex must not
+    /// turn every read into an error — the state it holds is a phase, a
+    /// timestamp and a downloaded artifact, and none of them is left
+    /// half-written by a panic.
+    fn lock(&self) -> MutexGuard<'_, ServiceState> {
+        self.inner
             .state
             .lock()
-            .expect("updater state mutex poisoned");
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// The current status, as the frontend reads it.
+    pub fn status(&self) -> UpdateStatusDto {
+        let state = self.lock();
         UpdateStatusDto {
             status: state.status.clone(),
             current_version: self.inner.current_version.clone(),
             last_checked_at: state.last_checked_at.clone(),
+            last_error: state.last_error.clone(),
         }
     }
 
@@ -142,9 +161,16 @@ impl UpdateService {
     }
 
     /// The worker loop: check, then wait an interval, forever.
+    ///
+    /// Each check runs in its own task, so a panic in one of them cannot
+    /// take the loop down with it. An updater that stopped checking would
+    /// silently never update again, and nothing would say so.
     pub async fn run(self) {
         loop {
-            self.check_now().await;
+            let service = self.clone();
+            if let Err(e) = tokio::spawn(async move { service.check_now().await }).await {
+                tracing::warn!(error = %e, "update check panicked");
+            }
             tokio::time::sleep(self.inner.config.interval).await;
         }
     }
@@ -155,11 +181,7 @@ impl UpdateService {
     /// so this never returns there.
     pub async fn install_ready(&self) -> Result<(), UpdateError> {
         let ready = {
-            let mut state = self
-                .inner
-                .state
-                .lock()
-                .expect("updater state mutex poisoned");
+            let mut state = self.lock();
             state.ready.take()
         };
         let Some(ready) = ready else {
@@ -179,17 +201,15 @@ impl UpdateService {
                 // failure.
                 let notes = ready.notes.clone();
                 let date = ready.date.clone();
-                let mut state = self
-                    .inner
-                    .state
-                    .lock()
-                    .expect("updater state mutex poisoned");
-                state.ready = Some(ready);
-                state.status = UpdateStatus::Ready {
+                {
+                    let mut state = self.lock();
+                    state.ready = Some(ready);
+                }
+                self.set_status(UpdateStatus::Ready {
                     version,
                     notes,
                     date,
-                };
+                });
                 Err(e)
             }
         }
@@ -206,9 +226,7 @@ impl UpdateService {
             }
             Err(e) => {
                 tracing::warn!(error = %e, "update check failed");
-                self.finish_check(UpdateStatus::Failed {
-                    message: e.to_string(),
-                });
+                self.fail_check(e.to_string());
                 return self.status();
             }
         };
@@ -220,11 +238,7 @@ impl UpdateService {
         // megabytes, and what stops a server-side rollback from
         // replacing a newer release with an older one.
         let held = {
-            let state = self
-                .inner
-                .state
-                .lock()
-                .expect("updater state mutex poisoned");
+            let state = self.lock();
             state
                 .ready
                 .as_ref()
@@ -258,23 +272,21 @@ impl UpdateService {
                     Ok(bytes) => (bytes, false),
                     Err(e) => {
                         tracing::warn!(error = %e, "update download failed");
-                        self.finish_check(UpdateStatus::Failed {
-                            message: e.to_string(),
-                        });
+                        self.fail_check(e.to_string());
                         return self.status();
                     }
                 }
             }
         };
 
-        // Verify before the release is ever announced. The plugin does
-        // not verify on download — only inside `install` — so without
-        // this a tampered artifact would reach the user.
+        // Verify before the release is ever announced. The plugin
+        // verifies the bytes it downloads as well, but the artifact can
+        // also come back from the disk cache — bytes that were verified
+        // against an earlier manifest and are checked against this one
+        // here. A tampered artifact never reaches `Ready`.
         if let Err(e) = release.verify(&bytes) {
             tracing::warn!(error = %e, "update verification failed");
-            self.finish_check(UpdateStatus::Failed {
-                message: e.to_string(),
-            });
+            self.fail_check(e.to_string());
             return self.status();
         }
 
@@ -289,11 +301,7 @@ impl UpdateService {
         let notes = release.notes().map(|n| n.to_string());
         let date = release.date().map(|d| d.to_string());
         {
-            let mut state = self
-                .inner
-                .state
-                .lock()
-                .expect("updater state mutex poisoned");
+            let mut state = self.lock();
             state.ready = Some(ReadyRelease {
                 version: version.clone(),
                 notes: notes.clone(),
@@ -307,9 +315,6 @@ impl UpdateService {
             notes: notes.clone(),
             date: date.clone(),
         });
-        self.inner
-            .notifier
-            .notify_ready(&version, notes.as_deref(), date.as_deref());
         self.status()
     }
 
@@ -394,24 +399,72 @@ impl UpdateService {
         }
     }
 
+    /// Stores a new phase and tells the frontend when the phase moved.
+    ///
+    /// The frontend reads the status through the `update_status` command;
+    /// this only says "something moved, ask again". It fires on a phase
+    /// change and not on every progress update, so a download does not
+    /// flood the channel.
     fn set_status(&self, status: UpdateStatus) {
-        let mut state = self
-            .inner
-            .state
-            .lock()
-            .expect("updater state mutex poisoned");
-        state.status = status;
+        let phase = status.phase();
+        let changed = {
+            let mut state = self.lock();
+            let changed = state.status.phase() != phase;
+            state.status = status;
+            changed
+        };
+        if changed {
+            self.inner.notifier.notify_status_changed(phase);
+        }
     }
 
     /// Records the completed check and the phase it ended in.
     fn finish_check(&self, status: UpdateStatus) {
-        let mut state = self
-            .inner
-            .state
-            .lock()
-            .expect("updater state mutex poisoned");
-        state.status = status;
-        state.last_checked_at = Some(Utc::now().to_rfc3339());
+        let phase = status.phase();
+        let changed = {
+            let mut state = self.lock();
+            let changed = state.status.phase() != phase;
+            state.status = status;
+            state.last_checked_at = Some(Utc::now().to_rfc3339());
+            state.last_error = None;
+            changed
+        };
+        if changed {
+            self.inner.notifier.notify_status_changed(phase);
+        }
+    }
+
+    /// Records a failed check.
+    ///
+    /// A release that is already downloaded stays installable: the
+    /// failure is reported next to it, not in place of it. Replacing a
+    /// `Ready` status with a `Failed` one would hide the update the user
+    /// has not installed yet — and the artifact is still on disk, so
+    /// `install_ready` would still work while the UI claimed there was
+    /// nothing to install.
+    fn fail_check(&self, message: String) {
+        let phase = {
+            let mut state = self.lock();
+            state.last_checked_at = Some(Utc::now().to_rfc3339());
+            state.last_error = Some(message.clone());
+            let status = match &state.ready {
+                Some(ready) => UpdateStatus::Ready {
+                    version: ready.version.clone(),
+                    notes: ready.notes.clone(),
+                    date: ready.date.clone(),
+                },
+                None => UpdateStatus::Failed {
+                    message: message.clone(),
+                },
+            };
+            let phase = status.phase();
+            state.status = status;
+            phase
+        };
+        // The phase may not have moved — a failure while a release is
+        // held leaves it at `Ready` — but the failure is new, so the
+        // frontend is told either way.
+        self.inner.notifier.notify_status_changed(phase);
     }
 }
 
@@ -497,15 +550,89 @@ mod tests {
         }
     }
 
+    /// A release whose download fails.
+    struct FailingDownloadRelease {
+        version: String,
+    }
+
+    #[async_trait::async_trait]
+    impl PendingRelease for FailingDownloadRelease {
+        fn version(&self) -> &str {
+            &self.version
+        }
+
+        fn notes(&self) -> Option<&str> {
+            None
+        }
+
+        fn date(&self) -> Option<&str> {
+            None
+        }
+
+        async fn download(
+            &self,
+            _on_progress: &(dyn Fn(u64, Option<u64>) + Send + Sync),
+        ) -> Result<Vec<u8>, UpdateError> {
+            Err(UpdateError::Network {
+                message: "connection reset".into(),
+            })
+        }
+
+        fn verify(&self, _bytes: &[u8]) -> Result<(), UpdateError> {
+            Ok(())
+        }
+
+        fn install(&self, _bytes: &[u8]) -> Result<(), UpdateError> {
+            Ok(())
+        }
+    }
+
+    /// A source whose check takes a while, so a second check can start
+    /// while the first is still running.
+    struct SlowSource {
+        delay: Duration,
+        checks: Arc<AtomicUsize>,
+    }
+
+    #[async_trait::async_trait]
+    impl UpdateSource for SlowSource {
+        async fn check(&self) -> Result<Option<Arc<dyn PendingRelease>>, UpdateError> {
+            self.checks.fetch_add(1, Ordering::SeqCst);
+            tokio::time::sleep(self.delay).await;
+            Ok(None)
+        }
+    }
+
+    /// A source whose first check panics.
+    struct PanickingSource {
+        checks: Arc<AtomicUsize>,
+    }
+
+    #[async_trait::async_trait]
+    impl UpdateSource for PanickingSource {
+        async fn check(&self) -> Result<Option<Arc<dyn PendingRelease>>, UpdateError> {
+            let attempt = self.checks.fetch_add(1, Ordering::SeqCst);
+            if attempt == 0 {
+                panic!("the release server exploded");
+            }
+            Ok(None)
+        }
+    }
+
     /// Records the notifications the service emits.
     struct RecordingNotifier {
-        sent: Arc<Mutex<Vec<String>>>,
+        phases: Arc<Mutex<Vec<String>>>,
     }
 
     impl UpdateNotifier for RecordingNotifier {
-        fn notify_ready(&self, version: &str, _notes: Option<&str>, _date: Option<&str>) {
-            self.sent.lock().unwrap().push(version.to_string());
+        fn notify_status_changed(&self, phase: &str) {
+            self.phases.lock().unwrap().push(phase.to_string());
         }
+    }
+
+    /// The phases the notifier was told about.
+    fn phases(f: &Fixture) -> Vec<String> {
+        f.notifier.phases.lock().unwrap().clone()
     }
 
     /// A service over a temp data directory, plus the fakes behind it.
@@ -539,7 +666,7 @@ mod tests {
             checks: Arc::new(AtomicUsize::new(0)),
         });
         let notifier = Arc::new(RecordingNotifier {
-            sent: Arc::new(Mutex::new(Vec::new())),
+            phases: Arc::new(Mutex::new(Vec::new())),
         });
         let service = UpdateService::new(
             "0.1.0".into(),
@@ -582,17 +709,23 @@ mod tests {
                 date: Some("2026-11-18T06:05:10Z".into()),
             }
         );
-        assert_eq!(*f.notifier.sent.lock().unwrap(), vec!["0.1.1".to_string()]);
+        assert_eq!(
+            phases(&f),
+            vec![
+                "checking".to_string(),
+                "downloading".to_string(),
+                "ready".to_string()
+            ]
+        );
         assert_eq!(f.downloads.load(Ordering::SeqCst), 1);
     }
 
     #[tokio::test]
-    async fn the_same_version_is_not_downloaded_or_announced_twice() {
+    async fn the_same_version_is_not_downloaded_twice() {
         let f = fixture(Some("0.1.1"), false);
         f.service.check_now().await;
         f.service.check_now().await;
         assert_eq!(f.downloads.load(Ordering::SeqCst), 1);
-        assert_eq!(f.notifier.sent.lock().unwrap().len(), 1);
     }
 
     #[tokio::test]
@@ -629,7 +762,11 @@ mod tests {
             "got {:?}",
             dto.status
         );
-        assert!(f.notifier.sent.lock().unwrap().is_empty());
+        assert!(
+            !phases(&f).iter().any(|p| p == "ready"),
+            "the release was never announced: {:?}",
+            phases(&f)
+        );
     }
 
     #[tokio::test]
@@ -642,7 +779,11 @@ mod tests {
             "got {:?}",
             dto.status
         );
-        assert!(f.notifier.sent.lock().unwrap().is_empty());
+        assert!(
+            !phases(&f).iter().any(|p| p == "ready"),
+            "the release was never announced: {:?}",
+            phases(&f)
+        );
     }
 
     #[tokio::test]
@@ -669,7 +810,7 @@ mod tests {
                 UpdateConfig::default(),
                 source,
                 Arc::new(RecordingNotifier {
-                    sent: Arc::new(Mutex::new(Vec::new())),
+                    phases: Arc::new(Mutex::new(Vec::new())),
                 }),
                 dir.path().to_path_buf(),
             )
@@ -716,7 +857,7 @@ mod tests {
                 UpdateConfig::default(),
                 source,
                 Arc::new(RecordingNotifier {
-                    sent: Arc::new(Mutex::new(Vec::new())),
+                    phases: Arc::new(Mutex::new(Vec::new())),
                 }),
                 dir.path().to_path_buf(),
             )
@@ -759,7 +900,7 @@ mod tests {
                 UpdateConfig::default(),
                 source,
                 Arc::new(RecordingNotifier {
-                    sent: Arc::new(Mutex::new(Vec::new())),
+                    phases: Arc::new(Mutex::new(Vec::new())),
                 }),
                 dir.path().to_path_buf(),
             )
@@ -799,5 +940,138 @@ mod tests {
             f.service.install_ready().await,
             Err(UpdateError::NotReady)
         ));
+    }
+
+    /// The frontend reads the status through the `update_status` command,
+    /// and the command is only called again when something tells it to.
+    /// A check that failed is something.
+    #[tokio::test]
+    async fn a_failed_check_tells_the_frontend_to_read_the_status_again() {
+        let f = fixture(Some("0.1.1"), false);
+        *f.source.fail_with.lock().unwrap() = Some("offline".into());
+        f.service.check_now().await;
+        assert!(
+            phases(&f).iter().any(|p| p == "failed"),
+            "the failure was not announced: {:?}",
+            phases(&f)
+        );
+    }
+
+    /// A download that fails is a failure, not a release.
+    #[tokio::test]
+    async fn a_failed_download_leaves_the_status_failed() {
+        let f = fixture(Some("0.1.1"), false);
+        *f.source.announced.lock().unwrap() = Some(Arc::new(FailingDownloadRelease {
+            version: "0.1.1".into(),
+        }));
+        let dto = f.service.check_now().await;
+        assert!(
+            matches!(dto.status, UpdateStatus::Failed { .. }),
+            "got {:?}",
+            dto.status
+        );
+    }
+
+    /// A release that is already downloaded stays installable when the
+    /// next check fails. The artifact is on disk and verified; replacing
+    /// the status with a failure would hide the update the user has not
+    /// installed yet, and the row's install button with it.
+    #[tokio::test]
+    async fn a_failed_check_keeps_a_held_release_installable() {
+        let f = fixture(Some("0.1.1"), false);
+        f.service.check_now().await;
+        *f.source.fail_with.lock().unwrap() = Some("offline".into());
+        let dto = f.service.check_now().await;
+        assert_eq!(
+            dto.status,
+            UpdateStatus::Ready {
+                version: "0.1.1".into(),
+                notes: Some("release notes".into()),
+                date: Some("2026-11-18T06:05:10Z".into()),
+            },
+            "the downloaded release stays installable"
+        );
+        assert_eq!(
+            dto.last_error.as_deref(),
+            Some("update network failure: offline"),
+            "the failure is reported next to the release"
+        );
+    }
+
+    /// A manual check during a download must not start a second one.
+    #[tokio::test]
+    async fn a_second_check_while_one_is_in_flight_is_a_no_op() {
+        let checks = Arc::new(AtomicUsize::new(0));
+        let service = UpdateService::new(
+            "0.1.0".into(),
+            UpdateConfig::default(),
+            Arc::new(SlowSource {
+                delay: Duration::from_secs(30),
+                checks: checks.clone(),
+            }),
+            Arc::new(RecordingNotifier {
+                phases: Arc::new(Mutex::new(Vec::new())),
+            }),
+            tempfile::tempdir().unwrap().path().to_path_buf(),
+        );
+        let running = service.clone();
+        let first = tokio::spawn(async move { running.check_now().await });
+        // Let the first check reach the source.
+        tokio::time::sleep(Duration::from_millis(20)).await;
+
+        let second = service.check_now().await;
+        assert_eq!(
+            checks.load(Ordering::SeqCst),
+            1,
+            "the second check did not start another one"
+        );
+        assert_eq!(second.status, UpdateStatus::Checking);
+        first.abort();
+    }
+
+    /// A check that panics must not take the hourly loop down with it:
+    /// an updater that stopped checking would silently never update
+    /// again.
+    #[tokio::test]
+    async fn a_panicking_check_does_not_stop_the_worker_loop() {
+        let checks = Arc::new(AtomicUsize::new(0));
+        let service = UpdateService::new(
+            "0.1.0".into(),
+            UpdateConfig {
+                interval: Duration::from_millis(10),
+            },
+            Arc::new(PanickingSource {
+                checks: checks.clone(),
+            }),
+            Arc::new(RecordingNotifier {
+                phases: Arc::new(Mutex::new(Vec::new())),
+            }),
+            tempfile::tempdir().unwrap().path().to_path_buf(),
+        );
+        let worker = tokio::spawn(service.run());
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while checks.load(Ordering::SeqCst) < 2 {
+                tokio::time::sleep(Duration::from_millis(5)).await;
+            }
+        })
+        .await
+        .expect("the worker kept checking after the panic");
+        worker.abort();
+    }
+
+    /// A panic in one of the updater's own paths poisons the state
+    /// mutex. The frontend reads the status on a timer, so a poisoned
+    /// mutex must not turn every read into an error.
+    #[tokio::test]
+    async fn a_poisoned_state_mutex_does_not_break_the_status_read() {
+        let f = fixture(None, false);
+        let inner = f.service.inner.clone();
+        let _ = std::thread::spawn(move || {
+            let _guard = inner.state.lock().unwrap();
+            panic!("poison the mutex");
+        })
+        .join();
+        let dto = f.service.status();
+        assert_eq!(dto.status, UpdateStatus::Idle);
     }
 }

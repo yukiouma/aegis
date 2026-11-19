@@ -1,9 +1,10 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
+import { userEvent } from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { UpdateStatusRow } from "../../../features/updater/components/UpdateStatusRow";
 
@@ -25,6 +26,7 @@ function renderRow(props: Parameters<typeof UpdateStatusRow>[0]) {
 const BASE = {
   currentVersion: "0.1.0",
   lastCheckedAt: "2026-11-18T06:05:10Z",
+  lastError: null,
   onCheck: () => {},
   onInstall: () => {},
   checking: false,
@@ -86,5 +88,29 @@ describe("UpdateStatusRow", () => {
   it("omits the installed version until it is known", () => {
     renderRow({ ...BASE, status: { kind: "idle" }, currentVersion: "" });
     expect(screen.queryByText(/Installed version/)).not.toBeInTheDocument();
+  });
+
+  it("triggers a check when the check button is clicked", async () => {
+    const onCheck = vi.fn();
+    renderRow({ ...BASE, status: { kind: "idle" }, onCheck });
+    await userEvent.click(
+      screen.getByRole("button", { name: "Check for updates" }),
+    );
+    expect(onCheck).toHaveBeenCalled();
+  });
+
+  /// A check that failed while a release is held leaves the status at
+  /// `Ready` — the download is still installable. The failure is shown
+  /// next to it, not in place of it.
+  it("shows a failed check next to an available update", () => {
+    renderRow({
+      ...BASE,
+      status: { kind: "ready", version: "0.1.1", notes: null, date: null },
+      lastError: "update network failure: offline",
+    });
+    expect(screen.getByText("Update available: 0.1.1")).toBeInTheDocument();
+    expect(
+      screen.getByText("Update check failed: update network failure: offline"),
+    ).toBeInTheDocument();
   });
 });

@@ -28,6 +28,7 @@ vi.mock("@tauri-apps/plugin-store", () => ({
 }));
 
 import { UpdateReadyDialog } from "../../../features/updater/components/UpdateReadyDialog";
+import { captureUnhandledRejections } from "../../helpers/unhandled-rejections";
 import { mockCommands, mockInvoke } from "../../helpers/tauri-mock";
 
 function makeClient() {
@@ -56,6 +57,7 @@ const READY_STATUS = {
   status: { kind: "ready", version: "0.1.1", notes: null, date: null },
   currentVersion: "0.1.0",
   lastCheckedAt: "2026-11-18T06:05:10Z",
+  lastError: null,
 };
 
 beforeEach(() => {
@@ -102,6 +104,7 @@ describe("UpdateReadyDialog", () => {
         status: { kind: "failed", message: "release server unreachable" },
         currentVersion: "0.1.0",
         lastCheckedAt: "2026-11-18T06:05:10Z",
+        lastError: null,
       }),
     });
     renderDialog();
@@ -109,5 +112,65 @@ describe("UpdateReadyDialog", () => {
     expect(
       screen.queryByText("Aegis 0.1.1 is ready to install"),
     ).not.toBeInTheDocument();
+  });
+
+  it("installs the release when Update now is clicked", async () => {
+    mockCommands({
+      update_status: () => READY_STATUS,
+      install_ready_update: () => undefined,
+    });
+    renderDialog();
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Update now" }),
+    );
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith("install_ready_update"),
+    );
+  });
+
+  it("shows an install failure in an alert", async () => {
+    mockCommands({
+      update_status: () => READY_STATUS,
+      install_ready_update: () => {
+        throw { kind: "update", message: "the installer would not start" };
+      },
+    });
+    renderDialog();
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Update now" }),
+    );
+    expect(
+      await screen.findByText(
+        "Failed to install the update: the installer would not start",
+      ),
+    ).toBeInTheDocument();
+  });
+
+  /// The install command rejects on Windows as the process exits. The
+  /// rejection must not escape as an unhandled rejection — the webview
+  /// log ships those to the server.
+  it("does not leave an unhandled rejection when the install fails", async () => {
+    const captured = captureUnhandledRejections();
+    try {
+      mockCommands({
+        update_status: () => READY_STATUS,
+        install_ready_update: () => {
+          throw { kind: "update", message: "the installer would not start" };
+        },
+      });
+      renderDialog();
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Update now" }),
+      );
+      await screen.findByText(
+        "Failed to install the update: the installer would not start",
+      );
+      // Give the rejected mutation a tick to surface as an unhandled
+      // rejection if nothing handled it.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(captured.rejections).toEqual([]);
+    } finally {
+      captured.release();
+    }
   });
 });

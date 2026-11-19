@@ -10,7 +10,7 @@ import {
 import { useI18n } from "@aegis/ui/i18n";
 
 import { errorMessage } from "../../../shared/api/error";
-import { useInstallUpdate, useUpdateReadyEvent } from "../data/update-status";
+import { useInstallUpdate, useUpdateStatusEvent } from "../data/update-status";
 import { useUpdatePrompt } from "../data/update-prompt";
 
 /**
@@ -25,7 +25,7 @@ export function UpdateReadyDialog() {
   const install = useInstallUpdate();
   // One listener for the whole window: the status query it invalidates
   // is shared with the Settings row.
-  useUpdateReadyEvent();
+  useUpdateStatusEvent();
 
   const version = ready?.version ?? "";
   const handleLater = () => {
@@ -54,7 +54,7 @@ export function UpdateReadyDialog() {
           {t("updater.action.later")}
         </Button>
         <Button
-          onClick={() => void install.mutateAsync()}
+          onClick={() => install.mutate()}
           variant="contained"
           disabled={install.isPending}
         >
