@@ -20,6 +20,7 @@ export const en = {
   'settings.theme.totoro': 'Totoro',
   'settings.theme.xi': 'XI',
   'settings.language.label': 'Language',
+  'settings.version.section': 'Version',
   'settings.password.button': 'Update password',
   'settings.password.dialog.title': 'Update password',
   'settings.password.dialog.field': 'New password',

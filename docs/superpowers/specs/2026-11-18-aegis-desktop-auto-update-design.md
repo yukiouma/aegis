@@ -464,10 +464,14 @@ src/features/updater/components/index.ts
   It owns its own hooks, the same way `SettingsSyncBridge` owns
   `useHydrateSettingsFromStore` — it is not page-owned, so the "pages own the
   hooks" convention does not apply to it.
-- `UpdateStatusRow` is rendered by `SettingsPage`. Following the repo's
-  drawer/dialog convention, the page owns the hooks
-  (`useUpdateStatus`, `useCheckForUpdates`, `useInstallUpdate`) and passes
-  the values down as props; the component itself imports no API module.
+- `UpdateStatusRow` is rendered by `SettingsPage`, inside a **Version
+  section** — a card with a `Version` heading that holds the version
+  information and both update buttons together, so the running version,
+  what the updater is doing and the actions are one thing to find rather
+  than three loose lines on the page. Following the repo's drawer/dialog
+  convention, the page owns the hooks (`useUpdateStatus`,
+  `useCheckForUpdates`, `useInstallUpdate`) and passes the values down as
+  props; the component itself imports no API module.
 - Because both consumers live in the authenticated shell, the status query
   only ever runs after login. The Rust worker still checks and downloads in
   the background regardless of login state — the "background" requirement is

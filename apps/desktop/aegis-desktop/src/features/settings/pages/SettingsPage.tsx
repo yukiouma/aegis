@@ -4,6 +4,9 @@ import {
   Alert,
   Box,
   Button,
+  Card,
+  CardContent,
+  CardHeader,
   Dialog,
   DialogActions,
   DialogContent,
@@ -152,23 +155,41 @@ export function SettingsPage() {
         </Select>
       </FormControl>
 
-      <UpdateStatusRow
-        status={updateStatus.data?.status}
-        currentVersion={updateStatus.data?.currentVersion ?? ""}
-        lastCheckedAt={updateStatus.data?.lastCheckedAt ?? null}
-        lastError={updateStatus.data?.lastError ?? null}
-        onCheck={() => void checkForUpdates.mutate()}
-        onInstall={() => void installUpdate.mutate()}
-        checking={checkForUpdates.isPending}
-        installing={installUpdate.isPending}
-        errorMessage={
-          checkForUpdates.isError
-            ? errorMessage(checkForUpdates.error)
-            : installUpdate.isError
-              ? errorMessage(installUpdate.error)
-              : null
-        }
-      />
+      {/* The version section: the running version, what the updater is
+          doing, and the two actions. It is a labelled region so the
+          version information and its buttons are one thing to find. */}
+      <Card
+        component="section"
+        aria-labelledby="settings-version-section"
+        sx={{ maxWidth: 480 }}
+      >
+        <CardHeader
+          title={
+            <Typography id="settings-version-section" variant="h6">
+              {t("settings.version.section")}
+            </Typography>
+          }
+        />
+        <CardContent>
+          <UpdateStatusRow
+            status={updateStatus.data?.status}
+            currentVersion={updateStatus.data?.currentVersion ?? ""}
+            lastCheckedAt={updateStatus.data?.lastCheckedAt ?? null}
+            lastError={updateStatus.data?.lastError ?? null}
+            onCheck={() => void checkForUpdates.mutate()}
+            onInstall={() => void installUpdate.mutate()}
+            checking={checkForUpdates.isPending}
+            installing={installUpdate.isPending}
+            errorMessage={
+              checkForUpdates.isError
+                ? errorMessage(checkForUpdates.error)
+                : installUpdate.isError
+                  ? errorMessage(installUpdate.error)
+                  : null
+            }
+          />
+        </CardContent>
+      </Card>
 
       <Box>
         <Button
