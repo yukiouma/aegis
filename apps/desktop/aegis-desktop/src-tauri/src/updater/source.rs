@@ -84,10 +84,9 @@ fn classify_error(err: tauri_plugin_updater::Error) -> UpdateError {
 #[async_trait]
 impl UpdateSource for PluginUpdateSource {
     async fn check(&self) -> Result<Option<Arc<dyn PendingRelease>>, UpdateError> {
-        let updater = self
-            .handle
-            .updater()
-            .map_err(|e| UpdateError::Invalid { message: e.to_string() })?;
+        let updater = self.handle.updater().map_err(|e| UpdateError::Invalid {
+            message: e.to_string(),
+        })?;
         let update = updater.check().await.map_err(classify_error)?;
         Ok(update.map(|u| Arc::new(PluginRelease::new(u)) as Arc<dyn PendingRelease>))
     }
@@ -134,19 +133,25 @@ impl PendingRelease for PluginRelease {
                 || {},
             )
             .await
-            .map_err(|e| UpdateError::Network { message: e.to_string() })
+            .map_err(|e| UpdateError::Network {
+                message: e.to_string(),
+            })
     }
 
     fn verify(&self, bytes: &[u8]) -> Result<(), UpdateError> {
         self.update
             .verify(bytes)
-            .map_err(|e| UpdateError::Verification { message: e.to_string() })
+            .map_err(|e| UpdateError::Verification {
+                message: e.to_string(),
+            })
     }
 
     fn install(&self, bytes: &[u8]) -> Result<(), UpdateError> {
         self.update
             .install(bytes)
-            .map_err(|e| UpdateError::Install { message: e.to_string() })
+            .map_err(|e| UpdateError::Install {
+                message: e.to_string(),
+            })
     }
 }
 
@@ -199,10 +204,8 @@ mod tests {
     /// just answered with something unusable.
     #[test]
     fn a_manifest_parse_failure_is_classified_as_invalid() {
-        let serde_error =
-            serde_json::from_str::<serde_json::Value>("{ not json").unwrap_err();
-        let classified =
-            classify_error(tauri_plugin_updater::Error::Serialization(serde_error));
+        let serde_error = serde_json::from_str::<serde_json::Value>("{ not json").unwrap_err();
+        let classified = classify_error(tauri_plugin_updater::Error::Serialization(serde_error));
         assert!(
             matches!(classified, UpdateError::Invalid { .. }),
             "got {classified:?}"
@@ -211,8 +214,7 @@ mod tests {
 
     #[test]
     fn a_download_failure_is_classified_as_a_network_failure() {
-        let classified =
-            classify_error(tauri_plugin_updater::Error::Network("status 500".into()));
+        let classified = classify_error(tauri_plugin_updater::Error::Network("status 500".into()));
         assert!(
             matches!(classified, UpdateError::Network { .. }),
             "got {classified:?}"

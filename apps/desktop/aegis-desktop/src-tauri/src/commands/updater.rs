@@ -13,9 +13,7 @@ use crate::updater::status::UpdateStatusDto;
 
 /// The current update status.
 #[tauri::command]
-pub async fn update_status(
-    service: State<'_, UpdateService>,
-) -> Result<UpdateStatusDto, ApiError> {
+pub async fn update_status(service: State<'_, UpdateService>) -> Result<UpdateStatusDto, ApiError> {
     let span = tracing::info_span!("command", command = "update_status");
     async move {
         tracing::info!("enter");
@@ -46,9 +44,7 @@ pub async fn check_for_updates(
 /// Installs the downloaded release. On Windows this never returns — the
 /// plugin launches the installer and exits the process.
 #[tauri::command]
-pub async fn install_ready_update(
-    service: State<'_, UpdateService>,
-) -> Result<(), ApiError> {
+pub async fn install_ready_update(service: State<'_, UpdateService>) -> Result<(), ApiError> {
     let span = tracing::info_span!("command", command = "install_ready_update");
     async move {
         tracing::info!("enter");

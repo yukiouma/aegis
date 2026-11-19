@@ -67,10 +67,7 @@ pub struct UpdateService {
 /// against the current manifest every time they are read back, so a
 /// truncated or tampered file is never installed.
 pub fn artifact_cache_path(data_dir: &Path, version: &str) -> PathBuf {
-    data_dir
-        .join("updates")
-        .join(version)
-        .join("artifact.bin")
+    data_dir.join("updates").join(version).join("artifact.bin")
 }
 
 /// True when `version` is safe to use as a directory name.
@@ -341,11 +338,7 @@ impl UpdateService {
 
     /// Reads the cached artifact for `version` and verifies it against the
     /// current release. `None` means "not cached, or not usable".
-    fn read_cached_artifact(
-        &self,
-        version: &str,
-        release: &dyn PendingRelease,
-    ) -> Option<Vec<u8>> {
+    fn read_cached_artifact(&self, version: &str, release: &dyn PendingRelease) -> Option<Vec<u8>> {
         if !is_cacheable_version(version) {
             return None;
         }
@@ -582,10 +575,7 @@ mod tests {
                 date: Some("2026-11-18T06:05:10Z".into()),
             }
         );
-        assert_eq!(
-            *f.notifier.sent.lock().unwrap(),
-            vec!["0.1.1".to_string()]
-        );
+        assert_eq!(*f.notifier.sent.lock().unwrap(), vec!["0.1.1".to_string()]);
         assert_eq!(f.downloads.load(Ordering::SeqCst), 1);
     }
 
