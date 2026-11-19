@@ -246,8 +246,8 @@ impl UpdateService {
 
         // The bytes: from the cache when they still verify, otherwise
         // freshly downloaded.
-        let bytes = match self.read_cached_artifact(&version, release.as_ref()) {
-            Some(bytes) => bytes,
+        let (bytes, from_cache) = match self.read_cached_artifact(&version, release.as_ref()) {
+            Some(bytes) => (bytes, true),
             None => {
                 self.set_status(UpdateStatus::Downloading {
                     version: version.clone(),
@@ -255,7 +255,7 @@ impl UpdateService {
                     total: None,
                 });
                 match self.download(release.as_ref(), &version).await {
-                    Ok(bytes) => bytes,
+                    Ok(bytes) => (bytes, false),
                     Err(e) => {
                         tracing::warn!(error = %e, "update download failed");
                         self.finish_check(UpdateStatus::Failed {
@@ -278,7 +278,12 @@ impl UpdateService {
             return self.status();
         }
 
-        self.write_cached_artifact(&version, &bytes);
+        // Only write what was just downloaded. An artifact that came
+        // from the cache is already on disk, and rewriting it on every
+        // launch would be pointless I/O.
+        if !from_cache {
+            self.write_cached_artifact(&version, &bytes);
+        }
         self.prune_cache(&version);
 
         let notes = release.notes().map(|n| n.to_string());
@@ -333,7 +338,10 @@ impl UpdateService {
             });
         };
 
-        release.download(&on_progress).await
+        release.download(&on_progress).await.map(|bytes| {
+            tracing::info!(version, bytes = bytes.len(), "update artifact downloaded");
+            bytes
+        })
     }
 
     /// Reads the cached artifact for `version` and verifies it against the
@@ -681,6 +689,51 @@ mod tests {
             "the cached artifact is reused"
         );
         assert!(matches!(dto.status, UpdateStatus::Ready { .. }));
+    }
+
+    /// An artifact that came from the cache is already on disk. Writing
+    /// it back would be pointless I/O on every launch.
+    #[tokio::test]
+    async fn a_cached_artifact_is_not_rewritten() {
+        let dir = tempfile::tempdir().unwrap();
+        let downloads = Arc::new(AtomicUsize::new(0));
+        let installs = Arc::new(AtomicUsize::new(0));
+
+        let build = || {
+            let announced = Arc::new(FakeRelease {
+                version: "0.1.1".into(),
+                bytes: b"package".to_vec(),
+                verify_fails: false,
+                downloads: downloads.clone(),
+                installs: installs.clone(),
+            }) as Arc<dyn PendingRelease>;
+            let source = Arc::new(FakeSource {
+                announced: Mutex::new(Some(announced)),
+                fail_with: Mutex::new(None),
+                checks: Arc::new(AtomicUsize::new(0)),
+            });
+            UpdateService::new(
+                "0.1.0".into(),
+                UpdateConfig::default(),
+                source,
+                Arc::new(RecordingNotifier {
+                    sent: Arc::new(Mutex::new(Vec::new())),
+                }),
+                dir.path().to_path_buf(),
+            )
+        };
+
+        let first = build();
+        first.check_now().await;
+
+        let cached = artifact_cache_path(dir.path(), "0.1.1");
+        let written_at = std::fs::metadata(&cached).unwrap().modified().unwrap();
+
+        let second = build();
+        second.check_now().await;
+
+        let still_at = std::fs::metadata(&cached).unwrap().modified().unwrap();
+        assert_eq!(written_at, still_at, "the cached artifact was rewritten");
     }
 
     #[tokio::test]
