@@ -675,25 +675,40 @@ release server, not a blocker for this design, and it is not required by it.
 It is, however, **the prerequisite for the plugin's own version binding**,
 and the two halves of that have to land together:
 
-- The release server signs with `--app-version`, so the trusted comment
-  carries `version:0.1.1`.
+- The release is built with a Tauri CLI of **2.12.0 or newer**, which records
+  the app version in the signature's trusted comment. `tauri build` fills it
+  in automatically; `tauri signer sign --app-version <version>` does it by
+  hand for an artifact that was signed separately. The CLI in this repository
+  is **2.11.4**, which predates the feature — its signatures carry no
+  `version:` field, and the 0.1.0 artifact is proof of that.
 - `tauri.conf.json`'s `plugins.updater.requireSignedVersion` is set to
   `true`, which makes the plugin reject a signature whose version does not
   match the announced one.
 
-Until the server signs that way, `requireSignedVersion` has to stay `false`:
-the plugin would reject the current signatures with `MissingSignedVersion`
-and no update would ever be offered. With the flag off, a release server
-that is compromised can make the app install an *older*, genuinely signed
-artifact — the manifest announces 0.2.0 and points at the signed 0.1.0
-installer, and the signature check passes because the bytes really are
-signed. The version binding closes that.
+Until the CLI is upgraded and the release signed that way,
+`requireSignedVersion` has to stay `false`: the plugin would reject the
+current signatures with `MissingSignedVersion` and no update would ever be
+offered. With the flag off, a release server that is compromised can make
+the app install an *older*, genuinely signed artifact — the manifest
+announces 0.2.0 and points at the signed 0.1.0 installer, and the signature
+check passes because the bytes really are signed. The version binding closes
+that.
 
 **(c) The endpoint is `http://localhost:3000/...`** with
 `dangerousInsecureTransportProtocol: true` — a development-only
 configuration that has to be repointed at the real release server before any
 of this ships. The desktop side needs the production URL; it cannot invent
 one.
+
+**(d) The manifest generator spells the platform map `plaftorms`.** The
+generator is `.data/release/desktop-release-build.js` (a local, gitignored
+script — not part of this repository's tracked source). It wrote the map
+under `plaftorms`, which the plugin ignores, and the manifest then failed to
+parse with "the 'url' field was not set on the updater response" — the
+`Failed` status the Settings row showed. The key is now `platforms`, and
+the generator refuses to write a manifest whose `platforms` map is missing
+or incomplete, so a misspelling fails at publish time instead of at update
+time.
 
 ## 8. Testing
 
