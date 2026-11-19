@@ -175,26 +175,36 @@ Transitions, all owned by `UpdateService`:
 ```
 Idle --check()--> Checking
 Checking --no update--> Idle
-Checking --error--> Failed
+Checking --error--> Failed   (or back to Ready, when a release is held)
 Checking --release found--> Downloading   (or straight to Ready, from the disk cache)
 Downloading --error--> Failed
-Downloading --bytes verified--> Ready   (emits `aegis:update-ready`)
+Downloading --bytes verified--> Ready
 Ready --install()--> Installing
 ```
+
+Every transition emits `aegis:update-status` with the new phase, so a window
+that is already open learns about a change it did not ask for — see §7.7.
 
 `Installing` is effectively terminal on Windows — `install` exits the process
 before the command returns — but it is kept as a real state so the
 macOS/Linux path, where the installer is launched but the app is not
 restarted, can report "installed, please restart" rather than falling back
-to `Ready`.
+to `Ready`. The Settings row does not render that phase yet: on Windows
+there is no row left to render it, and on macOS/Linux the message it would
+show is still missing.
 
-**`Ready` means downloaded *and verified*.** The plugin does not do this for
-us: `Update::download` returns raw bytes and performs no signature check —
-verification happens inside `Update::install`. Left alone, a tampered or
-corrupt artifact would only be caught after the user clicked "Update now".
-`Update::verify(&self, bytes)` is public, so the service calls it explicitly
-after the download and only transitions to `Ready` once it passes. A
-verification failure is a `Failed` status, not a `Ready` one.
+**`Ready` means downloaded *and verified*.** The plugin does verify the bytes
+it downloads — `Update::download` ends with a `verify` call in plugin 2.14.1
+— but the artifact can also come back from the disk cache, and those bytes
+were verified against an *earlier* manifest. `Update::verify(&self, bytes)`
+is public, so the service calls it explicitly on both paths and only
+transitions to `Ready` once it passes. A verification failure is a `Failed`
+status, not a `Ready` one.
+
+A failed check does **not** take a held release away. The status stays at
+`Ready` and the failure is reported in `last_error` alongside it: the
+artifact is on disk and verified, so `install_ready` would still work, and
+a `Failed` status would hide the one button the user has for it.
 
 Two rules make the flow non-repeating:
 
@@ -206,9 +216,10 @@ Two rules make the flow non-repeating:
   announces 0.1.5) would otherwise be downloaded and would fire a second
   prompt — a second dialog for a downgrade. Comparing versions needs semver
   ordering, so `semver` is added as a dependency of the desktop crate.
-- **One prompt per version per session.** The worker emits
-  `aegis:update-ready` exactly once per version, because the status only
-  leaves `Ready` on install.
+- **One prompt per version per session.** The status only leaves `Ready` on
+  install, and the prompt is derived from the status *and* the deferral
+  (§7.9), so a release the user deferred is not offered again — in this
+  session or in the next one.
 
 ### 7.3 The source trait
 
@@ -369,17 +380,25 @@ Two channels, for two different needs:
   status. The frontend reads this on mount, so an update that became ready
   *before* the webview subscribed is still seen. This is what makes the
   `setup()`-before-webview ordering safe.
-- **`aegis:update-ready` event → the main window.** A signal that the status
-  just changed to `Ready`, so an open window can react without polling. It is
+- **`aegis:update-status` event → the main window.** A signal that the status
+  moved to another phase, so an open window can react without polling. It is
   emitted with `Emitter::emit_to("main", ...)`, because the dialog belongs to
-  the main window and workspace windows have their own layout.
+  the main window and workspace windows have their own layout. The payload
+  is the new phase and nothing else.
 
 The frontend's listener invalidates the status query; the dialog's open state
 is *derived* from the query result, not from the event payload. That way
 there is exactly one source of truth and the two channels cannot disagree.
 
+The event fires on **every** phase change, not only on `Ready`. That is what
+makes the two channels worth having: a check that failed in the background
+and a download that started after the window opened both have to reach a
+window that is already showing the status, and neither is a `Ready`
+transition. A download reports its progress *within* the `Downloading` phase,
+so it does not fire the event again — the progress rides the query below.
+
 The status the command returns is not just the phase enum — the Settings row
-needs three more facts:
+needs four more facts:
 
 ```rust
 pub struct UpdateStatusDto {
@@ -389,6 +408,12 @@ pub struct UpdateStatusDto {
     /// When the last check completed, so the row can say "up to date" only
     /// after a real check rather than before the first one.
     pub last_checked_at: Option<String>,
+    /// The message of the most recent failed check.
+    ///
+    /// It is set even when the status could not become `Failed` — a check
+    /// that fails while a release is already held leaves the status at
+    /// `Ready`, and this is where that failure is reported.
+    pub last_error: Option<String>,
 }
 ```
 
@@ -397,11 +422,12 @@ and there is nothing newer" — without it the Settings row would claim the app
 is up to date before the first check has ever run. `chrono` is already a
 workspace dependency, so the timestamp needs no new crate.
 
-**Download progress.** The progress bar cannot ride on either of the two
-channels above: the query is never refetched on its own
-(`staleTime: Infinity`), and the event fires only on the transition *to*
-`Ready`. So the status query carries a `refetchInterval` that is active only
-while a download is actually running:
+**Download progress.** The progress bar cannot ride on the command alone: the
+query is never refetched on its own (`staleTime: Infinity`), so the frontend
+would never learn that a download had started. The event is what carries
+that news — the transition into `Downloading` invalidates the query, the
+refetch returns a `Downloading` status, and the query's `refetchInterval`
+then takes over:
 
 ```ts
 refetchInterval: (query) =>
@@ -494,11 +520,13 @@ which the artifact cache would have invalidated anyway.
 ### 7.10 Errors and logging
 
 Both the worker and the commands log through `tracing`, matching the rest of
-the desktop backend. A failed check sets the status to `Failed { message }`
-and logs; it does not retry until the next hourly cycle, and it does not
-surface a dialog — a failed background check is not an interruption. The
-Settings row shows the failure inline and the manual "Check for updates"
-button is the retry.
+the desktop backend. A failed check records the message in `last_error` and
+sets the status to `Failed { message }` — unless a release is already held,
+which leaves the status at `Ready` and the failure next to it (§7.2). It
+does not retry until the next hourly cycle, and it does not surface a
+dialog — a failed background check is not an interruption. The Settings row
+shows the failure inline and the manual "Check for updates" button is the
+retry.
 
 The updater has its own internal error type (`updater::UpdateError`) so the
 plugin's error variants are not leaked into the transport layer:
@@ -644,10 +672,28 @@ the `version:` field and let the plugin enforce the binding between the
 announced version and the signed artifact. That is a hardening step for the
 release server, not a blocker for this design, and it is not required by it.
 
+It is, however, **the prerequisite for the plugin's own version binding**,
+and the two halves of that have to land together:
+
+- The release server signs with `--app-version`, so the trusted comment
+  carries `version:0.1.1`.
+- `tauri.conf.json`'s `plugins.updater.requireSignedVersion` is set to
+  `true`, which makes the plugin reject a signature whose version does not
+  match the announced one.
+
+Until the server signs that way, `requireSignedVersion` has to stay `false`:
+the plugin would reject the current signatures with `MissingSignedVersion`
+and no update would ever be offered. With the flag off, a release server
+that is compromised can make the app install an *older*, genuinely signed
+artifact — the manifest announces 0.2.0 and points at the signed 0.1.0
+installer, and the signature check passes because the bytes really are
+signed. The version binding closes that.
+
 **(c) The endpoint is `http://localhost:3000/...`** with
 `dangerousInsecureTransportProtocol: true` — a development-only
 configuration that has to be repointed at the real release server before any
-of this ships.
+of this ships. The desktop side needs the production URL; it cannot invent
+one.
 
 ## 8. Testing
 
@@ -657,13 +703,16 @@ of this ships.
   not leave `Ready`.
 - `service.rs` — against `FakeUpdateSource`: check finds nothing → `Idle`;
   check finds a release → `Downloading` → `Ready`; a second cycle for the
-  same version does not download again and does not emit again; an *older*
-  announced version does not replace the pending one; a download error →
-  `Failed`; a verification failure → `Failed`, not `Ready`; a cached
-  artifact verifies and skips the download; a cached artifact that fails
-  verification is discarded and re-downloaded; `install_ready` calls
-  `PendingRelease::install` with the downloaded bytes and errors when there
-  is nothing ready; a second check while one is in flight is a no-op.
+  same version does not download again; an *older* announced version does
+  not replace the pending one; a download error → `Failed`; a verification
+  failure → `Failed`, not `Ready`; a cached artifact verifies and skips the
+  download; a cached artifact that fails verification is discarded and
+  re-downloaded; `install_ready` calls `PendingRelease::install` with the
+  downloaded bytes and errors when there is nothing ready; a second check
+  while one is in flight is a no-op; a failed check keeps a held release
+  ready and reports the failure in `last_error`; every phase change tells
+  the frontend to read the status again; a check that panics does not stop
+  the hourly loop; a poisoned state mutex does not break the status read.
 - `source.rs` — `PluginRelease` maps the plugin's `Update` to the exposed
   version / notes / date.
 - A **manifest-shape contract test** that pins the plugin's expected
@@ -685,7 +734,10 @@ of this ships.
 - `UpdateStatusRow` — shows "up to date" only after a check has completed;
   shows "update available" with the version; shows download progress; and
   the "Check for updates" button triggers a check.
-- The event listener invalidates the status query.
+- The event listener invalidates the status query, and the status query
+  polls again while a download is running.
+- A failed install leaves no unhandled rejection behind — the webview log
+  ships those to the server.
 
 ## 9. Verification gate
 
