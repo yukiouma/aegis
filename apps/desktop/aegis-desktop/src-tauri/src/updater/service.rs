@@ -338,10 +338,9 @@ impl UpdateService {
             });
         };
 
-        release.download(&on_progress).await.map(|bytes| {
-            tracing::info!(version, bytes = bytes.len(), "update artifact downloaded");
-            bytes
-        })
+        let bytes = release.download(&on_progress).await?;
+        tracing::info!(version, bytes = bytes.len(), "update artifact downloaded");
+        Ok(bytes)
     }
 
     /// Reads the cached artifact for `version` and verifies it against the
