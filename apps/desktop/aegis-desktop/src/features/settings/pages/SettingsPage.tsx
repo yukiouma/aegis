@@ -4,9 +4,6 @@ import {
   Alert,
   Box,
   Button,
-  Card,
-  CardContent,
-  CardHeader,
   Dialog,
   DialogActions,
   DialogContent,
@@ -31,6 +28,7 @@ import {
   useInstallUpdate,
   useUpdateStatus,
 } from "../../updater";
+import { SettingsSection } from "../components/SettingsSection";
 import { useUpdatePassword } from "../data/update-password";
 import { errorMessage } from "../../../shared/api/error";
 
@@ -123,83 +121,85 @@ export function SettingsPage() {
       <Typography variant="h4" gutterBottom>
         {t("settings.heading")}
       </Typography>
-      <FormControl size="small" sx={{ minWidth: 160 }}>
-        <InputLabel id="theme-label">
-          {themeLabel}
-        </InputLabel>
-        <Select<ThemeMode>
-          labelId="theme-label"
-          value={mode}
-          label={themeLabel}
-          onChange={handleThemeSelect}
-        >
-          {THEME_OPTIONS.map((id) => (
-            <MenuItem key={id} value={id}>
-              {t(`settings.theme.${id}`)}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-      <FormControl size="small" sx={{ minWidth: 160 }}>
-        <InputLabel id="language-label">
-          {t("settings.language.label")}
-        </InputLabel>
-        <Select<Locale>
-          labelId="language-label"
-          value={locale}
-          label={t("settings.language.label")}
-          onChange={handleLanguageChange}
-        >
-          <MenuItem value="en">{t("language.english")}</MenuItem>
-          <MenuItem value="zh-CN">{t("language.simplifiedChinese")}</MenuItem>
-        </Select>
-      </FormControl>
 
-      {/* The version section: the running version, what the updater is
-          doing, and the two actions. It is a labelled region so the
-          version information and its buttons are one thing to find. */}
-      <Card
-        component="section"
-        aria-labelledby="settings-version-section"
-        sx={{ maxWidth: 480 }}
+      {/* General comes first: the appearance controls and the password
+          action, then the version section with the updater's own
+          actions. */}
+      <SettingsSection
+        id="settings-general-section"
+        title={t("settings.general.section")}
       >
-        <CardHeader
-          title={
-            <Typography id="settings-version-section" variant="h6">
-              {t("settings.version.section")}
-            </Typography>
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            alignItems: "flex-start",
+          }}
+        >
+          <FormControl size="small" sx={{ width: '100%' }}>
+            <InputLabel id="theme-label">
+              {themeLabel}
+            </InputLabel>
+            <Select<ThemeMode>
+              labelId="theme-label"
+              value={mode}
+              label={themeLabel}
+              onChange={handleThemeSelect}
+            >
+              {THEME_OPTIONS.map((id) => (
+                <MenuItem key={id} value={id}>
+                  {t(`settings.theme.${id}`)}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ width: '100%' }}>
+            <InputLabel id="language-label">
+              {t("settings.language.label")}
+            </InputLabel>
+            <Select<Locale>
+              labelId="language-label"
+              value={locale}
+              label={t("settings.language.label")}
+              onChange={handleLanguageChange}
+            >
+              <MenuItem value="en">{t("language.english")}</MenuItem>
+              <MenuItem value="zh-CN">{t("language.simplifiedChinese")}</MenuItem>
+            </Select>
+          </FormControl>
+          <Button
+            variant="outlined"
+            color="warning"
+            onClick={openPasswordDialog}
+          >
+            {t("settings.password.button")}
+          </Button>
+        </Box>
+      </SettingsSection>
+
+      <SettingsSection
+        id="settings-version-section"
+        title={t("settings.version.section")}
+      >
+        <UpdateStatusRow
+          status={updateStatus.data?.status}
+          currentVersion={updateStatus.data?.currentVersion ?? ""}
+          lastCheckedAt={updateStatus.data?.lastCheckedAt ?? null}
+          lastError={updateStatus.data?.lastError ?? null}
+          onCheck={() => void checkForUpdates.mutate()}
+          onInstall={() => void installUpdate.mutate()}
+          checking={checkForUpdates.isPending}
+          installing={installUpdate.isPending}
+          errorMessage={
+            checkForUpdates.isError
+              ? errorMessage(checkForUpdates.error)
+              : installUpdate.isError
+                ? errorMessage(installUpdate.error)
+                : null
           }
         />
-        <CardContent>
-          <UpdateStatusRow
-            status={updateStatus.data?.status}
-            currentVersion={updateStatus.data?.currentVersion ?? ""}
-            lastCheckedAt={updateStatus.data?.lastCheckedAt ?? null}
-            lastError={updateStatus.data?.lastError ?? null}
-            onCheck={() => void checkForUpdates.mutate()}
-            onInstall={() => void installUpdate.mutate()}
-            checking={checkForUpdates.isPending}
-            installing={installUpdate.isPending}
-            errorMessage={
-              checkForUpdates.isError
-                ? errorMessage(checkForUpdates.error)
-                : installUpdate.isError
-                  ? errorMessage(installUpdate.error)
-                  : null
-            }
-          />
-        </CardContent>
-      </Card>
-
-      <Box>
-        <Button
-          variant="outlined"
-          color="warning"
-          onClick={openPasswordDialog}
-        >
-          {t("settings.password.button")}
-        </Button>
-      </Box>
+      </SettingsSection>
 
       <Dialog
         open={passwordDialogOpen}

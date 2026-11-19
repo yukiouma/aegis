@@ -468,7 +468,11 @@ src/features/updater/components/index.ts
   section** — a card with a `Version` heading that holds the version
   information and both update buttons together, so the running version,
   what the updater is doing and the actions are one thing to find rather
-  than three loose lines on the page. Following the repo's drawer/dialog
+  than three loose lines on the page. The page's other controls live in a
+  **General** section above it (appearance, language, password), so the
+  page is two cards: General, then Version. Each card is a real
+  `<section>` named by its own heading, so the section is one thing to
+  find for assistive technology too. Following the repo's drawer/dialog
   convention, the page owns the hooks (`useUpdateStatus`,
   `useCheckForUpdates`, `useInstallUpdate`) and passes the values down as
   props; the component itself imports no API module.

@@ -22,6 +22,7 @@ export const zhCN = {
   'settings.theme.totoro': 'Totoro',
   'settings.theme.xi': 'XI',
   'settings.language.label': '语言',
+  'settings.general.section': '常规',
   'settings.version.section': '版本',
   'settings.password.button': '修改密码',
   'settings.password.dialog.title': '修改密码',

@@ -44,6 +44,40 @@ function userViewFixture() {
   };
 }
 
+describe("SettingsPage — general section", () => {
+  it("puts the appearance controls and the password action in the General section", async () => {
+    mockCommands({
+      current_user: () => userViewFixture(),
+    });
+    await renderSettings();
+    const general = await screen.findByRole("region", { name: /^general$/i });
+    expect(within(general).getByLabelText(/theme/i)).toBeInTheDocument();
+    expect(within(general).getByLabelText(/language/i)).toBeInTheDocument();
+    expect(
+      within(general).getByRole("button", { name: /update password/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("puts the General section before the Version section", async () => {
+    mockCommands({
+      current_user: () => userViewFixture(),
+      update_status: () => ({
+        status: { kind: "idle" },
+        currentVersion: "0.1.2",
+        lastCheckedAt: "2026-11-18T06:05:10Z",
+        lastError: null,
+      }),
+    });
+    await renderSettings();
+    const general = await screen.findByRole("region", { name: /^general$/i });
+    const version = await screen.findByRole("region", { name: /^version$/i });
+    expect(
+      general.compareDocumentPosition(version) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+});
+
 describe("SettingsPage — version section", () => {
   it("puts the version information and the update actions in the Version section", async () => {
     mockCommands({
