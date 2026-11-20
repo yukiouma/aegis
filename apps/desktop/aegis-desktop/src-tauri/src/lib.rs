@@ -11,6 +11,7 @@ mod scaffold;
 mod state;
 mod system;
 mod trace_id_setup;
+mod updater;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -20,6 +21,7 @@ fn greet(name: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> Result<(), Box<dyn std::error::Error>> {
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
@@ -133,6 +135,10 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
             commands::structures::delete_structure_node,
             // scaffold
             commands::scaffold::initialize_project_folder,
+            // updater
+            commands::updater::update_status,
+            commands::updater::check_for_updates,
+            commands::updater::install_ready_update,
             // health
             commands::healthz::healthz,
             // webview log forwarder (sink for console.warn / console.error)
@@ -164,6 +170,21 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .path()
                 .app_data_dir()
                 .map_err(|e| format!("app_data_dir: {e}"))?;
+
+            // The update worker. One per process: the frontend is loaded
+            // in every window, so a frontend-owned timer would check and
+            // download once per open window.
+            let handle = app.handle().clone();
+            let update_service = updater::service::UpdateService::new(
+                handle.package_info().version.to_string(),
+                updater::service::UpdateConfig::default(),
+                std::sync::Arc::new(updater::source::PluginUpdateSource::new(handle.clone())),
+                std::sync::Arc::new(updater::notifier::TauriNotifier::new(handle)),
+                app_data_dir.clone(),
+            );
+            app.manage(update_service.clone());
+            tauri::async_runtime::spawn(async move { update_service.run().await });
+
             let generator = trace_id_setup::load_or_create(&app_data_dir);
             tracing::info!(
                 device_prefix_file = %app_data_dir

@@ -48,5 +48,7 @@ export function errorMessage(e: unknown): string {
       return err.message;
     case "parse":
       return err.message;
+    case "update":
+      return err.message;
   }
 }

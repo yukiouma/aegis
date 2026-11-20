@@ -15,6 +15,7 @@ import {
 import { useI18n } from "@aegis/ui/i18n";
 import { useCurrentUser } from "../../auth";
 import { UserFooter } from "../../auth/components/UserFooter";
+import { UpdateReadyDialog } from "../../updater";
 
 const HomeMenuIcon = () => <HomeIcon />;
 const ProjectsMenuIcon = () => <WorkspacesIcon />;
@@ -105,6 +106,7 @@ export function AppLayout() {
           transition: "margin 0.3s",
         }}
       >
+        <UpdateReadyDialog />
         <Outlet />
       </Box>
     </Box>

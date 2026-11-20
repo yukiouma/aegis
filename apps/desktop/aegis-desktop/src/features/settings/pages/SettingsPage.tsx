@@ -22,6 +22,13 @@ import { useThemeMode, type ThemeMode } from "@aegis/ui/theme";
 
 import { useCurrentUser } from "../../auth/data/current-user";
 import { useLogout } from "../../auth/data/logout";
+import {
+  UpdateStatusRow,
+  useCheckForUpdates,
+  useInstallUpdate,
+  useUpdateStatus,
+} from "../../updater";
+import { SettingsSection } from "../components/SettingsSection";
 import { useUpdatePassword } from "../data/update-password";
 import { errorMessage } from "../../../shared/api/error";
 
@@ -32,6 +39,9 @@ export function SettingsPage() {
   const currentUser = useCurrentUser();
   const updatePassword = useUpdatePassword();
   const logout = useLogout();
+  const updateStatus = useUpdateStatus();
+  const checkForUpdates = useCheckForUpdates();
+  const installUpdate = useInstallUpdate();
 
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
@@ -111,47 +121,85 @@ export function SettingsPage() {
       <Typography variant="h4" gutterBottom>
         {t("settings.heading")}
       </Typography>
-      <FormControl size="small" sx={{ minWidth: 160 }}>
-        <InputLabel id="theme-label">
-          {themeLabel}
-        </InputLabel>
-        <Select<ThemeMode>
-          labelId="theme-label"
-          value={mode}
-          label={themeLabel}
-          onChange={handleThemeSelect}
-        >
-          {THEME_OPTIONS.map((id) => (
-            <MenuItem key={id} value={id}>
-              {t(`settings.theme.${id}`)}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-      <FormControl size="small" sx={{ minWidth: 160 }}>
-        <InputLabel id="language-label">
-          {t("settings.language.label")}
-        </InputLabel>
-        <Select<Locale>
-          labelId="language-label"
-          value={locale}
-          label={t("settings.language.label")}
-          onChange={handleLanguageChange}
-        >
-          <MenuItem value="en">{t("language.english")}</MenuItem>
-          <MenuItem value="zh-CN">{t("language.simplifiedChinese")}</MenuItem>
-        </Select>
-      </FormControl>
 
-      <Box>
-        <Button
-          variant="outlined"
-          color="warning"
-          onClick={openPasswordDialog}
+      {/* General comes first: the appearance controls and the password
+          action, then the version section with the updater's own
+          actions. */}
+      <SettingsSection
+        id="settings-general-section"
+        title={t("settings.general.section")}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            alignItems: "flex-start",
+          }}
         >
-          {t("settings.password.button")}
-        </Button>
-      </Box>
+          <FormControl size="small" sx={{ width: '100%' }}>
+            <InputLabel id="theme-label">
+              {themeLabel}
+            </InputLabel>
+            <Select<ThemeMode>
+              labelId="theme-label"
+              value={mode}
+              label={themeLabel}
+              onChange={handleThemeSelect}
+            >
+              {THEME_OPTIONS.map((id) => (
+                <MenuItem key={id} value={id}>
+                  {t(`settings.theme.${id}`)}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl size="small" sx={{ width: '100%' }}>
+            <InputLabel id="language-label">
+              {t("settings.language.label")}
+            </InputLabel>
+            <Select<Locale>
+              labelId="language-label"
+              value={locale}
+              label={t("settings.language.label")}
+              onChange={handleLanguageChange}
+            >
+              <MenuItem value="en">{t("language.english")}</MenuItem>
+              <MenuItem value="zh-CN">{t("language.simplifiedChinese")}</MenuItem>
+            </Select>
+          </FormControl>
+          <Button
+            variant="outlined"
+            color="warning"
+            onClick={openPasswordDialog}
+          >
+            {t("settings.password.button")}
+          </Button>
+        </Box>
+      </SettingsSection>
+
+      <SettingsSection
+        id="settings-version-section"
+        title={t("settings.version.section")}
+      >
+        <UpdateStatusRow
+          status={updateStatus.data?.status}
+          currentVersion={updateStatus.data?.currentVersion ?? ""}
+          lastCheckedAt={updateStatus.data?.lastCheckedAt ?? null}
+          lastError={updateStatus.data?.lastError ?? null}
+          onCheck={() => void checkForUpdates.mutate()}
+          onInstall={() => void installUpdate.mutate()}
+          checking={checkForUpdates.isPending}
+          installing={installUpdate.isPending}
+          errorMessage={
+            checkForUpdates.isError
+              ? errorMessage(checkForUpdates.error)
+              : installUpdate.isError
+                ? errorMessage(installUpdate.error)
+                : null
+          }
+        />
+      </SettingsSection>
 
       <Dialog
         open={passwordDialogOpen}

@@ -94,6 +94,16 @@ describe("AppLayout (authenticated)", () => {
       screen.getByRole("heading", { level: 4, name: /home/i }),
     ).toBeInTheDocument();
   });
+
+  // The update prompt mounts here, so the authenticated shell of the
+  // main window is the only place a release is ever offered.
+  it("reads the update status", async () => {
+    await renderRoot(["/"]);
+
+    await waitFor(() =>
+      expect(mockInvoke).toHaveBeenCalledWith("update_status"),
+    );
+  });
 });
 
 describe("AppLayout (role-based menu visibility)", () => {

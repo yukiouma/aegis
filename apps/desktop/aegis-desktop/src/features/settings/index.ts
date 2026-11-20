@@ -6,6 +6,10 @@ export {
   persistSettings,
   readActiveBranch,
   writeActiveBranch,
+  readUpdateDeferral,
+  writeUpdateDeferral,
 } from "./data/persist";
 
 export { useUpdatePassword } from "./data/update-password";
+
+export { SettingsSection } from "./components";

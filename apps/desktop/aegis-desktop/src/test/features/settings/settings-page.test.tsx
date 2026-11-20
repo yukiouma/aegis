@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { AegisI18nProvider } from "@aegis/ui/i18n";
 import { AegisThemeProvider } from "@aegis/ui/theme";
@@ -43,6 +43,68 @@ function userViewFixture() {
     updatedAt: "2026-01-01T00:00:00Z",
   };
 }
+
+describe("SettingsPage — general section", () => {
+  it("puts the appearance controls and the password action in the General section", async () => {
+    mockCommands({
+      current_user: () => userViewFixture(),
+    });
+    await renderSettings();
+    const general = await screen.findByRole("region", { name: /^general$/i });
+    expect(within(general).getByLabelText(/theme/i)).toBeInTheDocument();
+    expect(within(general).getByLabelText(/language/i)).toBeInTheDocument();
+    expect(
+      within(general).getByRole("button", { name: /update password/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("puts the General section before the Version section", async () => {
+    mockCommands({
+      current_user: () => userViewFixture(),
+      update_status: () => ({
+        status: { kind: "idle" },
+        currentVersion: "0.1.2",
+        lastCheckedAt: "2026-11-18T06:05:10Z",
+        lastError: null,
+      }),
+    });
+    await renderSettings();
+    const general = await screen.findByRole("region", { name: /^general$/i });
+    const version = await screen.findByRole("region", { name: /^version$/i });
+    expect(
+      general.compareDocumentPosition(version) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+});
+
+describe("SettingsPage — version section", () => {
+  it("puts the version information and the update actions in the Version section", async () => {
+    mockCommands({
+      current_user: () => userViewFixture(),
+      update_status: () => ({
+        status: { kind: "ready", version: "0.1.1", notes: null, date: null },
+        currentVersion: "0.1.0",
+        lastCheckedAt: "2026-11-18T06:05:10Z",
+        lastError: null,
+      }),
+    });
+    await renderSettings();
+    const section = await screen.findByRole("region", { name: /^version$/i });
+    expect(
+      within(section).getByText("Installed version: 0.1.0"),
+    ).toBeInTheDocument();
+    expect(
+      within(section).getByText("Update available: 0.1.1"),
+    ).toBeInTheDocument();
+    expect(
+      within(section).getByRole("button", { name: /update now/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(section).getByRole("button", { name: /check for updates/i }),
+    ).toBeInTheDocument();
+  });
+});
 
 describe("SettingsPage — update password", () => {
   it("renders the Update password button", async () => {

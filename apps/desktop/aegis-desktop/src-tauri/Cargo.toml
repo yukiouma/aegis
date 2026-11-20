@@ -24,7 +24,10 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri-plugin-store = "2"
 reqwest = { workspace = true }
-tokio = { workspace = true }
+# The `time` feature is needed by the updater worker's hourly sleep.
+# `tauri` enables `tokio` without it, so it is declared here, on the
+# crate that needs it, rather than on the workspace entry.
+tokio = { workspace = true, features = ["time"] }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
 chrono = { workspace = true }
@@ -41,6 +44,11 @@ tauri-plugin-dialog = "2"
 # middle segment of every trace id. Workspace-pinned so the same
 # version is used by any future crate that wants to mint ids.
 nanoid = { workspace = true }
+# `semver` orders the version the release server announces against the
+# version the updater already holds, so a server-side rollback is never
+# mistaken for a newer release. Not a shared workspace dependency —
+# only the desktop updater needs it.
+semver = "1"
 # `tracing` is the logging facade the desktop backend emits through.
 # Every command shim logs `enter` / `success` / `failed` events on a
 # span that carries `trace_id`; HttpClient emits request lines.
@@ -65,6 +73,9 @@ scaffolding = { path = "../../../../lib/crates/scaffolding" }
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-utils = { path = "../../../../lib/crates/windows-utils" }
 
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-updater = "2.14.1"
+
 
 [dev-dependencies]
 wiremock = "0.6"
@@ -73,3 +84,8 @@ tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
 # `tracing_init` and `trace_id_setup` tests don't touch the repo
 # working tree.
 tempfile = { workspace = true }
+# The updater's error classification test builds the plugin's signature
+# failure, which wraps a `minisign_verify::Error`. The crate is already
+# in the tree through `tauri-plugin-updater`; this makes it nameable
+# from a test.
+minisign-verify = "0.3"

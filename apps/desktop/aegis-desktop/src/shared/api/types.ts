@@ -23,7 +23,36 @@ export type ApiError =
   | { kind: "refreshFailed" }
   | { kind: "notImplemented"; detail: string }
   | { kind: "store"; message: string }
-  | { kind: "parse"; message: string };
+  | { kind: "parse"; message: string }
+  | { kind: "update"; message: string };
+
+// Mirrors `updater::status::UpdateStatus`. The Rust enum is tagged with
+// `kind = "camelCase"`, so the wire form is
+// `{ kind: "ready", version: "...", ... }`.
+export type UpdateStatus =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | {
+      kind: "downloading";
+      version: string;
+      downloaded: number;
+      total: number | null;
+    }
+  | { kind: "ready"; version: string; notes: string | null; date: string | null }
+  | { kind: "installing"; version: string }
+  | { kind: "failed"; message: string };
+
+// Mirrors `updater::status::UpdateStatusDto`.
+export interface UpdateStatusDto {
+  status: UpdateStatus;
+  currentVersion: string;
+  lastCheckedAt: string | null;
+  // The message of the most recent failed check. It is set even when
+  // the status could not become `failed` — a check that fails while an
+  // update is already held leaves the status at `ready`, and this is
+  // where that failure is reported.
+  lastError: string | null;
+}
 
 // Mirrors `commands::webview_log::WebviewLogLevel`. The Rust enum
 // uses `#[serde(rename_all = "lowercase")]`, so the wire form is

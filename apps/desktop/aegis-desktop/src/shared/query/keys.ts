@@ -91,4 +91,7 @@ export const queryKeys = {
     list: (level: StructureLevel) => ["structures", "list", level] as const,
     detail: (id: number) => ["structures", "detail", id] as const,
   },
+  updater: {
+    status: () => ["updater", "status"] as const,
+  },
 } as const;
