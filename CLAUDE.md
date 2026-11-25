@@ -92,7 +92,3 @@ cargo test -p aegis-desktop --lib http::auth::tests::login_persists_tokens
 pnpm --filter @aegis/ui typecheck
 pnpm --filter @aegis/ui test
 ```
-
-## Spec & plan history
-
-Past design decisions live in `docs/superpowers/` — one dated `-design.md` spec and `-plan.md` per feature. When working on an established area (`terminology`, `domain-model`, `aegis-desktop-sdtm-domain-list`, …) the spec from the same date range is the cheapest way to learn the *intent* behind the current shape.
